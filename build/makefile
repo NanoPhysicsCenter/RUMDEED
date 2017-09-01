@@ -3,12 +3,35 @@
 # 12.10.09
 
 # Compiler to use
+ifndef FCOMPILER
 FCOMPILER=ifort
+#FCOMPILER=gfortran
+#FCOMPILER=pgfortran
+endif
+
 
 # Compile flags
-#FFLAGS=-O2 -parallel -xHost -openmp -mcmodel=large -shared-intel
+# UNKNOWN COMPILERS
+FFLAGS=-O2
+
+# INTEL FORTRAN
+ifeq ($(FCOMPILER),ifort)
+$(info Using Intel Fortran)
 FFLAGS=-O2 -xHost -qopenmp -ip -ipo
-#FFLAGS=-check all -g -warn all -openmp
+#FFLAGS=-check all -g -warn all -qopenmp
+endif
+
+# GNU FORTRAN
+ifeq ($(FCOMPILER),gfortran)
+$(info Using GNU Fortran)
+FFLAGS=-O3 -fopenmp -ffast-math -m64 -funroll-loops -flto -march=native
+endif
+
+# PGI FORTRAN
+ifeq ($(FCOMPILER),pgfortran)
+$(info Using PGI Fortran)
+FFLAGS=-O2 -mp
+endif
 
 # Name of the output file
 PROJECT_NAME=Vacuum-MD

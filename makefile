@@ -4,9 +4,9 @@
 
 all:
 	cd build; make all
-sol:
-	cd build; make sol
 clean:
 	cd build; make clean
+test:
+	cd tests; ./compilers.py
 install:
 	cd build; make install
