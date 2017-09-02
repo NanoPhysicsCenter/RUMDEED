@@ -1,10 +1,10 @@
 # Makefile for docs
 
 all:
-	lualatex Notes-FE.tex
-	biber Notes-FE
-	lualatex Notes-FE.tex
-	lualatex Notes-FE.tex
+	lualatex notes.tex
+	biber notes
+	lualatex notes.tex
+	lualatex notes.tex
 
 clean:
 	rm -f *.log
