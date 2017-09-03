@@ -1,10 +1,16 @@
 # Makefile for docs
 
-all:
+all: notes.pdf
+
+notes.pdf: notes.tex notes.bbl notes.aux figures/coords.tikz
 	lualatex notes.tex
+	lualatex notes.tex
+
+notes.aux: notes.tex
+	lualatex notes.tex
+
+notes.bbl: notes-ref.bib notes.aux
 	biber notes
-	lualatex notes.tex
-	lualatex notes.tex
 
 clean:
 	rm -f *.log

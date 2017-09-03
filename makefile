@@ -10,3 +10,5 @@ test:
 	cd tests; ./compilers.py
 install:
 	cd build; make install
+doc:
+	cd doc; make all
