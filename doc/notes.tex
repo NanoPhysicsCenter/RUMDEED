@@ -80,6 +80,29 @@ where \(v_0\) is the initial velocity.
   In program \(L = 1.0*10^{-9}\,\mathrm{m}\) and \(T = 1.0*10^{-12}\,\mathrm{s}\),
   i.e. lengths are scaled in nano-meters and time in pico-seconds.
 
+  For the Coulomb force we have,
+  \begin{equation}
+    F_1 = \frac{q_1 q_2}{4\pi\epsilon} \frac{x_1 - x_2}{|x_1 - x_2|^3}\, .
+  \end{equation}
+  Setting \(x = L\bar{x}\) gives
+  \begin{equation}
+    F_1 = \frac{q_1 q_2}{4\pi\epsilon} \frac{1}{L^2} \frac{\bar{x}_1 - \bar{x}_2}{|\bar{x}_1 - \bar{x}_2|^3}\, .
+  \end{equation}
+  We wish to find the acceleration using \(F = ma = m\frac{L}{T^2}\bar{a}\) or
+  \begin{equation}
+    \bar{a}_1 = \frac{q_1 q_2}{4\pi\epsilon} \frac{T^2}{L^3} \frac{\bar{x}_1 - \bar{x}_2}{|\bar{x}_1 - \bar{x}_2|^3}\, .
+  \end{equation}
+
+  The acceleration from the electric field in the system is given by,
+  \begin{equation}
+    F = qE = q\frac{V}{d}\, ,
+  \end{equation}
+  where \(d\) is the gap spacing and \(V\) the voltage over the gap.
+  We set \(d = L\bar{d}\) and \(F = m\frac{L}{T^2}\) and obtain,
+  \begin{equation}
+    \bar{a} \frac{qV}{m\bar{d}} \frac{T^2}{L^2}\, .
+  \end{equation}
+
 \section{Field Emission}
 \subsection{Fowler-Nordheim equation}
 \begin{equation}
@@ -317,7 +340,7 @@ Calculated iteratively
   Define the base radius \(R\) and height of the tip \(h\) from the base (See Figure~\ref{fig:coords_Rh}).
   \begin{figure}
     \centering
-    \input{Figures/coords.tikz}
+    \input{figures/coords.tikz}
     \caption{Coordinates}
     \label{fig:coords_Rh}
   \end{figure}
