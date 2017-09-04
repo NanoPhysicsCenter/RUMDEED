@@ -16,7 +16,12 @@ MKLINCLUDE=$(MKLROOT)/include
 
 # Compile flags
 # UNKNOWN COMPILERS
+ifndef FFLAGS
 FFLAGS=-O2
+endif
+ifndef MKL_LIBS
+MKL_LIBS=-lmkl_intel_lp64 -lmkl_core -lmkl_intel_thread
+endif
 
 # INTEL FORTRAN
 ifeq ($(FCOMPILER),ifort)
