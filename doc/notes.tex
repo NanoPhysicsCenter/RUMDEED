@@ -100,9 +100,25 @@ where \(v_0\) is the initial velocity.
   where \(d\) is the gap spacing and \(V\) the voltage over the gap.
   We set \(d = L\bar{d}\) and \(F = m\frac{L}{T^2}\) and obtain,
   \begin{equation}
-    \bar{a} \frac{qV}{m\bar{d}} \frac{T^2}{L^2}\, .
+    \bar{a} = \frac{qV}{m\bar{d}} \frac{T^2}{L^2}\, .
   \end{equation}
 
+  \subsection{Unit Test Case}
+  Two electrons and one hole.\\
+  Fyrst electron: \(x_1 = 10\,\mathrm{nm}\), \(y_1 = 3\,\mathrm{nm}\), \(z_1 = 100\,\mathrm{nm}\).\\
+  Second electron: \(x_2 = 35\,\mathrm{nm}\), \(y_2 = -7\,\mathrm{nm}\), \(z_2 = 10\,\mathrm{nm}\).\\
+  The hole: \(x_3 = -12\,\mathrm{nm}\), \(y_3 = 0\,\mathrm{nm}\), \(z_3 = 50\,\mathrm{nm}\).\\
+  Parameters: \(d 100\,\mathrm{nm}\), \(V = 2\,\mathrm{V}\), \(\Delta t = 0.25\,\mathrm{ps}\).
+
+  The acceleration of the fyrst electron is
+  \begin{equation}
+    \mathbf{a}_{12} = \frac{e^2}{4\pi\epsilon_0} \frac{\mathbf{R}_1 - \mathbf{R}_2}{|\mathbf{R}_1 - \mathbf{R}_2|^3}
+  \end{equation}
+  \begin{equation}
+    \mathbf{a}_{13} = \frac{e^2}{4\pi\epsilon_0} \frac{\mathbf{R}_1 - \mathbf{R}_3}{|\mathbf{R}_1 - \mathbf{R}_3|^3}
+  \end{equation}
+
+\clearpage
 \section{Field Emission}
 \subsection{Fowler-Nordheim equation}
 \begin{equation}
@@ -165,8 +181,6 @@ The field is scaled by the vacuum field \(E_0 = -V_0/d\), we then obtain
 \end{equation}
 Calculated iteratively
 
-
-\cleardoublepage
 \subsection{Prolate spheroidal coordinates}
   The prolate spheroidal coordinates are defined as
   \begin{equation}\begin{split}
@@ -264,7 +278,7 @@ Calculated iteratively
   \end{equation}
 %
 %
-\subsection{Electric field for hyperbolid tip}
+\subsubsection{Electric Field for Hyperbolid Tip}
   The vector potential is~\cite{pan:2151}
   \begin{equation}
     V(\eta) = V_0 \frac{\ln{\left[ \frac{1 + \eta_1}{1-\eta_1}\frac{1-\eta}{1+\eta} \right]}}{\ln{\left[ \frac{1+\eta_1}{1-\eta_1}\frac{1-\eta_2}{1+\eta_2} \right]}}\, .
@@ -297,7 +311,7 @@ Calculated iteratively
     E_z = \frac{2V_0}{a} \frac{1}{1 - \eta_1^2} \frac{1}{\ln \left[ \frac{1+\eta_1}{1-\eta_1} \right]}\, .
   \end{equation}
 %
-\subsection{Area calculations for hyperbolid tip}
+\subsubsection{Area Calculations for Hyperbolid Tip}
   The Surface area is given by the integral
   \begin{equation}
     A = \int_{\xi_1}^{\xi_2} \int_{\phi_1}^{\phi_2} h_{\xi} h_{\phi}\, \ud\xi \ud\phi\, .
@@ -311,7 +325,7 @@ Calculated iteratively
     A = \frac{a^2}{2} \sqrt{1-\eta^2} (\phi_2 - \phi_1) \left[ \xi \sqrt{\xi^2 - \eta^2} - \eta^2 \ln\left(\xi + \sqrt{\xi^2 - \eta^2}\right) \right]_{\xi_1}^{\xi_2}
   \end{equation}
 %
-\subsection{Arc length}
+\subsubsection{Arc length}
   To find the arc length use
   \begin{equation}\begin{split}
     x &= a \sinh{\mu}\sin{\nu}\cos{\phi}\\
@@ -336,7 +350,7 @@ Calculated iteratively
     S = \int_0^{\mu_\ell} \sqrt{\sin^2{\nu} + \sinh^2{\mu}}\,\, \ud\mu
   \end{equation}
 %
-\subsection{Fixed tip size}
+\subsubsection{Fixed Tip Size}
   Define the base radius \(R\) and height of the tip \(h\) from the base (See Figure~\ref{fig:coords_Rh}).
   \begin{figure}
     \centering
@@ -368,7 +382,7 @@ Calculated iteratively
   It is possible to use Equations~\eqref{eq:tip-eta},~\eqref{eq:tip-ximax} and \eqref{eq:tip-eta} to keep
   the shape of the tip constant for all \(d\).
 %
-\subsection{Radius of Curvature}
+\subsubsection{Radius of Curvature}
   Radius of Curvature is
   \begin{equation}
     R = \left| \frac{\left( \left(\frac{\ud x}{\ud \xi}\right)^2 + \left(\frac{\ud z}{\ud \xi}\right)^2 \right)^{\frac{3}{2}}}{\frac{\ud x}{\ud \xi} \frac{\ud^2 z}{\ud \xi^2} - \frac{\ud z}{\ud \xi} \frac{\ud^2 x}{\ud \xi^2}} \right| \, .
@@ -390,7 +404,7 @@ Calculated iteratively
     R = \frac{a^2}{d} - d\, .
   \end{equation}
 %
-\subsection{Normal Vector to surface}
+\subsubsection{Normal Vector to Surface}
   Starting with
   \begin{equation}
     \xi = \frac{1}{2a}\left( \sqrt{x^2 + y^2 + (z+a)^2} + \sqrt{x^2 + y^2 + (z-a)^2} \right)
@@ -436,33 +450,8 @@ Calculated iteratively
 %                       &+ 8\sum_{i=1}^n\sum_{j=1}^{m-1} f(\xi_{2i-1}, \phi_{2j}) + 4\sum_{i=1}^{n-1}\sum_{j=1}^{m-1} f(\xi_{2i}, \phi_{2j}) \Big\}\, .
 %   \end{split}\end{equation}
 %
-\cleardoublepage
-\subsection{Circuit elements}
-\begin{figure}[!ht]
-  \centering
-  \begin{circuitikz} \draw
-    (0, -2) to[twoport, v^<=\(V_d\), *-*](0, 2) to[R, l_=\(R\), i<_=\(I\), v^=\(V_R\), *-*] ((2, 2) to[battery1, v=\(V_0\), *-*] (2, 0) to[C, l_=\(C\), v^=\(V_c\), *-*] (2, -2) -- (0, -2);
-  \end{circuitikz}
-  \caption{Circuit}
-\end{figure}
-For the circut we have
-\begin{equation}
- V_d(t) = V + V_c(t)\, ,
-\end{equation}
-or
-\begin{equation}
- V_c(t) = V_d(t) - V\, .
-\end{equation}
-For the capacitor
-\begin{equation}
- I(t) = C\frac{d V_c(t)}{d t} = C \frac{d V_d(t)}{dt}\, ,
-\end{equation}
-because \(V\) is constant. Integration from \(0\) to \(t\) then gives
-\begin{equation}
-  V_d(t) = V_d(0) + C\int_0^t I(t^\prime) dt^\prime\, ,
-\end{equation}
 
-\cleardoublepage
+\clearpage
 \section{Cylindrical Geometry}
 
 \subsection{Electric Field}
@@ -543,6 +532,32 @@ The emission process checks the angle between the positon vector (black solid li
   \caption{Angle between position and acceleration.}
   \label{fig:angle}
 \end{figure}
+
+\clearpage
+\section{Circuit Elements}
+\begin{figure}[!ht]
+  \centering
+  \begin{circuitikz} \draw
+    (0, -2) to[twoport, v^<=\(V_d\), *-*](0, 2) to[R, l_=\(R\), i<_=\(I\), v^=\(V_R\), *-*] ((2, 2) to[battery1, v=\(V_0\), *-*] (2, 0) to[C, l_=\(C\), v^=\(V_c\), *-*] (2, -2) -- (0, -2);
+  \end{circuitikz}
+  \caption{Circuit}
+\end{figure}
+For the circut we have
+\begin{equation}
+ V_d(t) = V + V_c(t)\, ,
+\end{equation}
+or
+\begin{equation}
+ V_c(t) = V_d(t) - V\, .
+\end{equation}
+For the capacitor
+\begin{equation}
+ I(t) = C\frac{d V_c(t)}{d t} = C \frac{d V_d(t)}{dt}\, ,
+\end{equation}
+because \(V\) is constant. Integration from \(0\) to \(t\) then gives
+\begin{equation}
+  V_d(t) = V_d(0) + C\int_0^t I(t^\prime) dt^\prime\, ,
+\end{equation}
 
 \cleardoublepage\printbibliography
 \end{document}
