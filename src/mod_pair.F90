@@ -499,17 +499,6 @@ contains
     logical, dimension(:), intent(in)                :: mask
     !logical, allocatable, dimension(:, :)            :: mask_2d
     integer, intent(in)                              :: m, k ! m = nrPart
-    !integer                                          :: i, j
-
-    ! j = 0
-    ! !k = lbound(A, 2)
-    ! !k = startElecHoles
-    ! do i = k, m
-    !   if (mask(i) .eqv. .true.) then ! Check if mask(i) == .true.
-    !     j = j + 1
-    !     A(:, j) = A(:, i)
-    !   end if
-    ! end do
 
     A(1, :) = pack(A(1, :), mask)
     A(2, :) = pack(A(2, :), mask)
@@ -524,10 +513,6 @@ contains
     integer                                          :: i, j
 
     j = 0
-    !k = lbound(A, 2)
-    !k = startElecHoles
-    !print *, 'Remove start = ', k
-    !print *, 'Remove end = ', m
     do i = k, m
       if (mask(i) .eqv. .true.) then ! Check if mask(i) == .true.
         j = j + 1

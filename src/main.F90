@@ -26,10 +26,6 @@ program VacuumMD
   print '(a)', 'Vacuum: Initialzing'
   call Init()
 
-  print '(a)', 'Vacuum: Setting up random number generators'
-  call Setup_Random_Number_Generator_MT(nthreads)
-  !call Setup_Random_Number_Generator_LeapFrog(nthreads)
-
   print '(a)', 'Vacuum: Writing out variables'
   call Write_Initial_Variables()
 
@@ -103,80 +99,8 @@ program VacuumMD
   call Write_Life_Time()
 
   print '(a)', 'Vacuum: Program finished'
-  call Clean_up(nthreads)
+  call Clean_up()
 contains
-
-  subroutine Setup_Random_Number_Generator_LeapFrog(nthreads)
-    integer, intent(in)   :: nthreads
-    integer               :: IFAIL, i
-    integer, dimension(8) :: time_array
-    integer, parameter    :: brng = VSL_BRNG_MCG31
-
-    allocate(streams(0:(nthreads-1)))
-    !Initialize the random number generator
-    call date_and_time(values=time_array)
-    SEED = sum(time_array)
-    !SEED = SEED + 0.25d0*GETPID()
-    !SEED = 8077
-    IFAIL = vslnewstream(streams(0)%s1, brng, SEED)
-    call CheckVslError(IFAIL)
-    !if (IFAIL /= 0) then
-    !  print '(a)', 'Vacuum: Error failed to initialize the random number generator'
-    !  stop
-    !end if
-
-    !! Generate the number of electron/hole pairs to be emitted each time step
-    !IFAIL = virngpoisson(VSL_RNG_METHOD_POISSON_PTPE, streams(0)%s1, steps, nrEmit, lambda_pos)
-    !call CheckVslError(IFAIL)
-
-    !! Write out the generated numbers
-    !call Write_Created()
-
-    if (nthreads > 1) then
-
-      ! Generate streams for each thread
-      do i = 1, (nthreads-1)
-        IFAIL = vslcopystream(streams(i)%s1, streams(0)%s1)
-        call CheckVslError(IFAIL)
-      end do
-
-      ! Apply the leapfor method
-      do i = 0, (nthreads-1)
-        IFAIL = vslleapfrogstream(streams(i)%s1, i, nthreads)
-        call CheckVslError(IFAIL)
-      end do
-
-    end if
-  end subroutine Setup_Random_Number_Generator_LeapFrog
-
-
-  subroutine Setup_Random_Number_Generator_MT(nthreads)
-    integer, intent(in)   :: nthreads
-    integer               :: IFAIL, i
-    integer, dimension(8) :: time_array
-    !integer, parameter    :: brng = VSL_BRNG_MT2203
-    integer, parameter    :: brng = VSL_BRNG_SFMT19937
-
-    allocate(streams(0:(nthreads-1)))
-    !Initialize the random number generator
-    call date_and_time(values=time_array)
-    SEED = sum(time_array)
-    !SEED = SEED + 0.25d0*GETPID()
-
-    do i = 0, (nthreads-1)
-      !IFAIL = vslnewstream(streams(i)%s1, brng + i, SEED)
-      IFAIL = vslnewstream(streams(i)%s1, brng, SEED+i)
-      call CheckVslError(IFAIL)
-    end do
-
-    !! Generate the number of electron/hole pairs to be emitted each time step
-    !IFAIL = virngpoisson(VSL_RNG_METHOD_POISSON_PTPE, streams(0)%s1, steps, nrEmit, lambda_pos)
-    !call CheckVslError(IFAIL)
-
-    !! Write out the generated numbers
-    !call Write_Created()
-  end subroutine Setup_Random_Number_Generator_MT
-
 
   subroutine PrintProgress(i)
     integer, intent(in) :: i
@@ -484,9 +408,8 @@ contains
   ! ----------------------------------------------------------------------------
   ! Clean up after the program
   ! Deallocate variables, close files, etc.
-  subroutine Clean_up(nthreads)
-    integer, intent(in) :: nthreads
-    integer :: IFAIL, i
+  subroutine Clean_up()
+    integer :: IFAIL
 
     ! Close file descriptors
     close(unit=ud_pos, iostat=IFAIL, status='keep')
@@ -528,10 +451,5 @@ contains
     !deallocate(dipoles_alpha)
     !deallocate(dipoles_center)
 
-    ! Delete the random number generator stream
-    do i = 0, (nthreads-1)
-      IFAIL = vsldeletestream(streams(i)%s1)
-    end do
-    deallocate(streams)
   end subroutine Clean_up
 end program VacuumMD

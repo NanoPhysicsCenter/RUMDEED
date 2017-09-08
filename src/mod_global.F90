@@ -4,11 +4,7 @@
 ! 07.05.15                                  !
 !-------------------------------------------!
 
-include 'mkl_vsl.f90' ! MKL Random number generator
-include "errcheck.inc"
 module mod_global
-  USE MKL_VSL_TYPE
-  USE MKL_VSL
   implicit none
 
   ! ----------------------------------------------------------------------------
@@ -215,13 +211,8 @@ module mod_global
   ! ----------------------------------------------------------------------------
   ! Parameters for random number generators
   ! http://en.wikipedia.org/wiki/Mersenne_Twister#SFMT
-  TYPE NEW_TYPE
-    TYPE (VSL_STREAM_STATE):: s1
-  END TYPE NEW_TYPE
   integer                                            :: tid ! Thread number
   integer                                            :: SEED = 2815
-  !integer                                            :: brng = VSL_BRNG_SFMT19937 ! Random number generator
-  TYPE (NEW_TYPE), dimension(:), allocatable :: streams ! Random number stream for use with MKL
 
 
   ! ----------------------------------------------------------------------------
