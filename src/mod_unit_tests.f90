@@ -26,7 +26,7 @@ contains
 
     double precision, parameter      :: d_test = 100.0d0*length_scale
     double precision, parameter      :: V_test = 2.0d0 ! V
-    double precision, parameter      :: delta_t_test = 0.25d-12 ! Time step
+    double precision, parameter      :: delta_t_test = 0.25d-15 ! Time step
 
     double precision, parameter      :: pre_fac_c_test = q_0**2/(4.0d0*pi*m_0*epsilon_0)
     double precision, parameter      :: pre_fac_E_test = q_0/m_0
@@ -92,21 +92,10 @@ contains
 
     !$OMP END MASTER
 
-    print *, 'Hi'
-    !$OMP BARRIER
-
-    !!$OMP SINGLE
-
+    !$OMP FLUSH
     call Calculate_Acceleration_Particles()
 
-    !!$OMP END SINGLE
-
-    print *, 'Hi2'
-    !$OMP BARRIER
-    print *, 'Hi3'
-
     !$OMP MASTER
-
     a_1_res = particles_cur_accel(:, 1)
     a_2_res = particles_cur_accel(:, 2)
     a_3_res = particles_cur_accel(:, 3)
@@ -144,6 +133,5 @@ contains
     end if
 
     !$OMP END MASTER
-    print *, 'Hi4'
   end subroutine Test_Acceleration
 end module mod_unit_tests
