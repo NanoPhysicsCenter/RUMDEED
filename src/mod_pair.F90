@@ -298,7 +298,7 @@ contains
   ! A subroutine to remove particles from that system
   subroutine Remove_Particles(step)
     integer, intent(in) :: step
-    integer             :: m, k, l, j, i
+    integer             :: m, k
 
     !$OMP FLUSH
 
@@ -434,8 +434,8 @@ contains
   ! ----------------------------------------------------------------------------
   ! Write out the current and information about the number of particles in
   ! the system
-  subroutine Write_Ramo_Current(step, step_mts, at_step)
-    integer, intent(in) :: step, step_mts, at_step
+  subroutine Write_Ramo_Current(step, at_step)
+    integer, intent(in) :: step, at_step
     integer             :: i, IFAIL
     double precision    :: ramo_cur
 
@@ -473,21 +473,10 @@ contains
         A(j) = A(i)
       else
         lt = step - A(i)
-        if (lt < 0) then
-          print *, 'step = ', step
-          print *, 'A(i) = ', A(i)
-          print *, 'i = ', i
-          pause
-        end if
         if (lt <= 0) lt = 1
         if (lt > MAX_LIFE_TIME) lt = MAX_LIFE_TIME
 
         s = particles_species(i)
-
-        if (s <= 0) then
-          print *, particles_species(i)
-          pause
-        end if
 
         life_time(lt, s) = life_time(lt, s) + 1
 
@@ -508,9 +497,9 @@ contains
   subroutine compact_array_2D_double(A, mask, k, m)
     double precision, dimension(:, :), intent(inout) :: A
     logical, dimension(:), intent(in)                :: mask
-    logical, allocatable, dimension(:, :)            :: mask_2d
+    !logical, allocatable, dimension(:, :)            :: mask_2d
     integer, intent(in)                              :: m, k ! m = nrPart
-    integer                                          :: i, j
+    !integer                                          :: i, j
 
     ! j = 0
     ! !k = lbound(A, 2)
@@ -557,17 +546,6 @@ contains
     double precision, dimension(:), intent(inout) :: A
     logical, dimension(:), intent(in)             :: mask
     integer, intent(in)                           :: m, k
-    integer                                       :: i, j
-
-    ! j = 0
-    ! !k = lbound(A, 1)
-    ! !k = startElecHoles
-    ! do i = k, m
-    !   if (mask(i) .eqv. .true.) then
-    !     j = j + 1
-    !     A(j) = A(i)
-    !   end if
-    ! end do
 
     A = pack(A, mask)
   end subroutine compact_array_1D_double
@@ -578,17 +556,6 @@ contains
     integer, dimension(:), intent(inout) :: A
     logical, dimension(:), intent(in)    :: mask
     integer, intent(in)                  :: m, k
-    integer                              :: i, j
-
-    ! j = 0
-    ! !k = lbound(A, 1)
-    ! !k = startElecHoles
-    ! do i = k, m
-    !   if (mask(i) .eqv. .true.) then
-    !     j = j + 1
-    !     A(j) = A(i)
-    !   end if
-    ! end do
 
     A = pack(A, mask)
   end subroutine compact_array_1D_int

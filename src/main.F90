@@ -312,15 +312,15 @@ contains
     nrHole_remove_bot = 0
 
     !progress(10) = 1.0*steps
-    progress(9) = 0.9*steps
-    progress(8) = 0.8*steps
-    progress(7) = 0.7*steps
-    progress(6) = 0.6*steps
-    progress(5) = 0.5*steps
-    progress(4) = 0.4*steps
-    progress(3) = 0.3*steps
-    progress(2) = 0.2*steps
-    progress(1) = 0.1*steps
+    progress(9) = nint(0.9d0*steps)
+    progress(8) = nint(0.8d0*steps)
+    progress(7) = nint(0.7d0*steps)
+    progress(6) = nint(0.6d0*steps)
+    progress(5) = nint(0.5d0*steps)
+    progress(4) = nint(0.4d0*steps)
+    progress(3) = nint(0.3d0*steps)
+    progress(2) = nint(0.2d0*steps)
+    progress(1) = nint(0.1d0*steps)
 
 
     ! Open data file for writing
