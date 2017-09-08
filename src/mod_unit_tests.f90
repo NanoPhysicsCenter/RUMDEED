@@ -31,7 +31,8 @@ contains
     double precision, parameter      :: pre_fac_c_test = q_0**2/(4.0d0*pi*m_0*epsilon_0)
     double precision, parameter      :: pre_fac_E_test = q_0/m_0
 
-    !$OMP SINGLE
+    !$OMP FLUSH
+    !$OMP MASTER
 
     R_1 = (/  3.0d0, -10.0d0, 101.0d0 /) * length_scale
     R_3 = (/  6.0d0, -24.0d0, 118.0d0 /) * length_scale
@@ -60,8 +61,6 @@ contains
 
     a_3 = a_31 + a_32 + a_3E
 
-    print *, 'hh'
-
     ! Set input variables
     box_dim = (/ 100.0d0, 100.0d0, d_test /)
     time_step = delta_t_test
@@ -87,27 +86,26 @@ contains
 
     ! Add particles
     par_vel = 0.0d0
-    print *, 'kk'
     call Add_Particle(R_1, par_vel, species_elec, 0)
     call Add_Particle(R_2, par_vel, species_elec, 0)
     call Add_Particle(R_3, par_vel, species_hole, 0)
 
-    !$OMP END SINGLE
+    !$OMP END MASTER
 
-    !!$OMP BARRIER
+    print *, 'Hi'
+    !$OMP BARRIER
 
-    !$OMP SINGLE
-    print *, 'kk2'
+    !!$OMP SINGLE
 
     call Calculate_Acceleration_Particles()
 
-    !$OMP END SINGLE
+    !!$OMP END SINGLE
 
-    !!$OMP BARRIER
+    print *, 'Hi2'
+    !$OMP BARRIER
+    print *, 'Hi3'
 
-    !$OMP SINGLE
-
-    print *, 'kk3'
+    !$OMP MASTER
 
     a_1_res = particles_cur_accel(:, 1)
     a_2_res = particles_cur_accel(:, 2)
@@ -145,6 +143,7 @@ contains
       print *, ''
     end if
 
-    !$OMP END SINGLE
+    !$OMP END MASTER
+    print *, 'Hi4'
   end subroutine Test_Acceleration
 end module mod_unit_tests

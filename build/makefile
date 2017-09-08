@@ -27,7 +27,7 @@ endif
 ifeq ($(FCOMPILER),gfortran)
 $(info Using GNU Fortran)
 #FFLAGS=-O3 -fopenmp -ffast-math -m64 -funroll-loops -flto -march=native -fno-range-check
-FFLAGS=-g -fcheck=all -fopenmp -fno-range-check -Wall
+FFLAGS=-g -fcheck=all -Wall -fopenmp
 endif
 
 # PGI FORTRAN

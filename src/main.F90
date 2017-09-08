@@ -37,7 +37,10 @@ program VacuumMD
   print '(a)', 'Vacuum: Starting main loop'
   print '(tr1, a, i0, a, ES12.4, a)', 'Doing ', steps, ' time steps of size ', time_step, ' seconds'
 
-  !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(i, tid)
+  !$OMP PARALLEL DEFAULT(PRIVATE) PRIVATE(i, tid) SHARED(particles_cur_pos, &
+  !$OMP& particles_prev_pos, particles_cur_vel, particles_cur_accel, &
+  !$OMP& particles_prev_accel, particles_charge, particles_species, &
+  !$OMP& particles_mass, particles_step, particles_mask)
   call Run_Unit_Tests()
   stop
 

@@ -68,9 +68,9 @@ contains
   !
   subroutine Update_Fast_Position(step)
     integer, intent(in) :: step
-    integer             :: i, x_i, y_i
+    integer             :: i
 
-    !$OMP DO PRIVATE(i, x_i, y_i) SCHEDULE(STATIC)
+    !$OMP DO PRIVATE(i) SCHEDULE(STATIC)
     do i = startElecHoles, endElecHoles
       particles_prev_pos(:, i)   = particles_cur_pos(:, i) ! Store the previous position
       particles_cur_pos(:, i)    = particles_cur_pos(:, i) + particles_cur_vel(:, i)*time_step &
