@@ -104,7 +104,7 @@ module mod_global
 
   ! ----------------------------------------------------------------------------
   ! Define scales used when reading and writing data
-  double precision, parameter :: length_scale = 1.0d-6 ! Length scale (1 micrometer)
+  double precision, parameter :: length_scale = 1.0d-9 ! Length scale (1 nanometer)
   double precision, parameter :: time_scale = 1.0d-12 ! Time scale (1 ps)
   double precision, parameter :: vel_scale = length_scale / time_scale ! Velocity scale (1 nm / 1 ps)
   double precision            :: cur_scale  ! Current scale (1 mA/cm^2)
@@ -269,5 +269,19 @@ contains
 
     isnan = ieee_is_nan(x)
   end function isnan
+#endif
+
+#if defined(__PGI)
+  double precision function norm2(a)
+    double precision, dimension(:), intent(in) :: a
+    !integer                                    :: i
+
+    norm2 = sum(a**2)
+
+    ! norm2 = 0.0d0
+    ! do i = 1, 3
+    !   norm2 = norm2 + a(i)**2
+    ! end do
+  end function norm2
 #endif
 end module mod_global

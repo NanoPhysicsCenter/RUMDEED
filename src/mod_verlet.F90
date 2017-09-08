@@ -183,8 +183,7 @@ contains
   ! Acceleration
   subroutine Calculate_Acceleration_Particles()
     double precision, dimension(1:3) :: force_E, force_c
-    double precision, dimension(1:3) :: pos_1, pos_2, diff, pos_tmp
-    double precision, dimension(1:3) :: diff_1, diff_2, diff_3, diff_4
+    double precision, dimension(1:3) :: pos_1, pos_2, diff
     double precision                 :: r, r_1, r_2, r_3, r_4
     double precision                 :: q_1, q_2
     double precision                 :: im_1, im_2
@@ -224,44 +223,6 @@ contains
 #else
         r = NORM2(diff) + length_scale**3 ! Prevent singularity
 #endif
-
-        ! Periodic boundary
-        pos_tmp = pos_2
-        pos_tmp(1) = pos_tmp(1) + box_dim(1)
-        diff_1 = pos_1 - pos_tmp
-#if defined(__PGI)
-        r_1 = sqrt(diff_1(1)**2 + diff_1(2)**2 + diff_1(3)**2) + length_scale**3 ! Prevent singularity
-#else
-        r_1 = NORM2(diff_1) + length_scale**3 ! Prevent singularity
-#endif
-
-        pos_tmp = pos_2
-        pos_tmp(1) = pos_tmp(1) - box_dim(1)
-        diff_2 = pos_1 - pos_tmp
-#if defined(__PGI)
-        r_2 = sqrt(diff_2(1)**2 + diff_2(2)**2 + diff_2(3)**2) + length_scale**3 ! Prevent singularity
-#else
-        r_2 = NORM2(diff_2) + length_scale**3 ! Prevent singularity
-#endif
-
-        pos_tmp = pos_2
-        pos_tmp(3) = pos_tmp(3) + box_dim(3)
-        diff_3 = pos_1 - pos_tmp
-#if defined(__PGI)
-        r_3 = sqrt(diff_3(1)**2 + diff_3(2)**2 + diff_3(3)**2) + length_scale**3 ! Prevent singularity
-#else
-        r_3 = NORM2(diff_3) + length_scale**3 ! Prevent singularity
-#endif
-
-        pos_tmp = pos_2
-        pos_tmp(3) = pos_tmp(3) - box_dim(3)
-        diff_4 = pos_1 - pos_tmp
-#if defined(__PGI)
-        r_4 = sqrt(diff_4(1)**2 + diff_4(2)**2 + diff_4(3)**2) + length_scale**3 ! Prevent singularity
-#else
-        r_4 = NORM2(diff_4) + length_scale**3 ! Prevent singularity
-#endif
-
 
         ! Calculate the Coulomb force
         ! F = (r_1 - r_2) / |r_1 - r_2|^3

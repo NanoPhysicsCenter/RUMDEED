@@ -1,0 +1,7 @@
+&INPUT
+V = 1.00d0,
+BOX_DIM =  250.0d0,  10.0d0,  250.0d0,
+TIME_STEP = 1.0d-3,
+STEPS = 1000,
+T = 200.0d0
+/

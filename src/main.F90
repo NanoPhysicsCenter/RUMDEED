@@ -1,4 +1,4 @@
-program SolarCell
+program VacuumMD
 #if defined(_OPENMP)
   use omp_lib
 #endif
@@ -8,6 +8,7 @@ program SolarCell
   use mod_global
   use mod_verlet
   use mod_pair
+  use mod_unit_tests
   implicit none
 
   integer :: i, nthreads
@@ -41,6 +42,9 @@ program SolarCell
   print '(tr1, a, i0, a, ES12.4, a)', 'Doing ', steps, ' time steps of size ', time_step, ' seconds'
 
   !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(i, tid)
+  call Run_Unit_Tests()
+  stop
+
 #if defined(_OPENMP)
   tid = omp_get_thread_num()
 #else
@@ -188,6 +192,7 @@ contains
   subroutine Read_Input_Variables()
     integer :: ud_input, IFAIL
 
+
     !Open the file 'input' for reading and check for errors
     open(newunit=ud_input, iostat=IFAIL, file='input', status='OLD', action='read')
     if (IFAIL /= 0) then
@@ -205,7 +210,7 @@ contains
     ! box_dim: Dimensions of the system
     ! d: Gap spacing
     box_dim = box_dim * length_scale
-    d = box_dim(2)
+    d = box_dim(3)
     E_z = -1.0d0*V/d
     V_a = V
 
@@ -529,4 +534,4 @@ contains
     end do
     deallocate(streams)
   end subroutine Clean_up
-end program SolarCell
+end program VacuumMD

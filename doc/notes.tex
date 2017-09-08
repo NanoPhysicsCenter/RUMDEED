@@ -90,7 +90,7 @@ where \(v_0\) is the initial velocity.
   \end{equation}
   We wish to find the acceleration using \(F = ma = m\frac{L}{T^2}\bar{a}\) or
   \begin{equation}
-    \bar{a}_1 = \frac{q_1 q_2}{4\pi\epsilon} \frac{T^2}{L^3} \frac{\bar{x}_1 - \bar{x}_2}{|\bar{x}_1 - \bar{x}_2|^3}\, .
+    \bar{a}_1 = \frac{q_1 q_2}{4\pi m\epsilon} \frac{T^2}{L^3} \frac{\bar{x}_1 - \bar{x}_2}{|\bar{x}_1 - \bar{x}_2|^3}\, .
   \end{equation}
 
   The acceleration from the electric field in the system is given by,
@@ -105,17 +105,17 @@ where \(v_0\) is the initial velocity.
 
   \subsection{Unit Test Case}
   Two electrons and one hole.\\
-  Fyrst electron: \(x_1 = 10\,\mathrm{nm}\), \(y_1 = 3\,\mathrm{nm}\), \(z_1 = 100\,\mathrm{nm}\).\\
-  Second electron: \(x_2 = 35\,\mathrm{nm}\), \(y_2 = -7\,\mathrm{nm}\), \(z_2 = 10\,\mathrm{nm}\).\\
-  The hole: \(x_3 = -12\,\mathrm{nm}\), \(y_3 = 0\,\mathrm{nm}\), \(z_3 = 50\,\mathrm{nm}\).\\
-  Parameters: \(d 100\,\mathrm{nm}\), \(V = 2\,\mathrm{V}\), \(\Delta t = 0.25\,\mathrm{ps}\).
+  Fyrst electron: \(x_1 = 3\,\mathrm{nm}\), \(y_1 = -10\,\mathrm{nm}\), \(z_1 = 101\,\mathrm{nm}\).\\
+  Second electron: \(x_2 = -9\,\mathrm{nm}\), \(y_2 = 26\,\mathrm{nm}\), \(z_2 = 80\,\mathrm{nm}\).\\
+  The hole: \(x_3 = 6\,\mathrm{nm}\), \(y_3 = -24\,\mathrm{nm}\), \(z_3 = 118\,\mathrm{nm}\).\\
+  Parameters: \(d = 100\,\mathrm{nm}\), \(V = 2\,\mathrm{V}\), \(\Delta t = 0.25\,\mathrm{ps}\).
 
   The acceleration of the fyrst electron is
   \begin{equation}
-    \mathbf{a}_{12} = \frac{e^2}{4\pi\epsilon_0} \frac{\mathbf{R}_1 - \mathbf{R}_2}{|\mathbf{R}_1 - \mathbf{R}_2|^3}
+    \mathbf{a}_{12} = \frac{e^2}{4\pi m\epsilon_0} \frac{\mathbf{R}_1 - \mathbf{R}_2}{|\mathbf{R}_1 - \mathbf{R}_2|^3}
   \end{equation}
   \begin{equation}
-    \mathbf{a}_{13} = \frac{e^2}{4\pi\epsilon_0} \frac{\mathbf{R}_1 - \mathbf{R}_3}{|\mathbf{R}_1 - \mathbf{R}_3|^3}
+    \mathbf{a}_{13} = -\frac{e^2}{4\pi m\epsilon_0} \frac{\mathbf{R}_1 - \mathbf{R}_3}{|\mathbf{R}_1 - \mathbf{R}_3|^3}
   \end{equation}
 
 \clearpage

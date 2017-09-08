@@ -20,6 +20,34 @@ module mod_pair
     module procedure compact_array_2D_double, compact_array_1D_double, compact_array_1D_int
   end interface
 contains
+  subroutine Add_Particle(par_pos, par_vel, par_species, step)
+    double precision, dimension(1:3), intent(in) :: par_pos, par_vel
+    integer, intent(in)                          :: par_species, step
+
+    ! Add the electron
+    particles_cur_pos(:, nrPart+1) = par_pos
+    particles_prev_pos(:, nrPart+1) = -1.0d0*length_scale
+    particles_cur_accel(:, nrPart+1) = 0.0d0
+    particles_prev_accel(:, nrPart+1) = 0.0d0
+    particles_cur_vel(:, nrPart+1) = par_vel
+    particles_step(nrPart+1) = step
+    particles_mask(nrPart+1) = .true.
+    particles_species(nrPart+1) = par_species
+
+    if (par_species == species_elec) then
+      particles_charge(nrPart+1) = -1.0d0*q_0
+      particles_mass(nrPart+1) = m_eeff*m_0
+      nrElec = nrElec + 1
+    else
+      particles_charge(nrPart+1) = +1.0d0*q_0
+      particles_mass(nrPart+1) = m_heff*m_0
+      nrHole = nrHole + 1
+    end if
+
+    ! Update the number of particles in the system
+    nrElecHole = nrElec + nrHole
+    nrPart = nrElecHole
+  end subroutine Add_Particle
   ! ! ----------------------------------------------------------------------------
   ! ! Loop through all the pairs to be created in this time step
   ! subroutine Pair_Creation(step)
