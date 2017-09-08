@@ -42,6 +42,7 @@ program VacuumMD
   !$OMP& particles_prev_accel, particles_charge, particles_species, &
   !$OMP& particles_mass, particles_step, particles_mask)
   call Run_Unit_Tests()
+  !$OMP BARRIER
   stop
 
 #if defined(_OPENMP)

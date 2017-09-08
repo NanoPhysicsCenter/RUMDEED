@@ -31,8 +31,7 @@ contains
     double precision, parameter      :: pre_fac_c_test = q_0**2/(4.0d0*pi*m_0*epsilon_0)
     double precision, parameter      :: pre_fac_E_test = q_0/m_0
 
-    !$OMP FLUSH
-    !$OMP MASTER
+    !$OMP SINGLE
 
     R_1 = (/  3.0d0, -10.0d0, 101.0d0 /) * length_scale
     R_3 = (/  6.0d0, -24.0d0, 118.0d0 /) * length_scale
@@ -90,9 +89,8 @@ contains
     call Add_Particle(R_2, par_vel, species_elec, 0)
     call Add_Particle(R_3, par_vel, species_hole, 0)
 
-    !$OMP END MASTER
+    !$OMP END SINGLE
 
-    !$OMP FLUSH
     call Calculate_Acceleration_Particles()
 
     !$OMP MASTER
