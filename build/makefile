@@ -9,6 +9,7 @@ FCOMPILER=gfortran
 #FCOMPILER=pgfortran
 endif
 
+UNIT_TEST = 1
 
 # Compile flags
 # UNKNOWN COMPILERS
@@ -34,7 +35,11 @@ endif
 ifeq ($(FCOMPILER),pgfortran)
 $(info Using PGI Fortran)
 #FFLAGS=-O2 -fast -mp -pgf90libs
-FFLAGS=-g -gopt -Mbounds -mp -pgf90libs
+FFLAGS=-g -gopt -Mbounds -mp
+endif
+
+ifdef UNIT_TEST
+FFLAGS+=-D_UNIT_TEST_
 endif
 
 # Name of the output file

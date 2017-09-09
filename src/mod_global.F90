@@ -121,7 +121,7 @@ module mod_global
   integer, parameter :: species_unkown   = 0 ! Unknown particle
   integer, parameter :: species_elec     = 1 ! Electron
   integer, parameter :: species_hole     = 2 ! Hole
-  integer, parameter :: nrSpecies        = 1 ! 3 = Elec, Hole, Ion
+  integer, parameter :: nrSpecies        = 2 ! 2 = Elec, Hole
 
 
   ! ----------------------------------------------------------------------------

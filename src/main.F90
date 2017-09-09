@@ -20,6 +20,10 @@ program VacuumMD
   nthreads = 1
 #endif
 
+#if defined(_UNIT_TEST_)
+  print '(a)', 'Vacuum: **** UNIT TESTING IS ACTIVE ****'
+#endif
+
   print '(a)', 'Vacuum: Reading input values'
   call Read_Input_Variables()
 
@@ -34,30 +38,34 @@ program VacuumMD
   !call Init_Dipoles(0, 0, 0)
   !call Write_Dipole_data()
 
+#if defined(_UNIT_TEST_)
+  print '(a)', 'Vacuum: Starting Unit Tests'
+  print *, ''
+#else
   print '(a)', 'Vacuum: Starting main loop'
   print '(tr1, a, i0, a, ES12.4, a)', 'Doing ', steps, ' time steps of size ', time_step, ' seconds'
+#endif
 
-  !$OMP PARALLEL DEFAULT(PRIVATE) PRIVATE(i, tid) SHARED(particles_cur_pos, &
-  !$OMP& particles_prev_pos, particles_cur_vel, particles_cur_accel, &
-  !$OMP& particles_prev_accel, particles_charge, particles_species, &
-  !$OMP& particles_mass, particles_step, particles_mask)
+  !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(i, tid)
+
+#if defined(_UNIT_TEST_)
   call Run_Unit_Tests()
   !$OMP BARRIER
   stop
+#endif
 
 #if defined(_OPENMP)
   tid = omp_get_thread_num()
 #else
   tid = 0
 #endif
-  !$OMP MASTER
+  !$OMP SINGLE
   print '(tr1, a, i0)', 'Number of threads ', nthreads
   print *, ''
 
   at_step = 0
   cur_time = 0
-  !$OMP END MASTER
-
+  !$OMP END SINGLE
 
   do i = 1, steps
 
@@ -67,6 +75,9 @@ program VacuumMD
     ! Update the position of all particles
     !print *, 'Update position'
     call Update_Position(i)
+
+    ! Remove particles from the system
+    call Remove_Particles(i)
 
     !$OMP MASTER
     if (i == progress(1)) then
@@ -90,6 +101,8 @@ program VacuumMD
     end if
 
     !$OMP END MASTER
+
+    !$OMP BARRIER
   end do
 
   !$OMP MASTER
@@ -214,6 +227,7 @@ contains
     particles_mask = .true.
 
     ramo_current = 0.0d0
+    life_time = 0
 
     density_map_elec = 0
     density_map_hole = 0
@@ -224,7 +238,7 @@ contains
     nrHole      = 0
     nrElecHole  = 0
 
-    startElecHoles = 0
+    startElecHoles = 1
     endElecHoles   = 0
 
 

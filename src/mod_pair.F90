@@ -47,6 +47,7 @@ contains
     ! Update the number of particles in the system
     nrElecHole = nrElec + nrHole
     nrPart = nrElecHole
+    endElecHoles = nrPart
   end subroutine Add_Particle
   ! ! ----------------------------------------------------------------------------
   ! ! Loop through all the pairs to be created in this time step
@@ -300,8 +301,6 @@ contains
     integer, intent(in) :: step
     integer             :: m, k
 
-    !$OMP FLUSH
-
     !$OMP SINGLE
 
     call Write_Absorbed(step)
@@ -439,9 +438,7 @@ contains
     integer             :: i, IFAIL
     double precision    :: ramo_cur
 
-    !$OMP FLUSH (ramo_current)
-
-    !$OMP SINGLE
+    !$OMP MASTER
     ramo_cur = 0.0d0
 
     do i = 1, nrSpecies
@@ -451,7 +448,7 @@ contains
     write (ud_ramo, "(ES12.4, tr2, i8, tr2, i8, tr2, E12.4, tr2, E12.4, tr2, i6, tr2, i6, tr2, i6)", iostat=IFAIL) &
     & cur_time, step, at_step, ramo_cur/cur_scale, V, nrPart, nrElec, nrHole
 
-    !$OMP END SINGLE
+    !$OMP END MASTER
   end subroutine Write_Ramo_current
 
   ! ----------------------------------------------------------------------------
