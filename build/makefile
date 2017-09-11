@@ -33,8 +33,8 @@ endif
 # PGI FORTRAN
 ifeq ($(FCOMPILER),pgfortran)
 $(info Using PGI Fortran)
-#FFLAGS=-O2 -fast -mp -pgf90libs
-FFLAGS=-g -gopt -Mbounds -mp -pgf90libs
+#FFLAGS=-O2 -fast -mp
+FFLAGS=-g -gopt -Mbounds -mp
 endif
 
 # Name of the output file

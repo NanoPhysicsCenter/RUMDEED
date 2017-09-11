@@ -240,6 +240,16 @@ module mod_global
   ! Define namelist
   namelist /input/ V, box_dim, time_step, steps, T
   !namelist /input_test/ V, d, box_dim, time_step, steps
+
+  ! ----------------------------------------------------------------------------
+  ! Prodecure pointers
+  interface
+    subroutine Check_Boundary(i)
+      integer, intent(in) :: i
+    end subroutine Check_Boundary
+  end interface
+
+  procedure(Check_Boundary), pointer :: ptr_Check_Boundary
 contains
 
   logical function isinf(a)

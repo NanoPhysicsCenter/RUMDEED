@@ -246,6 +246,8 @@ contains
     progress(2) = nint(0.2d0*steps)
     progress(1) = nint(0.1d0*steps)
 
+    ptr_Check_Boundary => Check_Boundary_ElecHole
+
 
     ! Open data file for writing
     open(newunit=ud_pos, iostat=IFAIL, file='position.dt', status='REPLACE', action='write')

@@ -86,7 +86,8 @@ contains
 
 
       ! Mark particles that should be removed with .false. in the mask array
-      call Check_Boundary_ElecHole(i)
+      !call Check_Boundary_ElecHole(i)
+      call ptr_Check_Boundary(i)
     end do
     !$OMP END DO
   end subroutine Update_Fast_Position
