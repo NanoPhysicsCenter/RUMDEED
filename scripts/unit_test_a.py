@@ -15,6 +15,7 @@ q_0 = 1.6021766208E-19 # Standard charge (C)
 
 # Defined constants
 pre_fac_c = q_0**2/(4*pi*m_0*epsilon_0)
+pre_fac_F = q_0/(4*pi*m_0*epsilon_0)
 pre_fac_E = q_0/m_0
 
 # System parameters
@@ -42,9 +43,9 @@ R_3 = np.array([6.0, -24.0, 118.0])
 
 
 # Acceleration particles 1 ----------------------------------------------------
-a_12 = +1.0*pre_fac_c * a_scale_c * (R_1 - R_2) / np.linalg.norm(R_1 - R_2)**3
-a_13 = -1.0*pre_fac_c * a_scale_c * (R_1 - R_3) / np.linalg.norm(R_1 - R_3)**3
-a_1E = -1.0*pre_fac_E * E * a_scale_E
+a_12 = +1.0*pre_fac_c * (R_1 - R_2) / np.linalg.norm(R_1 - R_2)**3
+a_13 = -1.0*pre_fac_c * (R_1 - R_3) / np.linalg.norm(R_1 - R_3)**3
+a_1E = -1.0*pre_fac_E * E
 
 a_1 = a_12 + a_13 + a_1E
 
@@ -54,9 +55,9 @@ print('')
 
 
 # Acceleration particles 2 -----------------------------------------------------
-a_21 = +1.0*pre_fac_c * a_scale_c * (R_2 - R_1) / np.linalg.norm(R_2 - R_1)**3
-a_23 = -1.0*pre_fac_c * a_scale_c * (R_2 - R_3) / np.linalg.norm(R_2 - R_3)**3
-a_2E = -1.0*pre_fac_E * E * a_scale_E
+a_21 = +1.0*pre_fac_c * (R_2 - R_1) / np.linalg.norm(R_2 - R_1)**3
+a_23 = -1.0*pre_fac_c * (R_2 - R_3) / np.linalg.norm(R_2 - R_3)**3
+a_2E = -1.0*pre_fac_E * E
 
 a_2 = a_21 + a_23 + a_2E
 
@@ -66,12 +67,25 @@ print('')
 
 
 # Acceleration particles 2 -----------------------------------------------------
-a_31 = -1.0*pre_fac_c * a_scale_c * (R_3 - R_1) / np.linalg.norm(R_3 - R_1)**3
-a_32 = -1.0*pre_fac_c * a_scale_c * (R_3 - R_2) / np.linalg.norm(R_3 - R_2)**3
-a_3E = +1.0*pre_fac_E * E * a_scale_E
+a_31 = -1.0*pre_fac_c * (R_3 - R_1) / np.linalg.norm(R_3 - R_1)**3
+a_32 = -1.0*pre_fac_c * (R_3 - R_2) / np.linalg.norm(R_3 - R_2)**3
+a_3E = +1.0*pre_fac_E * E
 
 a_3 = a_31 + a_32 + a_3E
 
 print('Particle 3')
 print(a_3)
+print('')
+
+
+# Electric field at position ---------------------------------------------------
+R_4 = np.array([-4.55, -2.34, 96.44])*length_scale
+
+E_1 = -1.0*pre_fac_F * (R_4 - R_1) / np.linalg.norm(R_4 - R_1)**3
+E_2 = -1.0*pre_fac_F * (R_4 - R_2) / np.linalg.norm(R_4 - R_2)**3
+E_3 = +1.0*pre_fac_F * (R_4 - R_3) / np.linalg.norm(R_4 - R_3)**3
+
+E_tot = E_1 + E_2 + E_3 + E
+print('Electric field')
+print(E_tot)
 print('')

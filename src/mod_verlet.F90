@@ -33,30 +33,20 @@ contains
 
     ! Update the voltage in the system
     call Set_Voltage(step)
-
-    ! Add electron/holes to the system
-    !call Pair_Creation(step, i)
-
     !$OMP END SINGLE
 
-    ! Update the position of particles
+
+    ! Update the position of particles (Electrons / Holes)
     if (nrElecHole > 0) then
-      call Update_Fast_Position(step)
+      call Update_ElecHole_Position(step)
 
       call Calculate_Acceleration_Particles()
 
-      call Update_Fast_Velocity(step)
+      call Update_Velocity(step)
     end if
-    !call Update_Dipoles(step, i)
-
-    !!!$OMP SINGLE
 
     ! Write out the current in the system
     call Write_Ramo_Current(step, at_step)
-
-    ! Remove particles from the system
-    call Remove_Particles(step)
-    !!!$OMP END SINGLE
 
     ! Write out the field in the system
     !call Write_Field_Longitudinal(step)
@@ -66,88 +56,49 @@ contains
 
   ! ----------------------------------------------------------------------------
   !
-  subroutine Update_Fast_Position(step)
+  subroutine Update_ElecHole_Position(step)
     integer, intent(in) :: step
-    integer             :: i, x_i, y_i
+    integer             :: i
 
-    !$OMP DO PRIVATE(i, x_i, y_i) SCHEDULE(STATIC)
+    !$OMP DO PRIVATE(i) SCHEDULE(STATIC)
     do i = startElecHoles, endElecHoles
-      particles_prev_pos(:, i)   = particles_cur_pos(:, i) ! Store the previous position
-      particles_cur_pos(:, i)    = particles_cur_pos(:, i) + particles_cur_vel(:, i)*time_step &
-                               & + 0.5d0*particles_cur_accel(:, i)*time_step2
+      particles_prev_pos(:, i) = particles_cur_pos(:, i) ! Store the previous position
+      particles_cur_pos(:, i)  = particles_cur_pos(:, i) + particles_cur_vel(:, i)*time_step &
+                             & + 0.5d0*particles_cur_accel(:, i)*time_step2
 
       particles_prev_accel(:, i) = particles_cur_accel(:, i)
       particles_cur_accel(:, i)  = 0.0d0
-
-      !if (isnan(particles_cur_pos(1, i)) .eqv. .true.) then
-      !  print *, 'Error'
-      !  !pause
-      !end if
-
 
       ! Mark particles that should be removed with .false. in the mask array
       !call Check_Boundary_ElecHole(i)
       call ptr_Check_Boundary(i)
     end do
     !$OMP END DO
-  end subroutine Update_Fast_Position
+  end subroutine Update_ElecHole_Position
 
   ! ----------------------------------------------------------------------------
-  ! Checks the boundary conditions of the box. Enforce periodic boundary conditions
-  ! and check which particles to remove.
+  ! Checks the boundary conditions of the box.
+  ! Check which particles to remove
+  ! Enforce periodic boundary conditions (ToDo)
   subroutine Check_Boundary_ElecHole(i)
     integer, intent(in) :: i
-    double precision    :: x, y, z
+    double precision    :: z
 
-
-    x = particles_cur_pos(1, i)
-    y = particles_cur_pos(2, i)
     z = particles_cur_pos(3, i)
 
-    if (x < 0.0d0) then
-      !particles_cur_pos(1, i) = z + d
-      particles_cur_pos(1, i) = box_dim(1) - x
-    else if (x > box_dim(1)) then
-      !particles_cur_pos(1, i) = z - d
-      particles_cur_pos(1, i) = x - box_dim(1)
-    end if
-
-    if (z < 0.0d0) then
-      !particles_cur_pos(3, i) = z + d
-      particles_cur_pos(3, i) = box_dim(3) - z
-    else if (z > box_dim(3)) then
-      !particles_cur_pos(3, i) = z - d
-      particles_cur_pos(3, i) = z - box_dim(3)
-    end if
-
     ! Check if the particle should be removed from the system
-    if (y < 0.0d0) then
-      ! Only remove holes on the left side
-      !if (particles_species(i) == species_hole) then
+    if (z < 0.0d0) then
         call Mark_Particles_Remove(i, remove_bot)
-      !else
-      !  particles_cur_pos(2, i) = -1.0d0*y
-      !  particles_cur_vel(2, i) = -1.0d0*particles_cur_vel(2, i)
-      !end if
     else if (z > box_dim(3)) then
-      ! Only remove electrons on the right side
-      !if (particles_species(i) == species_elec) then
         call Mark_Particles_Remove(i, remove_top)
-      !else
-      !  particles_cur_pos(2, i) = 2.0d0*d - y
-      !  particles_cur_vel(2, i) = -1.0d0*particles_cur_vel(2, i)
-      !end if
     end if
 
-    !nrPart_remove = nrElec_remove + nrHole_remove
-    !nrPart_remove_left = nrElec_remove_left + nrHole_remove_left
-    !nrPart_remove_right = nrElec_remove_right  + nrHole_remove_right
   end subroutine Check_Boundary_ElecHole
 
 
   ! ----------------------------------------------------------------------------
   !
-  subroutine Update_Fast_Velocity(step)
+  subroutine Update_Velocity(step)
     integer, intent(in) :: step
     integer             :: i, k
     double precision    :: q
@@ -158,25 +109,15 @@ contains
                             & + 0.5d0*( particles_prev_accel(:, i) &
                             & + particles_cur_accel(:, i) )*time_step
 
-      ! if (isnan(particles_cur_vel(2, i)) == .true.) then
-      !   print *, 'i = ', i
-      !   print *, 'particles_prev_accel(2, i) = ', particles_prev_accel(2, i)
-      !   print *, 'particles_cur_accel(2, i) = ', particles_cur_accel(2, i)
-      !   pause
-      ! end if
-
-      ! if (isnan(particles_cur_vel(1, i)) .eqv. .true.) then
-      !   print *, 'Error'
-      ! end if
-
       q = particles_charge(i)
       k = particles_species(i)
 
+      ! We use OMP ATOMIC here because the index k is not a loop index
       !$OMP ATOMIC
       ramo_current(k) = ramo_current(k) + q * E_zunit * particles_cur_vel(2, i)
     end do
     !$OMP END DO
-  end subroutine Update_Fast_Velocity
+  end subroutine Update_Velocity
 
 
   ! ----------------------------------------------------------------------------
@@ -200,7 +141,7 @@ contains
       k_1 = particles_species(i)
 
       ! Acceleration due to electric field
-      force_E = q_1 * field_E(pos_1)
+      force_E = q_1 * ptr_field_E(pos_1)
 
       ! Loop over particles from i+1 to nrElec.
       ! There is no need to loop over all particles since
@@ -212,7 +153,6 @@ contains
         im_2 = 1.0d0 / particles_mass(j)
         q_2 = particles_charge(j)
         k_2 = particles_species(j)
-
 
         pre_fac_c = q_1*q_2 * div_fac_c ! q_1*q_2 / (4*pi*epsilon)
 
@@ -226,31 +166,8 @@ contains
         ! (diff / r) is a unit vector
         force_c = diff * r**(-3)
 
-        ! if (isnan(force_c(2)) .eqv. .true.) then
-        !   print *, 'force_c(2) = ', force_c(2)
-        !   print *, 'r = ', r / length_scale
-        !   print *, 'diff = ', diff / length_scale
-        !   print *, 'i = ', i
-        !   print *, 'j = ', j
-        !   print *, 'pos_1 = ', pos_1 / length_scale
-        !   print *, 'pos_2 = ', pos_2 / length_scale
-        !   print *, 'particles_mask(i) = ', particles_mask(i)
-        !   print *, 'particles_mask(j) = ', particles_mask(j)
-        !   print *, 'q_1 = ', q_1
-        !   print *, 'q_2 = ', q_2
-        !   print *, 'pos_1(2) == pos_2(2)', (pos_1(2) == pos_2(2))
-        !   print *, 'particles_species(i) = ', particles_species(i)
-        !   print *, 'particles_species(j) = ', particles_species(j)
-        !   print *, 'nrElec = ', nrElec
-        !   print *, 'nrHole = ', nrHole
-        !   print *, 'nrElecHole = ', nrElecHole
-        !   pause
-        ! else
-          ! Record the acceleration using the fact that they are equal but
-          ! in opposite directions.
-          particles_cur_accel(:, j) = particles_cur_accel(:, j) - pre_fac_c * force_c * im_2
-          particles_cur_accel(:, i) = particles_cur_accel(:, i) + pre_fac_c * force_c * im_1
-        ! end if
+        particles_cur_accel(:, j) = particles_cur_accel(:, j) - pre_fac_c * force_c * im_2
+        particles_cur_accel(:, i) = particles_cur_accel(:, i) + pre_fac_c * force_c * im_1
       end do
 
       particles_cur_accel(:, i) = particles_cur_accel(:, i) + force_E * im_1
@@ -278,7 +195,7 @@ contains
     pos_1 = pos
 
     ! Acceleration due to electric field
-    force_tot = field_E(pos_1)
+    force_tot = ptr_field_E(pos_1)
     !$OMP END SINGLE
 
     !$OMP DO PRIVATE(j, pos_2, diff, r, force_c, q_2, pre_fac_c) &
@@ -289,7 +206,7 @@ contains
       pos_2 = particles_cur_pos(:, j)
       q_2 = particles_charge(j)
 
-      pre_fac_c = q_2 * div_fac_c ! q_1*q_2 / (4*pi*epsilon)
+      pre_fac_c = q_2 * div_fac_c ! q_2 / (4*pi*epsilon)
 
       ! Calculate the distance between the two particles
       diff = pos_1 - pos_2
@@ -301,9 +218,7 @@ contains
       ! (diff / r) is a unit vector
       force_c = diff * r**(-3)
 
-      if (isnan(force_c(2)) .eqv. .false.) then
-        force_tot = force_tot + pre_fac_c * force_c
-      end if
+      force_tot = force_tot + pre_fac_c * force_c
     end do
     !$OMP END DO
 

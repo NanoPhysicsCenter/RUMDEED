@@ -9,6 +9,7 @@ FCOMPILER=gfortran
 #FCOMPILER=pgfortran
 endif
 
+UNIT_TEST = 1
 
 # Compile flags
 # UNKNOWN COMPILERS
@@ -27,14 +28,18 @@ endif
 ifeq ($(FCOMPILER),gfortran)
 $(info Using GNU Fortran)
 #FFLAGS=-O3 -fopenmp -ffast-math -m64 -funroll-loops -flto -march=native -fno-range-check
-FFLAGS=-g -fcheck=all -fopenmp -fno-range-check -Wall
+FFLAGS=-g -fcheck=all -Wall -fopenmp
 endif
 
 # PGI FORTRAN
 ifeq ($(FCOMPILER),pgfortran)
 $(info Using PGI Fortran)
-#FFLAGS=-O2 -fast -mp
-FFLAGS=-g -gopt -Mbounds -mp
+#FFLAGS=-O2 -fast -mp -pgf90libs
+FFLAGS=-g -gopt -Mbounds -Mchkfpstk -Mchkfpstk -Mchkfpstk -Melf -traceback
+endif
+
+ifdef UNIT_TEST
+FFLAGS+=-D_UNIT_TEST_
 endif
 
 # Name of the output file

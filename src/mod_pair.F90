@@ -47,176 +47,8 @@ contains
     ! Update the number of particles in the system
     nrElecHole = nrElec + nrHole
     nrPart = nrElecHole
+    endElecHoles = nrPart
   end subroutine Add_Particle
-  ! ! ----------------------------------------------------------------------------
-  ! ! Loop through all the pairs to be created in this time step
-  ! subroutine Pair_Creation(step)
-  !   integer, intent(in)                         :: step
-  !   integer                                     :: i, nrPairs, IFAIL
-  !   double precision, dimension(:), allocatable :: pos_x, pos_y, pos_z, lambda, beta
-  !   double precision, dimension(1:3)            :: pos
-  !   double precision, parameter                 :: a = 0.0d0
-  !   !double precision                            :: cur_time_pair
-  !
-  !
-  !   !!!$OMP SINGLE
-  !
-  !   ! Why not use the cur_time?
-  !   !cur_time_pair = step_mts * time_step_small / time_scale
-  !
-  !   !if (step <= 25) then
-  !
-  !     ! Get the number of pairs to be created in this time step
-  !     !print *, 'step = ', step
-  !     nrPairs = nrEmit(step_mts)
-  !
-  !     allocate(pos_x(nrPairs), pos_y(nrPairs), pos_z(nrPairs), lambda(nrPairs), beta(nrPairs))
-  !
-  !     ! Get a random wavelength according to the solar spectrum distribution
-  !     lambda = RandSolarSpectrumDist(nrPairs)
-  !
-  !     beta = Find_Absorption_Coefficient(lambda)
-  !
-  !     IFAIL = vdrnguniform(VSL_RNG_METHOD_UNIFORM_STD, streams(tid)%s1, nrPairs, pos_x, 0.0d0, 1.0d0) ! x
-  !     call CheckVslError(IFAIL)
-  !     IFAIL = vdrnguniform(VSL_RNG_METHOD_UNIFORM_STD, streams(tid)%s1, nrPairs, pos_y, 0.0d0, 1.0d0) ! y
-  !     call CheckVslError(IFAIL)
-  !     IFAIL = vdrnguniform(VSL_RNG_METHOD_UNIFORM_STD, streams(tid)%s1, nrPairs, pos_z, 0.0d0, 1.0d0) ! z
-  !     call CheckVslError(IFAIL)
-  !
-  !     pos_x = pos_x * box_dim(1)
-  !     pos_y = pos_y * box_dim(2)
-  !     pos_z = pos_z * box_dim(3)
-  !
-  !     do i = 1, nrPairs
-  !       !IFAIL = vdrngexponential(VSL_RNG_METHOD_EXPONENTIAL_ICDF_ACCURATE, streams(tid)%s1, 1, pos(2), a, beta(i)) ! y
-  !       !call CheckVslError(IFAIL)
-  !
-  !       pos(1) = pos_x(i)
-  !       pos(2) = pos_y(i)
-  !       pos(3) = pos_z(i)
-  !       !print *, pos/length_scale
-  !
-  !       ! We assume that the box has perfectly reflecting sides.
-  !       ! Then photons that go deeper than the dimensions of the box
-  !       ! reflect back and forth until absorbed.
-  !       !j = floor(pos(2)/box_dim(2))
-  !       !if (mod(i, 2) == 0) then
-  !       !  pos(2) = pos(2) - box_dim(2)*j
-  !       !else
-  !       !  !pos(2) = box_dim(2) - (pos(2) - box_dim(2)*j)
-  !       !  pos(2) = box_dim(2)*(1+j) - pos(2)
-  !       !end if
-  !
-  !       call Create_Pair(pos, step, lambda(i))
-  !
-  !     end do
-  !     !print *, ''
-  !
-  !     write (ud_emit, "(ES12.4, tr2, i8)", iostat=IFAIL) cur_time, nrPairs
-  !
-  !     deallocate(pos_x, pos_y, pos_z, lambda, beta)
-  !
-  !   !end if
-  !
-  !   !!!$OMP END SINGLE
-  !
-  ! end subroutine Pair_Creation
-
-
-!   ! ----------------------------------------------------------------------------
-!   ! Create an electron / hole pair at position pos
-!   subroutine Create_Pair(pos, step, lambda)
-!     integer, intent(in)              :: step
-!     integer                          :: IFAIL
-!     !double precision, parameter      :: lambda = 500.0d0 ! in nm
-!     double precision, intent(in)     :: lambda ! Should be in nm
-!     double precision, dimension(1:3), intent(in) :: pos
-!     double precision, dimension(1:3) :: pos_e, pos_h ! Position of the electron / hole
-!     double precision, dimension(1:3) :: vec_or, vel_i
-!     double precision                 :: E_lambda, delta_E, E_e, E_h
-!     double precision                 :: v_ei, v_hi
-!
-!     ! Calculate the initial velocity of the electron / hole pair
-!     E_lambda = hc_evnm/lambda ! Energy of the incoming photon, in eV
-!     Delta_E = (E_lambda - E_g)*q_0 ! Diffrance of photon energy and the band gap, convert from eV to J
-!     if (Delta_E <= 0.0d0) then
-!       return ! Do not create this pair
-!     end if
-!
-!     ! Split the energy between the electron and hole
-!     E_e = k_p*Delta_E
-!     E_h = (1.0d0 - k_p)*Delta_E
-!
-!     ! Calculate the speed
-!     v_ei = +1.0d0*sqrt(2.0d0*E_e/(m_eeff*m_0))
-!     v_hi = -1.0d0*sqrt(2.0d0*E_h/(m_heff*m_0)) ! -1 because we want the hole to go in the opposite direction
-!
-!     if (nrPart + 2 > MAX_PARTICLES) then
-!       print '(a)', 'WARNING MAX_PARTICLES reached, skipping pair creation'
-!       return
-!     end if
-!
-!     ! Set the initial position of the pair
-!     !pos_e = pos
-!     !pos_h = pos
-!
-!     IFAIL = vdrnguniform(VSL_RNG_METHOD_UNIFORM_STD, streams(tid)%s1, 3, vec_or, -1.0d0, 1.0d0)
-!     call CheckVslError(IFAIL)
-! #if defined(__PGI)
-!    vec_or = vec_or / sqrt(vec_or(1)**2 + vec_or(2)**2 + vec_or(3)**2) ! Normalize the vector
-! #else
-!     vec_or = vec_or / norm2(vec_or) ! Normalize the vector
-! #endif
-!
-!     IFAIL = vdrnguniform(VSL_RNG_METHOD_UNIFORM_STD, streams(tid)%s1, 3, vel_i, -1.0d0, 1.0d0)
-!     call CheckVslError(IFAIL)
-! #if defined(__PGI)
-!     vel_i = vel_i / sqrt(vel_i(1)**1 + vel_i(2)**2 + vel_i(3)** 3) ! Normalize the vector
-! #else
-!     vel_i = vel_i / norm2(vel_i) ! Normalize the vector
-! #endif
-!
-!
-!     ! Add the electron
-!     particles_cur_pos(:, nrPart+1) = pos_e
-!     particles_prev_pos(:, nrPart+1) = 0.0d0
-!     particles_cur_accel(:, nrPart+1) = 0.0d0
-!     particles_prev_accel(:, nrPart+1) = 0.0d0
-!     particles_cur_vel(:, nrPart+1) = vel_i * v_ei
-!     particles_charge(nrPart+1) = -1.0d0*q_0
-!     particles_step(nrPart+1) = step
-!     particles_mass(nrPart+1) = m_eeff*m_0
-!     particles_mask(nrPart+1) = .true.
-!     particles_species(nrPart+1) = species_elec
-!
-!
-!     ! Add the hole
-!     particles_cur_pos(:, nrPart+2) = pos_h
-!     particles_prev_pos(:, nrPart+2) = 0.0d0
-!     particles_cur_accel(:, nrPart+2) = 0.0d0
-!     particles_prev_accel(:, nrPart+2) = 0.0d0
-!     particles_cur_vel(:, nrPart+2) = vel_i * v_hi
-!     particles_charge(nrPart+2) = +1.0d0*q_0
-!     particles_step(nrPart+2) = step
-!     particles_mass(nrPart+2) = m_heff*m_0
-!     particles_mask(nrPart+2) = .true.
-!     particles_species(nrPart+2) = species_hole
-!
-!     !print *, 'New Elec hole at'
-!     !print *, 'pos_e = ', pos_e / length_scale
-!     !print *, 'pos_h = ', pos_h / length_scale
-!     !print *, ''
-!
-!
-!     ! Update the number of particles in the system
-!     nrElec = nrElec + 1
-!     nrHole = nrHole + 1
-!     !nrPart = nrPart + 2
-!     nrElecHole = nrElec + nrHole
-!     nrPart = nrIons + nrElecHole
-!
-!   end subroutine Create_Pair
 
   ! ----------------------------------------------------------------------------
   ! Mark a particles for removal
@@ -295,12 +127,10 @@ contains
 
 
   ! ----------------------------------------------------------------------------
-  ! A subroutine to remove particles from that system
+  ! A subroutine to remove particles from the system
   subroutine Remove_Particles(step)
     integer, intent(in) :: step
     integer             :: m, k
-
-    !$OMP FLUSH
 
     !$OMP SINGLE
 
@@ -439,9 +269,7 @@ contains
     integer             :: i, IFAIL
     double precision    :: ramo_cur
 
-    !$OMP FLUSH (ramo_current)
-
-    !$OMP SINGLE
+    !$OMP MASTER
     ramo_cur = 0.0d0
 
     do i = 1, nrSpecies
@@ -451,7 +279,7 @@ contains
     write (ud_ramo, "(ES12.4, tr2, i8, tr2, i8, tr2, E12.4, tr2, E12.4, tr2, i6, tr2, i6, tr2, i6)", iostat=IFAIL) &
     & cur_time, step, at_step, ramo_cur/cur_scale, V, nrPart, nrElec, nrHole
 
-    !$OMP END SINGLE
+    !$OMP END MASTER
   end subroutine Write_Ramo_current
 
   ! ----------------------------------------------------------------------------

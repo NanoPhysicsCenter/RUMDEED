@@ -121,7 +121,7 @@ module mod_global
   integer, parameter :: species_unkown   = 0 ! Unknown particle
   integer, parameter :: species_elec     = 1 ! Electron
   integer, parameter :: species_hole     = 2 ! Hole
-  integer, parameter :: nrSpecies        = 1 ! 3 = Elec, Hole, Ion
+  integer, parameter :: nrSpecies        = 2 ! 2 = Elec, Hole
 
 
   ! ----------------------------------------------------------------------------
@@ -242,14 +242,22 @@ module mod_global
   !namelist /input_test/ V, d, box_dim, time_step, steps
 
   ! ----------------------------------------------------------------------------
-  ! Prodecure pointers
+  ! Prodecure interfaces and pointers
+  ! These are subroutines/functions that change depending on the type of
+  ! emission / geometry used.
   interface
     subroutine Check_Boundary(i)
       integer, intent(in) :: i
     end subroutine Check_Boundary
+
+    function Electric_Field(pos)
+      double precision, dimension(1:3), intent(in) :: pos
+      double precision, dimension(1:3)             :: Electric_Field
+    end function Electric_Field
   end interface
 
-  procedure(Check_Boundary), pointer :: ptr_Check_Boundary
+  procedure(Check_Boundary), pointer :: ptr_Check_Boundary => null()
+  procedure(Electric_Field), pointer :: ptr_field_E => null()
 contains
 
   logical function isinf(a)
@@ -263,6 +271,7 @@ contains
     end if
   end
 
+! PGI compiler does not have is isnan function
 #if defined(__PGI)
   logical function isnan(x)
     use ieee_arithmetic
@@ -272,10 +281,12 @@ contains
   end function isnan
 #endif
 
+! So far the PGI compiler (v. 17.4) as not implemented the NORM2 function
+! from the Fortran 2008 Standard
 #if defined(__PGI)
   double precision function norm2(a)
     double precision, dimension(:), intent(in) :: a
-    !integer                                    :: i
+    ! integer                                    :: i
 
     norm2 = sum(a**2)
 
