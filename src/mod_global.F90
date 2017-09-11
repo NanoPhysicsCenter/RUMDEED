@@ -254,10 +254,15 @@ module mod_global
       double precision, dimension(1:3), intent(in) :: pos
       double precision, dimension(1:3)             :: Electric_Field
     end function Electric_Field
+
+    subroutine Do_Emission(step)
+      integer, intent(in) :: step
+    end subroutine Do_Emission
   end interface
 
   procedure(Check_Boundary), pointer :: ptr_Check_Boundary => null()
   procedure(Electric_Field), pointer :: ptr_field_E => null()
+  procedure(Do_Emission), pointer    :: ptr_Do_Emission => null()
 contains
 
   logical function isinf(a)

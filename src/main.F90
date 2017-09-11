@@ -7,6 +7,7 @@ program VacuumMD
 #endif
   use mod_global
   use mod_verlet
+  use mod_photo_emission
   use mod_pair
   use mod_unit_tests
   implicit none
