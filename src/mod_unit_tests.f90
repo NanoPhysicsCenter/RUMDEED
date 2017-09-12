@@ -67,7 +67,6 @@ contains
     box_dim = (/ 100.0d0*length_scale, 100.0d0*length_scale, d_test /)
     time_step = delta_t_test
     steps = steps_test
-    T = 5.0d0
     V = V_test
 
     ! Init

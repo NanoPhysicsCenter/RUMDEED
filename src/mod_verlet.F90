@@ -28,8 +28,7 @@ contains
     ramo_current = 0.0d0
 
     ! Update the current time
-    cur_time = time_step * at_step / time_scale ! Scaled in units of time_scale
-    at_step = at_step + 1
+    cur_time = time_step * step / time_scale ! Scaled in units of time_scale
 
     ! Update the voltage in the system
     call Set_Voltage(step)
@@ -46,7 +45,7 @@ contains
     end if
 
     ! Write out the current in the system
-    call Write_Ramo_Current(step, at_step)
+    call Write_Ramo_Current(step)
 
     ! Write out the field in the system
     !call Write_Field_Longitudinal(step)
@@ -256,7 +255,7 @@ contains
     E_z = -1.0d0*V/d
     !E_zunit = -1.0d0*sign(1.0d0, V)/d
 
-    write (ud_volt, "(ES12.4, tr2, i8, tr2, i8, tr2, ES12.4)", iostat=IFAIL) cur_time, step, at_step, V
+    write (ud_volt, "(ES12.4, tr2, i8, tr2, i8, tr2, ES12.4)", iostat=IFAIL) cur_time, step, V
   end subroutine Set_Voltage
 
 end module mod_verlet

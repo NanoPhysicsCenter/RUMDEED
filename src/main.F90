@@ -64,7 +64,6 @@ program VacuumMD
   print '(tr1, a, i0)', 'Number of threads ', nthreads
   print *, ''
 
-  at_step = 0
   cur_time = 0
   !$OMP END SINGLE
 

@@ -109,6 +109,7 @@ module mod_global
   ! ----------------------------------------------------------------------------
   ! Define constans
   integer, parameter :: MAX_PARTICLES = 50000 ! Maximum number of particles of each type allowed in the system
+  integer, parameter :: MAX_EMITTERS  = 10    ! Maximum number of emitters in the system
 
 
   !! ----------------------------------------------------------------------------
@@ -131,8 +132,9 @@ module mod_global
   integer, parameter :: remove_bot   = 2
 
   ! ----------------------------------------------------------------------------
-  ! Define storage arrays
-  double precision, dimension(:, :), allocatable :: particles_cur_pos    ! Current position
+  ! Define storage arrays for particles
+  ! Fyrst dimension is x,y,z, second one is the number of the particle
+  double precision, dimension(:, :), allocatable :: particles_cur_pos    ! Current position (1:3, 1:MAX_PARTICLES)
   double precision, dimension(:, :), allocatable :: particles_prev_pos   ! Previous position
   double precision, dimension(:, :), allocatable :: particles_cur_vel    ! Current velocity
   double precision, dimension(:, :), allocatable :: particles_cur_accel  ! Current acceleration
@@ -143,6 +145,14 @@ module mod_global
   integer         , dimension(:)   , allocatable :: particles_step       ! Time step when particle was created
   logical         , dimension(:)   , allocatable :: particles_mask       ! Mask array used to indicate which particles should be removed
 
+  ! ----------------------------------------------------------------------------
+  ! Define storage arrays for emitters
+  ! Fyrst dimension is x,y,z, second one is the number of the emitter
+  double precision, dimension(:, :), allocatable :: emitters_pos         ! Position of the emitters (1:3, 1:MAX_EMITTERS)
+  double precision, dimension(:, :), allocatable :: emitters_dim         ! Dimensions of the emitters
+  integer,          dimension(:),    allocatable :: emitters_Type        ! The type of emitter
+  integer,          dimension(:),    allocatable :: emitters_delay       ! The time step the emitters become active
+
   ! Density map
   integer, dimension(:, :), allocatable :: density_map_elec
   integer, dimension(:, :), allocatable :: density_map_hole
@@ -152,23 +162,18 @@ module mod_global
 
   ! ----------------------------------------------------------------------------
   ! Define input parameters
-  double precision :: V ! Voltage over the gap
-  double precision :: V_a ! See the subroutine Set_Voltage in mod_verlet
-  !double precision, parameter :: T = 100.0d0 ! Period scaled in time_scale
-  double precision :: T ! Period of the voltage
-  !double precision, parameter :: w_v = 2.0d0*pi/T
-  double precision :: w_v ! Frequency of the voltage
-  double precision :: d ! Gap spacing
-  double precision :: E_z ! Electric field in the y-direction (E_z = -V/d)
+  double precision :: V       ! Voltage over the gap
+  double precision :: V_a     ! See the subroutine Set_Voltage in mod_verlet
+  double precision :: d       ! Gap spacing
+  double precision :: E_z     ! Electric field in the y-direction (E_z = -V/d)
   double precision :: E_zunit ! Unit electric field (E_zunit = -1/d) (See Ramo Current)
 
   double precision, dimension(1:3) :: box_dim ! Dimensions of the cell
 
-  double precision :: time_step ! Size of the time_step
+  double precision :: time_step  ! Size of the time_step
   double precision :: time_step2 ! time_step squared
 
-  integer          :: steps ! Number of time steps in the simulation
-  integer          :: at_step
+  integer          :: steps      ! Number of time steps in the simulation
 
 
   ! ----------------------------------------------------------------------------
@@ -177,6 +182,7 @@ module mod_global
   integer :: nrElec ! Number of electrons in the system
   integer :: nrHole ! Number of holes in the system
   integer :: nrElecHole
+  integer :: nrEmit ! Number of emitters in the system
 
   integer :: nrPart_remove_top
   integer :: nrPart_remove_bot
@@ -193,6 +199,13 @@ module mod_global
 
   integer :: startElecHoles
   integer :: endElecHoles
+
+
+  ! ----------------------------------------------------------------------------
+  ! Emitter types
+  integer, parameter :: EMIT_UNKNOWN   = 0
+  integer, parameter :: EMIT_CIRCLE    = 1
+  integer, parameter :: EMIT_RECTANGLE = 2
 
 
   double precision, dimension(:), allocatable :: ramo_current
@@ -233,13 +246,15 @@ module mod_global
   integer :: ud_density_map_total ! Density maps for holes - electrons
 
   !--
+  ! Used in Calc_Field_at in the Verlet module. Needs to be shared between threads.
+  ! Can we move it into the function? ToDo...
   double precision, dimension(1:3) :: force_tot
 
 
   ! ----------------------------------------------------------------------------
   ! Define namelist
-  namelist /input/ V, box_dim, time_step, steps, T
-  !namelist /input_test/ V, d, box_dim, time_step, steps
+  namelist /input/ V, box_dim, time_step, steps, emitters_pos, emitters_dim, &
+                   emitters_type, emitters_delay
 
   ! ----------------------------------------------------------------------------
   ! Prodecure interfaces and pointers
