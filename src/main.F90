@@ -2,9 +2,6 @@ program VacuumMD
 #if defined(_OPENMP)
   use omp_lib
 #endif
-#if defined(__INTEL_COMPILER)
-  USE IFPORT, only: GETPID
-#endif
   use mod_global
   use mod_verlet
   use mod_photo_emission
@@ -16,8 +13,11 @@ program VacuumMD
   integer, dimension(1:9) :: progress
 
 #if defined(_OPENMP)
+  print '(a)', 'Vacuum: Using OpenMP'
+  print '(tr1, a, i0)', 'Number of threads ', nthreads
   nthreads = omp_get_max_threads()
 #else
+  print '(a)', 'Vacuum: Single threaded'
   nthreads = 1
 #endif
 
@@ -30,6 +30,7 @@ program VacuumMD
 
   print '(a)', 'Vacuum: Initialzing'
   call Init()
+  call Init_Photo_Emission()
 
   print '(a)', 'Vacuum: Writing out variables'
   call Write_Initial_Variables()
@@ -47,28 +48,18 @@ program VacuumMD
   print '(tr1, a, i0, a, ES12.4, a)', 'Doing ', steps, ' time steps of size ', time_step, ' seconds'
 #endif
 
-  !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(i, tid)
-
 #if defined(_UNIT_TEST_)
   call Run_Unit_Tests()
 #else
 
-#if defined(_OPENMP)
-  tid = omp_get_thread_num()
-#else
-  tid = 0
-#endif
-  !$OMP SINGLE
-  print '(tr1, a, i0)', 'Number of threads ', nthreads
   print *, ''
 
   cur_time = 0
-  !$OMP END SINGLE
 
   do i = 1, steps
 
     ! Do Emission
-    !call emission code
+    call Do_Photo_Emission(i)
 
     ! Update the position of all particles
     !print *, 'Update position'
@@ -77,7 +68,6 @@ program VacuumMD
     ! Remove particles from the system
     call Remove_Particles(i)
 
-    !$OMP MASTER
     if (i == progress(1)) then
       call PrintProgress(1)
     else if (i == progress(2)) then
@@ -98,20 +88,14 @@ program VacuumMD
       call PrintProgress(9)
     end if
 
-    !$OMP END MASTER
-
-    !$OMP BARRIER
   end do
 
-  !$OMP MASTER
   call PrintProgress(10)
   print '(a)', 'Vacuum: Main loop finished'
-  !$OMP END MASTER
 
 ! End of else for unit test
 #endif
 
-  !$OMP END PARALLEL
 
 #if defined(_UNIT_TEST_)
   print '(a)', 'Vacuum: Unit tests finished'
@@ -121,6 +105,7 @@ program VacuumMD
 #endif
 
   print '(a)', 'Vacuum: Program finished'
+  call Clean_Up_Photo_Emission()
   call Clean_up()
 contains
 
@@ -212,7 +197,8 @@ contains
   ! Initialize the program
   ! allocate and initilize variables, open data files for writing, etc.
   subroutine Init()
-    integer :: IFAIL
+    integer :: IFAIL, n
+    integer, dimension(:), allocatable :: my_seed
 
     ! Allocate arrays
     allocate(particles_cur_pos(1:3, 1:MAX_PARTICLES))
@@ -284,6 +270,13 @@ contains
 
     ptr_Check_Boundary => Check_Boundary_ElecHole
     ptr_field_E => field_E
+
+    call RANDOM_SEED(size = n)
+    allocate(my_seed(n))
+    my_seed = SEED
+    call RANDOM_SEED(PUT = my_seed)
+    deallocate(my_seed)
+
 
     ! Open data file for writing
     open(newunit=ud_pos, iostat=IFAIL, file='position.dt', status='REPLACE', action='write')

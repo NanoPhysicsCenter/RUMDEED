@@ -44,6 +44,11 @@ contains
       nrHole = nrHole + 1
     end if
 
+    if (particles_mass(nrPart+1) == 0.0d0) then
+      print *, 'WTF'
+      pause
+    end if
+
     ! Update the number of particles in the system
     nrElecHole = nrElec + nrHole
     nrPart = nrElecHole
@@ -131,6 +136,8 @@ contains
   subroutine Remove_Particles(step)
     integer, intent(in) :: step
     integer             :: m, k
+
+    !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(m, k)
 
     !$OMP SINGLE
 
@@ -229,6 +236,8 @@ contains
     end if
 
     !$OMP END SINGLE
+
+    !$OMP END PARALLEL
   end subroutine Remove_Particles
 
   ! --------------------------------------------------------------------------
@@ -269,7 +278,6 @@ contains
     integer             :: i, IFAIL
     double precision    :: ramo_cur
 
-    !$OMP MASTER
     ramo_cur = 0.0d0
 
     do i = 1, nrSpecies
@@ -278,8 +286,6 @@ contains
 
     write (ud_ramo, "(ES12.4, tr2, i8, tr2, i8, tr2, E12.4, tr2, E12.4, tr2, i6, tr2, i6)", iostat=IFAIL) &
     & cur_time, step, ramo_cur/cur_scale, V, nrPart, nrElec, nrHole
-
-    !$OMP END MASTER
   end subroutine Write_Ramo_current
 
   ! ----------------------------------------------------------------------------

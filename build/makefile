@@ -9,7 +9,8 @@ FCOMPILER=gfortran
 #FCOMPILER=pgfortran
 endif
 
-UNIT_TEST = 1
+#UNIT_TEST = 1
+#OPENMP = 1
 
 # Compile flags
 # UNKNOWN COMPILERS
@@ -21,14 +22,20 @@ endif
 ifeq ($(FCOMPILER),ifort)
 $(info Using Intel Fortran)
 #FFLAGS=-O2 -xHost -qopenmp -ip -ipo
-FFLAGS=-check all -g -warn interfaces -warn all -qopenmp
+FFLAGS=-check all -g -warn interfaces -warn all
+ifdef OPENMP
+FFLAGS+=-qopenmp
+endif
 endif
 
 # GNU FORTRAN
 ifeq ($(FCOMPILER),gfortran)
 $(info Using GNU Fortran)
 #FFLAGS=-O3 -fopenmp -ffast-math -m64 -funroll-loops -flto -march=native -fno-range-check
-FFLAGS=-g -fcheck=all -Wall -fopenmp -fbacktrace -ffpe-trap=zero,overflow,underflow,denormal
+FFLAGS=-g -fcheck=all -Wall -fbacktrace -ffpe-trap=zero,overflow,underflow,denormal
+ifdef OPENMP
+FFLAGS+=-fopenmp
+endif
 endif
 
 # PGI FORTRAN
@@ -36,6 +43,9 @@ ifeq ($(FCOMPILER),pgfortran)
 $(info Using PGI Fortran)
 #FFLAGS=-O2 -fast -mp
 FFLAGS=-g -gopt -Mbounds -Mchkfpstk -Mchkfpstk -Mchkfpstk -Melf -traceback
+ifdef OPENMP
+FFLAGS+=-mp
+endif
 endif
 
 ifdef UNIT_TEST

@@ -224,7 +224,6 @@ module mod_global
   ! ----------------------------------------------------------------------------
   ! Parameters for random number generators
   ! http://en.wikipedia.org/wiki/Mersenne_Twister#SFMT
-  integer                                            :: tid ! Thread number
   integer                                            :: SEED = 2815
 
 

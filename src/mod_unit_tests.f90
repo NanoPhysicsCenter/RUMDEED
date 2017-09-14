@@ -109,7 +109,6 @@ contains
 
     ! We must use OMP MASTER here because the variables declared above
     ! are private for each thread and are NOT shared.
-    !$OMP MASTER
     print *, 'Running test for acceleration'
 
     R_1 = (/  3.0d0, -10.0d0, 101.0d0 /) * length_scale
@@ -148,15 +147,11 @@ contains
     call Add_Particle(R_2, par_vel, species_elec, 1)
     call Add_Particle(R_3, par_vel, species_hole, 1)
 
-    !$OMP END MASTER
-
-    !$OMP BARRIER
     call Calculate_Acceleration_Particles()
 
     par_vel = (/ -4.55, -2.34, 96.44 /) * length_scale
     E_pos = Calc_Field_at(par_vel)
 
-    !$OMP MASTER
     a_1_res = particles_cur_accel(:, 1)
     a_2_res = particles_cur_accel(:, 2)
     a_3_res = particles_cur_accel(:, 3)
@@ -206,8 +201,6 @@ contains
 
     print *, 'Acceleration test finished'
     print *, ''
-
-    !$OMP END MASTER
   end subroutine Test_Acceleration
 
   !-----------------------------------------------------------------------------
@@ -233,7 +226,6 @@ contains
 
     double precision, dimension(1:3) :: R_1, par_vel
 
-    !$OMP MASTER
     print *, 'Starting transite time test'
     R_1 = (/ 0.0d0, 0.0d0, 1.0d0*length_scale /)
 
@@ -246,8 +238,6 @@ contains
     ! Add particle
     par_vel = 0.0d0
     call Add_Particle(R_1, par_vel, species_elec, 1)
-    !$OMP END MASTER
-    !$OMP BARRIER
 
     do i = 1, steps
 
@@ -260,18 +250,16 @@ contains
 
       ! Remove particles from the system
       call Remove_Particles(i)
-      !$OMP MASTER
+
       !print *, 'i = ', i
       !print *, 'nrPart = ', nrPart
       if ((nrPart == 0) .and. (found_res .eqv. .false.)) then
         steps_res = i
         found_res = .true.
       end if
-      !$OMP END MASTER
-      !$OMP BARRIER
+
     end do
 
-    !$OMP MASTER
       do i = 1, MAX_LIFE_TIME
         if (life_time(i, species_elec) /= 0) then
           print *, i
@@ -289,6 +277,5 @@ contains
 
       print *, 'Transit time test finished'
       print *, ''
-    !$OMP END MASTER
   end subroutine Test_Transit_Time
 end module mod_unit_tests

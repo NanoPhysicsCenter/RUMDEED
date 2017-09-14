@@ -24,7 +24,6 @@ contains
   subroutine Velocity_Verlet(step)
     integer, intent(in) :: step
 
-    !$OMP SINGLE
     ramo_current = 0.0d0
 
     ! Update the current time
@@ -32,7 +31,6 @@ contains
 
     ! Update the voltage in the system
     call Set_Voltage(step)
-    !$OMP END SINGLE
 
 
     ! Update the position of particles (Electrons / Holes)
@@ -59,7 +57,7 @@ contains
     integer, intent(in) :: step
     integer             :: i
 
-    !$OMP DO PRIVATE(i) SCHEDULE(STATIC)
+    !$OMP PARALLEL DO PRIVATE(i) SCHEDULE(STATIC)
     do i = startElecHoles, endElecHoles
       particles_prev_pos(:, i) = particles_cur_pos(:, i) ! Store the previous position
       particles_cur_pos(:, i)  = particles_cur_pos(:, i) + particles_cur_vel(:, i)*time_step &
@@ -72,7 +70,7 @@ contains
       !call Check_Boundary_ElecHole(i)
       call ptr_Check_Boundary(i)
     end do
-    !$OMP END DO
+    !$OMP END PARALLEL DO
   end subroutine Update_ElecHole_Position
 
   ! ----------------------------------------------------------------------------
@@ -102,7 +100,7 @@ contains
     integer             :: i, k
     double precision    :: q
 
-    !$OMP DO PRIVATE(i, q, k)
+    !$OMP PARALLEL DO PRIVATE(i, q, k)
     do i = startElecHoles, endElecHoles
       particles_cur_vel(:, i) = particles_cur_vel(:, i) &
                             & + 0.5d0*( particles_prev_accel(:, i) &
@@ -115,7 +113,7 @@ contains
       !$OMP ATOMIC
       ramo_current(k) = ramo_current(k) + q * E_zunit * particles_cur_vel(2, i)
     end do
-    !$OMP END DO
+    !$OMP END PARALLEL DO
   end subroutine Update_Velocity
 
 
@@ -130,7 +128,7 @@ contains
     double precision                 :: pre_fac_c
     integer                          :: i, j, k_1, k_2
 
-    !$OMP DO PRIVATE(i, j, k_1, k_2, pos_1, pos_2, diff, r, force_E, force_c, im_1, q_1, im_2, q_2, pre_fac_c) &
+    !$OMP PARALLEL DO PRIVATE(i, j, k_1, k_2, pos_1, pos_2, diff, r, force_E, force_c, im_1, q_1, im_2, q_2, pre_fac_c) &
     !$OMP& REDUCTION(+:particles_cur_accel) SCHEDULE(GUIDED)
     do i = 1, nrPart
       ! Information about the particle we are calculating the force/acceleration on
@@ -149,6 +147,9 @@ contains
 
         ! Information about the particle that is acting on the particle at pos_1
         pos_2 = particles_cur_pos(:, j)
+        if (particles_mass(j) == 0.0d0) then
+          print *, 'Hi'
+        end if
         im_2 = 1.0d0 / particles_mass(j)
         q_2 = particles_charge(j)
         k_2 = particles_species(j)
@@ -171,7 +172,7 @@ contains
 
       particles_cur_accel(:, i) = particles_cur_accel(:, i) + force_E * im_1
     end do
-    !$OMP END DO
+    !$OMP END PARALLEL DO
   end subroutine Calculate_Acceleration_Particles
 
 
@@ -181,9 +182,7 @@ contains
     double precision, dimension(1:3)             :: Calc_Field_at
     double precision, dimension(1:3), intent(in) :: pos
 
-    double precision, dimension(1:3), save :: force_tot ! Declared with save to make it shared between OpenMP threads
-
-    double precision, dimension(1:3) :: force_c
+    double precision, dimension(1:3) :: force_c, force_tot
     double precision, dimension(1:3) :: pos_1, pos_2, diff
     double precision                 :: r
     double precision                 :: q_2
@@ -193,12 +192,10 @@ contains
     ! Position of the particle we are calculating the force/acceleration on
     pos_1 = pos
 
-    !$OMP SINGLE
     ! Electric field in the system
     force_tot = ptr_field_E(pos_1)
-    !$OMP END SINGLE
 
-    !$OMP DO PRIVATE(j, pos_2, diff, r, force_c, q_2, pre_fac_c) &
+    !$OMP PARALLEL DO PRIVATE(j, pos_2, diff, r, force_c, q_2, pre_fac_c) &
     !$OMP& REDUCTION(+:force_tot) SCHEDULE(GUIDED)
     do j = 1, nrPart
 
@@ -220,7 +217,7 @@ contains
 
       force_tot = force_tot + pre_fac_c * force_c
     end do
-    !$OMP END DO
+    !$OMP END PARALLEL DO
 
     Calc_Field_at = force_tot
 

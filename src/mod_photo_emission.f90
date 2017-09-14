@@ -25,6 +25,14 @@ Module mod_photo_emission
   integer, parameter                          :: MAX_EMISSION_TRY = 100
 
 contains
+  subroutine Init_Photo_Emission()
+    allocate(nrEmitted_emitters(1:MAX_EMITTERS))
+  end subroutine Init_Photo_Emission
+
+  subroutine Clean_Up_Photo_Emission()
+    deallocate(nrEmitted_emitters)
+  end subroutine Clean_Up_Photo_Emission
+
   subroutine Do_Photo_Emission(step)
     integer, intent(in)   :: step
       integer             :: i, IFAIL
@@ -78,8 +86,6 @@ contains
     double precision, dimension(1:3) :: par_pos, par_vel, field
     double precision                 :: r_e, theta_e
 
-    !$OMP MASTER
-
     par_pos = 0.0d0
     nrTry = 0
     nrElecEmit = 0
@@ -116,8 +122,6 @@ contains
 
     posInit = posInit + nrElecEmit
     nrEmitted = nrEmitted + nrElecEmit
-    !$OMP END MASTER
-    !$OMP BARRIER
   end subroutine Do_Photo_Emission_Circle
 
   subroutine Do_Photo_Emission_Rectangle(step, emit)
@@ -174,7 +178,6 @@ contains
 
     posInit = posInit + nrElecEmit
     nrEmitted = nrEmitted + nrElecEmit
-
   end subroutine Do_Photo_Emission_Rectangle
 
   ! ! Add the absorption event to the absorption graph.
