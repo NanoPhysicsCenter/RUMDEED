@@ -10,7 +10,7 @@ module mod_unit_tests
   use mod_verlet
   implicit none
 
-  double precision, parameter :: tolerance = 1.0d-10
+  double precision, parameter :: tolerance = 1.0d-6
 contains
   subroutine Run_Unit_Tests()
     call Test_Acceleration()
@@ -94,7 +94,7 @@ contains
   ! optimizations and the OpenMP are working correctly.
   subroutine Test_Acceleration()
     double precision, dimension(1:3) :: R_1, R_2, R_3
-    double precision, dimension(1:3) :: E_test, par_vel, E_pos
+    double precision, dimension(1:3) :: E_test, par_vel, E_pos, E_python
 
     double precision, dimension(1:3) :: a_1, a_12, a_13, a_1E, a_1_res
     double precision, dimension(1:3) :: a_2, a_21, a_23, a_2E, a_2_res
@@ -188,13 +188,21 @@ contains
       print *, 'Particle 3 PASSED'
     else
       print *, 'Particle 3 FAILED'
-      print *, a_2_res
-      print *, a_2
+      print *, a_3_res
+      print *, a_3
       print *, ''
     end if
 
-    print *, 'Electric field at'
-    print *, 'E_pos = ', E_pos
+    E_python = (/ 6192429.94450208d0,  -4866704.16373579d0, -17454923.69763095d0 /) ! Results from Python script
+    if (all(abs(E_python - E_pos)/E_python < tolerance)) then
+      print *, 'Electric field PASSED'
+    else
+      print *, 'Electric field FAILED'
+      print *, 'E_python = ', E_python
+      print *, 'E_pos = ', E_pos
+      print *, 'abs(E_python - E_pos)/E_python = ', abs(E_python - E_pos)/E_python
+      print *, ''
+    end if
 
     print *, 'Acceleration test finished'
     print *, ''

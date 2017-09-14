@@ -34,7 +34,7 @@ endif
 # PGI FORTRAN
 ifeq ($(FCOMPILER),pgfortran)
 $(info Using PGI Fortran)
-#FFLAGS=-O2 -fast -mp -pgf90libs
+#FFLAGS=-O2 -fast -mp
 FFLAGS=-g -gopt -Mbounds -Mchkfpstk -Mchkfpstk -Mchkfpstk -Melf -traceback
 endif
 
@@ -49,7 +49,7 @@ PROJECT_NAME=Vacuum-MD
 all: $(PROJECT_NAME).out
 
 $(PROJECT_NAME).out: ../src/main.F90 mod_global.mod mod_verlet.mod mod_pair.mod	mod_unit_tests.mod mod_photo_emission.mod
-		$(FCOMPILER) $(FFLAGS) ../src/main.F90 mod_global.o mod_verlet.o mod_pair.o mod_unit_tests.o \
+		$(FCOMPILER) $(FFLAGS) ../src/main.F90 mod_global.o mod_verlet.o mod_pair.o mod_unit_tests.o mod_photo_emission.o \
 			-lpthread -lm -ldl -o $(PROJECT_NAME).out
 
 mod_global.mod: ../src/mod_global.F90

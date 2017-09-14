@@ -181,6 +181,8 @@ contains
     double precision, dimension(1:3)             :: Calc_Field_at
     double precision, dimension(1:3), intent(in) :: pos
 
+    double precision, dimension(1:3), save :: force_tot ! Declared with save to make it shared between OpenMP threads
+
     double precision, dimension(1:3) :: force_c
     double precision, dimension(1:3) :: pos_1, pos_2, diff
     double precision                 :: r
@@ -188,12 +190,11 @@ contains
     double precision                 :: pre_fac_c
     integer                          :: j
 
-
-    !$OMP SINGLE
     ! Position of the particle we are calculating the force/acceleration on
     pos_1 = pos
 
-    ! Acceleration due to electric field
+    !$OMP SINGLE
+    ! Electric field in the system
     force_tot = ptr_field_E(pos_1)
     !$OMP END SINGLE
 

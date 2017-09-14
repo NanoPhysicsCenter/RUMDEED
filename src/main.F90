@@ -51,9 +51,7 @@ program VacuumMD
 
 #if defined(_UNIT_TEST_)
   call Run_Unit_Tests()
-  !$OMP BARRIER
-  stop
-#endif
+#else
 
 #if defined(_OPENMP)
   tid = omp_get_thread_num()
@@ -110,10 +108,17 @@ program VacuumMD
   print '(a)', 'Vacuum: Main loop finished'
   !$OMP END MASTER
 
+! End of else for unit test
+#endif
+
   !$OMP END PARALLEL
 
+#if defined(_UNIT_TEST_)
+  print '(a)', 'Vacuum: Unit tests finished'
+#else
   print '(a)', 'Vacuum: Writing data'
   call Write_Life_Time()
+#endif
 
   print '(a)', 'Vacuum: Program finished'
   call Clean_up()
@@ -141,6 +146,16 @@ contains
       stop
     end if
 
+    allocate(emitters_pos(1:3, 1:MAX_EMITTERS))
+    allocate(emitters_dim(1:3, 1:MAX_EMITTERS))
+    allocate(emitters_type(1:MAX_EMITTERS))
+    allocate(emitters_delay(1:MAX_EMITTERS))
+
+    emitters_dim = 0.0d0
+    emitters_pos = 0.0d0
+    emitters_type = 0
+    emitters_delay = 0
+
     ! Read the input file
     read(ud_input, NML=input)
 
@@ -156,6 +171,9 @@ contains
     V_a = V
 
     E_zunit = -1.0d0/d
+
+    emitters_dim = emitters_dim * length_scale
+    emitters_pos = emitters_pos * length_scale
 
     ! Set the dimensions of the box used
     !box_dim(1) = d
@@ -458,6 +476,11 @@ contains
     deallocate(particles_species)
     deallocate(particles_mass)
     deallocate(particles_mask)
+
+    deallocate(emitters_pos)
+    deallocate(emitters_dim)
+    deallocate(emitters_type)
+    deallocate(emitters_delay)
 
     deallocate(ramo_current)
     deallocate(life_time)

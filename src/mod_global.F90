@@ -253,7 +253,8 @@ module mod_global
 
   ! ----------------------------------------------------------------------------
   ! Define namelist
-  namelist /input/ V, box_dim, time_step, steps, emitters_pos, emitters_dim, &
+  namelist /input/ V, box_dim, time_step, steps, &
+                   nrEmit, emitters_pos, emitters_dim, &
                    emitters_type, emitters_delay
 
   ! ----------------------------------------------------------------------------
@@ -301,19 +302,20 @@ contains
   end function isnan
 #endif
 
-! So far the PGI compiler (v. 17.4) as not implemented the NORM2 function
+! So far the PGI compiler (v. 17.4) has not implemented the NORM2 function
 ! from the Fortran 2008 Standard
 #if defined(__PGI)
   double precision function norm2(a)
     double precision, dimension(:), intent(in) :: a
     ! integer                                    :: i
 
-    norm2 = sum(a**2)
+    norm2 = sqrt(sum(a**2))
 
     ! norm2 = 0.0d0
-    ! do i = 1, 3
+    ! do i = lbound(a, dim=1), ubound(a, dim=1)
     !   norm2 = norm2 + a(i)**2
     ! end do
+    ! norm2 = sqrt(norm2)
   end function norm2
 #endif
 end module mod_global

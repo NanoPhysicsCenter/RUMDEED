@@ -15,31 +15,32 @@ q_0 = 1.6021766208E-19 # Standard charge (C)
 
 # Defined constants
 pre_fac_c = q_0**2/(4*pi*m_0*epsilon_0)
-pre_fac_F = q_0/(4*pi*m_0*epsilon_0)
+pre_fac_F = q_0/(4*pi*epsilon_0)
 pre_fac_E = q_0/m_0
 
-# System parameters
-d = 100.0 # Gap spacing (nm)
-V = 2.0 # Voltage over gap (V)
-delta_t = 0.25 # Time step (ps)
 
 # Scale factors
 time_scale = 1.0E-12
 length_scale = 1.0E-9
 
-a_scale_c = time_scale**2/length_scale**3
-a_scale_E = time_scale**2/length_scale**3
+# System parameters
+d = 100.0*length_scale # Gap spacing (nm)
+V = 2.0 # Voltage over gap (V)
+delta_t = 0.25E-3*time_scale # Time step (ps)
+
+#a_scale_c = time_scale**2/length_scale**3
+#a_scale_E = time_scale**2/length_scale**3
 
 # Electric field in system
 E = np.array([0.0, 0.0, -V/d])
 
 # Particle locations
 # Electrons
-R_1 = np.array([3.0, -10.0, 101.0])
-R_2 = np.array([-9.0, 26.0, 80.0])
+R_1 = np.array([3.0, -10.0, 101.0])*length_scale
+R_2 = np.array([-9.0, 26.0, 80.0])*length_scale
 
 # Holes
-R_3 = np.array([6.0, -24.0, 118.0])
+R_3 = np.array([6.0, -24.0, 118.0])*length_scale
 
 
 # Acceleration particles 1 ----------------------------------------------------
@@ -84,6 +85,10 @@ R_4 = np.array([-4.55, -2.34, 96.44])*length_scale
 E_1 = -1.0*pre_fac_F * (R_4 - R_1) / np.linalg.norm(R_4 - R_1)**3
 E_2 = -1.0*pre_fac_F * (R_4 - R_2) / np.linalg.norm(R_4 - R_2)**3
 E_3 = +1.0*pre_fac_F * (R_4 - R_3) / np.linalg.norm(R_4 - R_3)**3
+
+print('pre_fac_F = ', pre_fac_F)
+print('diff = ', (R_4 - R_1))
+print('r = ', np.linalg.norm(R_4 - R_1))
 
 E_tot = E_1 + E_2 + E_3 + E
 print('Electric field')
