@@ -12,7 +12,7 @@ Module mod_photo_emission
 
   ! ----------------------------------------------------------------------------
   ! Variables
-  double precision, dimension(:), allocatable :: nrEmitted_emitters
+  integer, dimension(:), allocatable :: nrEmitted_emitters
   integer                                     :: posInit
   logical                                     :: EmitGauss = .false.
   integer                                     :: maxElecEmit = -1
@@ -26,7 +26,7 @@ Module mod_photo_emission
 
 contains
   subroutine Init_Photo_Emission()
-    allocate(nrEmitted_emitters(1:MAX_EMITTERS))
+    allocate(nrEmitted_emitters(1:nrEmit))
   end subroutine Init_Photo_Emission
 
   subroutine Clean_Up_Photo_Emission()
@@ -34,50 +34,49 @@ contains
   end subroutine Clean_Up_Photo_Emission
 
   subroutine Do_Photo_Emission(step)
-    integer, intent(in)   :: step
-      integer             :: i, IFAIL
-      double precision    :: cur_time
-      double precision, dimension(1:3) :: pos
+    integer, intent(in) :: step
+    integer             :: i, IFAIL
+    double precision    :: cur_time
+    double precision, dimension(1:3) :: pos
 
-      posInit = 0
-      nrEmitted_emitters = 0
+    posInit = 0
+    nrEmitted_emitters = 0
 
-      !if (step > 2) then
-      !  return
-      !end if
+    !if (step > 2) then
+    !  return
+    !end if
 
-      ! Check if we are doing a Gaussian distributed emission
-      ! and set the max number of electrons allowed to be emitted if we are
-      if (EmitGauss .eqv. .TRUE.) then
-        maxElecEmit = Gauss_Emission(step)
+    ! Check if we are doing a Gaussian distributed emission
+    ! and set the max number of electrons allowed to be emitted if we are
+    if (EmitGauss .eqv. .TRUE.) then
+      maxElecEmit = Gauss_Emission(step)
+    end if
+
+    !i = 1
+
+    ! Loop through all of the emitters
+    do i = 1, nrEmit
+
+      ! Check the type of the emitter CIRCLE / RECTANGLE
+      if (emitters_delay(i) < step) then
+        !select case (emitters_type(i))
+        !case (EMIT_CIRCLE)
+          !print *, 'Doing Circle'
+        !  call Do_Photo_Emission_Circle(step, i)
+        !case (EMIT_RECTANGLE)
+          !print *, 'Doing Rectangle'
+          call Do_Photo_Emission_Rectangle(step, i)
+        !case default
+        !  print *, 'Vacuum: WARNING unknown emitter type!!'
+        !  print *, emitters_type(i)
+        !end select
       end if
+    end do
 
-      !i = 1
+    cur_time = time_step * step / time_scale ! Scaled in units of time_scale
+    write (ud_emit, "(E14.6, *(tr8, i6))", iostat=IFAIL) cur_time, step, posInit, &
+    & nrEmitted, nrElec, (nrEmitted_emitters(i), i = 1, nrEmit), maxElecEmit
 
-     ! Loop through all of the emitters
-     do i = 1, nrEmit
-
-       ! Check the type of the emitter CIRCLE / RECTANGLE
-       if (emitters_delay(i) < step) then
-         select case (emitters_type(i))
-           case (EMIT_CIRCLE)
-             !print *, 'Doing Circle'
-             call Do_Photo_Emission_Circle(step, i)
-           case (EMIT_RECTANGLE)
-             !print *, 'Doing Rectangle'
-             call Do_Photo_Emission_Rectangle(step, i)
-           case default
-             print *, 'Vacuum: WARNING unknown emitter type!!'
-             print *, emitters_type(i)
-         end select
-       end if
-     end do
-
-      !if (step <= MAX_TIME_STEP_WRITE) then
-        cur_time = time_step * step / time_scale ! Scaled in units of time_scale
-        write (ud_emit, "(E14.6, *(tr8, i6))", iostat=IFAIL) cur_time, step, posInit, &
-          & nrEmitted, nrElec, (nrEmitted_emitters(i), i = 1, nrEmit), maxElecEmit
-      !end if
   end subroutine Do_Photo_Emission
 
   subroutine Do_Photo_Emission_Circle(step, emit)
@@ -150,18 +149,18 @@ contains
 
       CALL RANDOM_NUMBER(par_pos(1:2)) ! Gives a random number [0,1]
 
-      par_pos(1) = emitters_pos(1, emit) + emitters_dim(1, emit)*par_pos(1)
-      par_pos(2) = emitters_pos(2, emit) + emitters_dim(2, emit)*par_pos(2)
+      par_pos(1:2) = emitters_pos(1:2, emit) + emitters_dim(1:2, emit)*par_pos(1:2)
+      !par_pos(2) = emitters_pos(2, emit) + emitters_dim(2, emit)*par_pos(2)
 
       nrTry = nrTry + 1
       par_pos(3) = 0.0d0 * length_scale !Check in plane
       field = Calc_Field_at(par_pos)
 
-      if (field(3) <= 0.0d0) then
+      if (field(3) < 0.0d0) then
         par_pos(3) = 1.0d0 * length_scale !Above plane
         field = Calc_Field_at(par_pos)
 
-        if (field(3) <= 0.0d0) then
+        if (field(3) < 0.0d0) then
 
           par_pos(3) = 1.0d0 * length_scale ! Place above plane
           par_vel = 0.0d0
