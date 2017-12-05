@@ -67,12 +67,12 @@ contains
     box_dim = (/ 100.0d0*length_scale, 100.0d0*length_scale, d_test /)
     time_step = delta_t_test
     steps = steps_test
-    V = V_test
+    V_s = V_test
 
     ! Init
     d = box_dim(3)
-    E_z = -1.0d0*V/d
-    V_a = V
+    V_d = V_s
+    E_z = -1.0d0*V_d/d
     E_zunit = -1.0d0/d
 
     dens_x_d = box_dim(1) / (N_x_densmap-1)

@@ -276,16 +276,18 @@ contains
   subroutine Write_Ramo_Current(step)
     integer, intent(in) :: step
     integer             :: i, IFAIL
-    double precision    :: ramo_cur
+    double precision    :: ramo_cur = 0.0d0
 
-    ramo_cur = 0.0d0
+    !ramo_cur = 0.0d0
 
-    do i = 1, nrSpecies
-      ramo_cur = ramo_cur + ramo_current(i)
-    end do
+    !do i = 1, nrSpecies
+    !  ramo_cur = ramo_cur + ramo_current(i)
+    !end do
+    ramo_cur = sum(ramo_current) / cur_scale
 
-    write (ud_ramo, "(ES12.4, tr2, i8, tr2, i8, tr2, E12.4, tr2, E12.4, tr2, i6, tr2, i6)", iostat=IFAIL) &
-    & cur_time, step, ramo_cur/cur_scale, V, nrPart, nrElec, nrHole
+    write (ud_ramo, "(ES12.4, tr2, i8, tr2, E12.4, tr2, E12.4, tr2, i6, tr2, i6, tr2, i6)", iostat=IFAIL) &
+    & cur_time, step, ramo_cur, V_d, nrPart, nrElec, nrHole
+
   end subroutine Write_Ramo_current
 
   ! ----------------------------------------------------------------------------

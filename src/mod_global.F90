@@ -162,8 +162,8 @@ module mod_global
 
   ! ----------------------------------------------------------------------------
   ! Define input parameters
-  double precision :: V       ! Voltage over the gap
-  double precision :: V_a     ! See the subroutine Set_Voltage in mod_verlet
+  double precision :: V_d     ! Voltage over the gap
+  double precision :: V_s     ! Voltage from the source
   double precision :: d       ! Gap spacing
   double precision :: E_z     ! Electric field in the y-direction (E_z = -V/d)
   double precision :: E_zunit ! Unit electric field (E_zunit = -1/d) (See Ramo Current)
@@ -209,6 +209,8 @@ module mod_global
 
 
   double precision, dimension(:), allocatable :: ramo_current
+  double precision :: ramo_cur_prev
+  double precision :: ramo_integral
 
   double precision :: cur_time ! This is updated in the main loop, given in ps
   integer, parameter :: MAX_LIFE_TIME = 1000
@@ -252,7 +254,7 @@ module mod_global
 
   ! ----------------------------------------------------------------------------
   ! Define namelist
-  namelist /input/ V, box_dim, time_step, steps, &
+  namelist /input/ V_s, box_dim, time_step, steps, &
                    nrEmit, emitters_pos, emitters_dim, &
                    emitters_type, emitters_delay
 

@@ -24,13 +24,15 @@ contains
   subroutine Velocity_Verlet(step)
     integer, intent(in) :: step
 
-    ramo_current = 0.0d0
-
     ! Update the current time
     cur_time = time_step * step / time_scale ! Scaled in units of time_scale
 
     ! Update the voltage in the system
     call Set_Voltage(step)
+
+    ! Reset the ramo current. Note, this should be done after set_voltage,
+    ! since the ramo current may be used there.
+    ramo_current = 0.0d0
 
 
     ! Update the position of particles (Electrons / Holes)
@@ -111,7 +113,7 @@ contains
 
       ! We use OMP ATOMIC here because the index k is not a loop index
       !$OMP ATOMIC
-      ramo_current(k) = ramo_current(k) + q * E_zunit * particles_cur_vel(2, i)
+      ramo_current(k) = ramo_current(k) + q * E_zunit * particles_cur_vel(3, i)
     end do
     !$OMP END PARALLEL DO
   end subroutine Update_Velocity
@@ -248,12 +250,77 @@ contains
   subroutine Set_Voltage(step)
     integer, intent(in) :: step
     integer             :: IFAIL
+    double precision    :: V_R = 0.0d0, V_C = 0.0d0
 
-    V = V_a
-    E_z = -1.0d0*V/d
+    !V_R = Voltage_Resistor()
+    !V_C = Voltage_Capacitor()
+    !V_d = V_s + V_R + V_C
+
+    V_C = Voltage_Parallel_Capacitor()
+    V_d = V_s - V_C
+
+    E_z = -1.0d0*V_d/d
     !E_zunit = -1.0d0*sign(1.0d0, V)/d
 
-    write (ud_volt, "(ES12.4, tr2, i8, tr2, i8, tr2, ES12.4)", iostat=IFAIL) cur_time, step, V
+    write (ud_volt, "(ES12.4, tr2, i8, tr2, ES12.4, tr2, ES12.4, tr2, ES12.4)", iostat=IFAIL) cur_time, step, V_d, V_R, V_C
   end subroutine Set_Voltage
+
+  double precision pure function Voltage_Resistor()
+    double precision, parameter :: R = 5.0d5 ! Ohm
+    double precision            :: ramo_cur
+
+    ! Calculate the total ramo current
+    ramo_cur = sum(ramo_current)
+
+    ! Calculate the voltage drop over the resistor
+    Voltage_Resistor = -1.0d0*R*ramo_cur
+  end function Voltage_Resistor
+
+  double precision function Voltage_Capacitor()
+    double precision, parameter :: C = 10.0E-18 ! Farad (Atto Farads?)
+    double precision            :: ramo_cur
+
+    ! Calculate the total ramo current
+    ramo_cur = sum(ramo_current)
+
+    ! Colculate the voltage drop over the capacitor
+    ramo_integral = ramo_integral + time_step * (ramo_cur_prev + ramo_cur) * 0.5d0
+    ramo_cur_prev = ramo_cur
+    Voltage_Capacitor = -1.0d0/C * ramo_integral
+  end function Voltage_Capacitor
+
+  double precision function Voltage_Parallel_Capacitor_Resistor()
+    double precision, parameter :: C   = 10.0E-18 ! Farad
+    double precision, parameter :: R_C = 0.5d6 ! Ohm
+    double precision, parameter :: R   = 0.5d6 ! Ohm
+    double precision, parameter :: ib   = 1.0d0/(C*(R+R_C))
+    double precision            :: ramo_cur
+
+    ! Calculate the total ramo current
+    ramo_cur = sum(ramo_current)
+
+    ! Caclulate the voltage over the diode
+    ramo_integral = ramo_integral + time_step * (ramo_cur_prev*exp(-1.0d0*time_step*ib) + ramo_cur) * 0.5d0
+    ramo_cur_prev = ramo_cur
+
+    Voltage_Parallel_Capacitor_Resistor = (R**2)/(C*(R+R_C)**2) * ramo_integral - R*R_C/(R+R_C)*ramo_cur
+  end function Voltage_Parallel_Capacitor_Resistor
+
+  double precision function Voltage_Parallel_Capacitor()
+    double precision, parameter :: C = 10.0E-9 ! Farad
+    double precision, parameter :: R = 0.5d6 ! Ohm
+    double precision, parameter :: RC = R*C
+    double precision, parameter :: iRC = 1.0d0/RC
+    double precision            :: ramo_cur
+
+    ! Calculate the total ramo current
+    ramo_cur = sum(ramo_current)
+
+    ! Caclulate the voltage over the diode
+    ramo_integral = ramo_integral + time_step * (ramo_cur_prev*exp(-1.0d0*time_step*iRC) + ramo_cur) * 0.5d0
+    ramo_cur_prev = ramo_cur
+
+    Voltage_Parallel_Capacitor = 1.0d0/C * ramo_integral
+  end function Voltage_Parallel_Capacitor
 
 end module mod_verlet

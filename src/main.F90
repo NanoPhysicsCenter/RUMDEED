@@ -152,8 +152,8 @@ contains
     ! d: Gap spacing
     box_dim = box_dim * length_scale
     d = box_dim(3)
-    E_z = -1.0d0*V/d
-    V_a = V
+    V_d = V_s
+    E_z = -1.0d0*V_d/d
 
     E_zunit = -1.0d0/d
 
@@ -168,8 +168,9 @@ contains
     dens_x_d = box_dim(1) / (N_x_densmap-1)
     dens_y_d = box_dim(2) / (N_y_densmap-1)
 
-    ! Set the current scale to mA / cm^2
-    cur_scale = 1.0d-3 * (box_dim(1)*1.0d2) * (box_dim(3)*1.0d2) ! mA / cm^2
+    ! Set the current scale to mA / micrometer^2
+    !cur_scale = 1.0d-3 * (box_dim(1)*1.0d6) * (box_dim(2)*1.0d6) ! mA / micrometer^2
+    cur_scale = 1.0d-6 ! microAmper
 
     !time_step: The size of the time step
     time_step = time_step * time_scale
@@ -231,6 +232,8 @@ contains
     particles_mask = .true.
 
     ramo_current = 0.0d0
+    ramo_cur_prev = 0.0d0
+    ramo_integral = 0.0d0
     life_time = 0
 
     density_map_elec = 0
@@ -421,7 +424,7 @@ contains
     write(ud_init, *)
 
     write(ud_init, *) '---------------------------------------------------------'
-    write(ud_init, fmt_rel) 'V             = ', V,          'The Voltage in the system'
+    write(ud_init, fmt_rel) 'V_s           = ', V_s,        'The Voltage from the source'
     write(ud_init, fmt_rel) 'box_dim_x     = ', box_dim(1), 'System x-length'
     write(ud_init, fmt_rel) 'box_dim_y     = ', box_dim(2), 'System y-length'
     write(ud_init, fmt_rel) 'box_dim_z     = ', box_dim(3), 'System z-length'
