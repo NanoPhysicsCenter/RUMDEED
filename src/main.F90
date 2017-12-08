@@ -5,6 +5,7 @@ program VacuumMD
   use mod_global
   use mod_verlet
   use mod_photo_emission
+  use mod_therminoic_emission
   use mod_pair
   use mod_unit_tests
   implicit none
@@ -55,6 +56,7 @@ program VacuumMD
   print *, ''
 
   cur_time = 0
+  call Set_Voltage(0) ! Set voltage for time step 0
 
   do i = 1, steps
 
@@ -152,8 +154,10 @@ contains
     ! d: Gap spacing
     box_dim = box_dim * length_scale
     d = box_dim(3)
+
     V_d = V_s
     E_z = -1.0d0*V_d/d
+    !print *, E_z
 
     E_zunit = -1.0d0/d
 
