@@ -58,8 +58,8 @@ PROJECT_NAME=Vacuum-MD
 # makefile
 all: $(PROJECT_NAME).out
 
-$(PROJECT_NAME).out: ../src/main.F90 mod_global.mod mod_verlet.mod mod_pair.mod	mod_unit_tests.mod mod_photo_emission.mod
-		$(FCOMPILER) $(FFLAGS) ../src/main.F90 mod_global.o mod_verlet.o mod_pair.o mod_unit_tests.o mod_photo_emission.o \
+$(PROJECT_NAME).out: ../src/main.F90 mod_global.mod mod_verlet.mod mod_pair.mod	mod_unit_tests.mod mod_photo_emission.mod mod_therminoic_emission.mod
+		$(FCOMPILER) $(FFLAGS) ../src/main.F90 mod_global.o mod_verlet.o mod_pair.o mod_unit_tests.o mod_photo_emission.o mod_therminoic_emission.o \
 			-lpthread -lm -ldl -o $(PROJECT_NAME).out
 
 mod_global.mod: ../src/mod_global.F90
@@ -76,6 +76,9 @@ mod_unit_tests.mod: ../src/mod_unit_tests.f90 mod_global.mod mod_verlet.mod mod_
 
 mod_photo_emission.mod: ../src/mod_photo_emission.f90 mod_global.mod mod_verlet.mod mod_pair.mod
 		$(FCOMPILER) -c $(FFLAGS) ../src/mod_photo_emission.f90
+
+mod_therminoic_emission.mod: ../src/mod_thermionic_emission.f90 mod_global.mod mod_verlet.mod mod_pair.mod
+		$(FCOMPILER) -c $(FFLAGS) ../src/mod_thermionic_emission.f90
 
 clean:
 		rm -f *.o

@@ -256,8 +256,8 @@ contains
     !V_C = Voltage_Capacitor()
     !V_d = V_s + V_R + V_C
 
-    V_C = Voltage_Parallel_Capacitor()
-    V_d = V_s - V_C
+    V_C = Voltage_Parallel_Capacitor(step)
+    V_d = V_C
 
     E_z = -1.0d0*V_d/d
     !E_zunit = -1.0d0*sign(1.0d0, V)/d
@@ -306,21 +306,26 @@ contains
     Voltage_Parallel_Capacitor_Resistor = (R**2)/(C*(R+R_C)**2) * ramo_integral - R*R_C/(R+R_C)*ramo_cur
   end function Voltage_Parallel_Capacitor_Resistor
 
-  double precision function Voltage_Parallel_Capacitor()
-    double precision, parameter :: C = 10.0E-9 ! Farad
-    double precision, parameter :: R = 0.5d6 ! Ohm
+  double precision function Voltage_Parallel_Capacitor(step)
+    integer, intent(in)         :: step
+    double precision, parameter :: C = 1.0E-15 ! Farad
+    double precision, parameter :: R = 1.0d3 ! Ohm
     double precision, parameter :: RC = R*C
     double precision, parameter :: iRC = 1.0d0/RC
-    double precision            :: ramo_cur
+    double precision            :: ramo_cur, cur_time_s
 
     ! Calculate the total ramo current
     ramo_cur = sum(ramo_current)
+
+    ! Current time in seconds
+    cur_time_s = time_step * step
 
     ! Caclulate the voltage over the diode
     ramo_integral = ramo_integral + time_step * (ramo_cur_prev*exp(-1.0d0*time_step*iRC) + ramo_cur) * 0.5d0
     ramo_cur_prev = ramo_cur
 
-    Voltage_Parallel_Capacitor = 1.0d0/C * ramo_integral
+    Voltage_Parallel_Capacitor = V_s*exp(-1.0d0*cur_time_s*iRC)*( RC*(exp(cur_time_s*iRC) - 1.0d0) + 0.0d0 ) &
+                               - 1.0d0/C * ramo_integral
   end function Voltage_Parallel_Capacitor
 
 end module mod_verlet
