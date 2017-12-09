@@ -60,12 +60,12 @@ def v_y(l: float) -> float:
 # Fyrst we integrate over x to obtain, ( a = L/(2*d) )
 # J/(9\pi) * 2*a \sqrt(z) / ( (x^2 + z^2) \sqrt(y^2 + z^2 + a^2) )
 # This is the function we integrate numerically below. z = [0, 1], y = [0, a]
-# We change the integration on y from [-a, a] to [0, a] and multiply with 2 instead.
 def int_fun(y: float, z: float, a: float) -> float:
     val = np.sqrt(z) / ((y**2 + z**2)*np.sqrt(a**2 + y**2 + z**2))
     return val
 
-
+print('Starting calculations')
+print('k upto ' + str(N_L))
 # Loop over L values
 for k in range(N_L):
 
@@ -94,10 +94,12 @@ for k in range(N_L):
         options={'limit': 100} # Increase the number of subintervals in the integration
         # nquad does an N-dimensional integration
         # https://docs.scipy.org/doc/scipy/reference/generated/scipy.integrate.nquad.html
+        # integrate int_fun, y=0..a, z=0..1, with extra arguments (a,) passed to the function
+        # We change the integration on y from [-a, a] to [0, a] and multiply with 2 instead (4a = 2*2a).
         E_z, abserr = nquad(int_fun, [[0.0, a], [0.0, 1.0]], args=(a,), opts=[options, options])
         E_z = J/(9*pi) * 4*a * E_z
 
-        # Set F to out new value. The factor 2 is for image-charge effects
+        # Set F to out new value. The factor 2 due to image-charge effects
         F = 1 - 2*E_z
 
         # Set values that we want to keep
@@ -107,13 +109,16 @@ for k in range(N_L):
 
     # Check the convergance
     if np.abs((J_keep[N-1] - J_keep[N-2])) > 1E-3:
-        print('Warning error > 1E-3');
+        print('Warning error > 1E-3')
+    else:
+        print('k = ' + str(k) + ' done')
 
     # Set values that we want to keep
     J_L[k] = J
     F_L[k] = F
 
 # Plot the results
+print('Ploting results')
 plt.plot(L/1E-9, J_L*J_CL)
 plt.xlabel('L [nm]')
 plt.ylabel('J [A/m^2]')
