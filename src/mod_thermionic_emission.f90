@@ -66,12 +66,9 @@ contains
     double precision, dimension(1:3) :: par_pos
     !double precision, allocatable, dimension(:) :: rnd
     integer                          :: i, j, s, IFAIL, nrElecEmit, n_r
-    double precision                 :: A_f, D_f, n_s, n_add
+    double precision                 :: A_f, n_s, n_add
     double precision                 :: len_x, len_y
     integer                          :: nr_x, nr_y
-    double precision, dimension(1:3) :: F_avg
-    double precision                 :: zf_avg, df_avg, rnd
-    type(electron)                   :: par_elec
 
     nr_x = 1000
     nr_y = nr_x
@@ -84,7 +81,6 @@ contains
 
     par_pos = 0.0d0
     n_s = 0.0d0
-    F_avg = 0.0d0
 
     !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(i, j, s, par_pos, par_elec, F, n_add, D_f)
 
@@ -109,72 +105,65 @@ contains
     end do
     !$OMP END DO
 
+    print *, 'n_s = ', n_s
+    pause
+
 
     !$OMP SINGLE
-    F_avg(1:3) = F_avg(1:3) / (nr_x*nr_y)
-
     n_s = n_s - res_s
     n_r = nint(n_s)
     res_s = n_r - n_s
     !$OMP END SINGLE
 
-    !$OMP DO REDUCTION(+:df_avg)
-    do s = 1, n_r
-
-      !par_pos(1:2) = Metro_algo_circle(30)
-      par_pos(1:2) = Metro_algo_rec(30, emit)
-      !if (isnan(par_pos(1)) == .true.) then
-      !  print *, par_pos
-      !  pause
-      !end if
-      par_pos(3) = 0.0d0*length
-      !particles(nrElec+1)%cur_pos = par_pos
-      !call Calculate_Acceleration(nrElec+1)
-      par_elec%cur_pos = par_pos
-      call Calculate_Acceleration_particle(par_elec)
-      F = par_elec%accel(3) * pre_fac_a
-      !F = E_z
-
-      !print *, 'F = ', F
-      !print *, 's = ', s
-      !print *, 'nrElec = ', nrElec
-      !pause
-
-      if (F >= 0.0d0) then
-        D_f = 0.0d0
-        !print *, 'Warning: F > 0.0d0'
-      else
-        D_f = Escape_Prob(F, par_pos)
-        if (D_f > 1.0d0) then
-          print *, 'Warning D_f > 1.0d0'
-          print *, 'D_f = ', D_f
-        end if
-      end if
-
-      CALL RANDOM_NUMBER(rnd)
-      if (rnd <= D_f) then
-        par_pos(3) = 1.0d0*length
-        !$OMP CRITICAL
-        particles(nrElec+1)%cur_pos = par_pos
-        particles(nrElec+1)%in_step = step
-        nrElec = nrElec + 1
-        nrElecEmit = nrElecEmit + 1
-        call Add_Plane_Graph_emit(par_pos, step)
-        !call Add_Plane_Graph_emitt_xy(par_pos)
-        !$OMP END CRITICAL
-      end if
-    end do
-    !$OMP END DO
+    ! !$OMP DO REDUCTION(+:df_avg)
+    ! do s = 1, n_r
+    !
+    !   !par_pos(1:2) = Metro_algo_circle(30)
+    !   par_pos(1:2) = Metro_algo_rec(30, emit)
+    !   !if (isnan(par_pos(1)) == .true.) then
+    !   !  print *, par_pos
+    !   !  pause
+    !   !end if
+    !   par_pos(3) = 0.0d0*length
+    !   !particles(nrElec+1)%cur_pos = par_pos
+    !   !call Calculate_Acceleration(nrElec+1)
+    !   par_elec%cur_pos = par_pos
+    !   call Calculate_Acceleration_particle(par_elec)
+    !   F = par_elec%accel(3) * pre_fac_a
+    !   !F = E_z
+    !
+    !   !print *, 'F = ', F
+    !   !print *, 's = ', s
+    !   !print *, 'nrElec = ', nrElec
+    !   !pause
+    !
+    !   if (F >= 0.0d0) then
+    !     D_f = 0.0d0
+    !     !print *, 'Warning: F > 0.0d0'
+    !   else
+    !     D_f = Escape_Prob(F, par_pos)
+    !     if (D_f > 1.0d0) then
+    !       print *, 'Warning D_f > 1.0d0'
+    !       print *, 'D_f = ', D_f
+    !     end if
+    !   end if
+    !
+    !   CALL RANDOM_NUMBER(rnd)
+    !   if (rnd <= D_f) then
+    !     par_pos(3) = 1.0d0*length
+    !     !$OMP CRITICAL
+    !     particles(nrElec+1)%cur_pos = par_pos
+    !     particles(nrElec+1)%in_step = step
+    !     nrElec = nrElec + 1
+    !     nrElecEmit = nrElecEmit + 1
+    !     call Add_Plane_Graph_emit(par_pos, step)
+    !     !call Add_Plane_Graph_emitt_xy(par_pos)
+    !     !$OMP END CRITICAL
+    !   end if
+    ! end do
+    ! !$OMP END DO
 
     !$OMP END PARALLEL
-
-
-    !deallocate(rnd)
-
-    df_avg = df_avg / n_r
-
-    !write (ud_debug, "(i8, tr2, E16.8, tr2, E16.8, tr2, E16.8, tr2, i8, tr2, E16.8)", iostat=IFAIL) &
-    !                                  step, F_avg(1), F_avg(2), F_avg(3), n_r, df_avg
 
     posInit = posInit + nrElecEmit
     nrEmitted = nrEmitted + nrElecEmit
