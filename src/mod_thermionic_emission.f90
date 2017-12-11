@@ -66,7 +66,7 @@ contains
     double precision, dimension(1:3) :: par_pos
     !double precision, allocatable, dimension(:) :: rnd
     integer                          :: i, j, s, IFAIL, nrElecEmit, n_r
-    double precision                 :: A_f, n_s, n_add
+    double precision                 :: A_f, n_s, n_add, res_s
     double precision                 :: len_x, len_y
     integer                          :: nr_x, nr_y
 
