@@ -285,10 +285,44 @@ contains
     !end do
     ramo_cur = sum(ramo_current) / cur_scale
 
-    write (ud_ramo, "(ES12.4, tr2, i8, tr2, E12.4, tr2, E12.4, tr2, i6, tr2, i6, tr2, i6)", iostat=IFAIL) &
+    write (ud_ramo, fmt="(ES12.4, tr2, i8, tr2, E12.4, tr2, E12.4, tr2, i6, tr2, i6, tr2, i6)", iostat=IFAIL) &
     & cur_time, step, ramo_cur, V_d, nrPart, nrElec, nrHole
 
   end subroutine Write_Ramo_current
+
+  !-----------------------------------------------------------------------------
+  ! Write out the positions
+  subroutine Write_Particle_Data(step)
+    integer, intent(in) :: step
+    integer             :: i, IFAIL, ud_data
+    character(len=128)  :: filename
+
+    ! Prepare the name of the output file
+    ! each file is named particles-0.dt where the number
+    ! represents the current time step.
+    write(filename, '(a14, i0, a3)') 'out/particles-', step, '.dt'
+
+    ! Open the output file
+    open(newunit=ud_data, iostat=IFAIL, file=filename, status='REPLACE', action='write')
+    if (IFAIL /= 0) then
+      print *, 'Vacuum: Failed to open the data file.'
+      return
+    end if
+
+    ! The first line in the file is the number of particles
+    write(unit=ud_data, fmt="(i8)", iostat=IFAIL) nrPart
+
+    ! All the other lines are data about the particles, with each particle on its
+    ! own line.
+    ! Position, Velocity, Acceleration
+    do i = 1, nrPart
+      write(unit=ud_data, fmt="(*(ES12.4))", iostat=IFAIL) &
+        particles_cur_pos(:, i), particles_cur_vel(:, i), particles_cur_accel(:, i)
+    end do
+
+    ! Close the file
+    close(unit=ud_data, iostat=IFAIL, status='keep')
+  end subroutine
 
   ! ----------------------------------------------------------------------------
   ! Record the life time of particles.

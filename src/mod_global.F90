@@ -231,7 +231,7 @@ module mod_global
 
   ! ----------------------------------------------------------------------------
   ! unit descriptors for data files
-  integer :: ud_pos ! Position file
+  !integer :: ud_pos ! Position file
   integer :: ud_emit ! File for emitted electrons and holes
   integer :: ud_absorb ! File for absorbed electrons and holes
   integer :: ud_absorb_top ! File for absorbed electrons and holes

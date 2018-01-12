@@ -9,7 +9,7 @@ FCOMPILER=gfortran
 #FCOMPILER=pgfortran
 endif
 
-#UNIT_TEST = 1
+UNIT_TEST = 1
 #OPENMP = 1
 
 # Compile flags

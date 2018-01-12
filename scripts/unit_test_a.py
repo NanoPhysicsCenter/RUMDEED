@@ -1,5 +1,5 @@
-#!/usr/bin/python3
-# Unti test for the acceleration
+#!/usr/bin/env python3
+# Unit test for the acceleration
 
 import numpy as np
 

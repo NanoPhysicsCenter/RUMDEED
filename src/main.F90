@@ -284,13 +284,16 @@ contains
     call RANDOM_SEED(PUT = my_seed)
     deallocate(my_seed)
 
+    ! Create folder for output files
+    call execute_command_line ('mkdir -p out/')
+
 
     ! Open data file for writing
-    open(newunit=ud_pos, iostat=IFAIL, file='position.dt', status='REPLACE', action='write')
-    if (IFAIL /= 0) then
-      print *, 'Vacuum: Failed to open file position.dt. ABORTING'
-      stop
-    end if
+    !open(newunit=ud_pos, iostat=IFAIL, file='position.dt', status='REPLACE', action='write')
+    !if (IFAIL /= 0) then
+    !  print *, 'Vacuum: Failed to open file position.dt. ABORTING'
+    !  stop
+    !end if
 
     ! open(newunit=ud_vel, iostat=IFAIL, file='velocity.dt', status='REPLACE', action='write')
     ! if (IFAIL /= 0) then
@@ -298,73 +301,73 @@ contains
     !   stop
     ! end if
 
-    open(newunit=ud_emit, iostat=IFAIL, file='emitted.dt', status='REPLACE', action='write')
+    open(newunit=ud_emit, iostat=IFAIL, file='out/emitted.dt', status='REPLACE', action='write')
     if (IFAIL /= 0) then
       print *, 'Vacuum: Failed to open file emitted.dt. ABORTING'
       stop
     end if
 
-    open(newunit=ud_absorb, iostat=IFAIL, file='absorbed.dt', status='REPLACE', action='write')
+    open(newunit=ud_absorb, iostat=IFAIL, file='out/absorbed.dt', status='REPLACE', action='write')
     if (IFAIL /= 0) then
       print *, 'Vacuum: Failed to open file absorbed.dt. ABORTING'
       stop
     end if
 
-    open(newunit=ud_absorb_top, iostat=IFAIL, file='absorbed_top.dt', status='REPLACE', action='write')
+    open(newunit=ud_absorb_top, iostat=IFAIL, file='out/absorbed_top.dt', status='REPLACE', action='write')
     if (IFAIL /= 0) then
       print *, 'Vacuum: Failed to open file absorbed_top.dt. ABORTING'
       stop
     end if
 
-    open(newunit=ud_absorb_bot, iostat=IFAIL, file='absorbed_bot.dt', status='REPLACE', action='write')
+    open(newunit=ud_absorb_bot, iostat=IFAIL, file='out/absorbed_bot.dt', status='REPLACE', action='write')
     if (IFAIL /= 0) then
       print *, 'Vacuum: Failed to open file absorbed_bot.dt. ABORTING'
       stop
     end if
 
-    open(newunit=ud_ramo, iostat=IFAIL, file='ramo_current.dt', status='REPLACE', action='write')
+    open(newunit=ud_ramo, iostat=IFAIL, file='out/ramo_current.dt', status='REPLACE', action='write')
     if (IFAIL /= 0) then
       print *, 'Vacuum: Failed to open file ramo_current.dt. ABORTING'
       stop
     end if
 
-    open(newunit=ud_volt, iostat=IFAIL, file='volt.dt', status='REPLACE', action='write')
+    open(newunit=ud_volt, iostat=IFAIL, file='out/volt.dt', status='REPLACE', action='write')
     if (IFAIL /= 0) then
       print *, 'Vacuum: Failed to open file volt.dt. ABORTING'
       stop
     end if
 
-    open(newunit=ud_dipole_pos, iostat=IFAIL, file='dipole_pos.dt', status='REPLACE', action='write')
+    open(newunit=ud_dipole_pos, iostat=IFAIL, file='out/dipole_pos.dt', status='REPLACE', action='write')
     if (IFAIL /= 0) then
       print *, 'Vacuum: Failed to open file dipole_pos.dt. ABORTING'
       stop
     end if
 
-    open(newunit=ud_dipole_vec, iostat=IFAIL, file='dipole_vec.dt', status='REPLACE', action='write')
+    open(newunit=ud_dipole_vec, iostat=IFAIL, file='out/dipole_vec.dt', status='REPLACE', action='write')
     if (IFAIL /= 0) then
       print *, 'Vacuum: Failed to open file dipole_vec.dt. ABORTING'
       stop
     end if
 
-    open(newunit=ud_field, iostat=IFAIL, file='long_field.dt', status='REPLACE', action='write')
+    open(newunit=ud_field, iostat=IFAIL, file='out/long_field.dt', status='REPLACE', action='write')
     if (IFAIL /= 0) then
       print *, 'Vacuum: Failed to open file long_field.dt. ABORTING'
       stop
     end if
 
-    open(newunit=ud_density_map_elec, iostat=IFAIL, file='density_elec.dt', status='REPLACE', action='write')
+    open(newunit=ud_density_map_elec, iostat=IFAIL, file='out/density_elec.dt', status='REPLACE', action='write')
     if (IFAIL /= 0) then
       print *, 'Vacuum: Failed to open file density_elec.dt. ABORTING'
       stop
     end if
 
-    open(newunit=ud_density_map_hole, iostat=IFAIL, file='density_hole.dt', status='REPLACE', action='write')
+    open(newunit=ud_density_map_hole, iostat=IFAIL, file='out/density_hole.dt', status='REPLACE', action='write')
     if (IFAIL /= 0) then
       print *, 'Vacuum: Failed to open file density_hole.dt. ABORTING'
       stop
     end if
 
-    open(newunit=ud_density_map_total, iostat=IFAIL, file='density_total.dt', status='REPLACE', action='write')
+    open(newunit=ud_density_map_total, iostat=IFAIL, file='out/density_total.dt', status='REPLACE', action='write')
     if (IFAIL /= 0) then
       print *, 'Vacuum: Failed to open file density_total.dt. ABORTING'
       stop
@@ -382,7 +385,7 @@ contains
     !character(len=*), parameter :: fmt_cmp = "(a, tr2, '(', G16.6, ',', G16.6, ')', tr2, a)"
 
     ! Open file 'init.dt' for writing
-    open(newunit=ud_init, iostat=IFAIL, file='init.dt', status='REPLACE', action='write')
+    open(newunit=ud_init, iostat=IFAIL, file='out/init.dt', status='REPLACE', action='write')
     if (IFAIL /= 0) then
       print *, 'Failed to open file init.dt. ABORTING'
       stop

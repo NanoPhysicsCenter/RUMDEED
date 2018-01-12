@@ -16,6 +16,8 @@ contains
     call Test_Acceleration()
 
     call Test_Transit_Time()
+
+    call Test_Many_Particles()
   end subroutine Run_Unit_Tests
 
   !-----------------------------------------------------------------------------
@@ -278,4 +280,55 @@ contains
       print *, 'Transit time test finished'
       print *, ''
   end subroutine Test_Transit_Time
+
+  !-----------------------------------------------------------------------------
+  ! A test with 1000 particles
+  !
+  subroutine Test_Many_Particles()
+    double precision, parameter      :: d_test = 100.0d0*length_scale
+    double precision, parameter      :: V_test = 2.0d0 ! V
+    double precision, parameter      :: delta_t_test = 0.25d-15 ! Time step
+
+    integer, parameter               :: n_par = 1000 ! Number of particles to read from the input file
+    double precision, dimension(1:3) :: par_pos, par_vel
+
+    integer                          :: ud_data, i, IFAIL
+
+    print *, 'Starting many particles test'
+
+    ! Set up the test system for 1000 time steps
+    call Setup_Test_System(d_test, delta_t_test, 1000, V_test)
+
+    ! Open the file with initial positions of particles
+    open(newunit=ud_data, iostat=IFAIL, file='rand_pos_init.dt', status='OLD', action='read')
+    if (IFAIL /= 0) then
+      print '(a)', 'Vacuum: ERROR UNABLE TO OPEN file input'
+      stop
+    end if
+
+    do i = 1, n_par
+      ! Set the intial position and velocity
+      read(unit=ud_data, fmt=*) par_pos ! Read the next line
+      par_vel = 0.0d0
+
+      ! Add the particle to the system
+      call Add_Particle(par_pos, par_vel, species_elec, 1)
+    end do
+
+    ! Start the simulation
+    do i = 1, steps
+
+      ! Do Emission
+      !call emission code
+
+      ! Update the position of all particles
+      !print *, 'Update position'
+      call Update_Position(i)
+
+      ! Remove particles from the system
+      call Remove_Particles(i)
+    end do
+
+    print *, 'Many particles test finished'
+  end subroutine Test_Many_Particles
 end module mod_unit_tests
