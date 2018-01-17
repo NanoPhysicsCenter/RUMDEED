@@ -534,30 +534,132 @@ The emission process checks the angle between the positon vector (black solid li
   \label{fig:angle}
 \end{figure}
 
-\clearpage
-\section{Circuit Elements}
+\cleardoublepage
+\section{Circuit elements}
+
+\subsection{Series with Resistor and Capacitor}
 \begin{figure}[!ht]
   \centering
   \begin{circuitikz} \draw
-    (0, -2) to[twoport, v^<=\(V_d\), *-*](0, 2) to[R, l_=\(R\), i<_=\(I\), v^=\(V_R\), *-*] ((2, 2) to[battery1, v=\(V_0\), *-*] (2, 0) to[C, l_=\(C\), v^=\(V_c\), *-*] (2, -2) -- (0, -2);
+    (0, -2) to[twoport, v^<=\(V_d\), *-*](0, 2) to[R, l_=\(R\), i<_=\(I\), v^<=\(V_R\), *-*] ((2, 2) to[battery1, v=\(V_0\), *-*] (2, 0) to[C, l_=\(C\), v^<=\(V_c\), *-*] (2, -2) -- (0, -2);
   \end{circuitikz}
   \caption{Circuit}
 \end{figure}
-For the circut we have
+For the circuit we have
 \begin{equation}
- V_d(t) = V + V_c(t)\, ,
+  V_0 = V_d + V_R + V_c
 \end{equation}
 or
 \begin{equation}
- V_c(t) = V_d(t) - V\, .
+  V_c(t) = V_0 - V_d - IR\, .
 \end{equation}
 For the capacitor
 \begin{equation}
- I(t) = C\frac{d V_c(t)}{d t} = C \frac{d V_d(t)}{dt}\, ,
+  I(t) = C\frac{d V_c(t)}{d t} = C \left[ \frac{d V_0(t)}{dt} - \frac{d V_d(t)}{dt} - R\frac{d I(t)}{dt} \right]\, ,
 \end{equation}
-because \(V\) is constant. Integration from \(0\) to \(t\) then gives
+or
 \begin{equation}
-  V_d(t) = V_d(0) + C\int_0^t I(t^\prime) dt^\prime\, ,
+  -C \frac{d V_d(t)}{dt} = RC\frac{d I(t)}{dt} + I(t)\, ,
+\end{equation}
+note that \(V_0\) is constant in time. Integration from \(0\) to \(t\) yields,
+\begin{equation}
+  V_d(t) = V_d(0) + R\left[ I(0) - I(t) \right] - \frac{1}{C}\int_0^t I(\tau)\,d\tau\, .
+\end{equation}
+The initial conditions \(V_d(0) = V_0\) and \(I(0) = 0\) give,
+\begin{equation}
+  V_d(t) = V_0 - RI(t) - \frac{1}{C}\int_0^t I(\tau)\,d\tau\, .
+\end{equation}
+
+The numberical integration can be done using the trapezoidal rule,
+\begin{equation}
+  \int_{t_n}^{t_{n+1}} I(\tau)\,d\tau \approx \Delta t \frac{I(t_n) + I(t_{n+1})}{2}\, ,
+\end{equation}
+or
+\begin{equation}
+  \int_{0}^{t_{n+1}}\!\! I(\tau)\,d\tau = \int_0^{t_{n}}\!\! I(\tau)\, d\tau + \!\!\int_{t_n}^{t_{n+1}}\!\! I(\tau)\,d\tau = \int_0^{t_{n}}\!\! I(\tau)\, d\tau + \Delta t \frac{I(t_n) + I(t_{n+1})}{2}\, ,
+\end{equation}
+
+\subsection{Parallel Capacitor}
+\begin{figure}[!ht]
+  \centering
+  \begin{circuitikz} \draw
+    (0, -2) to[twoport, v^<=\(V_d\), *-*](0, 2) to[R, l_=\(R\), i<_=\(I\), v^<=\(V_R\), *-*] ((2, 2) to[battery1, v=\(V_0\), *-*] (2, 0) to[C, l_=\(C\), v^<=\(V_c\), *-*] (2, -2) -- (0, -2);
+  \end{circuitikz}
+  \caption{Todo change this figure}
+\end{figure}
+
+For this circuit we have
+\begin{align}
+  I &= I_d + I_C\,,\\
+  V_d &= V_{RC} + V_C\, ,\\
+  V_d &= V_s - V_R\, ,\\
+  I_C &= C \frac{dV_C}{dt}\, ,\\
+  V_{RC} &= R_C I_C\, ,\\
+  V_R &= RI\, .
+\end{align}
+The goal is to write \(V_d\) as a function of \(I_d\).
+\begin{equation} \label{eq:par-c1}
+  V_d = V_s - V_R = V_s - RI = V_s - R(I_d + I_C) = V_s - RI_d - RC\frac{d V_C}{dt}\, .
+\end{equation}
+We now get rid of \(V_C\) by setting \(V_C = V_d - V_{RC}\) to obtain,
+\begin{equation}
+  V_d = V_s - RI_d - RC\frac{d V_d}{dt} + RC\frac{V_{RC}}{dt}\, .
+\end{equation}
+Rewriting the equation and using the \(V_{RC} = R_C C\frac{d V_C}{dt}\) gives,
+\begin{equation}
+  RC\frac{d V_d}{dt} + V_d = V_s - RI_d + RC\frac{V_{RC}}{dt} = V_s - RI_d + RR_C C^2\frac{d^2 V_C}{dt^2}\, .
+\end{equation}
+We again end up with \(V_C\) in our equation. To get rid of it we use equation~\ref{eq:par-c1},
+\begin{equation}
+  RC\frac{d V_C}{dt} = V_s - RI_d - V_d\, ,
+\end{equation}
+then taking the derivative and multiplying with \(R_C C\),
+\begin{equation}
+  RR_CC^2 \frac{d^2 V_C}{dt^2} = -RR_C C\frac{d I_d}{dt} - R_C C\frac{d V_d}{dt}\, .
+\end{equation}
+We then obtain,
+\begin{equation}
+  RC\frac{d V_d}{dt} + V_d = V_s - RI_d - RR_C C\frac{d I_d}{dt} - R_C C\frac{d V_d}{dt}\, ,
+\end{equation}
+or rearranging terms,
+\begin{equation}
+ (R+R_C)C\frac{d V_d}{dt} + V_d = V_s - RI_d - RR_C C\frac{d I_d}{dt}\, .
+\end{equation}
+This is a linear differential equation, \( \frac{d V_d(t)}{dt}+f(t)V_d(t)=g(t)\), with a general solution given by,
+\begin{equation}
+  V_d(t)=e^{-\int f(t)\,dt}\left(\int g(t)e^{\int f(t)\,dt}\,dt+\kappa \right)\, ,
+\end{equation}
+where \(\kappa\) is a constant determined by the initial conditions \(V_d(0) = V_s\),
+\({ f(t) = \frac{1}{C(R+R_C)} }\) and \(g(t) = \frac{1}{C(R+R_C)}\left( V_s + RI_d - RR_C C\frac{d I_d}{dt} \right)\).
+Let's set \(b = C(R+R_C)\), then \(\int_0^t f(t^\prime) dt^\prime = \frac{t}{b}\).
+Integration of the terms in \(g(t)\) yeilds,
+\begin{equation}
+  \int_0^t V_s e^{t^\prime/b} dt^\prime = bV_s(e^{t/b} - 1)\, ,
+\end{equation}
+\begin{equation}
+  \int_0^t \frac{dI_d}{dt^\prime} e^{t^\prime/b} dt^\prime = \left[ e^{t^\prime/b}I_d \right]_0^t - \frac{1}{b}\int_0^t I_d e^{t^\prime/b} dt^\prime
+  = I_d e^{t/b} I_d(0) - \frac{1}{b}\int_0^t I_d e^{t^\prime/b} dt^\prime\, .
+\end{equation}
+The solutions the becomes,
+\begin{equation}
+  V_d(t) = \frac{1}{b} e^{-t/b}\left[ bV_s\left( e^{t/b} - 1 \right) - R\int_0^t I_d e^{t^\prime/b}dt^\prime - RR_C C \left( I_d e^{t/b} -I_d(0) - \frac{1}{b}\int_0^t I_d e^{t^\prime/b} dt^\prime \right) + \kappa \right]\, ,
+\end{equation}
+or
+\begin{equation}
+  V_d(t) = \frac{1}{b} e^{-t/b}\left[ bV_s\left( e^{t/b} - 1 \right) - \left( R - \frac{RR_C C}{b} \right)\int_0^t I_d e^{t^\prime/b}dt^\prime - RR_C C \left( I_d e^{t/b} -I_d(0) \right) + \kappa \right]\, .
+\end{equation}
+Using the initial conditions \(V_d(0) = V_s\) and \(I_d(0) = 0\) gives \(\kappa = bV_s\),
+\begin{equation}
+  V_d(t) = e^{-t/b}\left[ V_s e^{t/b} - \frac{1}{b}\left( R - \frac{RR_C C}{b} \right)\int_0^t I_d e^{t^\prime/b}dt^\prime - \frac{RR_C C}{b} I_d e^{t/b} \right]\, .
+\end{equation}
+In the end we get
+\begin{equation}
+  V_d(t) = V_s - \frac{R^2}{(R+R_C)^2 C}\int_0^t I_d(t^\prime) e^{\frac{t^\prime-t}{C(R+R_C)}} dt^\prime - \frac{RR_C}{R+R_C}I_d(t) \, .
+\end{equation}
+
+For the numerical integration we have
+\begin{equation}
+  \int_{t_n}^{t_{n+1}} I(t^\prime) e^{\frac{t^\prime-t_{n+1}}{C(R+R_C)}} dt^\prime = \frac{\Delta t}{2}\left( I(t_n)e^{-\frac{\Delta t}{C(R+R_C)}} + I(t_{n+1}) \right)\, .
 \end{equation}
 
 \cleardoublepage\printbibliography
