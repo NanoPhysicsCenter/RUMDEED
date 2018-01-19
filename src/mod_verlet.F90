@@ -290,7 +290,7 @@ contains
   end function Voltage_Capacitor
 
   double precision function Voltage_Parallel_Capacitor_Resistor()
-    double precision, parameter :: C   = 10.0E-18 ! Farad
+    double precision, parameter :: C   = 10.0d-18 ! Farad
     double precision, parameter :: R_C = 0.5d6 ! Ohm
     double precision, parameter :: R   = 0.5d6 ! Ohm
     double precision, parameter :: ib   = 1.0d0/(C*(R+R_C))
