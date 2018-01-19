@@ -23,7 +23,7 @@ R = 0.5E6 # Resistance of the resistor in the circuit [Ohm]
 R_C = 0.5E6 # Resistance of the resistor in series with the capcitor
 C = 1.0E-18 # Capacitance of the capacitor in series [F]
 time_step = 0.25E-3*time_scale # Size of the time step [S]
-steps = 100000 # Number of time steps
+steps = 1000000 # Number of time steps
 
 # Variables for functions
 ramo_integral = 0.0
@@ -72,24 +72,14 @@ voltage = np.zeros(steps)
 time    = np.zeros(steps)
 
 for step in range(steps):
+    I = Current_Diode_Child(V, step) # Current from the diode
     V_C = Voltage_Parallel_Capacitor_Resistor(I)
 
-    V = V_C # Voltage over diode
-    I = Current_Diode_Child(V, step) # Current from the diode
+    V = V_S - V_C # Voltage over diode
 
-    #print(V_d)
-    #print(I)
-    #print('')
     voltage[step] = V
     current[step] = I / 1.0E-6
     time[step] = step*time_step / time_scale
-    #if (step == 0):
-    #print('V = ', V)
-    #print('V_S = ', V_S)
-    #print('V_R = ', V_R)
-    #print('V_C = ', V_C)
-    #print('I = ', I)
-    #print('')
 
 plt.figure()
 plt.plot(time, current)
