@@ -10,7 +10,7 @@
 
 import numpy as np
 import matplotlib.pyplot as plt
-from scipy.constants import e, m_e, epsilon_0
+from scipy.constants import e, m_e, epsilon_0, pi
 
 # Scales
 time_scale = 1.0E-12 # Time scale [S]
@@ -70,12 +70,24 @@ def Current_Diode_Child(V_diode: float, step: int) -> float:
     J_cl_prev = J_cl
 
     if (step > 500000):
-        I_cl = 0.0
+        #I_cl = 0.0
+        I_cl = I_cl*( 1.0 + 0.1*np.sin(2.0*pi/(10*time_scale)*step*time_step) )
 
     return I_cl
 
 def Current_Diode(V_diode: float, step: int) -> float:
     return 10.0E-3
+
+print('Starting Simulation')
+print('V_0 = {:.2G} V'.format(V_0))
+print('R = {:.2E} Ω'.format(R))
+print('R_C = {:.2E} Ω'.format(R_C))
+print('R_D = {:.2E} Ω'.format(R_D))
+print('C = {:.2E} F'.format(C))
+print('time_step = {:.4G} ps'.format(time_step/time_scale))
+print('d = {:.4G} nm'.format(d/length_scale))
+print('L = {:.4G} nm'.format(L/length_scale))
+print('')
 
 V_cur  = np.zeros(4)
 V_prev = np.zeros(4)
@@ -94,6 +106,7 @@ time = np.zeros(steps)
 A = np.zeros((4, 4))
 b = np.zeros(4)
 
+print('Starting main loop with {:d} steps.'.format(steps))
 for step in range(steps):
     A[0, 0] = 1.0/R_D + 1.0/R_C
     A[0, 1] = -1.0/R_D
@@ -130,7 +143,9 @@ for step in range(steps):
     time[step] = step*time_step / time_scale
 
 print('')
-print('V_cur = ', V_cur)
+print('Simulation done')
+print('Ploting results')
+#print('V_cur = ', V_cur)
 
 plt.figure()
 plt.plot(time, V_C, time, V_D)
