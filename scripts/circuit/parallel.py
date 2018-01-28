@@ -4,7 +4,8 @@
 # Test of equations for a resistor and capacitor in parallel with diode
 # Kristinn Torfason
 # 18.01.2018
-# See section Circuit elemens in notes
+# See section Circuit elements in notes
+# Differential equation version
 #-------------------------------------------------------------------------------
 
 import numpy as np

@@ -56,9 +56,10 @@ contains
   end subroutine Add_Particle
 
   ! ----------------------------------------------------------------------------
-  ! Mark a particles for removal
-  ! i: The particle to be removed
-  ! m: Why is the particles being removed
+  ! Mark a particle for removal
+  ! Keyword arguments:
+  ! i -- The particle to be removed
+  ! m -- Why the particle is being removed
   !    m = 0: Unknown (remove_unknown)
   !    m = 1: Exited left boundary (remove_left)
   !    m = 2: Exited right boundary (remove_right)
@@ -132,7 +133,15 @@ contains
 
 
   ! ----------------------------------------------------------------------------
-  ! A subroutine to remove particles from the system
+  ! A subroutine to remove particles from the system.
+  ! It takes the array's that hold information and about the particles and
+  ! compacts them.
+  !
+  ! If particle 3 has been marked for removal then
+  ! | 1 | 2 | - | 4 | 5 | -> | 1 | 2 | 4 | 5 | - |
+  !
+  ! Keyword arguments:
+  ! step -- The current time step
   subroutine Remove_Particles(step)
     integer, intent(in) :: step
     integer             :: m, k
@@ -256,6 +265,8 @@ contains
 
   ! ----------------------------------------------------------------------------
   ! Write data about number of particles absorbed. Called in Remove_Particle
+  ! Keyword arguments:
+  ! step -- The current time step
   subroutine Write_Absorbed(step)
     integer, intent(in) :: step
     integer             :: IFAIL
@@ -273,6 +284,8 @@ contains
   ! ----------------------------------------------------------------------------
   ! Write out the current and information about the number of particles in
   ! the system
+  ! Keyword arguments:
+  ! step -- The current time step
   subroutine Write_Ramo_Current(step)
     integer, intent(in) :: step
     integer             :: i, IFAIL
@@ -292,6 +305,8 @@ contains
 
   !-----------------------------------------------------------------------------
   ! Write out the positions
+  ! Keyword arguments:
+  ! step -- The current time step
   subroutine Write_Particle_Data(step)
     integer, intent(in) :: step
     integer             :: i, IFAIL, ud_data
