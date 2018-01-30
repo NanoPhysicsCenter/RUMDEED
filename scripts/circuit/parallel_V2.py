@@ -4,36 +4,58 @@
 # Test of node analysis for a resistor and capacitor in parallel with the diode
 # Kristinn Torfason
 # 25.01.2018
-# See section Circuit elements in notes
-# Matrix Version
+# Nodal Analysis version with finite difference
 #-------------------------------------------------------------------------------
 
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.constants import e, m_e, epsilon_0, pi
 
+#-------------------------------------------------------------------------------
+# Child Langmuire limited System
+# Set I_D = Current_Diode_Child
+
 # Scales
-time_scale = 1.0E-6    # Time scale [s]
+time_scale = 1.0E-12    # Time scale [s]
 length_scale = 1.0E-9  # Length scale [m]
 
 # System variables
-d         = 200.0*length_scale  # Gap spacing [nm]
-L         = 100.0*length_scale  # Side length of emitter [nm]
-time_step = 0.25E0*time_scale     # Size of the time step [s]
+d         = 500.0*length_scale # Gap spacing [nm]
+L         = 250.0*length_scale  # Side length of emitter [nm]
+time_step = 0.25E-3*time_scale     # Size of the time step [s]
 steps     = 1000000             # Number of time steps [time_step]
 
 # Curcuit elements
-# V_0 = 2.0       # Voltage source [V]
-# R_D = 1.0E6     # Diode resistor [Ohm]
-# R_C = 1.0E6     # Capacitor resistor [Ohm]
-# R   = 1.0E6     # Voltage source resistor [Ohm]
-# C   = 10.0E-18  # Capacitor [Farad]
+V_0 = 2.0       # Voltage source [V]
+R_D = 1.0E6     # Diode resistor [Ohm]
+R_C = 1.0E6     # Capacitor resistor [Ohm]
+R   = 1.0E6     # Voltage source resistor [Ohm]
+#C   = 10.0E-18  # Capacitor [Farad]
 
-V_0 = 2.0     # Volts (Voltage source)
-R_D = 1.0E3   # Ohm   (Diode resistor)
-R_C = 1.0E3   # Ohm   (Capacitor resistor)
-R   = 1.0E3   # Ohm   (Voltage source resistor)
-C   = 10.0E-6 # Farad (Capacitor)
+# Parallel plate capacitor C = ε_0 A / d
+C  = epsilon_0*L**2/d # Capacitor [Farad]
+
+#-------------------------------------------------------------------------------
+# Test System
+# Set I_D = Current_Diode
+
+# # Scales
+# time_scale = 1.0E-6    # Time scale [s]
+# length_scale = 1.0E-9  # Length scale [m]
+#
+# # System variables
+# d         = 200.0*length_scale  # Gap spacing [nm]
+# L         = 100.0*length_scale  # Side length of emitter [nm]
+# time_step = 0.25E0*time_scale     # Size of the time step [s]
+# steps     = 1000000             # Number of time steps [time_step]
+#
+# # Curcuit elements
+# V_0 = 2.0     # Volts (Voltage source)
+# R_D = 1.0E3   # Ohm   (Diode resistor)
+# R_C = 1.0E3   # Ohm   (Capacitor resistor)
+# R   = 1.0E3   # Ohm   (Voltage source resistor)
+# C   = 10.0E-6 # Farad (Capacitor)
+#-------------------------------------------------------------------------------
 
 # To store the previous value of the current density from Child's law
 J_cl_prev = 0.0
@@ -164,8 +186,8 @@ for step in range(steps):
     I_C[step]  = ( (V_cur[0] - V_cur[2]) / R_C ) / 1.0E-6  # Capacitor current
     I_DC[step] = ( (V_cur[0] - V_cur[1]) / R_D ) / 1.0E-6  # Diode current
 
-    #I_D = Current_Diode_Child(V_D[step], step)
-    I_D = Current_Diode(V_D[step], step)
+    I_D = Current_Diode_Child(V_D[step], step)
+    #I_D = Current_Diode(V_D[step], step)
 
     # Store the current time
     time[step] = step*time_step / time_scale
