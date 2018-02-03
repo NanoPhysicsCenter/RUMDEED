@@ -4,7 +4,7 @@
 # Test of node analysis for a resistor and capacitor in parallel with the diode
 # Kristinn Torfason
 # 25.01.2018
-# Nodal Analysis version with trapezoidal approximation
+# Modified Nodal Analysis version with trapezoidal approximation
 #-------------------------------------------------------------------------------
 
 import numpy as np
@@ -132,8 +132,8 @@ print('')
 
 N = 5
 
-V_cur  = np.zeros(N)
-V_prev = np.zeros(N)
+V_cur  = np.zeros(N) # [V_1, V_2, V_3, V_4, I_C]
+V_prev = np.zeros(N) # V_cur from previous time step
 
 V_C  = np.zeros(steps)
 V_D  = np.zeros(steps)
@@ -189,8 +189,9 @@ for step in range(steps):
     V_SC[step] = V_cur[0] - V_cur[3] # Source voltage (Should be equal to V_S)
 
     # Calculate currents from voltages over resistors
-    I_T[step]  = ( -1.0*V_cur[3] / R_S ) / 1.0E-6            # Total current
-    I_C[step]  = ( (V_cur[0] - V_cur[2]) / R_C ) / 1.0E-6  # Capacitor current
+    I_T[step]  = ( -1.0*V_cur[3] / R_S ) / 1.0E-6          # Total current
+    #I_C[step]  = ( (V_cur[0] - V_cur[2]) / R_C ) / 1.0E-6  # Capacitor current
+    I_C[step]  = V_cur[4] / 1.0E-6                         # Capacitor current
     I_DC[step] = ( (V_cur[0] - V_cur[1]) / R_D ) / 1.0E-6  # Diode current
 
     I_D = Current_Diode_Child(V_D[step], step)
