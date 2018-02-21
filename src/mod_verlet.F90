@@ -328,4 +328,70 @@ contains
                                - 1.0d0/C * ramo_integral
   end function Voltage_Parallel_Capacitor
 
+  double precision function Parallel_Capacitor_MNA(step, I_D)
+    integer, intent(in)          :: step
+    double precision, intent(in) :: I_D
+    double precision, parameter  :: C = 10.0d-18 ! Farad
+    double precision, parameter  :: R_D = 1.0d6  ! Ohm
+    double precision, parameter  :: R_S = 1.0d6  ! Ohm
+    double precision, parameter  :: R_C = 1.0d6  ! Ohm
+
+    double precision, dimension(1:5, 1:5) :: A, A_inv
+    double precision, dimension(1:5)      :: b
+    logical                               :: OK_FLAG
+
+    A = 0.0d0
+    A_inv = 0.0d0
+    b = 0.0d0
+
+    A(1, 1) = 1.0d0/R_D + 1.0d0/R_C
+    A(1, 2) = -1.0d0/R_D
+    A(1, 3) = -1.0d0/R_C
+    A(1, 4) = 1.0d0/R_S
+    b(1)    = 0.0
+
+    A(2, 1) = 1.0d0
+    A(2, 4) = -1.0d0
+    b(2)    = V_S
+
+    A(3, 1) = -1.0d0
+    A(3, 2) = 1.0d0
+    b(3)    = -1.0d0*I_D*R_D
+
+    A(4, 3) = 2.0d0*C/time_step
+    A(4, 5) = -1.0d0
+    b(4)    = V_prev(4) + 2.0d0*C/time_step*V_prev(2)
+
+    A(5, 4) = 1.0d0/R_S
+    A(5, 5) = 1.0d0
+    b(5)    = -I_D
+
+    ! Store previous values of the voltages
+    V_prev = V_cur
+
+    ! Solve the system of equations Ax=b or x=A^-1*b
+    ! Find the inverse of A
+    call M55INV(A, A_inv, OK_FLAG)
+
+    ! x = A^-1*b
+    V_cur = matmul(A_inv, b)
+
+    ! Calculate voltages
+    !V_D(step) = V_cur(1)             ! Voltage over the diode
+    !V_C(step) = V_cur(2)             ! Voltage of the capacitor
+    !V_SC(step) = V_cur(0) - V_cur(3) ! Source voltage (Should be equal to V_S)
+
+    ! Calculate currents from voltages over resistors
+    !I_T(step)  = ( -1.0d0*V_cur(3) / R_S ) / 1.0d-6          ! Total current
+    !!I_C(step)  = ( (V_cur(0) - V_cur(2)) / R_C ) / 1.0d-6  ! Capacitor current
+    !I_C(step)  = V_cur(4) / 1.0d-6                         ! Capacitor current
+    !I_DC(step) = ( (V_cur(0) - V_cur(1)) / R_D ) / 1.0d-6  ! Diode current
+
+    !I_D = Current_Diode_Child(V_D(step), step)
+    !I_D = Current_Diode(V_D[step], step)
+
+    ! Store the current time
+    !time = step*time_step / time_scale
+  end function Parallel_Capacitor_MNA
+
 end module mod_verlet

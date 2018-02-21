@@ -5,7 +5,7 @@ program VacuumMD
   use mod_global
   use mod_verlet
   use mod_photo_emission
-  use mod_therminoic_emission
+  !use mod_therminoic_emission
   use mod_pair
   use mod_unit_tests
   implicit none
@@ -242,6 +242,9 @@ contains
 
     density_map_elec = 0
     density_map_hole = 0
+
+    V_cur = 0.0d0
+    V_prev = 0.0d0
 
     ! Start with an empty system
     nrPart      = 0
