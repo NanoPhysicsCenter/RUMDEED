@@ -329,7 +329,7 @@ contains
 !  A       = input 5x5 matrix to be inverted
 !  AINV    = output 5x5 inverse of matrix A
 !  OK_FLAG = (output) .TRUE. if the input matrix could be inverted, and .FALSE. if the input matrix is singular.
-! http://web.hku.hk/~gdli/UsefulFiles/matrix/m55inv_f90.txt
+! http://www.davidgsimpson.com/software.html
 !***********************************************************************************************************************************
 
       SUBROUTINE M55INV (A, AINV, OK_FLAG)
