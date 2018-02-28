@@ -31,7 +31,15 @@ program VacuumMD
 
   print '(a)', 'Vacuum: Initialzing'
   call Init()
-  call Init_Photo_Emission()
+  SELECT CASE (EMISSION_MODE)
+  case(EMISSION_PHOTO)
+    call Init_Photo_Emission()
+  !case(EMISSION_FIELD)
+  !  call Init_Field_Emission()
+  case DEFAULT
+    print '(a)', 'Vaccum: ERROR UNKNOWN EMISSION MODEL'
+    stop
+  END SELECT
 
   print '(a)', 'Vacuum: Writing out variables'
   call Write_Initial_Variables()
@@ -277,9 +285,6 @@ contains
     progress(3) = nint(0.3d0*steps)
     progress(2) = nint(0.2d0*steps)
     progress(1) = nint(0.1d0*steps)
-
-    ptr_Check_Boundary => Check_Boundary_ElecHole
-    ptr_field_E => field_E
 
     call RANDOM_SEED(size = n)
     allocate(my_seed(n))

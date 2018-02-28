@@ -12,7 +12,7 @@ Module mod_photo_emission
 
   ! ----------------------------------------------------------------------------
   ! Variables
-  integer, dimension(:), allocatable :: nrEmitted_emitters
+  integer, dimension(:), allocatable          :: nrEmitted_emitters
   integer                                     :: posInit
   logical                                     :: EmitGauss = .false.
   integer                                     :: maxElecEmit = -1
@@ -26,7 +26,14 @@ Module mod_photo_emission
 
 contains
   subroutine Init_Photo_Emission()
+    ! Allocate the number of emitters
     allocate(nrEmitted_emitters(1:nrEmit))
+
+    ! Function that checks the boundary conditions for the System
+    ptr_Check_Boundary => Check_Boundary_ElecHole
+
+    ! Function for the electric field in the system
+    ptr_field_E => field_E_planar
   end subroutine Init_Photo_Emission
 
   subroutine Clean_Up_Photo_Emission()

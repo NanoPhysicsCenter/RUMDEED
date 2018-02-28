@@ -180,6 +180,7 @@ contains
 
   !-----------------------------------------------------------------------------
   ! Find field in point
+  ! Return the electric field in V/m
   function Calc_Field_at(pos)
     double precision, dimension(1:3)             :: Calc_Field_at
     double precision, dimension(1:3), intent(in) :: pos
@@ -228,21 +229,21 @@ contains
 
   ! ----------------------------------------------------------------------------
   ! The vacuum electric field
-  pure function field_E(pos)
+  pure function field_E_planar(pos)
     double precision, dimension(1:3), intent(in) :: pos
-    double precision, dimension(1:3)             :: field_E
+    double precision, dimension(1:3)             :: field_E_planar
 
     ! Electric field
     ! x
-    field_E(1) = 0.0d0
+    field_E_planar(1) = 0.0d0
 
     ! y
-    field_E(2) = 0.0d0
+    field_E_planar(2) = 0.0d0
 
     ! z
-    field_E(3) = E_z
+    field_E_planar(3) = E_z
 
-  end function field_E
+  end function field_E_planar
 
 
   !-----------------------------------------------------------------------------
@@ -256,8 +257,10 @@ contains
     !V_C = Voltage_Capacitor()
     !V_d = V_s + V_R + V_C
 
-    V_C = Voltage_Parallel_Capacitor(step)
-    V_d = V_C
+    !V_C = Voltage_Parallel_Capacitor(step)
+    !V_d = V_C
+
+    V_d = V_s
 
     E_z = -1.0d0*V_d/d
     !E_zunit = -1.0d0*sign(1.0d0, V)/d

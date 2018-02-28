@@ -81,6 +81,7 @@ module mod_global
   !double precision, parameter :: epsilon_0 = 8.854187817d-12 ! Farads / meters
   double precision, parameter :: epsilon = epsilon_r * epsilon_0 ! Permittivity
   double precision, parameter :: m_u = 1.660539040d-27 ! Atomic mass unit (kg)
+  double precision, parameter :: h_bar = 1.054571726d-34
 
 
   double precision, parameter :: m_0 = 9.10938356d-31 ! Free electron mass (kg)
@@ -89,7 +90,7 @@ module mod_global
 
   double precision, parameter :: q_0 = 1.6021766208d-19 ! Standard charge (C)
   double precision, parameter :: q_02 = q_0**2 ! Standard charge squared (C)
-  !double precision, parameter :: q_e = -1.602176565d-19 ! Electron charge (Coulomb)
+  !double precision, parameter :: q_e = -1.0d0*q_e ! Electron charge (Coulomb)
   !double precision, parameter :: q_h = 1.602176565d-19 ! Hole charge (Coulomb)
 
   double precision, parameter :: hc_nm = h*c/(1.0d-9)
@@ -216,6 +217,15 @@ module mod_global
   integer, parameter :: MAX_LIFE_TIME = 1000
   integer, dimension(:, :), allocatable :: life_time
 
+  ! ----------------------------------------------------------------------------
+  ! Emission models
+  integer, parameter :: EMISSION_PHOTO      = 1 ! Planar photo emission
+  integer, parameter :: EMISSION_FIELD      = 2 ! Planar field emission
+  integer, parameter :: EMISSION_FIELD_TIP  = 3 ! Field emission from a hyperboloid tip
+  integer, parameter :: EMISSION_THERMIONIC = 4 ! Thermionic emission
+
+  integer            :: EMISSION_MODE           ! Parameter that defines the emission mode
+
 
 
   ! ----------------------------------------------------------------------------
@@ -259,7 +269,7 @@ module mod_global
   ! Define namelist
   namelist /input/ V_s, box_dim, time_step, steps, &
                    nrEmit, emitters_pos, emitters_dim, &
-                   emitters_type, emitters_delay
+                   emitters_type, emitters_delay, EMISSION_MODE
 
   ! ----------------------------------------------------------------------------
   ! Prodecure interfaces and pointers
@@ -322,6 +332,34 @@ contains
     ! norm2 = sqrt(norm2)
   end function norm2
 #endif
+
+! "The Box–Muller transform, by George Edward Pelham Box and Mervin Edgar Muller,
+! is a pseudo-random number sampling method for generating pairs of independent,
+! standard, normally distributed (zero expectation, unit variance) random numbers,
+! given a source of uniformly distributed random numbers."
+! See https://en.wikipedia.org/wiki/Box%E2%80%93Muller_transform
+function box_muller(mean, std)
+  double precision, dimension(1:2) :: box_muller
+  double precision, intent(in)     :: mean, std
+  double precision                 :: x_1, x_2, w, y_1, y_2
+
+  do
+    CALL RANDOM_NUMBER(x_1)
+    CALL RANDOM_NUMBER(x_2)
+
+    x_1 = 2.0d0 * x_1 - 1.0d0
+    x_2 = 2.0d0 * x_2 - 1.0d0
+    w = x_1**2 + x_2**2
+    if (w < 1.0d0) exit
+  end do
+
+  w = sqrt( (-2.0d0 * log( w ) ) / w )
+  y_1 = x_1 * w
+  y_2 = x_2 * w
+
+  box_muller(1) = y_1*std + mean
+  box_muller(2) = y_2*std + mean
+end function box_muller
 
 !***********************************************************************************************************************************
 !  M55INV  -  Compute the inverse of a 5x5 matrix.
