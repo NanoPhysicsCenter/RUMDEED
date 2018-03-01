@@ -29,22 +29,25 @@ Module mod_field_emission
   logical, parameter          :: image_charge = .true.
 
 contains
+  !-----------------------------------------------------------------------------
+  ! Initialize the Field Emission
   subroutine Init_Field_Emission()
     ! Allocate the number of emitters
     allocate(nrEmitted_emitters(1:nrEmit))
 
     ! Function that checks the boundary conditions for the System
-    ptr_Check_Boundary => Check_Boundary_ElecHole
+    ptr_Check_Boundary => Check_Boundary_ElecHole_Planar
 
     ! Function for the electric field in the system
     ptr_field_E => field_E_planar
   end subroutine Init_Field_Emission
 
+  !-----------------------------------------------------------------------------
+  ! This subroutine gets called from main when the emitters should emit the electrons
   subroutine Do_Field_Emission(step)
     integer, intent(in) :: step
     integer             :: i, IFAIL
     double precision    :: cur_time
-    double precision, dimension(1:3) :: pos
 
     posInit = 0
     nrEmitted_emitters = 0
@@ -73,58 +76,66 @@ contains
     & nrEmitted, nrElec, (nrEmitted_emitters(i), i = 1, nrEmit)
   end subroutine Do_Field_Emission
 
-
+  !-----------------------------------------------------------------------------
+  ! Do the field emission for a planar rectangular emitter
+  ! step is the current time step
+  ! emit is the number of the emitter
   subroutine Do_Field_Emission_Plane_int_rec(step, emit)
     integer, intent(in)              :: step, emit
     double precision                 :: F
-    double precision, dimension(1:3) :: par_pos, par_vel
+    double precision, dimension(1:3) :: par_pos, par_vel ! Position and velocity of the electron to be emitted
     !double precision, allocatable, dimension(:) :: rnd
-    integer                          :: i, j, s, IFAIL, nrElecEmit, n_r
+    integer                          :: i, j, s, nrElecEmit, n_r
     double precision                 :: A_f, D_f, n_s, n_add
     double precision                 :: len_x, len_y
     integer                          :: nr_x, nr_y
     double precision, dimension(1:3) :: field, F_avg
-    double precision                 :: zf_avg, df_avg, rnd
+    double precision                 :: df_avg, rnd
 
     par_pos = 0.0d0
     nrElecEmit = 0
     nrEmitted_emitters(emit) = 0
 
-    nr_x = 1000
-    nr_y = nr_x
-    len_x = emitters_dim(1, emit) / nr_x
-    len_y = emitters_dim(2, emit) / nr_y
+    A_f = len_x*len_y ! Total area of the emitter
 
-    !print *, len_x, len_x / length
-    !print *, len_y, len_y / length
+    nr_x = 1000 ! Divide the area into this many sections in the x-direction
+    nr_y = nr_x ! Divide the area into this many sections in the y-direction
 
-    A_f = len_x*len_y
+    len_x = emitters_dim(1, emit) / nr_x ! Size of each section in x
+    len_y = emitters_dim(2, emit) / nr_y ! Size of each section in y
 
-    n_s = 0.0d0
-    F_avg = 0.0d0
+    n_s = 0.0d0 ! Set the number of electrons to be emitted in this time step to zero.
+    F_avg = 0.0d0 ! Set the avereage field to zero before we start.
 
     !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(i, j, s, par_pos, F, n_add, D_f)
 
     !$OMP DO REDUCTION(+:n_s,F_avg)
     do i = 1, nr_x
       do j = 1, nr_y
+
+        ! Find the mid point of each section
         par_pos(1) = (i - 0.5d0)*len_x + emitters_pos(1, emit)
         par_pos(2) = (j - 0.5d0)*len_y + emitters_pos(2, emit)
         par_pos(3) = 0.0d0
 
+        ! Calculate the field in the midpoint of each section
         par_pos(3) = 0.0d0 * length_scale !Check in plane
         field = Calc_Field_at(par_pos)
 
-        F = field(3)
+        F = field(3) ! Take the z-value of the field
 
+        ! Calculate the average field. (Division with number of sections is done after the loop).
         F_avg(1:3) = F_avg(1:3) + field(1:3)
 
+        ! Check if the field is favourable.
         if (F >= 0.0d0) then
-          n_add = 0.0d0
+          n_add = 0.0d0 ! Do not emit any electrons from this section.
         else
+          ! Calculate the electron supply to see how many electrons to emit from this section.
           n_add = Elec_supply(A_f, F, par_pos)
         end if
 
+        ! Add to the total number of electrons to be emitted.
         n_s = n_s + n_add
       end do
     end do
@@ -132,20 +143,22 @@ contains
 
 
     !$OMP SINGLE
+    ! Finish calculating the average field.
     F_avg(1:3) = F_avg(1:3) / (nr_x*nr_y)
 
+    ! The number of electrons we are going to emit has to be a integer (A whole number).
+    ! We round to the nearest integer and store the residual.
+    ! We add the resdual from the previous time step for accurate accounting.
     n_s = n_s - res_s
-    n_r = nint(n_s)
+    n_r = nint(n_s) ! round the number
     res_s = n_r - n_s
-    !print *, n_s
 
-    !allocate(rnd(1:n_r))
-    !IFAIL = vdrnguniform(VSL_RNG_METHOD_UNIFORM_STD, stream, n_r, rnd(1:n_r), 0.0d0, 1.0d0)
-
+    ! Set the average escape probability to zero.
     df_avg = 0.0d0
     !$OMP END SINGLE
 
 
+    ! Loop over the electrons to be emitted.
     !$OMP DO REDUCTION(+:df_avg)
     do s = 1, n_r
 
@@ -265,11 +278,10 @@ contains
   function Metro_algo_rec(ndim, emit)
     integer, intent(in)                          :: ndim, emit
     double precision, dimension(1:2)             :: Metro_algo_rec
-    double precision, dimension(ndim)            :: alpha_r
     double precision, dimension(1:3)             :: par_pos, new_pos, field
     double precision                             :: old_val, new_val, alpha, std, rnd
     integer                                      :: old_val_s, new_val_s
-    integer :: i, IFAIL
+    integer                                      :: i
 
     std = (emitters_dim(1, emit)*0.05d0 + emitters_dim(2, emit)*0.05d0) / (2.0d0)
 
@@ -277,7 +289,7 @@ contains
 
     par_pos(1:2) = par_pos(1:2)*emitters_dim(1:2, emit) + emitters_pos(1:2, emit)
 
-    field = Calc_Field_at(par_pos)*(-1.0d0) ! This code assumed it is using the acceleration
+    field = Calc_Field_at(par_pos)*(-1.0d0) ! This code assumes it is using the acceleration
 
     old_val = norm2(field)
     if (field(3) > 0.0d0) then
@@ -292,7 +304,7 @@ contains
       new_pos(1:2) = par_pos(1:2) + box_muller(0.0d0, std)
       call check_limits_metro_rec(new_pos, emit)
 
-      field = Calc_Field_at(par_pos)*(-1.0d0) ! This code assumed it is using the acceleration
+      field = Calc_Field_at(par_pos)*(-1.0d0) ! This code assumes it is using the acceleration
       new_val = norm2(field)
 
       if (field(3) > 0.0d0) then
@@ -306,7 +318,7 @@ contains
       else if ((old_val_s > 0) .and. (new_val_s < 0)) then
         alpha = 0.0d0 ! Do not jump to this point
       else if ((old_val_s < 0) .and. (new_val_s > 0)) then
-        alpha = 1.0d0 ! Do jump this point
+        alpha = 1.0d0 ! Do jump to this point
       else
         alpha = new_val / old_val
       end if
@@ -497,47 +509,5 @@ contains
     !  w_theta_xy = 2.4d0
     !end if
   end function w_theta_xy
-
-!   double precision function n_Do_J_integral()
-!     integer, parameter :: nrPx = 100, nrPy = 100
-!     integer :: i, j
-!     double precision :: x_c, y_c
-!     double precision :: x_len, y_len
-!     double precision :: F, I_FN, A_cm !, F_avg
-
-!     x_len = emitters(1)%dim(1) / nrPx
-!     y_len = emitters(1)%dim(2) / nrPx
-
-!     A_cm = x_len * y_len / 0.01**2
-
-!     I_FN = 0.0d0
-!     !F_avg = 0.0d0
-
-!     do i = 1, nrPx
-!       do j = 1, nrPy
-!         x_c = (i - 0.5d0)*x_len
-!         y_c = (j - 0.5d0)*y_len
-
-!         particles(nrElec+1)%cur_pos(1) = x_c
-!         particles(nrElec+1)%cur_pos(2) = y_c
-!         particles(nrElec+1)%cur_pos(3) = 0.0d0
-
-!         call Calculate_Acceleration(nrElec+1)
-!         F = m_e*particles(nrElec+1)%accel(3) / q_e
-!         !F_avg = F + F_avg
-!         if (F < 0.0d0) then
-!           I_FN = I_FN + Fowler_Nordheim_curdens(F)
-!         end if
-!         if (isnan(I_FN) == .true.) then
-!           print *, F
-!         end if
-!       end do
-!     end do
-
-!     !F_avg = F_avg / (nrPx*nrPy)
-!     !print *, 'F_avg = ', F_avg
-
-!     n_Do_J_integral = I_FN * A_cm
-!   end function n_Do_J_integral
 
 end Module mod_field_emission

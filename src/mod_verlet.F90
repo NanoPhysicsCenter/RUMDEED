@@ -79,7 +79,7 @@ contains
   ! Checks the boundary conditions of the box.
   ! Check which particles to remove
   ! Enforce periodic boundary conditions (ToDo)
-  subroutine Check_Boundary_ElecHole(i)
+  subroutine Check_Boundary_ElecHole_Planar(i)
     integer, intent(in) :: i
     double precision    :: z
 
@@ -92,7 +92,7 @@ contains
         call Mark_Particles_Remove(i, remove_top)
     end if
 
-  end subroutine Check_Boundary_ElecHole
+  end subroutine Check_Boundary_ElecHole_Planar
 
 
   ! ----------------------------------------------------------------------------
