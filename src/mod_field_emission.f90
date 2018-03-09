@@ -40,6 +40,9 @@ contains
 
     ! Function for the electric field in the system
     ptr_field_E => field_E_planar
+
+    ! The function that does the emission
+    ptr_Do_Emission => Do_Field_Emission
   end subroutine Init_Field_Emission
 
   !-----------------------------------------------------------------------------
@@ -91,18 +94,19 @@ contains
     integer                          :: nr_x, nr_y
     double precision, dimension(1:3) :: field, F_avg
     double precision                 :: df_avg, rnd
+    integer                          :: IFAIL
 
     par_pos = 0.0d0
     nrElecEmit = 0
     nrEmitted_emitters(emit) = 0
-
-    A_f = len_x*len_y ! Total area of the emitter
 
     nr_x = 1000 ! Divide the area into this many sections in the x-direction
     nr_y = nr_x ! Divide the area into this many sections in the y-direction
 
     len_x = emitters_dim(1, emit) / nr_x ! Size of each section in x
     len_y = emitters_dim(2, emit) / nr_y ! Size of each section in y
+
+    A_f = len_x*len_y ! Total area of the emitter
 
     n_s = 0.0d0 ! Set the number of electrons to be emitted in this time step to zero.
     F_avg = 0.0d0 ! Set the avereage field to zero before we start.
@@ -200,17 +204,13 @@ contains
 
     !$OMP END PARALLEL
 
-
-    !deallocate(rnd)
-
     df_avg = df_avg / n_r
 
-    !write (ud_debug, "(i8, tr2, E16.8, tr2, E16.8, tr2, E16.8, tr2, i8, tr2, E16.8)", iostat=IFAIL) &
-    !                                  step, F_avg(1), F_avg(2), F_avg(3), n_r, df_avg
+    write (ud_debug, "(i8, tr2, E16.8, tr2, E16.8, tr2, E16.8, tr2, i8, tr2, E16.8)", iostat=IFAIL) &
+                                      step, F_avg(1), F_avg(2), F_avg(3), n_r, df_avg
 
     posInit = posInit + nrElecEmit
     nrEmitted = nrEmitted + nrElecEmit
-
   end subroutine Do_Field_Emission_Plane_int_rec
 
 !----------------------------------------------------------------------------------------

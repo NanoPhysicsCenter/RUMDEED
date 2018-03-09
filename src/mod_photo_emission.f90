@@ -34,6 +34,9 @@ contains
 
     ! Function for the electric field in the system
     ptr_field_E => field_E_planar
+
+    ! The function that does the emission
+    ptr_Do_Emission => Do_Photo_Emission
   end subroutine Init_Photo_Emission
 
   subroutine Clean_Up_Photo_Emission()

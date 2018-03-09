@@ -5,6 +5,7 @@ program VacuumMD
   use mod_global
   use mod_verlet
   use mod_photo_emission
+  use mod_field_emission
   !use mod_therminoic_emission
   use mod_pair
   use mod_unit_tests
@@ -33,9 +34,11 @@ program VacuumMD
   call Init()
   SELECT CASE (EMISSION_MODE)
   case(EMISSION_PHOTO)
+    print '(a)', 'Vacuum: Doing Photo emission'
     call Init_Photo_Emission()
-  !case(EMISSION_FIELD)
-  !  call Init_Field_Emission()
+  case(EMISSION_FIELD)
+    print '(a)', 'Vacuum: Doing Field emission'
+    call Init_Field_Emission()
   case DEFAULT
     print '(a)', 'Vaccum: ERROR UNKNOWN EMISSION MODEL'
     stop
@@ -69,7 +72,7 @@ program VacuumMD
   do i = 1, steps
 
     ! Do Emission
-    call Do_Photo_Emission(i)
+    call ptr_Do_Emission(i)
 
     ! Update the position of all particles
     !print *, 'Update position'
@@ -194,11 +197,11 @@ contains
       stop
     end if
 
-    !open(newunit=ud_debug, iostat=IFAIL, file='debug.dt', status='replace', action='write')
-    !if (IFAIL /= 0) then
-    !  print '(a)', 'Vacuum: ERROR UNABLE TO OPEN file debug.dt'
-    !  stop
-    !end if
+    open(newunit=ud_debug, iostat=IFAIL, file='debug.dt', status='replace', action='write')
+    if (IFAIL /= 0) then
+      print '(a)', 'Vacuum: ERROR UNABLE TO OPEN file debug.dt'
+      stop
+    end if
 
     !write(ud_debug, NML=input_test)
 
@@ -448,6 +451,10 @@ contains
     write(ud_init, *) '---------------------------------------------------------'
     !write(ud_init, *)
     !write(ud_init, *)
+    write(ud_init, *) '---------------------------------------------------------'
+    write(ud_init, fmt_int) 'NrEmit        = ', NrEmit,        'Number of emitters'
+    write(ud_init, fmt_int) 'EMISSION_MODE = ', EMISSION_MODE, 'The emission mechanism'
+    write(ud_init, *) '---------------------------------------------------------'
 
     ! Close file 'init.dt'
     close(unit=ud_init, iostat=IFAIL, status='keep')

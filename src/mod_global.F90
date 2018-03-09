@@ -109,7 +109,7 @@ module mod_global
 
   ! ----------------------------------------------------------------------------
   ! Define constans
-  integer, parameter :: MAX_PARTICLES = 50000 ! Maximum number of particles of each type allowed in the system
+  integer, parameter :: MAX_PARTICLES = 500000 ! Maximum number of particles of each type allowed in the system
   integer, parameter :: MAX_EMITTERS  = 10    ! Maximum number of emitters in the system
 
 
