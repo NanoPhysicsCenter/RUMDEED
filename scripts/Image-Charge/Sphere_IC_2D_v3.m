@@ -11,7 +11,7 @@
 % Note: The vacuum field is not included here.
 
 close all
-clear all
+clear variables
 
 q = -1.602176565E-19; % Electron charge
 epsilon_0 = 8.854187817E-12; % \epsilon_0

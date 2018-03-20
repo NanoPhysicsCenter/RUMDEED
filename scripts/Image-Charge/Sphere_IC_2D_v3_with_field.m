@@ -10,7 +10,7 @@
 % use to calculate the image charge partner. See chapter 2.2 in Jackson.
 
 close all
-clear all
+clear variables
 
 q = +1.602176565E-19; % Electron charge
 epsilon_0 = 8.854187817E-12; % \epsilon_0
