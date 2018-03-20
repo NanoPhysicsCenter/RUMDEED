@@ -153,15 +153,15 @@ contains
     integer, intent(in) :: step
     integer             :: m, k
 
-    !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(m, k)
-
-    !$OMP SINGLE
 
     call Write_Absorbed(step)
 
     if ((nrPart_remove > 0) .and. (nrPart > 0)) then ! Check if we have some thing to do
 
       if ((nrPart - nrPart_remove) > 0) then ! Check if we can skip this
+        !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(m, k)
+        !$OMP SINGLE
+
         k = startElecHoles
         m = endElecHoles
 
@@ -199,7 +199,11 @@ contains
         call compact_array(particles_charge, particles_mask, k, m)
         !$OMP END TASK
 
+        ! Wait for all tasks to finish
         !$OMP TASKWAIT
+
+        !$OMP END SINGLE
+        !$OMP END PARALLEL
       end if
 
       ! !Sanity check
@@ -236,7 +240,7 @@ contains
       startElecHoles = 1
       endElecHoles = startElecHoles + nrElecHole - 1
 
-      particles_mask = .true. ! Reset the mask
+      particles_mask = .true. ! Reset the mask. .true. means all particles are active.
 
       ! Reset the number of particles to remove
       nrPart_remove = 0
@@ -251,9 +255,6 @@ contains
       nrHole_remove_bot = 0
     end if
 
-    !$OMP END SINGLE
-
-    !$OMP END PARALLEL
   end subroutine Remove_Particles
 
   ! --------------------------------------------------------------------------
@@ -381,7 +382,7 @@ contains
   ! A subroutine to compactify the 2D arrays used to store data
   ! The mask says which particles we should keep and wich should be removed.
   ! It is .true. for particles that should be keept and .false. for particles
-  ! that should be removed. The loop jumps over particles that are marked
+  ! that it should be removed. The loop jumps over particles that are marked
   ! as .false..
   !
   ! Note: The pack subroutine also does this, but returns 1D arrays!!
@@ -392,12 +393,15 @@ contains
     !logical, allocatable, dimension(:, :)            :: mask_2d
     integer, intent(in)                              :: m, k ! m = nrPart
 
-    A(1, :) = pack(A(1, :), mask)
-    A(2, :) = pack(A(2, :), mask)
-    A(3, :) = pack(A(3, :), mask)
+    A(1, :) = pack(A(1, :), mask, A(1, :))
+    A(2, :) = pack(A(2, :), mask, A(2, :))
+    A(3, :) = pack(A(3, :), mask, A(3, :))
+
+    ! We could also do! Performance?
+    ! A = reshape(pack(A, mask), (/ 3, N/))
   end subroutine compact_array_2D_double
 
-
+  ! Todo: Check if this has better performance than the pack method.
   subroutine compact_array_2D_double_verbal(A, mask, k, m)
     double precision, dimension(:, :), intent(inout) :: A
     logical, dimension(:), intent(in)                :: mask
@@ -424,7 +428,7 @@ contains
     logical, dimension(:), intent(in)             :: mask
     integer, intent(in)                           :: m, k
 
-    A = pack(A, mask)
+    A = pack(A, mask, A)
   end subroutine compact_array_1D_double
 
   ! ----------------------------------------------------------------------------
@@ -434,6 +438,6 @@ contains
     logical, dimension(:), intent(in)    :: mask
     integer, intent(in)                  :: m, k
 
-    A = pack(A, mask)
+    A = pack(A, mask, A)
   end subroutine compact_array_1D_int
 end module mod_pair

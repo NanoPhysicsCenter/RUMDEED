@@ -111,9 +111,9 @@ contains
     n_s = 0.0d0 ! Set the number of electrons to be emitted in this time step to zero.
     F_avg = 0.0d0 ! Set the avereage field to zero before we start.
 
-    !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(i, j, s, par_pos, F, n_add, D_f)
+    !!!!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(i, j, s, par_pos, F, n_add, D_f)
 
-    !$OMP DO REDUCTION(+:n_s,F_avg)
+    !$OMP PARALLEL DO PRIVATE(i, j, par_pos, F, n_add) REDUCTION(+:n_s,F_avg)
     do i = 1, nr_x
       do j = 1, nr_y
 
@@ -143,10 +143,10 @@ contains
         n_s = n_s + n_add
       end do
     end do
-    !$OMP END DO
+    !$OMP END PARALLEL DO
 
 
-    !$OMP SINGLE
+    !!!$OMP SINGLE
     ! Finish calculating the average field.
     F_avg(1:3) = F_avg(1:3) / (nr_x*nr_y)
 
@@ -159,11 +159,11 @@ contains
 
     ! Set the average escape probability to zero.
     df_avg = 0.0d0
-    !$OMP END SINGLE
+    !!!$OMP END SINGLE
 
 
     ! Loop over the electrons to be emitted.
-    !$OMP DO REDUCTION(+:df_avg)
+    !$OMP PARALLEL DO PRIVATE(s, n_r, par_pos, field, F, D_f, rnd, par_vel) REDUCTION(+:df_avg)
     do s = 1, n_r
 
       par_pos(1:2) = Metro_algo_rec(30, emit)
@@ -200,9 +200,9 @@ contains
         !$OMP END CRITICAL
       end if
     end do
-    !$OMP END DO
+    !$OMP END PARALLEL DO
 
-    !$OMP END PARALLEL
+    !!!$OMP END PARALLEL
 
     df_avg = df_avg / n_r
 

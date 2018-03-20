@@ -16,8 +16,8 @@ program VacuumMD
 
 #if defined(_OPENMP)
   print '(a)', 'Vacuum: Using OpenMP'
-  print '(tr1, a, i0)', 'Number of threads ', nthreads
   nthreads = omp_get_max_threads()
+  print '(tr1, a, i0)', 'Number of threads ', nthreads
 #else
   print '(a)', 'Vacuum: Single threaded'
   nthreads = 1
@@ -32,6 +32,7 @@ program VacuumMD
 
   print '(a)', 'Vacuum: Initialzing'
   call Init()
+
   SELECT CASE (EMISSION_MODE)
   case(EMISSION_PHOTO)
     print '(a)', 'Vacuum: Doing Photo emission'
@@ -80,6 +81,9 @@ program VacuumMD
 
     ! Remove particles from the system
     call Remove_Particles(i)
+
+    ! Flush data
+    call Flush_Data()
 
     if (i == progress(1)) then
       call PrintProgress(1)
@@ -384,6 +388,16 @@ contains
       stop
     end if
   end subroutine Init
+
+  ! ----------------------------------------------------------------------------
+  ! Flush data written to files such that it can read
+  subroutine Flush_Data()
+
+    flush(ud_emit)
+    flush(ud_absorb)
+    flush(ud_volt)
+
+  end subroutine Flush_Data
 
 
   ! ----------------------------------------------------------------------------

@@ -470,7 +470,7 @@ contains
         & * K_xic*K_xi/(K_eta1*K_meta2 - K_meta1*K_eta2)
 
     fac_2 = K_eta*K_meta2 * (K_etac*K_meta1 - K_metac*K_eta1) &
-        & * K_meta*K_eta1 * (K_metac*K_eta2 - K_etac*K_meta2)
+        & + K_meta*K_eta1 * (K_metac*K_eta2 - K_etac*K_meta2)
 
     Calculate_Sm = fac_1 * fac_2
   end function Calculate_Sm

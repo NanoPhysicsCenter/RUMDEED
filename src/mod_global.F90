@@ -144,7 +144,10 @@ module mod_global
   integer         , dimension(:)   , allocatable :: particles_species    ! Type of particle
   double precision, dimension(:)   , allocatable :: particles_mass       ! Mass
   integer         , dimension(:)   , allocatable :: particles_step       ! Time step when particle was created
+  integer         , dimension(:)   , allocatable :: particles_emitter    ! The emitter the particle came from
   logical         , dimension(:)   , allocatable :: particles_mask       ! Mask array used to indicate which particles should be removed
+                                                                         ! .true. means that the particle is active,
+                                                                         ! .false. means it is inactive and should be removed
 
   ! ----------------------------------------------------------------------------
   ! Define storage arrays for emitters
