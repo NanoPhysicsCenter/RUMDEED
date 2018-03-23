@@ -52,7 +52,7 @@ z_tip = a .* xi .* eta_1;
 % Particle 1
 xi_a1 = 1.020;
 %eta_a1 = (1450E-9 - shift_z)/a;
-eta_a1 = -0.9730;
+eta_a1 = -0.9610;
 phi_a1 = 0.0;
 
 x_a1 = a * sqrt(xi_a1^2 - 1) * sqrt(1 - eta_a1^2) * cos(phi_a1);
@@ -162,7 +162,10 @@ plot(x_tip/1E-9, E_new, '-b', x_tip/1E-9, E_vac, '--c');
 xlim([-250 250])
 xlabel('x [nm]')
 ylabel('E [V/m]')
+title(strcat(num2str(p_d/1E-9, 4),' nm'))
 
 x_s = x_tip/1E-9;
 sigma_s = E_new*epsilon_0/1E-6;
 %save('data_sphere_z-1475-xi-1_0.mat', 'x_s', 'sigma_s', '-v7')
+
+set(gcf, 'Position', [698   390   747   420]);
