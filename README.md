@@ -18,7 +18,7 @@
 ```
 
 ## Notes
-  See notes.pdf(Vacuum-MD/doc/notes.pdf)
+  See [notes.pdf](Vacuum-MD/doc/notes.pdf)
 
 ## Photo-Emission
     Photo
