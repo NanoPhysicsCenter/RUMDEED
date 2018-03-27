@@ -1,0 +1,3 @@
+[submodule "Util/Tip-IC"]
+	path = Util/Tip-IC
+	url = git@github.com:Izelord/Tip-IC.git
