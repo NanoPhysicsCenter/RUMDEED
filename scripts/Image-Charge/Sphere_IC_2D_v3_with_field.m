@@ -16,7 +16,7 @@ q = +1.602176565E-19; % Electron charge
 m_e = 9.10938291E-31; % Electron mass
 epsilon_0 = 8.854187817E-12; % \epsilon_0
 h_bar = 1.054571726E-34;
-w_theta = 2.0;
+w_theta = 4.7; % eV
 
 % r_tip = 2E-9;
 % eta_1 = -0.9;
@@ -27,8 +27,11 @@ w_theta = 2.0;
 
 %Base radius
 R = 250.0E-9; % [nm]
-%R = 250;
+
+% Height
 h = 500E-9; % [nm]
+
+% Gap spacing
 d = 1000.0E-9; % [nm]
 d_plane = d + h;
 
@@ -55,7 +58,7 @@ z_tip = a .* xi .* eta_1;
 % Particle 1
 xi_a1 = 1.020;
 %eta_a1 = (1450E-9 - shift_z)/a;
-eta_a1 = -0.9610;
+eta_a1 = -0.97515;
 phi_a1 = 0.0;
 
 x_a1 = a * sqrt(xi_a1^2 - 1) * sqrt(1 - eta_a1^2) * cos(phi_a1);
@@ -182,7 +185,7 @@ t_y = 1 + l.*(1/9 - 1/18*log(l));
 
 FN_st = a_FN ./ (t_y.^2 .* w_theta) .* E_new.^2 .* exp(b_FN .* w_theta^(3/2) .* v_y ./ E_new);
 
-plot(x_tip/1E-9, FN_st);
+semilogy(x_tip/1E-9, FN_st);
 xlim([-250 250])
 xlabel('x [nm]')
 ylabel('J [A/m]')
