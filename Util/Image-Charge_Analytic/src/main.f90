@@ -249,6 +249,10 @@ contains
       end do
 
       res = res * h/3.0d0
+      if (isnan(abs(res)) .eq. .true.) then
+        print *, 'Error: Integral is NaN'
+        exit
+      end if
       res_tot = res_tot + res
 
       ! We stop if the magnitude of the last interval is less than 10^-9
@@ -282,14 +286,19 @@ contains
       ! Calculate H_m(tau)
       H_array(m) = Calculate_Hm(m, tau, xi, phi)
 
-      if (m > 5) then ! Always do at least 5
+      if (m > 3) then ! Always do at least 3
         diff = abs(H_array(m-1) - H_array(m))
         last_diff = abs(H_array(m-2) - H_array(m-1))
 
         ! Check for exponental growth
-        if (diff > 10.0d0*last_diff) then
+        if ((diff > 10.0d0*last_diff) .or. (isnan(diff) .eq. .true.)) then
           m_cut = m - 1
           exit ! Ok cut the summation and exit the loop
+        end if
+      else
+        if (isnan(abs(H_array(m))) .eq. .true.) then
+          print *, 'IT IS NAN'
+          pause
         end if
 
       end if
@@ -327,7 +336,11 @@ contains
     CALL conicp(xi, m, tau, K_xi, ierr)
     if (ierr /= 0) then
       print *, 'WARNING: ierr = ', ierr
-      print *, 'xi'
+      print *, 'xi = ', xi
+      print *, 'm = ', m
+      print *, 'tau = ', 'tau'
+      print *, 'K_xi = ', K_xi
+      print *, ''
     end if
     !---------------------------------------------------------------------------
 
