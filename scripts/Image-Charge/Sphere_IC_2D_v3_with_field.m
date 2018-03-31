@@ -13,7 +13,10 @@ close all
 clear variables
 
 q = +1.602176565E-19; % Electron charge
+m_e = 9.10938291E-31; % Electron mass
 epsilon_0 = 8.854187817E-12; % \epsilon_0
+h_bar = 1.054571726E-34;
+w_theta = 2.0;
 
 % r_tip = 2E-9;
 % eta_1 = -0.9;
@@ -67,7 +70,7 @@ disp('Particle z [nm]')
 disp((z_a1+shift_z)/1.0E-9)
 
 
-subplot(1, 2, 1);
+subplot(1, 3, 1);
 %figure(1);
 hold on
 axis equal
@@ -147,14 +150,14 @@ E_z = E_z1 - E_z2;
 
 [Ex_vac, Ey_vac, Ez_vac] = Tip_Field(x_tip, y_tip, z_tip, eta_1, a);
 
-E_x = E_x + Ex_vac;
-E_y = E_y + Ey_vac;
-E_z = E_z + Ez_vac;
+E_x = E_x - Ex_vac;
+E_y = E_y - Ey_vac;
+E_z = E_z - Ez_vac;
 
 E_new = sqrt(E_x.^2 + E_y.^2 + E_z.^2);
 E_vac = sqrt(Ex_vac.^2 + Ey_vac.^2  + Ez_vac.^2);
 
-subplot(1, 2, 2);
+subplot(1, 3, 2);
 %figure(2);
 %hold on
 %axis equal
@@ -167,5 +170,22 @@ title(strcat(num2str(p_d/1E-9, 4),' nm'))
 x_s = x_tip/1E-9;
 sigma_s = E_new*epsilon_0/1E-6;
 %save('data_sphere_z-1475-xi-1_0.mat', 'x_s', 'sigma_s', '-v7')
+
+subplot(1, 3, 3);
+a_FN = q^2/(16.0*pi^2*h_bar); % A eV V^{-2}
+b_FN = -4.0/(3.0*h_bar) * sqrt(2.0*m_e*q); % eV^{-3/2} V m^{-1}
+l_const = q / (4.0*pi*epsilon_0); % eV^{2} V^{-1} m
+
+l = l_const * E_new / w_theta^2;
+v_y = 1 - l + 1/6*l.*log(l);
+t_y = 1 + l.*(1/9 - 1/18*log(l));
+
+FN_st = a_FN ./ (t_y.^2 .* w_theta) .* E_new.^2 .* exp(b_FN .* w_theta^(3/2) .* v_y ./ E_new);
+
+plot(x_tip/1E-9, FN_st);
+xlim([-250 250])
+xlabel('x [nm]')
+ylabel('J [A/m]')
+
 
 set(gcf, 'Position', [698   390   747   420]);
