@@ -46,7 +46,7 @@ disp(a/1.0E-9)
 
 % Tip
 max_x = a*sqrt(max_xi^2-1)*sqrt(1-eta_1^2)*1;
-x_tip = linspace(-max_x, max_x, 1000);
+x_tip = linspace(-max_x, max_x, 10000);
 %x_tip = 2.5719e-09;
 %x = 0.0;
 %y_tip = 0.0;
@@ -58,7 +58,7 @@ z_tip = a .* xi .* eta_1;
 % Particle 1
 xi_a1 = 1.020;
 %eta_a1 = (1450E-9 - shift_z)/a;
-eta_a1 = -0.97515;
+eta_a1 = -0.974;
 phi_a1 = 0.0;
 
 x_a1 = a * sqrt(xi_a1^2 - 1) * sqrt(1 - eta_a1^2) * cos(phi_a1);
@@ -140,16 +140,16 @@ tmp_dis_a = ( (x_tip - x_a1).^2 + (y_tip - y_a1).^2 + (z_tip - z_a1).^2 );
 tmp_dis_b = ( (x_tip - x_b).^2 + (y_tip - y_b).^2 + (z_tip - z_b).^2 );
 
 E_x1 = q/(4*pi*epsilon_0) * (x_a1 - x_tip)./sqrt(tmp_dis_a).^(3);
-E_x2 = q/(4*pi*epsilon_0) * (R_sphere.*(x_b - x_tip))./(a_b.*sqrt(tmp_dis_b).^(3));
-E_x = E_x1 - E_x2;
+E_x2 = -q/(4*pi*epsilon_0) * (R_sphere.*(x_b - x_tip))./(a_b.*sqrt(tmp_dis_b).^(3));
+E_x = E_x1 + E_x2;
 
 E_y1 = q/(4*pi*epsilon_0) * (y_a1 - y_tip)./sqrt(tmp_dis_a).^(3);
-E_y2 = q/(4*pi*epsilon_0) * (R_sphere.*(y_b - y_tip))./(a_b.*sqrt(tmp_dis_b).^(3));
-E_y = E_y1 - E_y2;
+E_y2 = -q/(4*pi*epsilon_0) * (R_sphere.*(y_b - y_tip))./(a_b.*sqrt(tmp_dis_b).^(3));
+E_y = E_y1 + E_y2;
 
 E_z1 = q/(4*pi*epsilon_0) * (z_a1 - z_tip)./sqrt(tmp_dis_a).^(3);
-E_z2 = q/(4*pi*epsilon_0) * (R_sphere.*(z_b - z_tip))./(a_b.*sqrt(tmp_dis_b).^(3));
-E_z = E_z1 - E_z2;
+E_z2 = -q/(4*pi*epsilon_0) * (R_sphere.*(z_b - z_tip))./(a_b.*sqrt(tmp_dis_b).^(3));
+E_z = E_z1 + E_z2;
 
 [Ex_vac, Ey_vac, Ez_vac] = Tip_Field(x_tip, y_tip, z_tip, eta_1, a);
 
@@ -191,4 +191,4 @@ xlabel('x [nm]')
 ylabel('J [A/m]')
 
 
-set(gcf, 'Position', [698   390   747   420]);
+set(gcf, 'Position', [185         426        1150         420]);
