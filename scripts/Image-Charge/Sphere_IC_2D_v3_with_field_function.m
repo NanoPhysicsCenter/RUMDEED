@@ -1,3 +1,7 @@
+function [FN, I, p_d] = Sphere_IC_2D_v3_with_field_function(eta_p)
+%UNTITLED Summary of this function goes here
+%   Detailed explanation goes here
+
 % Kristinn Torfason
 % 24.04.2015
 % Sphere approximation of image charge effect V3
@@ -8,9 +12,6 @@
 % with that radius, that passes through this point and is orthogonal to a
 % line from the electron to the point on that tip. This sphere is then
 % use to calculate the image charge partner. See chapter 2.2 in Jackson.
-
-close all
-clear variables
 
 %--------------------------------------------------------------------------
 % Physical constants
@@ -42,12 +43,12 @@ eta_1 = - d / a;
 theta = acos(eta_1);
 shift_z = abs(a*eta_1*max_xi);
 
-disp('a')
-disp(a/1.0E-9)
+%disp('a')
+%disp(a/1.0E-9)
 
 %
 max_x = a*sqrt(max_xi^2-1)*sqrt(1-eta_1^2)*1;
-x_tip = linspace(-max_x, max_x, 100000);
+x_tip = linspace(-max_x, max_x, 1000000);
 %x_tip = 2.5719e-09;
 %x = 0.0;
 %y_tip = 0.0;
@@ -71,7 +72,8 @@ xi_a1 = 1.0;
 % Anything above 0 would be above the absorption plane.
 %eta_a1 = -0.97515; % 1 nm, if xi = 1.02.
 %eta_a1 = -0.9745; % 2 nm, if x = 1.02.
-eta_a1 = -0.975802551744737;
+%eta_a1 = -0.9745;
+eta_a1 = eta_p;
 
 % Rotation of the particle around the tip.
 phi_a1 = 0.0;
@@ -81,27 +83,13 @@ x_a1 = a * sqrt(xi_a1^2 - 1) * sqrt(1 - eta_a1^2) * cos(phi_a1);
 y_a1 = a * sqrt(xi_a1^2 - 1) * sqrt(1 - eta_a1^2) * sin(phi_a1);
 z_a1 = a * xi_a1 * eta_a1;
 
-disp('Particle x [nm]')
-disp(x_a1/1.0E-9)
-disp('Particle y [nm]')
-disp(y_a1/1.0E-9)
-disp('Particle z [nm]')
-disp((z_a1+shift_z)/1.0E-9)
+%disp('Particle x [nm]')
+%disp(x_a1/1.0E-9)
+%disp('Particle y [nm]')
+%disp(y_a1/1.0E-9)
+%disp('Particle z [nm]')
+%disp((z_a1+shift_z)/1.0E-9)
 
-
-%--------------------------------------------------------------------------
-% Plot the Particle and tip
-subplot(1, 3, 1);
-%figure(1);
-hold on
-axis equal
-plot(x_tip/1E-9, (z_tip+shift_z)/1E-9, 'b-');
-
-plot(x_a1/1E-9, (z_a1+shift_z)/1E-9, 'ok', 'MarkerFaceColor', 'k', 'MarkerSize', 2.5);
-%plot(x_a2/1E-9, (z_a2+shift_z)/1E-9, '+k', 'MarkerFaceColor', 'k', 'MarkerSize', 2.5);
-axis([-250, 250, 0, 700])
-xlabel('x [nm]')
-ylabel('z [nm]')
 
 %--------------------------------------------------------------------------
 
@@ -122,8 +110,8 @@ z_tip = a .* xi .* eta_1;
 
 % Particle distance from tip
 p_d = sqrt((x_0 - x_a1)^2 + (y_0 - y_a1)^2 + (z_0 - z_a1)^2);
-disp('Particle distance from tip [nm]')
-disp(p_d / 1.0E-9)
+%disp('Particle distance from tip [nm]')
+%disp(p_d / 1.0E-9)
 
 xi_0 = abs(z_0/(a*eta_1));
 R_sphere = abs(a/eta_1 * ( (xi_0^2 - eta_1^2).^(3/2) ) / (sqrt(1 - eta_1^2)));
@@ -146,14 +134,7 @@ x_b = -n(1)*b + x_c;
 y_b = -n(2)*b + y_c;
 z_b = -n(3)*b + z_c;
 
-% Draw sphere
-t = linspace(0, 2*pi, 100);
-x_sp = x_c + 1*R_sphere*cos(t);
-z_sp = z_c + 1*R_sphere*sin(t);
-
-plot(x_sp/1E-9, (z_sp+shift_z)/1E-9, 'r--');
-plot(x_b/1E-9, (z_b+shift_z)/1E-9, 'ok', 'MarkerFaceColor', 'k', 'MarkerSize', 2.5);
-%
+%--------------------------------------------------------------------------
 
 tmp_dis_a = ( (x_tip - x_a1).^2 + (y_tip - y_a1).^2 + (z_tip - z_a1).^2 );
 tmp_dis_b = ( (x_tip - x_b).^2 + (y_tip - y_b).^2 + (z_tip - z_b).^2 );
@@ -179,21 +160,10 @@ E_z = E_z - Ez_vac;
 E_new = sqrt(E_x.^2 + E_y.^2 + E_z.^2);
 E_vac = sqrt(Ex_vac.^2 + Ey_vac.^2  + Ez_vac.^2);
 
-subplot(1, 3, 2);
-%figure(2);
-%hold on
-%axis equal
-plot(x_tip/1E-9, E_new, '-b', x_tip/1E-9, E_vac, '--c');
-xlim([-250 250])
-xlabel('x [nm]')
-ylabel('E [V/m]')
-title(strcat(num2str(p_d/1E-9, 4),' nm'))
-
-x_s = x_tip/1E-9;
-sigma_s = E_new*epsilon_0/1E-6;
+%x_s = x_tip/1E-9;
+%sigma_s = E_new*epsilon_0/1E-6;
 %save('data_sphere_z-1475-xi-1_0.mat', 'x_s', 'sigma_s', '-v7')
 
-subplot(1, 3, 3);
 a_FN = q^2/(16.0*pi^2*h_bar); % A eV V^{-2}
 b_FN = -4.0/(3.0*h_bar) * sqrt(2.0*m_e*q); % eV^{-3/2} V m^{-1}
 l_const = q / (4.0*pi*epsilon_0); % eV^{2} V^{-1} m
@@ -204,10 +174,9 @@ t_y = 1 + l.*(1/9 - 1/18*log(l));
 
 FN_st = a_FN ./ (t_y.^2 .* w_theta) .* E_new.^2 .* exp(b_FN .* w_theta^(3/2) .* v_y ./ E_new);
 
-semilogy(x_tip/1E-9, FN_st);
-xlim([-250 250])
-xlabel('x [nm]')
-ylabel('J [A/m]')
+%FN = FN_st(length(FN_st)/2);
+FN = max(FN_st);
 
-% Set graph position and size.
-set(gcf, 'Position', [185         426        1150         420]);
+I = 2*pi*a^2*sqrt(1-eta_1^2)*sum(FN_st.*sqrt(xi.^2-eta_1^2));
+end
+

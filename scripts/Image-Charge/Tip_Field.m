@@ -1,7 +1,6 @@
 %
-function [Ex, Ey, Ez] = Tip_Field( x_0, y_0, z_0, eta_1, a )
+function [Ex, Ey, Ez] = Tip_Field( x_0, y_0, z_0, eta_1, a, V_0 )
 
-V_0 = 1.0E3;
 eta_2 = 0.0;
 
 xi = 1/(2.0*a) * ( sqrt(x_0.^2 + y_0.^2 + (z_0+a).^2) + sqrt(x_0.^2 + y_0.^2 + (z_0-a).^2) );
