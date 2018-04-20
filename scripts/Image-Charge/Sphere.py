@@ -27,23 +27,63 @@ a = np.sqrt( d**2*R**2/(h**2+2*d*h) + d**2 )
 xi_max = h/d + 1.0
 eta_1 = -d/a
 
+
+max_xi = h/d + 1.0
+max_x = a*np.sqrt(max_xi**2-1.0)*np.sqrt(1.0-eta_1**2)
+x_tip = np.linspace(-max_x, max_x, 1000)
+
+y_tip = 0.0
+
+xi = np.sqrt(x_tip**2/(a**2*(1.0-eta_1**2)) + 1.0)
+z_tip = a * xi * eta_1
+
 #-------------------------------------------------------------------------------
 # Radius of sphere
-a = 4.999999999999993E-08 # in m
+R_a = np.abs(a**2/d-d)
+
+# Center of the sphere. We place it at the top of the tip.
+r_c = np.array([0.0, 0.0, h-R_a])
 
 # Size of charge
 q = +e # in C
 
-# distance from sphere
-d = np.linspace(a+0.05E-9, a+10.0E-9, 10000)
+# Position of the charged particle outside the sphere (tip).
+r_p = np.array([0.0, 0.0, h+10.0E-9])
 
-# (a-d)/abs(a-d)**3
-term_1 = (a-d)/np.abs(a-d)**(3.0/2.0)
+# Vector from center of sphere r_c = (x_c, y_c, z_c) to particle r_p = (x_p, y_p, z_p)
+R_cp = r_p - r_c
 
-# 1/(a*d) * (1-a/d)/abs(1-a/d)**3
-term_2 = 1.0/(a*d) * (1.0-a/d)/np.abs(1.0-a/d)**(3.0/2.0)
+# Distance of the particle from the center of the sphere.
+d_p = np.sqrt(np.inner(R_cp, R_cp))
 
-E = q/(4.0*pi*epsilon_0) * ( term_1 - term_2 )
+# Scale it to unit size.
+R_cp = R_cp / d
 
-plt.plot(d/1E-9, E)
+# Distance of the image charge partner from the center of the sphere.
+d_ic = R_a**2/d
+
+# The position of the image charge partner.
+r_ic = r_c + R_cp*d_ic
+
+# Now calculate the size of the charge of the image charge partner.
+q_ic = -1.0*R_a/d*q
+
+#-------------------------------------------------------------------------------
+E_tot = np.array([])
+
+for i, (x, z) in enumerate(zip(x_tip, z_tip)):
+    r = np.array([x, 0.0, z])
+    r_kp  = r - r_p
+    r_kic = r - r_ic
+
+    d_kp = np.sqrt( np.inner(r_kp, r_kp) )
+    d_kic = np.sqrt( np.inner(r_kic, r_kic) )
+
+    E_p = q/(4.0*pi*epsilon_0)*r_kp / d_kp**3
+    E_ic = q_ic/(4.0*pi*epsilon_0)*r_kic / d_kic**3
+
+    E = E_p + E_ic
+    E_tot = np.append(E_tot, np.sqrt( np.inner(E, E) ))
+
+plt.plot(x_tip/1E-9, E_tot)
 plt.show()
