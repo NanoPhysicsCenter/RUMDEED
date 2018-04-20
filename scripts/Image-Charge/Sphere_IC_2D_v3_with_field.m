@@ -63,15 +63,15 @@ z_tip = a .* xi .* eta_1;
 
 % Height of the particle, ξ [1, inf].
 % xi = 1 is the top of the tip.
-%xi_a1 = 1.020;
-xi_a1 = 1.0;
+xi_a1 = 1.020;
+%xi_a1 = 1.0;
 
 % Distance from the tip, η [0, -1].
 % Should not be lower than eta_1. That would be inside the tip.
 % Anything above 0 would be above the absorption plane.
 %eta_a1 = -0.97515; % 1 nm, if xi = 1.02.
-%eta_a1 = -0.9745; % 2 nm, if x = 1.02.
-eta_a1 = -0.975802551744737;
+eta_a1 = -0.9745; % 2 nm, if x = 1.02.
+%eta_a1 = -0.975802551744737;
 
 % Rotation of the particle around the tip.
 phi_a1 = 0.0;
