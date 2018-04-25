@@ -37,8 +37,8 @@ shift_z = abs(a*eta*max_xi);
 %--------------------------------------------------------------------------
 % Particle
 % Position in prolate spheroidal coordinates
-xi_a = 1.020;
-eta_a = -0.8745;
+xi_a = 1.000;
+eta_a = -0.975724;
 phi_a = 0.0;
 
 % Position of the particle in x,y,z coordinates
@@ -51,13 +51,17 @@ z_a = a * xi_a * eta_a;
 % Caclulate x, y and z values for the tip
 % Max x value, should be the same as R_r (base radius)
 max_x = a*sqrt(max_xi^2-1)*sqrt(1-eta_1^2)*1;
-x_tip = linspace(-max_x, max_x, 1000);
+x_tip = linspace(-max_x, max_x, 10001);
 %x_tip = 2.5719e-09;
 %x = 0.0;
 y_tip = 0.0;
 
 xi = sqrt(x_tip.^2/(a^2*(1-eta_1^2)*1) + 1);
 z_tip = a .* xi .* eta_1;
+
+%x_tip = 0.0;
+%y_tip = 0.0;
+%z_tip = a .* 1.0 .* eta_1;
 
 %--------------------------------------------------------------------------
 % Center of the sphere used for the image charge approximation
@@ -68,6 +72,7 @@ z_c = a*1.0*eta_1 - r_tip*g_fac; % Located at the top of the tip
 
 % Distance from center of sphere (x_c, y_c, z_c) to particle (x_a, y_a, z_a).
 a_b = sqrt((x_a - x_c).^2 + (y_a - y_c).^2 + (z_a - z_c).^2);
+disp(a_b/1E-9)
 
 % Distance of image charge from center of sphere.
 b = r_tip^2/a_b;
@@ -111,22 +116,23 @@ tmp_dis_b = ( (x_tip - x_b).^2 + (y_tip - y_b).^2 + (z_tip - z_b).^2 );
 q_ic = -r_tip/a_b*q;
 
 % x
-E_x1 = q/(4*pi*epsilon_0)    * (x_a - x_tip)./sqrt(tmp_dis_a).^(3);
-E_x2 = q_ic/(4*pi*epsilon_0) *  (x_b - x_tip)./sqrt(tmp_dis_b).^(3);
+E_x1 = q/(4*pi*epsilon_0)    * (x_tip - x_a)./sqrt(tmp_dis_a).^(3);
+E_x2 = q_ic/(4*pi*epsilon_0) * (x_tip - x_b)./sqrt(tmp_dis_b).^(3);
 E_x = E_x1 + E_x2;
 
 % y
-E_y1 = q/(4*pi*epsilon_0)    * (y_a - y_tip)./sqrt(tmp_dis_a).^(3);
-E_y2 = q_ic/(4*pi*epsilon_0) * (y_b - y_tip)./sqrt(tmp_dis_b).^(3);
+E_y1 = q/(4*pi*epsilon_0)    * (y_tip - y_a)./sqrt(tmp_dis_a).^(3);
+E_y2 = q_ic/(4*pi*epsilon_0) * (y_tip - y_b)./sqrt(tmp_dis_b).^(3);
 E_y = E_y1 + E_y2;
 
 % z
-E_z1 = q/(4*pi*epsilon_0)   * (z_a - z_tip)./sqrt(tmp_dis_a).^(3);
-E_z2 = q_ic/(4*pi*epsilon_0) * (z_b - z_tip)./sqrt(tmp_dis_b).^(3);
+E_z1 = q/(4*pi*epsilon_0)    * (z_tip - z_a)./sqrt(tmp_dis_a).^(3);
+E_z2 = q_ic/(4*pi*epsilon_0) * (z_tip - z_b)./sqrt(tmp_dis_b).^(3);
 E_z = E_z1 + E_z2;
 
 % Magnitude of the field.
 E_new = sqrt(E_x.^2 + E_y.^2 + E_z.^2);
+disp(E_new)
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Draw the field as a function of position on the tip.
