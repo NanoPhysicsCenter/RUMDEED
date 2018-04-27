@@ -1,4 +1,4 @@
-function [FN, I, a_b, E_top] = Sphere_IC_2D_v4_function(eta_a)
+function [FN, I, p_t, E_top, v_yy, t_yy, l_yy] = Sphere_IC_2D_v4_function(eta_a)
 % Kristinn Torfason
 % 26.04.2018
 % Sphere approximation of image charge effect V4
@@ -68,6 +68,15 @@ xi = sqrt(x_tip.^2/(a^2*(1-eta_1^2)*1) + 1);
 z_tip = a .* xi .* eta_1;
 
 %--------------------------------------------------------------------------
+% Top of the tip
+x_t = 0.0;
+y_t = 0.0;
+z_t = a * 1.0 * eta_1; % xi = 1, at the top
+
+% Distance from particle to top of tip
+p_t = sqrt( (x_a - x_t)^2 + (y_a - y_t)^2 + (z_a - z_t)^2 );
+
+%--------------------------------------------------------------------------
 % Center of the sphere used for the image charge approximation
 x_c = 0.0;
 y_c = 0.0;
@@ -135,12 +144,18 @@ a_FN = q^2/(16.0*pi^2*h_bar); % A eV V^{-2}
 b_FN = -4.0/(3.0*h_bar) * sqrt(2.0*m_e*q); % eV^{-3/2} V m^{-1}
 l_const = q / (4.0*pi*epsilon_0); % eV^{2} V^{-1} m
 
-% Note: Is l < 1?
+%
 l = l_const * E_new / w_theta^2;
+l(l>1.0) = 1.0;
+l(l<0.0) = 0.0;
+l_yy = max(l);
 v_y = 1 - l + 1/6*l.*log(l);
 t_y = 1 + l.*(1/9 - 1/18*log(l));
 %v_y = 1.0;
 %t_y = 1.0;
+
+v_yy = v_y((N-1)/2+1);
+t_yy = t_y((N-1)/2+1);
 
 FN_st = a_FN ./ (t_y.^2 .* w_theta) .* E_new.^2 .* exp(b_FN .* w_theta^(3/2) .* v_y ./ E_new);
 
@@ -148,6 +163,7 @@ FN_st = a_FN ./ (t_y.^2 .* w_theta) .* E_new.^2 .* exp(b_FN .* w_theta^(3/2) .* 
 %FN = max(FN_st);
 
 % J at x = 0
+%FN_st(l>1.0) = 0.0;
 FN = FN_st((N-1)/2+1);
 
 % Calculate the current

@@ -7,7 +7,7 @@ eta_p = linspace(-0.971, -0.975900072948533, 10000);
 
 for i = 1:length(eta_p)
     %[FN(i), I(i), p_d(i)] = Sphere_IC_2D_v3_with_field_function(eta_p(i));
-    [FN(i), I(i), p_d(i), E(i)] = Sphere_IC_2D_v4_function(eta_p(i));
+    [FN(i), I(i), p_d(i), E(i), v_y(i), t_y(i), l(i)] = Sphere_IC_2D_v4_function(eta_p(i));
 end
 
 
@@ -33,6 +33,12 @@ figure()
 semilogy(p_d/1E-9, E)
 xlabel('d [nm]')
 ylabel('E [V/m]')
+
+figure()
+plot(p_d/1E-9, v_y, p_d/1E-9, t_y, p_d/1E-9, l)
+xlabel('d [nm]')
+ylabel('v_y/t_y/l')
+legend('v_y', 't_y', 'l')
 
 % figure()
 % q = +1.602176565E-19; % Electron charge
