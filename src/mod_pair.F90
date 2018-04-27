@@ -9,11 +9,6 @@ module mod_pair
   use mod_global
   implicit none
 
-  ! Defines how the energy is split up between the electron and hole
-  ! This comes from the convervation of momentum, m_e*v_ei = m_h*v_hi,
-  ! where v_ei = sqrt(2*k*\Delta E/m_e) and v_hi = sqrt(2*(1-k)*\Delta E/m_h)
-  double precision, parameter :: k_p = m_heff / (m_eeff + m_heff)
-  double precision, parameter :: E_gj = E_g*q_0
   ! ----------------------------------------------------------------------------
   ! Interface to combine the two functions into one
   interface compact_array
@@ -30,7 +25,7 @@ contains
       ! Add code to reallocate arrays to larger size?
     else
 
-      ! Add the electron
+      ! Add the particle
       particles_cur_pos(:, nrPart+1) = par_pos
       particles_prev_pos(:, nrPart+1) = -1.0d0*length_scale
       particles_cur_accel(:, nrPart+1) = 0.0d0
@@ -40,11 +35,11 @@ contains
       particles_mask(nrPart+1) = .true.
       particles_species(nrPart+1) = par_species
 
-      if (par_species == species_elec) then
+      if (par_species == species_elec) then ! Electron
         particles_charge(nrPart+1) = -1.0d0*q_0
         particles_mass(nrPart+1) = m_eeff*m_0
         nrElec = nrElec + 1
-      else
+      else ! Hole
         particles_charge(nrPart+1) = +1.0d0*q_0
         particles_mass(nrPart+1) = m_heff*m_0
         nrHole = nrHole + 1
@@ -387,19 +382,6 @@ contains
   !
   ! Note: The pack subroutine also does this, but returns 1D arrays!!
   !
-  subroutine compact_array_2D_double(A, mask, k, m)
-    double precision, dimension(:, :), intent(inout) :: A
-    logical, dimension(:), intent(in)                :: mask
-    !logical, allocatable, dimension(:, :)            :: mask_2d
-    integer, intent(in)                              :: m, k ! m = nrPart
-
-    A(1, :) = pack(A(1, :), mask, A(1, :))
-    A(2, :) = pack(A(2, :), mask, A(2, :))
-    A(3, :) = pack(A(3, :), mask, A(3, :))
-
-    ! We could also do! Performance?
-    ! A = reshape(pack(A, mask), (/ 3, N/))
-  end subroutine compact_array_2D_double
 
   ! Todo: Check if this has better performance than the pack method.
   subroutine compact_array_2D_double_verbal(A, mask, k, m)
@@ -419,6 +401,21 @@ contains
     end do
     !print *, ''
   end subroutine compact_array_2D_double_verbal
+
+  ! This subroutine uses the pack method.
+  subroutine compact_array_2D_double(A, mask, k, m)
+    double precision, dimension(:, :), intent(inout) :: A
+    logical, dimension(:), intent(in)                :: mask
+    !logical, allocatable, dimension(:, :)            :: mask_2d
+    integer, intent(in)                              :: m, k ! m = nrPart
+
+    A(1, :) = pack(A(1, :), mask, A(1, :))
+    A(2, :) = pack(A(2, :), mask, A(2, :))
+    A(3, :) = pack(A(3, :), mask, A(3, :))
+
+    ! We could also do! Performance?
+    ! A = reshape(pack(A, mask), (/ 3, N/))
+  end subroutine compact_array_2D_double
 
 
   ! ----------------------------------------------------------------------------

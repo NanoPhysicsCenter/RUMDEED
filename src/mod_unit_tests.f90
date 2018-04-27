@@ -2,6 +2,8 @@
 ! Module for unit testing                   !
 ! Kristinn Torfason                         !
 ! 10.09.17                                  !
+! Just some simple tests to check if        !
+! some things are working correctly         !
 !-------------------------------------------!
 
 module mod_unit_tests

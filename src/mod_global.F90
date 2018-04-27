@@ -9,63 +9,11 @@ module mod_global
 
   ! ----------------------------------------------------------------------------
   ! Define material parameters
-  ! GaAs
-  ! http://www.iue.tuwien.ac.at/phd/palankovski/node32.html
-  ! http://en.wikipedia.org/wiki/Effective_mass_%28solid-state_physics%29#Density_of_states_effective_masses_.28lightly_doped_semiconductors.29
-  !character(len=*), parameter :: material = 'GaAs' ! Material used
-  !double precision, parameter :: epsilon_r = 13.1d0 ! Relative permittivity
-  !double precision, parameter :: m_eeff = 0.067d0 ! Effective mass for electrons
-  !double precision, parameter :: m_heff = 0.45d0 ! Effective mass for holes
-  !double precision, parameter :: lambda_pos = 2.0d0
-
-  ! ! ----------------------------------------------------------------------------
-  ! ! Define material parameters
-  ! ! Si at 300 K
-  ! ! http://en.wikipedia.org/wiki/Relative_permittivity
-  ! ! http://www.semiconductors.co.uk/propiviv5431.htm
-  ! ! http://en.wikipedia.org/wiki/Effective_mass_%28solid-state_physics%29#Density_of_states_effective_masses_.28lightly_doped_semiconductors.29
-  ! character(len=*), parameter :: material = 'Silicon' ! Material used
-  ! !double precision, parameter :: epsilon_r = 11.68d0 ! Relative permittivity
-  ! double precision, parameter :: epsilon_r = 11.9d0 ! Relative permittivity
-  ! !double precision, parameter :: m_eeff = 1.09d0 ! Effective mass for electrons
-  ! !double precision, parameter :: m_heff = 1.15d0 ! Effective mass for holes
-  ! !double precision, parameter :: m_eeff = 0.9163d0 ! Effective mass for electrons
-  ! !double precision, parameter :: m_heff = 0.49d0 ! Effective mass for holes
-  ! double precision, parameter :: m_eeff = 0.34d0 ! Scaps
-  ! double precision, parameter :: m_heff = 0.60d0 ! Scaps
-  ! !double precision, parameter :: lambda_pos = 0.0746d0 ! Average number of electron/holes pairs to generate per time step
-  ! double precision            :: lambda_pos ! Average number of electron/holes pairs to generate per time step
-  ! !double precision, parameter :: alpha = 1.11E6 ! Absorption coefficient in m^{-1}
-  ! double precision, parameter :: E_g = 1.12d0 ! Band gap in eV
-  ! double precision, parameter :: mu_e = 0.14d0 ! Electron mobility
-  ! double precision, parameter :: mu_h = 0.045d0 ! Hole mobility
-
-  ! ----------------------------------------------------------------------------
-  ! Define material parameters
-  ! Methylammonium
   !
   character(len=*), parameter :: material = 'Vacuum' ! Material used
-
-  ! See "Molecular Motion and Dynamic Crystal Structures of Hybrid Halide Perovskites"
-  ! it says epsilon_r = 33
   double precision, parameter :: epsilon_r = 1.0d0! Relative permittivity
-
-  ! See "Direct measurement of the exciton binding energy and effective masses for
-  !      charge carriers in organic–inorganic tri-halide perovskites"
-  !   DOI: 10.1038/NPHYS3357
-  ! it says m_eff = 0.104*m_e
-  ! m_eff = 0.23d0
-  ! m_heff = 0.29d0
-  !double precision, parameter :: m_eeff = 0.23d0
-  double precision, parameter :: m_eeff = 1.0d0
-  double precision, parameter :: m_heff = 1.0d0
-
-  double precision            :: lambda_pos ! Average number of electron/holes pairs to generate per time step
-  double precision, parameter :: E_g = 1.55d0 ! Band gap in eV
-
-  ! See "Impact of work function of back contact of perovskite solar cells without hole transport material analyzed by device simulation"
-  double precision, parameter :: mu_e = 2.0d0*1.0d-4 ! [cm²/Vs] -> [m²/Vs] Electron mobility
-  double precision, parameter :: mu_h = 2.0d0*1.0d-4 ! [cm²/Vs] -> [m²/Vs] Hole mobility
+  double precision, parameter :: m_eeff = 1.0d0 ! Effective mass for electrons
+  double precision, parameter :: m_heff = 1.0d0 ! Effective mass for holes
 
 
   ! ----------------------------------------------------------------------------
