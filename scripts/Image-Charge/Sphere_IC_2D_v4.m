@@ -132,7 +132,7 @@ E_z = E_z1 + E_z2;
 
 % Magnitude of the field.
 E_new = sqrt(E_x.^2 + E_y.^2 + E_z.^2);
-disp(E_new)
+%disp(E_new)
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Draw the field as a function of position on the tip.

@@ -1,6 +1,6 @@
 function [FN, I, a_b, E_top] = Sphere_IC_2D_v4_function(eta_a)
 % Kristinn Torfason
-% 24.04.2015
+% 26.04.2018
 % Sphere approximation of image charge effect V4
 % Sphere location fixed at tip
 
@@ -39,7 +39,7 @@ eta_1 = - d / a;
 theta = acos(d/a);
 r_tip = a*sin(theta)*tan(theta);
 %eta_2 = 0.0; % Defines the plane of absorption
-eta = eta_1; % Defines the tip
+%eta = eta_1; % Defines the tip
 %shift_z = abs(a*eta*max_xi);
 
 %--------------------------------------------------------------------------
@@ -59,7 +59,7 @@ z_a = a * xi_a * eta_a;
 % Caclulate x, y and z values for the tip
 % Max x value, should be the same as R_r (base radius)
 max_x = a*sqrt(max_xi^2-1)*sqrt(1-eta_1^2)*1;
-x_tip = linspace(-max_x, max_x, 1001);
+x_tip = linspace(-max_x, max_x, 10001);
 %x_tip = 2.5719e-09;
 %x = 0.0;
 y_tip = 0.0;
@@ -90,28 +90,27 @@ x_b = x_c + n_a(1, :).*b;
 y_b = y_c + n_a(2, :).*b;
 z_b = z_c + n_a(3, :).*b;
 
-%--------------------------------------------------------------------------
 % Calculate the electric field.
 
-tmp_dis_a = sqrt( (x_tip - x_a).^2 + (y_tip - y_a).^2 + (z_tip - z_a).^2 );
-tmp_dis_b = sqrt( (x_tip - x_b).^2 + (y_tip - y_b).^2 + (z_tip - z_b).^2 );
+tmp_dis_a = ( (x_tip - x_a).^2 + (y_tip - y_a).^2 + (z_tip - z_a).^2 );
+tmp_dis_b = ( (x_tip - x_b).^2 + (y_tip - y_b).^2 + (z_tip - z_b).^2 );
 
 % Size of the charge of the image charge partner.
 q_ic = -r_tip/a_b*q;
 
 % x
-E_x1 = q/(4*pi*epsilon_0)    * (x_tip - x_a)./tmp_dis_a.^(3);
-E_x2 = q_ic/(4*pi*epsilon_0) * (x_tip - x_b)./tmp_dis_b.^(3);
+E_x1 = q/(4*pi*epsilon_0)    * (x_tip - x_a)./sqrt(tmp_dis_a).^(3);
+E_x2 = q_ic/(4*pi*epsilon_0) * (x_tip - x_b)./sqrt(tmp_dis_b).^(3);
 E_x = E_x1 + E_x2;
 
 % y
-E_y1 = q/(4*pi*epsilon_0)    * (y_tip - y_a)./tmp_dis_a.^(3);
-E_y2 = q_ic/(4*pi*epsilon_0) * (y_tip - y_b)./tmp_dis_b.^(3);
+E_y1 = q/(4*pi*epsilon_0)    * (y_tip - y_a)./sqrt(tmp_dis_a).^(3);
+E_y2 = q_ic/(4*pi*epsilon_0) * (y_tip - y_b)./sqrt(tmp_dis_b).^(3);
 E_y = E_y1 + E_y2;
 
 % z
-E_z1 = q/(4*pi*epsilon_0)    * (z_tip - z_a)./tmp_dis_a.^(3);
-E_z2 = q_ic/(4*pi*epsilon_0) * (z_tip - z_b)./tmp_dis_b.^(3);
+E_z1 = q/(4*pi*epsilon_0)    * (z_tip - z_a)./sqrt(tmp_dis_a).^(3);
+E_z2 = q_ic/(4*pi*epsilon_0) * (z_tip - z_b)./sqrt(tmp_dis_b).^(3);
 E_z = E_z1 + E_z2;
 
 % Magnitude of the field.
@@ -128,21 +127,30 @@ E_z = E_z + Ez_vac;
 E_new = sqrt(E_x.^2 + E_y.^2 + E_z.^2);
 E_vac = sqrt(Ex_vac.^2 + Ey_vac.^2  + Ez_vac.^2);
 
-E_top = E_tip(round(length(E_tip)/2));
+N = length(E_new);
+
+E_top = E_tip((N-1)/2+1) + E_vac((N-1)/2+1);
 
 a_FN = q^2/(16.0*pi^2*h_bar); % A eV V^{-2}
 b_FN = -4.0/(3.0*h_bar) * sqrt(2.0*m_e*q); % eV^{-3/2} V m^{-1}
 l_const = q / (4.0*pi*epsilon_0); % eV^{2} V^{-1} m
 
+% Note: Is l < 1?
 l = l_const * E_new / w_theta^2;
 v_y = 1 - l + 1/6*l.*log(l);
 t_y = 1 + l.*(1/9 - 1/18*log(l));
+%v_y = 1.0;
+%t_y = 1.0;
 
 FN_st = a_FN ./ (t_y.^2 .* w_theta) .* E_new.^2 .* exp(b_FN .* w_theta^(3/2) .* v_y ./ E_new);
 
 %FN = FN_st(length(FN_st)/2);
-FN = max(FN_st);
+%FN = max(FN_st);
 
+% J at x = 0
+FN = FN_st((N-1)/2+1);
+
+% Calculate the current
 I = 2*pi*a^2*sqrt(1-eta_1^2)*sum(FN_st.*sqrt(xi.^2-eta_1^2));
 
 end
