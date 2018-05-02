@@ -1,4 +1,4 @@
-function [FN, I, p_t, E_top, v_yy, t_yy, l_yy] = Sphere_IC_2D_v4_function(eta_a)
+function [FN, I, p_t, E_top, v_yy, t_yy, l_yy] = Sphere_IC_2D_v4_function(xi_a, eta_a)
 % Kristinn Torfason
 % 26.04.2018
 % Sphere approximation of image charge effect V4
@@ -45,7 +45,7 @@ r_tip = a*sin(theta)*tan(theta);
 %--------------------------------------------------------------------------
 % Particle
 % Position in prolate spheroidal coordinates
-xi_a = 1.000;
+%xi_a = 1.002;
 %eta_a = -0.8745;
 phi_a = 0.0;
 
@@ -69,9 +69,9 @@ z_tip = a .* xi .* eta_1;
 
 %--------------------------------------------------------------------------
 % Top of the tip
-x_t = 0.0;
-y_t = 0.0;
-z_t = a * 1.0 * eta_1; % xi = 1, at the top
+x_t = a * sqrt(xi_a^2 - 1) * sqrt(1 - eta_1^2) * cos(phi_a);
+y_t = a * sqrt(xi_a^2 - 1) * sqrt(1 - eta_1^2) * sin(phi_a);
+z_t = a * xi_a * eta_1; % xi = 1, at the top
 
 % Distance from particle to top of tip
 p_t = sqrt( (x_a - x_t)^2 + (y_a - y_t)^2 + (z_a - z_t)^2 );

@@ -2,43 +2,82 @@
 close all
 clear variables
 
-eta_p = linspace(-0.971, -0.975900072948533, 10000);
+N = 10000;
+
+eta_p = linspace(-0.971, -0.975900072948533, N);
+
+I_0 = zeros(1, N);
+I_2 = zeros(1, N);
+I_4 = zeros(1, N);
+I_6 = zeros(1, N);
+
+pd_0 = zeros(1, N);
+pd_2 = zeros(1, N);
+pd_4 = zeros(1, N);
+pd_6 = zeros(1, N);
 
 
+xi_p = 1.000;
 for i = 1:length(eta_p)
     %[FN(i), I(i), p_d(i)] = Sphere_IC_2D_v3_with_field_function(eta_p(i));
-    [FN(i), I(i), p_d(i), E(i), v_y(i), t_y(i), l(i)] = Sphere_IC_2D_v4_function(eta_p(i));
+    [~, I_0(i), pd_0(i), ~, ~, ~, ~] = Sphere_IC_2D_v4_function(xi_p, eta_p(i));
 end
 
+xi_p = 1.002;
+for i = 1:length(eta_p)
+    %[FN(i), I(i), p_d(i)] = Sphere_IC_2D_v3_with_field_function(eta_p(i));
+    [~, I_2(i), pd_2(i), ~, ~, ~, ~] = Sphere_IC_2D_v4_function(xi_p, eta_p(i));
+end
+
+xi_p = 1.004;
+for i = 1:length(eta_p)
+    %[FN(i), I(i), p_d(i)] = Sphere_IC_2D_v3_with_field_function(eta_p(i));
+    [~, I_4(i), pd_4(i), ~, ~, ~, ~] = Sphere_IC_2D_v4_function(xi_p, eta_p(i));
+end
+
+xi_p = 1.006;
+for i = 1:length(eta_p)
+    %[FN(i), I(i), p_d(i)] = Sphere_IC_2D_v3_with_field_function(eta_p(i));
+    [~, I_6(i), pd_6(i), ~, ~, ~, ~] = Sphere_IC_2D_v4_function(xi_p, eta_p(i));
+end
 
 figure()
-semilogy(p_d/1E-9, FN)
-%xlim([0, 5])
+semilogy(pd_0/1E-9, I_0, pd_2/1E-9, I_2, pd_4/1E-9, I_4, pd_6/1E-9, I_6)
+xlim([0.5, 5])
 xlabel('d [nm]')
-ylabel('J [A/m^2]')
+ylabel('log(I) [log(A)]')
+legend('1.000', '1.002', '1.004', '1.006')
 
-figure()
-semilogy(eta_p, I)
-%xlim([0, 5])
-xlabel('eta')
-ylabel('I [A]')
 
-figure()
-semilogy(p_d/1E-9, I)
-%xlim([0, 5])
-xlabel('d [nm]')
-ylabel('I [A]')
 
-figure()
-semilogy(p_d/1E-9, E)
-xlabel('d [nm]')
-ylabel('E [V/m]')
-
-figure()
-plot(p_d/1E-9, v_y, p_d/1E-9, t_y, p_d/1E-9, l)
-xlabel('d [nm]')
-ylabel('v_y/t_y/l')
-legend('v_y', 't_y', 'l')
+% figure()
+% semilogy(p_d/1E-9, FN)
+% %xlim([0, 5])
+% xlabel('d [nm]')
+% ylabel('J [A/m^2]')
+% 
+% figure()
+% semilogy(eta_p, I)
+% %xlim([0.5, 5])
+% xlabel('eta')
+% ylabel('log(I) [log(A)]')
+% 
+% figure()
+% semilogy(p_d/1E-9, I)
+% xlim([0.5, 5])
+% xlabel('d [nm]')
+% ylabel('log(I) [log(A)]')
+% 
+% figure()
+% semilogy(p_d/1E-9, E)
+% xlabel('d [nm]')
+% ylabel('E [V/m]')
+% 
+% figure()
+% plot(p_d/1E-9, v_y, p_d/1E-9, t_y, p_d/1E-9, l)
+% xlabel('d [nm]')
+% ylabel('v_y/t_y/l')
+% legend('v_y', 't_y', 'l')
 
 % figure()
 % q = +1.602176565E-19; % Electron charge
