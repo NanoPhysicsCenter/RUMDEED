@@ -20,12 +20,24 @@ Module mod_field_emission
 
   ! ----------------------------------------------------------------------------
   ! Constants for field emission
-  double precision, parameter :: a_FN = q_02/(16.0d0*pi**2*h_bar) ! A eV V^{-2}
-  double precision, parameter :: b_FN = -4.0d0/(3.0d0*h_bar) * sqrt(2.0d0*m_0*q_0) ! eV^{-3/2} V m^{-1}
-  double precision, parameter :: l_const = q_0 / (4.0d0*pi*epsilon_0) ! eV^{2} V^{-1} m
-  double precision, parameter :: w_theta = 2.0d0 ! work function in eV
+  ! Fyrst Fowler-Nordheim constant in units [ A eV V^{-2} ]
+  double precision, parameter :: a_FN = q_02/(16.0d0*pi**2*h_bar)
 
-  ! Image Charge
+  ! Second Fowler-Nodheim constant in units [ eV^{-3/2} V m^{-1} ]
+  double precision, parameter :: b_FN = -4.0d0/(3.0d0*h_bar) * sqrt(2.0d0*m_0*q_0)
+
+  ! Constant used for calculation of the l in v_y and t_y.
+  ! The units are [ eV^{2} V^{-1} m ]
+  ! See Forbes, R. G., & Deane, J. H. (2007, November).
+  ! "Reformulation of the standard theory of Fowler–Nordheim tunnelling and cold field electron emission."
+  ! In Proceedings of the Royal Society of London A: Mathematical,
+  ! Physical and Engineering Sciences (Vol. 463, No. 2087, pp. 2907-2927). The Royal Society.
+  double precision, parameter :: l_const = q_0 / (4.0d0*pi*epsilon_0)
+
+  ! The work function. Unit [ eV ]
+  double precision, parameter :: w_theta = 2.0d0
+
+  ! Use image Charge or not
   logical, parameter          :: image_charge = .true.
 
 contains
@@ -214,6 +226,13 @@ contains
   end subroutine Do_Field_Emission_Plane_int_rec
 
 !----------------------------------------------------------------------------------------
+! The functions v_y and t_y are because of the image charge effect in the FN equation.
+! The approximation for v_y and t_y are taken from
+! Forbes, R. G., & Deane, J. H. (2007, November).
+! "Reformulation of the standard theory of Fowler–Nordheim tunnelling and cold field electron emission."
+! In Proceedings of the Royal Society of London A: Mathematical,
+! Physical and Engineering Sciences (Vol. 463, No. 2087, pp. 2907-2927). The Royal Society.
+!
   double precision function v_y(F, pos)
     double precision, intent(in)                 :: F
     double precision, dimension(1:3), intent(in) :: pos
@@ -252,16 +271,33 @@ contains
     end if
   end function t_y
 
+  !-----------------------------------------------------------------------------
+  ! The Fowler-Nordheim equation is
+  ! J = a_FN*F^2/(t_y^2*w_theta)*exp(-b_FN*w_theta^(3/2)*v_y/F)
+  ! We break it into two parts
+  ! J = Elec_Supply*Escape_Prob .
+  ! Elec_supply is the the part before the exponental
+  ! and Escape_prob is the exponental.
+
+  ! The electron supply part
+  ! This functions returns the number of electrons
+  ! Elec_supply = a_FN*F^2/(t_y^2*w_theta) * (A*time_step/q_0),
+  ! To get the number of electrons we multiply the first part of the FN
+  ! equation with the area (A) and the time step (time_step). This gives
+  ! the current. The divide that with the charge of the electron (q_0) to get
+  ! the number of electrons.
   double precision function Elec_Supply(A, F, pos)
     double precision, intent(in)                 :: A, F
     double precision, dimension(1:3), intent(in) :: pos
     double precision                             :: n
 
-    n = A * a_FN * F**2 * time_step / (1.0d0*q_0 * w_theta_xy(pos) * (t_y(F, pos))**2)
+    n = A * a_FN * F**2 * time_step / (q_0 * w_theta_xy(pos) * (t_y(F, pos))**2)
 
     Elec_supply = n
   end function Elec_supply
 
+  ! This function returns the escape probability of the Electrons.
+  ! Escape_prob = exp(-b_FN*w_theta^(3/2)*v_y/F) .
   double precision function Escape_Prob(F, pos)
     double precision, intent(in)                 :: F
     double precision, dimension(1:3), intent(in) :: pos
@@ -275,6 +311,9 @@ contains
     end if
   end function Escape_Prob
 
+  !-----------------------------------------------------------------------------
+  ! Metropolis–Hastings algorithm
+  ! https://en.wikipedia.org/wiki/Metropolis%E2%80%93Hastings_algorithm
   function Metro_algo_rec(ndim, emit)
     integer, intent(in)                          :: ndim, emit
     double precision, dimension(1:2)             :: Metro_algo_rec

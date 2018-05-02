@@ -426,7 +426,6 @@ contains
     write(ud_init, fmt_rel) 'epsilon_r  = ', epsilon_r, 'Relative permittivity'
     write(ud_init, fmt_rel) 'm_eeff     = ', m_eeff,    'Effective mass for electrons'
     write(ud_init, fmt_rel) 'm_heff     = ', m_heff,    'Effective mass for holes'
-    write(ud_init, fmt_rel) 'lambda_pos = ', lambda_pos,'Mean value in the Poisson distribution'
     write(ud_init, *) '---------------------------------------------------------'
     write(ud_init, *)
     write(ud_init, *)
