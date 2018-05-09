@@ -15,9 +15,17 @@ module mod_pair
     module procedure compact_array_2D_double, compact_array_1D_double, compact_array_1D_int
   end interface
 contains
-  subroutine Add_Particle(par_pos, par_vel, par_species, step)
+  ! ----------------------------------------------------------------------------
+  ! Subroutine to add a particle to the system
+  ! Keyword arguments:
+  ! par_pos: Particle postion (x, y, z)
+  ! par_vel: Particle initial velocity (v_x, v_y, v_z)
+  ! par_species: The type of particle, search for species_elec in mod_global to see a list
+  ! step: The current time step, i.e. when the particle is emitted
+  ! emit: The number of the emitter that the particle came from
+  subroutine Add_Particle(par_pos, par_vel, par_species, step, emit)
     double precision, dimension(1:3), intent(in) :: par_pos, par_vel
-    integer, intent(in)                          :: par_species, step
+    integer, intent(in)                          :: par_species, step, emit
 
     ! Check if we have reach the maximum number of paticles allowed
     if (nrPart+1 > MAX_PARTICLES) then
@@ -34,6 +42,7 @@ contains
       particles_step(nrPart+1) = step
       particles_mask(nrPart+1) = .true.
       particles_species(nrPart+1) = par_species
+      particles_emitter(nrPart+1) = emit
 
       if (par_species == species_elec) then ! Electron
         particles_charge(nrPart+1) = -1.0d0*q_0
@@ -192,6 +201,10 @@ contains
 
         !$OMP TASK FIRSTPRIVATE(k, m) SHARED(particles_charge, particles_mask)
         call compact_array(particles_charge, particles_mask, k, m)
+        !$OMP END TASK
+
+        !$OMP TASK FIRSTPRIVATE(k, m) SHARED(particles_emitter, particles_mask)
+        call compact_array(particles_emitter, particles_mask, k, m)
         !$OMP END TASK
 
         ! Wait for all tasks to finish

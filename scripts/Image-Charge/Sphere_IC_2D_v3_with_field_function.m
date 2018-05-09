@@ -1,4 +1,4 @@
-function [FN, I, p_d] = Sphere_IC_2D_v3_with_field_function(eta_p)
+function [FN, I, p_d] = Sphere_IC_2D_v3_with_field_function(xi_p, eta_p)
 %UNTITLED Summary of this function goes here
 %   Detailed explanation goes here
 
@@ -65,7 +65,8 @@ z_tip = a .* xi .* eta_1;
 % Height of the particle, ξ [1, inf].
 % xi = 1 is the top of the tip.
 %xi_a1 = 1.020;
-xi_a1 = 1.0;
+%xi_a1 = 1.0;
+xi_a1 = xi_p;
 
 % Distance from the tip, η [0, -1].
 % Should not be lower than eta_1. That would be inside the tip.

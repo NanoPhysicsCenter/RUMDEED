@@ -203,7 +203,7 @@ contains
 
           ! Add a particle to the system
           par_vel = 0.0d0
-          call Add_Particle(par_pos, par_vel, species_elec, step)
+          call Add_Particle(par_pos, par_vel, species_elec, step, emit)
 
           nrElecEmit = nrElecEmit + 1
           nrEmitted_emitters(emit) = nrEmitted_emitters(emit) + 1
