@@ -19,26 +19,26 @@ pd_6 = zeros(1, N);
 
 xi_p = 1.000;
 for i = 1:length(eta_p)
-    %[FN(i), I(i), p_d(i)] = Sphere_IC_2D_v3_with_field_function(eta_p(i));
-    [~, I_0(i), pd_0(i), ~, ~, ~, ~] = Sphere_IC_2D_v4_function(xi_p, eta_p(i));
+    [~, I_0(i), pd_0(i)] = Sphere_IC_2D_v3_with_field_function(xi_p, eta_p(i));
+    %[~, I_0(i), pd_0(i), ~, ~, ~, ~] = Sphere_IC_2D_v4_function(xi_p, eta_p(i));
 end
 
 xi_p = 1.002;
 for i = 1:length(eta_p)
-    %[FN(i), I(i), p_d(i)] = Sphere_IC_2D_v3_with_field_function(eta_p(i));
-    [~, I_2(i), pd_2(i), ~, ~, ~, ~] = Sphere_IC_2D_v4_function(xi_p, eta_p(i));
+    [~, I_2(i), pd_2(i)] = Sphere_IC_2D_v3_with_field_function(xi_p, eta_p(i));
+    %[~, I_2(i), pd_2(i), ~, ~, ~, ~] = Sphere_IC_2D_v4_function(xi_p, eta_p(i));
 end
 
 xi_p = 1.004;
 for i = 1:length(eta_p)
-    %[FN(i), I(i), p_d(i)] = Sphere_IC_2D_v3_with_field_function(eta_p(i));
-    [~, I_4(i), pd_4(i), ~, ~, ~, ~] = Sphere_IC_2D_v4_function(xi_p, eta_p(i));
+    [~, I_4(i), pd_4(i)] = Sphere_IC_2D_v3_with_field_function(xi_p, eta_p(i));
+    %[~, I_4(i), pd_4(i), ~, ~, ~, ~] = Sphere_IC_2D_v4_function(xi_p, eta_p(i));
 end
 
 xi_p = 1.006;
 for i = 1:length(eta_p)
-    %[FN(i), I(i), p_d(i)] = Sphere_IC_2D_v3_with_field_function(eta_p(i));
-    [~, I_6(i), pd_6(i), ~, ~, ~, ~] = Sphere_IC_2D_v4_function(xi_p, eta_p(i));
+    [~, I_6(i), pd_6(i)] = Sphere_IC_2D_v3_with_field_function(xi_p, eta_p(i));
+    %[~, I_6(i), pd_6(i), ~, ~, ~, ~] = Sphere_IC_2D_v4_function(xi_p, eta_p(i));
 end
 
 figure()

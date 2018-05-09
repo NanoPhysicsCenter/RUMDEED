@@ -119,7 +119,7 @@ contains
 
       if (field(3) < 0.0d0) then
         par_pos(3) = 1.0d0 * length_scale ! Place above plane
-        call Add_Particle(par_pos, par_vel, species_elec, step)
+        call Add_Particle(par_pos, par_vel, species_elec, step, emit)
         !call Add_Plane_Graph_emitt(par_pos, par_vel)
 
         nrElecEmit = nrElecEmit + 1
@@ -173,7 +173,7 @@ contains
 
           par_pos(3) = 1.0d0 * length_scale ! Place above plane
           par_vel = 0.0d0
-          call Add_Particle(par_pos, par_vel, species_elec, step)
+          call Add_Particle(par_pos, par_vel, species_elec, step, emit)
 
           !print *, 'field = ', field
           !pause
