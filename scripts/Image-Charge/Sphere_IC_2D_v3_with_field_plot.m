@@ -7,20 +7,30 @@ N = 10000;
 eta_p = linspace(-0.971, -0.975900072948533, N);
 
 I_0 = zeros(1, N);
+I_05 = zeros(1, N);
 I_2 = zeros(1, N);
 I_4 = zeros(1, N);
 I_6 = zeros(1, N);
+I_end = zeros(1, N);
 
 pd_0 = zeros(1, N);
+pd_05 = zeros(1, N);
 pd_2 = zeros(1, N);
 pd_4 = zeros(1, N);
 pd_6 = zeros(1, N);
+pd_end = zeros(1, N);
 
 
 xi_p = 1.000;
 for i = 1:length(eta_p)
     [~, I_0(i), pd_0(i)] = Sphere_IC_2D_v3_with_field_function(xi_p, eta_p(i));
     %[~, I_0(i), pd_0(i), ~, ~, ~, ~] = Sphere_IC_2D_v4_function(xi_p, eta_p(i));
+end
+
+xi_p = 1.0005;
+for i = 1:length(eta_p)
+    %[FN(i), I(i), p_d(i)] = Sphere_IC_2D_v3_with_field_function(eta_p(i));
+    [~, I_05(i), pd_05(i), ~, ~, ~, ~] = Sphere_IC_2D_v4_function(xi_p, eta_p(i));
 end
 
 xi_p = 1.002;
@@ -41,12 +51,18 @@ for i = 1:length(eta_p)
     %[~, I_6(i), pd_6(i), ~, ~, ~, ~] = Sphere_IC_2D_v4_function(xi_p, eta_p(i));
 end
 
+xi_p = 1.0236;
+for i = 1:length(eta_p)
+    %[FN(i), I(i), p_d(i)] = Sphere_IC_2D_v3_with_field_function(eta_p(i));
+    [~, I_end(i), pd_end(i), ~, ~, ~, ~] = Sphere_IC_2D_v4_function(xi_p, eta_p(i));
+end
+
 figure()
-semilogy(pd_0/1E-9, I_0, pd_2/1E-9, I_2, pd_4/1E-9, I_4, pd_6/1E-9, I_6)
+semilogy(pd_0/1E-9, I_0, pd_05/1E-9, I_05, pd_2/1E-9, I_2, pd_4/1E-9, I_4, pd_6/1E-9, I_6, pd_end/1E-9, I_end)
 xlim([0.5, 5])
 xlabel('d [nm]')
 ylabel('log(I) [log(A)]')
-legend('1.000', '1.002', '1.004', '1.006')
+legend('1.0000', '1.0005', '1.0020', '1.0040', '1.0060', '1.0236')
 
 
 
