@@ -122,7 +122,12 @@ program VacuumMD
 #endif
 
   print '(a)', 'Vacuum: Program finished'
-  call Clean_Up_Photo_Emission()
+  SELECT CASE (EMISSION_MODE)
+  case(EMISSION_PHOTO)
+    call Clean_Up_Photo_Emission()
+  case(EMISSION_FIELD)
+    call Clean_Up_Field_Emission()
+  END SELECT
   call Clean_up()
 contains
 
@@ -232,6 +237,7 @@ contains
     allocate(particles_mass(1:MAX_PARTICLES))
     allocate(particles_step(1:MAX_PARTICLES))
     allocate(particles_mask(1:MAX_PARTICLES))
+    allocate(particles_emitter(1:MAX_PARTICLES))
 
     allocate(life_time(1:MAX_LIFE_TIME, 1:2))
     allocate(ramo_current(1:nrSpecies))
@@ -352,41 +358,54 @@ contains
       stop
     end if
 
-    open(newunit=ud_dipole_pos, iostat=IFAIL, file='out/dipole_pos.dt', status='REPLACE', action='write')
+    !open(newunit=ud_dipole_pos, iostat=IFAIL, file='out/dipole_pos.dt', status='REPLACE', action='write')
+    !if (IFAIL /= 0) then
+    !  print *, 'Vacuum: Failed to open file dipole_pos.dt. ABORTING'
+    !  stop
+    !end if
+
+    !open(newunit=ud_dipole_vec, iostat=IFAIL, file='out/dipole_vec.dt', status='REPLACE', action='write')
+    !if (IFAIL /= 0) then
+    !  print *, 'Vacuum: Failed to open file dipole_vec.dt. ABORTING'
+    !  stop
+    !end if
+
+    !open(newunit=ud_field, iostat=IFAIL, file='out/long_field.dt', status='REPLACE', action='write')
+    !if (IFAIL /= 0) then
+    !  print *, 'Vacuum: Failed to open file long_field.dt. ABORTING'
+    !  stop
+    !end if
+
+    !open(newunit=ud_density_map_elec, iostat=IFAIL, file='out/density_elec.dt', status='REPLACE', action='write')
+    !if (IFAIL /= 0) then
+    !  print *, 'Vacuum: Failed to open file density_elec.dt. ABORTING'
+    !  stop
+    !end if
+
+    !open(newunit=ud_density_map_hole, iostat=IFAIL, file='out/density_hole.dt', status='REPLACE', action='write')
+    !if (IFAIL /= 0) then
+    !  print *, 'Vacuum: Failed to open file density_hole.dt. ABORTING'
+    !  stop
+    !end if
+
+    !open(newunit=ud_density_map_total, iostat=IFAIL, file='out/density_total.dt', status='REPLACE', action='write')
+    !if (IFAIL /= 0) then
+    !  print *, 'Vacuum: Failed to open file density_total.dt. ABORTING'
+    !  stop
+    !end if
+
+    open(newunit=ud_density_emit, iostat=IFAIL, file='out/density_emit.bin', status='REPLACE', action='WRITE', access='STREAM')
     if (IFAIL /= 0) then
-      print *, 'Vacuum: Failed to open file dipole_pos.dt. ABORTING'
+      print *, 'Vacuum: Failed to open file density_emit.dt. ABORTING'
       stop
     end if
 
-    open(newunit=ud_dipole_vec, iostat=IFAIL, file='out/dipole_vec.dt', status='REPLACE', action='write')
+    open(newunit=ud_density_absorb, iostat=IFAIL, file='out/density_absorb.bin', status='REPLACE', action='WRITE', access='STREAM')
     if (IFAIL /= 0) then
-      print *, 'Vacuum: Failed to open file dipole_vec.dt. ABORTING'
+      print *, 'Vacuum: Failed to open file density_absorb.dt. ABORTING'
       stop
     end if
 
-    open(newunit=ud_field, iostat=IFAIL, file='out/long_field.dt', status='REPLACE', action='write')
-    if (IFAIL /= 0) then
-      print *, 'Vacuum: Failed to open file long_field.dt. ABORTING'
-      stop
-    end if
-
-    open(newunit=ud_density_map_elec, iostat=IFAIL, file='out/density_elec.dt', status='REPLACE', action='write')
-    if (IFAIL /= 0) then
-      print *, 'Vacuum: Failed to open file density_elec.dt. ABORTING'
-      stop
-    end if
-
-    open(newunit=ud_density_map_hole, iostat=IFAIL, file='out/density_hole.dt', status='REPLACE', action='write')
-    if (IFAIL /= 0) then
-      print *, 'Vacuum: Failed to open file density_hole.dt. ABORTING'
-      stop
-    end if
-
-    open(newunit=ud_density_map_total, iostat=IFAIL, file='out/density_total.dt', status='REPLACE', action='write')
-    if (IFAIL /= 0) then
-      print *, 'Vacuum: Failed to open file density_total.dt. ABORTING'
-      stop
-    end if
   end subroutine Init
 
   ! ----------------------------------------------------------------------------
@@ -396,6 +415,8 @@ contains
     flush(ud_emit)
     flush(ud_absorb)
     flush(ud_volt)
+    flush(ud_density_emit)
+    flush(ud_density_absorb)
 
   end subroutine Flush_Data
 
@@ -489,12 +510,14 @@ contains
     close(unit=ud_absorb_bot, iostat=IFAIL, status='keep')
     close(unit=ud_ramo, iostat=IFAIL, status='keep')
     close(unit=ud_volt, iostat=IFAIL, status='keep')
-    close(unit=ud_dipole_pos, iostat=IFAIL, status='keep')
-    close(unit=ud_dipole_vec, iostat=IFAIL, status='keep')
+    !close(unit=ud_dipole_pos, iostat=IFAIL, status='keep')
+    !close(unit=ud_dipole_vec, iostat=IFAIL, status='keep')
     close(unit=ud_field, iostat=IFAIL, status='keep')
-    close(unit=ud_density_map_elec, iostat=IFAIL, status='keep')
-    close(unit=ud_density_map_hole, iostat=IFAIL, status='keep')
-    close(unit=ud_density_map_total, iostat=IFAIL, status='keep')
+    !close(unit=ud_density_map_elec, iostat=IFAIL, status='keep')
+    !close(unit=ud_density_map_hole, iostat=IFAIL, status='keep')
+    !close(unit=ud_density_map_total, iostat=IFAIL, status='keep')
+    close(unit=ud_density_emit, iostat=IFAIL, status='keep')
+    close(unit=ud_density_absorb, iostat=IFAIL, status='keep')
 
     ! Deallocate arrays
     deallocate(particles_cur_pos)
@@ -507,6 +530,7 @@ contains
     deallocate(particles_species)
     deallocate(particles_mass)
     deallocate(particles_mask)
+    deallocate(particles_emitter)
 
     deallocate(emitters_pos)
     deallocate(emitters_dim)

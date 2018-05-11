@@ -77,8 +77,8 @@ module mod_global
   ! ----------------------------------------------------------------------------
   ! Particle removal flags
   integer, parameter :: remove_unknown = 0
-  integer, parameter :: remove_top    = 1
-  integer, parameter :: remove_bot   = 2
+  integer, parameter :: remove_top     = 1
+  integer, parameter :: remove_bot     = 2
 
   ! ----------------------------------------------------------------------------
   ! Define storage arrays for particles
@@ -200,12 +200,14 @@ module mod_global
   integer :: ud_ramo ! File for the Ramo current
   integer :: ud_volt ! Voltage in the system
   integer :: ud_debug ! File for debuging and testing
-  integer :: ud_dipole_pos ! File for dipole positions
-  integer :: ud_dipole_vec ! File for dipole orientation
+  !integer :: ud_dipole_pos ! File for dipole positions
+  !integer :: ud_dipole_vec ! File for dipole orientation
   integer :: ud_field ! File for longitudinal field
-  integer :: ud_density_map_elec ! Density maps for electrons
-  integer :: ud_density_map_hole ! Density maps for holes
-  integer :: ud_density_map_total ! Density maps for holes - electrons
+  !integer :: ud_density_map_elec ! Density maps for electrons
+  !integer :: ud_density_map_hole ! Density maps for holes
+  !integer :: ud_density_map_total ! Density maps for holes - electrons
+  integer :: ud_density_emit
+  integer :: ud_density_absorb
 
   !--
   ! Used in Calc_Field_at in the Verlet module. Needs to be shared between threads.

@@ -17,6 +17,7 @@ module mod_pair
 contains
   ! ----------------------------------------------------------------------------
   ! Subroutine to add a particle to the system
+  ! note: This subroutine should be called inside a OpenMP ciritical section
   ! Keyword arguments:
   ! par_pos: Particle postion (x, y, z)
   ! par_vel: Particle initial velocity (v_x, v_y, v_z)
@@ -63,6 +64,10 @@ contains
       nrElecHole = nrElec + nrHole
       nrPart = nrElecHole
       endElecHoles = nrPart
+
+      ! Write out the x and y position of the emitted particle
+      ! along with which emitter it came from.
+      write(unit=ud_density_emit) par_pos(1), par_pos(2), emit
     end if
   end subroutine Add_Particle
 
@@ -71,10 +76,7 @@ contains
   ! Keyword arguments:
   ! i -- The particle to be removed
   ! m -- Why the particle is being removed
-  !    m = 0: Unknown (remove_unknown)
-  !    m = 1: Exited left boundary (remove_left)
-  !    m = 2: Exited right boundary (remove_right)
-  !    m = 3: Recombination (remove_recomb)
+  ! See mod_global for list of removal flags
   subroutine Mark_Particles_Remove(i, m)
     integer, intent(in) :: i, m
 
@@ -89,26 +91,31 @@ contains
     particles_charge(i) = 0.0d0
 
     ! Take care of the book keeping
-    !$OMP ATOMIC
+    !$OMP ATOMIC UPDATE
     nrPart_remove = nrPart_remove + 1
 
     if (particles_species(i) == species_elec) then
 
-      !$OMP ATOMIC
+      !$OMP ATOMIC UPDATE
       nrElec_remove = nrElec_remove + 1
 
       SELECT CASE (m)
       CASE (remove_top)
-          !$OMP ATOMIC
+          !$OMP ATOMIC UPDATE
           nrPart_remove_top = nrPart_remove_top + 1
 
-          !$OMP ATOMIC
+          !$OMP ATOMIC UPDATE
           nrElec_remove_top = nrElec_remove_top + 1
+
+          ! Write out the x and y position of the particle along with which emitter it came from.
+          !$OMP CRITICAL(DENSITY_ABSORB)
+          write(unit=ud_density_absorb) particles_cur_pos(1, i), particles_cur_pos(2, i), particles_emitter(i)
+          !$OMP END CRITICAL(DENSITY_ABSORB)
         CASE (remove_bot)
-          !$OMP ATOMIC
+          !$OMP ATOMIC UPDATE
           nrPart_remove_bot = nrPart_remove_bot + 1
 
-          !$OMP ATOMIC
+          !$OMP ATOMIC UPDATE
           nrElec_remove_bot = nrElec_remove_bot + 1
         CASE DEFAULT
           print *, 'Error unkown remove case ', m
@@ -116,21 +123,21 @@ contains
 
     else if (particles_species(i) == species_hole) then
 
-      !$OMP ATOMIC
+      !$OMP ATOMIC UPDATE
       nrHole_remove = nrHole_remove + 1
 
       SELECT CASE (m)
       CASE (remove_top)
-          !$OMP ATOMIC
+          !$OMP ATOMIC UPDATE
           nrPart_remove_top = nrPart_remove_top + 1
 
-          !$OMP ATOMIC
+          !$OMP ATOMIC UPDATE
           nrHole_remove_top = nrHole_remove_top + 1
         CASE (remove_bot)
-          !$OMP ATOMIC
+          !$OMP ATOMIC UPDATE
           nrPart_remove_bot = nrPart_remove_bot + 1
 
-          !$OMP ATOMIC
+          !$OMP ATOMIC UPDATE
           nrHole_remove_bot = nrHole_remove_bot + 1
         CASE DEFAULT
           print *, 'Error unkown remove case ', m
@@ -388,7 +395,7 @@ contains
 
   ! ----------------------------------------------------------------------------
   ! A subroutine to compactify the 2D arrays used to store data
-  ! The mask says which particles we should keep and wich should be removed.
+  ! The mask says which particles we should keep and which should be removed.
   ! It is .true. for particles that should be keept and .false. for particles
   ! that it should be removed. The loop jumps over particles that are marked
   ! as .false..

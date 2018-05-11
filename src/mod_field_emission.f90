@@ -57,6 +57,10 @@ contains
     ptr_Do_Emission => Do_Field_Emission
   end subroutine Init_Field_Emission
 
+  subroutine Clean_Up_Field_Emission()
+    deallocate(nrEmitted_emitters)
+  end subroutine Clean_Up_Field_Emission
+
   !-----------------------------------------------------------------------------
   ! This subroutine gets called from main when the emitters should emit the electrons
   subroutine Do_Field_Emission(step)
