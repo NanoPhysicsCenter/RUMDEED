@@ -157,11 +157,13 @@ contains
     allocate(emitters_dim(1:3, 1:MAX_EMITTERS))
     allocate(emitters_type(1:MAX_EMITTERS))
     allocate(emitters_delay(1:MAX_EMITTERS))
+    allocate(nrElec_remove_top_emit(1:MAX_EMITTERS))
 
     emitters_dim = 0.0d0
     emitters_pos = 0.0d0
     emitters_type = 0
     emitters_delay = 0
+    nrElec_remove_top_emit(1:MAX_EMITTERS) = 0
 
     ! Read the input file
     read(ud_input, NML=input)
@@ -536,6 +538,7 @@ contains
     deallocate(emitters_dim)
     deallocate(emitters_type)
     deallocate(emitters_delay)
+    deallocate(nrElec_remove_top_emit)
 
     deallocate(ramo_current)
     deallocate(life_time)

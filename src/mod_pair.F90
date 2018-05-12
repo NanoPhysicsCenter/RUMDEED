@@ -79,6 +79,7 @@ contains
   ! See mod_global for list of removal flags
   subroutine Mark_Particles_Remove(i, m)
     integer, intent(in) :: i, m
+    integer             :: emit
 
     ! Check if the particle has already been marked for removal
     ! if so just return
@@ -106,6 +107,11 @@ contains
 
           !$OMP ATOMIC UPDATE
           nrElec_remove_top = nrElec_remove_top + 1
+
+          emit = particles_emitter(i)
+
+          !$OMP ATOMIC UPDATE
+          nrElec_remove_top_emit(emit) = nrElec_remove_top_emit(emit) + 1
 
           ! Write out the x and y position of the particle along with which emitter it came from.
           !$OMP CRITICAL(DENSITY_ABSORB)
@@ -268,6 +274,8 @@ contains
       nrElec_remove_bot = 0
       nrHole_remove_top = 0
       nrHole_remove_bot = 0
+
+      nrElec_remove_top_emit(1:MAX_EMITTERS) = 0
     end if
 
   end subroutine Remove_Particles
@@ -292,13 +300,13 @@ contains
   ! step -- The current time step
   subroutine Write_Absorbed(step)
     integer, intent(in) :: step
-    integer             :: IFAIL
+    integer             :: IFAIL, i
 
     write (ud_absorb, "(ES12.4, *(tr2, i8))", iostat=IFAIL) cur_time, step, &
     & nrPart_remove, nrElec_remove, nrHole_remove
 
     write (ud_absorb_top, "(ES12.4, *(tr2, i8))", iostat=IFAIL) cur_time, step, &
-    & nrPart_remove_top, nrElec_remove_top, nrHole_remove_top
+    & nrPart_remove_top, nrElec_remove_top, nrHole_remove_top, (nrElec_remove_top_emit(i), i = 1, nrEmit)
 
     write (ud_absorb_bot, "(ES12.4, *(tr2, i8))", iostat=IFAIL) cur_time, step, &
     & nrPart_remove_bot, nrElec_remove_bot, nrHole_remove_bot

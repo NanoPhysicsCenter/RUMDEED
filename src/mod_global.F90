@@ -152,6 +152,8 @@ module mod_global
   integer :: startElecHoles
   integer :: endElecHoles
 
+  integer, dimension(:), allocatable :: nrElec_remove_top_emit
+
 
   ! ----------------------------------------------------------------------------
   ! Emitter types

@@ -112,7 +112,7 @@ contains
       k = particles_species(i)
 
       ! We use OMP ATOMIC here because the index k is not a loop index
-      !$OMP ATOMIC
+      !$OMP ATOMIC UPDATE
       ramo_current(k) = ramo_current(k) + q * E_zunit * particles_cur_vel(3, i)
     end do
     !$OMP END PARALLEL DO

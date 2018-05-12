@@ -8,23 +8,40 @@ file_abs = '../../data/FE-Test/out/density_absorb.bin';
 
 %--------------------------------------------------------------------------
 % Emission
-figure(1)
+figure()
 [x, y, emit] = Read_Density_File(file_emit);
 
 plot(x, y, 'b.')
 title('Emission density')
 xlabel('x [nm]')
 ylabel('y [nm]')
+axis equal
+
+
+figure()
+title('Emission density')
+h = histogram2(x, y, 'DisplayStyle', 'tile', 'ShowEmptyBins', 'on');
+h.NumBins = [100 100];
+colorbar
+axis equal
 
 %--------------------------------------------------------------------------
 % Absorption
-figure(2)
+figure()
 [x, y, emit] = Read_Density_File(file_abs);
 
 plot(x, y, 'b.')
 title('Absorption density')
 xlabel('x [nm]')
 ylabel('y [nm]')
+axis equal
+
+figure()
+title('Absorption density')
+h = histogram2(x, y, 'DisplayStyle', 'tile', 'ShowEmptyBins', 'on');
+h.NumBins = [100 100];
+colorbar
+axis equal
 
 %--------------------------------------------------------------------------
 % Read unformated binary stream file from Fortran
