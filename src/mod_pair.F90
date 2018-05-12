@@ -12,7 +12,7 @@ module mod_pair
   ! ----------------------------------------------------------------------------
   ! Interface to combine the two functions into one
   interface compact_array
-    module procedure compact_array_2D_double, compact_array_1D_double, compact_array_1D_int
+    module procedure compact_array_2D_double_alt, compact_array_1D_double_alt, compact_array_1D_int_alt
   end interface
 contains
   ! ----------------------------------------------------------------------------
@@ -412,7 +412,7 @@ contains
   !
 
   ! Todo: Check if this has better performance than the pack method.
-  subroutine compact_array_2D_double_verbal(A, mask, k, m)
+  subroutine compact_array_2D_double_alt(A, mask, k, m)
     double precision, dimension(:, :), intent(inout) :: A
     logical, dimension(:), intent(in)                :: mask
     integer, intent(in)                              :: m, k ! m = nrPart
@@ -423,12 +423,12 @@ contains
       if (mask(i) .eqv. .true.) then ! Check if mask(i) == .true.
         j = j + 1
         A(:, j) = A(:, i)
-      else
-        print *, 'Removed particle ', i, j, ' at ', particles_cur_pos(:, i) / length_scale, particles_cur_pos(:, j) / length_scale
+      !else
+      !  print *, 'Removed particle ', i, j, ' at ', particles_cur_pos(:, i) / length_scale, particles_cur_pos(:, j) / length_scale
       end if
     end do
     !print *, ''
-  end subroutine compact_array_2D_double_verbal
+  end subroutine compact_array_2D_double_alt
 
   ! This subroutine uses the pack method.
   subroutine compact_array_2D_double(A, mask, k, m)
@@ -456,6 +456,24 @@ contains
     A = pack(A, mask, A)
   end subroutine compact_array_1D_double
 
+  subroutine compact_array_1D_double_alt(A, mask, k, m)
+    double precision, dimension(:), intent(inout) :: A
+    logical, dimension(:), intent(in)             :: mask
+    integer, intent(in)                           :: m, k ! m = nrPart
+    integer                                       :: i, j
+
+    j = 0
+    do i = k, m
+      if (mask(i) .eqv. .true.) then ! Check if mask(i) == .true.
+        j = j + 1
+        A(j) = A(i)
+      !else
+      !  print *, 'Removed particle ', i, j, ' at ', particles_cur_pos(:, i) / length_scale, particles_cur_pos(:, j) / length_scale
+      end if
+    end do
+    !print *, ''
+  end subroutine compact_array_1D_double_alt
+
   ! ----------------------------------------------------------------------------
   ! A subroutine to compactify the 1D arrays used to store data
   subroutine compact_array_1D_int(A, mask, k, m)
@@ -465,4 +483,22 @@ contains
 
     A = pack(A, mask, A)
   end subroutine compact_array_1D_int
+
+  subroutine compact_array_1D_int_alt(A, mask, k, m)
+    integer, dimension(:), intent(inout) :: A
+    logical, dimension(:), intent(in)    :: mask
+    integer, intent(in)                  :: m, k ! m = nrPart
+    integer                              :: i, j
+
+    j = 0
+    do i = k, m
+      if (mask(i) .eqv. .true.) then ! Check if mask(i) == .true.
+        j = j + 1
+        A(j) = A(i)
+      !else
+      !  print *, 'Removed particle ', i, j, ' at ', particles_cur_pos(:, i) / length_scale, particles_cur_pos(:, j) / length_scale
+      end if
+    end do
+    !print *, ''
+  end subroutine compact_array_1D_int_alt
 end module mod_pair

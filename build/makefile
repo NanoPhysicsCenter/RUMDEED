@@ -21,8 +21,8 @@ endif
 # INTEL FORTRAN
 ifeq ($(FCOMPILER),ifort)
 $(info Using Intel Fortran)
-#FFLAGS=-O2 -xHost -qopenmp -ip -ipo
-FFLAGS=-check all -g -warn interfaces -warn all
+FFLAGS=-O3 -xHost -qopenmp -ip -ipo
+#FFLAGS=-check all -g -warn interfaces -warn all
 ifdef OPENMP
 FFLAGS+=-qopenmp
 endif
@@ -31,7 +31,7 @@ endif
 # GNU FORTRAN
 ifeq ($(FCOMPILER),gfortran)
 $(info Using GNU Fortran)
-FFLAGS=-O3 -fopenmp -ffast-math -m64 -funroll-loops -flto -march=native #-fno-range-check
+FFLAGS=-O3 -fopenmp -ffast-math -m64 -funroll-loops -flto -march=native
 #FFLAGS=-g -fcheck=all -Wall -fbacktrace -ffpe-trap=zero,overflow,underflow,denormal
 ifdef OPENMP
 FFLAGS+=-fopenmp
