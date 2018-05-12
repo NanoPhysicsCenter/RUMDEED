@@ -1,8 +1,13 @@
-% Read unformated stream file from Fortran
+%-------------------------------------------------------------------------%
+% Plot density plots for emission and absorbsion                          %
+% Kristinn Torfason                                                       %
+% 11.05.2018                                                              %
+%-------------------------------------------------------------------------%
 
 clear all
 close all
 
+% File names for the binary files containing the data 
 file_emit = '../../data/FE-Test/out/density_emit.bin';
 file_abs = '../../data/FE-Test/out/density_absorb.bin';
 
@@ -11,18 +16,24 @@ file_abs = '../../data/FE-Test/out/density_absorb.bin';
 figure()
 [x, y, emit] = Read_Density_File(file_emit);
 
+% Filter out data for each emitter
+% Emitter number 1
 x_1 = x(emit == 1);
 y_1 = y(emit == 1);
 
+% Emitter number 2
 x_2 = x(emit == 2);
 y_2 = y(emit == 2);
 
+% Emitter number 3
 x_3 = x(emit == 3);
 y_3 = y(emit == 3);
 
+% Emitter number 4
 x_4 = x(emit == 4);
 y_4 = y(emit == 4);
 
+% Plot the graph
 plot(x_1, y_1, 'b.', x_2, y_2, 'r.', x_3, y_3, 'k.', x_4, y_4, 'g.')
 title('Emission density')
 xlabel('x [nm]')
@@ -42,18 +53,24 @@ axis equal
 figure()
 [x, y, emit] = Read_Density_File(file_abs);
 
+% Filter out data for each emitter
+% Emitter number 1
 x_1 = x(emit == 1);
 y_1 = y(emit == 1);
 
+% Emitter number 2
 x_2 = x(emit == 2);
 y_2 = y(emit == 2);
 
+% Emitter number 3
 x_3 = x(emit == 3);
 y_3 = y(emit == 3);
 
+% Emitter number 4
 x_4 = x(emit == 4);
 y_4 = y(emit == 4);
 
+% Plot the graph
 plot(x_1, y_1, 'b.', x_2, y_2, 'r.', x_3, y_3, 'k.', x_4, y_4, 'g.')
 title('Absorption density')
 xlabel('x [nm]')
