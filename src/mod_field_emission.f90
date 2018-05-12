@@ -162,7 +162,7 @@ contains
     !$OMP END PARALLEL DO
 
 
-    !!!$OMP SINGLE
+    !!$OMP SINGLE
     ! Finish calculating the average field.
     F_avg(1:3) = F_avg(1:3) / (nr_x*nr_y)
 
@@ -175,11 +175,10 @@ contains
 
     ! Set the average escape probability to zero.
     df_avg = 0.0d0
-    !!!$OMP END SINGLE
-
+    !!$OMP END SINGLE
 
     ! Loop over the electrons to be emitted.
-    !$OMP PARALLEL DO PRIVATE(s, n_r, par_pos, field, F, D_f, rnd, par_vel) REDUCTION(+:df_avg)
+    !$OMP PARALLEL DO PRIVATE(s, par_pos, field, F, D_f, rnd, par_vel) REDUCTION(+:df_avg)
     do s = 1, n_r
 
       par_pos(1:2) = Metro_algo_rec(30, emit)
@@ -203,7 +202,7 @@ contains
       CALL RANDOM_NUMBER(rnd)
       if (rnd <= D_f) then
         par_pos(3) = 1.0d0*length_scale
-        !$OMP CRITICAL
+        !$OMP CRITICAL(EMIT_PAR)
 
           ! Add a particle to the system
           par_vel = 0.0d0
@@ -213,7 +212,7 @@ contains
           nrEmitted_emitters(emit) = nrEmitted_emitters(emit) + 1
           !call Add_Plane_Graph_emit(par_pos, step)
           !call Add_Plane_Graph_emitt_xy(par_pos)
-        !$OMP END CRITICAL
+        !$OMP END CRITICAL(EMIT_PAR)
       end if
     end do
     !$OMP END PARALLEL DO

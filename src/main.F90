@@ -45,6 +45,8 @@ program VacuumMD
     stop
   END SELECT
 
+  print '(tr1, a, i0)', 'Number of emitters ', nrEmit
+
   print '(a)', 'Vacuum: Writing out variables'
   call Write_Initial_Variables()
 
