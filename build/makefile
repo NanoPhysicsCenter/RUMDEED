@@ -21,8 +21,8 @@ endif
 # INTEL FORTRAN
 ifeq ($(FCOMPILER),ifort)
 $(info Using Intel Fortran)
-#FFLAGS=-O2 -xHost -qopenmp -ip -ipo
-FFLAGS=-check all -g -warn interfaces -warn all
+FFLAGS=-O2 -xHost -qopenmp -ip -ipo
+#FFLAGS=-check all -g -warn interfaces -warn all
 ifdef OPENMP
 FFLAGS+=-qopenmp
 endif
