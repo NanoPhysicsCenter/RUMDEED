@@ -1,4 +1,5 @@
 program VacuumMD
+  use iso_fortran_env
 #if defined(_OPENMP)
   use omp_lib
 #endif
@@ -13,6 +14,10 @@ program VacuumMD
 
   integer :: i, nthreads
   integer, dimension(1:9) :: progress
+
+  print '(4a)', 'This program was compiled by ', &
+                compiler_version(), ' using the options ', &
+                compiler_options()
 
 #if defined(_OPENMP)
   print '(a)', 'Vacuum: Using OpenMP'

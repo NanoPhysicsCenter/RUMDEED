@@ -4,8 +4,8 @@
 
 # Compiler to use
 ifndef FCOMPILER
-FCOMPILER=ifort
-#FCOMPILER=gfortran
+#FCOMPILER=ifort
+FCOMPILER=gfortran
 #FCOMPILER=pgfortran
 endif
 
@@ -31,7 +31,7 @@ endif
 # GNU FORTRAN
 ifeq ($(FCOMPILER),gfortran)
 $(info Using GNU Fortran)
-FFLAGS=-O3 -fopenmp -ffast-math -m64 -funroll-loops -flto -march=native
+FFLAGS=-Ofast -fopenmp -m64 -funroll-loops -flto -march=native
 #FFLAGS=-g -fcheck=all -Wall -fbacktrace -ffpe-trap=zero,overflow,underflow,denormal
 ifdef OPENMP
 FFLAGS+=-fopenmp

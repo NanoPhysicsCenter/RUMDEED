@@ -10,10 +10,16 @@ module mod_pair
   implicit none
 
   ! ----------------------------------------------------------------------------
-  ! Interface to combine the two functions into one
+  ! Interface to combine the functions into one
+#if defined(__INTEL_COMPILER)
   interface compact_array
     module procedure compact_array_2D_double_alt, compact_array_1D_double_alt, compact_array_1D_int_alt
   end interface
+#else
+interface compact_array
+  module procedure compact_array_2D_double, compact_array_1D_double, compact_array_1D_int
+end interface
+#endif
 contains
   ! ----------------------------------------------------------------------------
   ! Subroutine to add a particle to the system
