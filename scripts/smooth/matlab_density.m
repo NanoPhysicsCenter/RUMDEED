@@ -35,15 +35,16 @@ y_4 = y(emit == 4);
 
 % Plot the graph
 plot(x_1, y_1, 'b.', x_2, y_2, 'r.', x_3, y_3, 'k.', x_4, y_4, 'g.')
-title('Emission density')
+title('Emission density scatter')
 xlabel('x [nm]')
 ylabel('y [nm]')
 axis equal
+legend('Emitter 1', 'Emitter 2', 'Emitter 3', 'Emitter 4')
 
 
 figure()
-title('Emission density')
 h = histogram2(x, y, 'DisplayStyle', 'tile', 'ShowEmptyBins', 'on');
+title('Emission density histogram')
 h.NumBins = [100 100];
 colorbar
 axis equal
@@ -72,14 +73,15 @@ y_4 = y(emit == 4);
 
 % Plot the graph
 plot(x_1, y_1, 'b.', x_2, y_2, 'r.', x_3, y_3, 'k.', x_4, y_4, 'g.')
-title('Absorption density')
+title('Absorption density scatter')
 xlabel('x [nm]')
 ylabel('y [nm]')
 axis equal
+legend('Emitter 1', 'Emitter 2', 'Emitter 3', 'Emitter 4')
 
 figure()
-title('Absorption density')
 h = histogram2(x, y, 'DisplayStyle', 'tile', 'ShowEmptyBins', 'on');
+title('Absorption density histogram')
 h.NumBins = [100 100];
 colorbar
 axis equal
@@ -137,5 +139,6 @@ while (i > 0)
     end
 end
 
+% Close the file
 fclose(fid);
 end
