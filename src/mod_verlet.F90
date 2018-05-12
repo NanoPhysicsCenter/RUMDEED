@@ -135,8 +135,8 @@ contains
     double precision                 :: pre_fac_c
     integer                          :: i, j, k_1, k_2
 
-    !$OMP PARALLEL DO PRIVATE(i, j, k_1, k_2, pos_1, pos_2, diff, r, force_E, force_c, im_1, q_1, im_2, q_2, pre_fac_c) &
-    !$OMP& REDUCTION(+:particles_cur_accel) SCHEDULE(GUIDED)
+    !$OMP PARALLEL DO PRIVATE(i, j, k_1, k_2, pos_1, pos_2, diff, r, force_E, force_c, im_1, q_1, im_2, q_2, pre_fac_c) !!&
+    !!!$OMP& REDUCTION(+:particles_cur_accel) SCHEDULE(GUIDED)
     do i = 1, nrPart
       ! Information about the particle we are calculating the force/acceleration on
       pos_1 = particles_cur_pos(:, i)
@@ -173,11 +173,15 @@ contains
         ! (diff / r) is a unit vector
         force_c = diff * r**(-3)
 
+        !$OMP CRITICAL(ACCEL_UPDATE)
         particles_cur_accel(:, j) = particles_cur_accel(:, j) - pre_fac_c * force_c * im_2
         particles_cur_accel(:, i) = particles_cur_accel(:, i) + pre_fac_c * force_c * im_1
+        !$OMP END CRITICAL(ACCEL_UPDATE)
       end do
 
+      !$OMP CRITICAL(ACCEL_UPDATE)
       particles_cur_accel(:, i) = particles_cur_accel(:, i) + force_E * im_1
+      !$OMP END CRITICAL(ACCEL_UPDATE)
     end do
     !$OMP END PARALLEL DO
   end subroutine Calculate_Acceleration_Particles
