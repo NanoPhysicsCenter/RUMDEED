@@ -33,6 +33,7 @@ contains
     ! Reset the ramo current. Note, this should be done after set_voltage,
     ! since the ramo current may be used there.
     ramo_current = 0.0d0
+    ramo_current_emit(1:MAX_EMITTERS) = 0.0d0
 
 
     ! Update the position of particles (Electrons / Holes)
@@ -99,7 +100,7 @@ contains
   !
   subroutine Update_Velocity(step)
     integer, intent(in) :: step
-    integer             :: i, k
+    integer             :: i, k, emit
     double precision    :: q
 
     !$OMP PARALLEL DO PRIVATE(i, q, k)
@@ -110,10 +111,14 @@ contains
 
       q = particles_charge(i)
       k = particles_species(i)
+      emit = particles_emitter(i)
 
       ! We use OMP ATOMIC here because the index k is not a loop index
       !$OMP ATOMIC UPDATE
       ramo_current(k) = ramo_current(k) + q * E_zunit * particles_cur_vel(3, i)
+
+      !$OMP ATOMIC UPDATE
+      ramo_current_emit(emit) = ramo_current_emit(emit) + q * E_zunit * particles_cur_vel(3, i)
     end do
     !$OMP END PARALLEL DO
   end subroutine Update_Velocity

@@ -329,8 +329,8 @@ contains
     !end do
     ramo_cur = sum(ramo_current) / cur_scale
 
-    write (ud_ramo, fmt="(ES12.4, tr2, i8, tr2, E12.4, tr2, E12.4, tr2, i6, tr2, i6, tr2, i6)", iostat=IFAIL) &
-    & cur_time, step, ramo_cur, V_d, nrPart, nrElec, nrHole
+    write (ud_ramo, fmt="(ES12.4, tr2, i8, tr2, E12.4, tr2, E12.4, tr2, i6, tr2, i6, tr2, i6, *(tr2, ES12.4))", iostat=IFAIL) &
+    & cur_time, step, ramo_cur, V_d, nrPart, nrElec, nrHole, (ramo_current_emit(i)/cur_scale, i = 1, nrEmit)
 
   end subroutine Write_Ramo_current
 

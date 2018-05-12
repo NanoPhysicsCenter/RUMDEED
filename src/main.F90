@@ -158,6 +158,7 @@ contains
     allocate(emitters_type(1:MAX_EMITTERS))
     allocate(emitters_delay(1:MAX_EMITTERS))
     allocate(nrElec_remove_top_emit(1:MAX_EMITTERS))
+    allocate(ramo_current_emit(1:MAX_EMITTERS))
 
     emitters_dim = 0.0d0
     emitters_pos = 0.0d0
@@ -259,6 +260,7 @@ contains
     particles_mask = .true.
 
     ramo_current = 0.0d0
+    ramo_current_emit(1:MAX_EMITTERS) = 0.0d0
     ramo_cur_prev = 0.0d0
     ramo_integral = 0.0d0
     life_time = 0
@@ -539,6 +541,7 @@ contains
     deallocate(emitters_type)
     deallocate(emitters_delay)
     deallocate(nrElec_remove_top_emit)
+    deallocate(ramo_current_emit)
 
     deallocate(ramo_current)
     deallocate(life_time)

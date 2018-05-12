@@ -163,6 +163,7 @@ module mod_global
 
 
   double precision, dimension(:), allocatable :: ramo_current
+  double precision, dimension(:), allocatable :: ramo_current_emit
   double precision :: ramo_cur_prev
   double precision :: ramo_integral
 
