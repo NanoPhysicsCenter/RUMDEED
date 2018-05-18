@@ -21,7 +21,10 @@ endif
 # INTEL FORTRAN
 ifeq ($(FCOMPILER),ifort)
 $(info Using Intel Fortran)
-FFLAGS=-O3 -xHost -qopenmp -ip -ipo
+FFLAGS=-O2 -xHost -ip -ipo -prec-div -prec-sqrt -fp-model precise
+#-fltconsistency
+#-prec-div -prec-sqrt
+#-fp-model precise
 #FFLAGS=-check all -g -warn interfaces -warn all
 ifdef OPENMP
 FFLAGS+=-qopenmp
@@ -41,8 +44,8 @@ endif
 # PGI FORTRAN
 ifeq ($(FCOMPILER),pgfortran)
 $(info Using PGI Fortran)
-#FFLAGS=-O2 -fast -mp
-FFLAGS=-g -gopt -Mbounds -Mchkfpstk -Mchkfpstk -Mchkfpstk -Melf -traceback
+FFLAGS=-O2 -fast
+#FFLAGS=-g -gopt -Mbounds -Mchkfpstk -Mchkfpstk -Mchkfpstk -Melf -traceback
 ifdef OPENMP
 FFLAGS+=-mp
 endif

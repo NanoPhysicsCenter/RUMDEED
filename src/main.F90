@@ -317,7 +317,11 @@ contains
     deallocate(my_seed)
 
     ! Create folder for output files
+#if defined(__PGI)
+    call system('mkdir -p out/')
+#else
     call execute_command_line ('mkdir -p out/')
+#endif
 
 
     ! Open data file for writing

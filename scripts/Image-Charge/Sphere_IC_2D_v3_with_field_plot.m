@@ -23,46 +23,48 @@ pd_end = zeros(1, N);
 
 xi_p = 1.000;
 for i = 1:length(eta_p)
-    [~, I_0(i), pd_0(i)] = Sphere_IC_2D_v3_with_field_function(xi_p, eta_p(i));
-    %[~, I_0(i), pd_0(i), ~, ~, ~, ~] = Sphere_IC_2D_v4_function(xi_p, eta_p(i));
+    [~, I_0(i), pd_0(i), ~, ~, ~] = Sphere_IC_2D_v3_with_field_function(xi_p, eta_p(i));
+    %[~, I_0(i), pd_0(i), ~, ~, ~] = Sphere_IC_2D_v4_function(xi_p, eta_p(i));
 end
 
 xi_p = 1.0005;
 for i = 1:length(eta_p)
-    %[FN(i), I(i), p_d(i)] = Sphere_IC_2D_v3_with_field_function(eta_p(i));
-    [~, I_05(i), pd_05(i), ~, ~, ~, ~] = Sphere_IC_2D_v4_function(xi_p, eta_p(i));
+    [~, I_05(i), pd_05(i), ~, ~, ~] = Sphere_IC_2D_v3_with_field_function(xi_p, eta_p(i));
+    %[~, I_05(i), pd_05(i), ~, ~, ~] = Sphere_IC_2D_v4_function(xi_p, eta_p(i));
 end
 
 xi_p = 1.002;
 for i = 1:length(eta_p)
-    [~, I_2(i), pd_2(i)] = Sphere_IC_2D_v3_with_field_function(xi_p, eta_p(i));
-    %[~, I_2(i), pd_2(i), ~, ~, ~, ~] = Sphere_IC_2D_v4_function(xi_p, eta_p(i));
+    [~, I_2(i), pd_2(i), ~, ~, ~] = Sphere_IC_2D_v3_with_field_function(xi_p, eta_p(i));
+    %[~, I_2(i), pd_2(i), ~, ~, ~] = Sphere_IC_2D_v4_function(xi_p, eta_p(i));
 end
 
 xi_p = 1.004;
 for i = 1:length(eta_p)
-    [~, I_4(i), pd_4(i)] = Sphere_IC_2D_v3_with_field_function(xi_p, eta_p(i));
-    %[~, I_4(i), pd_4(i), ~, ~, ~, ~] = Sphere_IC_2D_v4_function(xi_p, eta_p(i));
+    [~, I_4(i), pd_4(i), ~, ~, ~] = Sphere_IC_2D_v3_with_field_function(xi_p, eta_p(i));
+    %[~, I_4(i), pd_4(i), ~, ~, ~] = Sphere_IC_2D_v4_function(xi_p, eta_p(i));
 end
 
 xi_p = 1.006;
 for i = 1:length(eta_p)
-    [~, I_6(i), pd_6(i)] = Sphere_IC_2D_v3_with_field_function(xi_p, eta_p(i));
-    %[~, I_6(i), pd_6(i), ~, ~, ~, ~] = Sphere_IC_2D_v4_function(xi_p, eta_p(i));
+    [~, I_6(i), pd_6(i), ~, ~, ~] = Sphere_IC_2D_v3_with_field_function(xi_p, eta_p(i));
+    %[~, I_6(i), pd_6(i), ~, ~, ~] = Sphere_IC_2D_v4_function(xi_p, eta_p(i));
 end
 
 xi_p = 1.0236;
 for i = 1:length(eta_p)
-    %[FN(i), I(i), p_d(i)] = Sphere_IC_2D_v3_with_field_function(eta_p(i));
-    [~, I_end(i), pd_end(i), ~, ~, ~, ~] = Sphere_IC_2D_v4_function(xi_p, eta_p(i));
+    [~, I_end(i), pd_end(i), ~, ~, ~] = Sphere_IC_2D_v3_with_field_function(xi_p, eta_p(i));
+    %[~, I_end(i), pd_end(i), ~, ~, ~] = Sphere_IC_2D_v4_function(xi_p, eta_p(i));
 end
 
+I_vac = FN_I(500.0, 250.0E-9, 500.0E-9, 1000.0E-9, 4.7);
+
 figure()
-semilogy(pd_0/1E-9, I_0, pd_05/1E-9, I_05, pd_2/1E-9, I_2, pd_4/1E-9, I_4, pd_6/1E-9, I_6, pd_end/1E-9, I_end)
+semilogy(pd_0/1E-9, I_0, pd_05/1E-9, I_05, pd_2/1E-9, I_2, pd_4/1E-9, I_4, pd_6/1E-9, I_6, pd_end/1E-9, I_end, [pd_0(1)/1E-9, pd_0(end)/1E-9], [I_vac, I_vac])
 xlim([0.5, 5])
 xlabel('d [nm]')
 ylabel('log(I) [log(A)]')
-legend('1.0000', '1.0005', '1.0020', '1.0040', '1.0060', '1.0236')
+legend('1.0000', '1.0005', '1.0020', '1.0040', '1.0060', '1.0236', 'Vac')
 
 
 

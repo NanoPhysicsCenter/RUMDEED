@@ -238,19 +238,19 @@ contains
 
   ! ----------------------------------------------------------------------------
   ! The vacuum electric field
-  pure function field_E_planar(pos)
+  pure function field_E_planar(pos) result(field_E)
     double precision, dimension(1:3), intent(in) :: pos
-    double precision, dimension(1:3)             :: field_E_planar
+    double precision, dimension(1:3)             :: field_E
 
     ! Electric field
     ! x
-    field_E_planar(1) = 0.0d0
+    field_E(1) = 0.0d0
 
     ! y
-    field_E_planar(2) = 0.0d0
+    field_E(2) = 0.0d0
 
     ! z
-    field_E_planar(3) = E_z
+    field_E(3) = E_z
 
   end function field_E_planar
 
