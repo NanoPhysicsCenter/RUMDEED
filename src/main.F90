@@ -7,6 +7,7 @@ program VacuumMD
   use mod_verlet
   use mod_photo_emission
   use mod_field_emission
+  use mod_field_emission_tip
   !use mod_therminoic_emission
   use mod_pair
   use mod_unit_tests
@@ -45,6 +46,9 @@ program VacuumMD
   case(EMISSION_FIELD)
     print '(a)', 'Vacuum: Doing Field emission'
     call Init_Field_Emission()
+  case(EMISSION_FIELD_TIP)
+    print '(a)', 'Vacuum: Doing Field emission from a tip'
+    call Init_Field_Emission_Tip()
   case DEFAULT
     print '(a)', 'Vaccum: ERROR UNKNOWN EMISSION MODEL'
     stop
@@ -134,6 +138,8 @@ program VacuumMD
     call Clean_Up_Photo_Emission()
   case(EMISSION_FIELD)
     call Clean_Up_Field_Emission()
+  case(EMISSION_FIELD_TIP)
+    call Clean_Up_Field_Emission_Tip()
   END SELECT
   call Clean_up()
 contains

@@ -10,7 +10,7 @@ FCOMPILER=gfortran
 endif
 
 #UNIT_TEST = 1
-OPENMP = 1
+OPENMP = 0
 
 # Compile flags
 # UNKNOWN COMPILERS
@@ -61,8 +61,11 @@ PROJECT_NAME=Vacuum-MD
 # makefile
 all: $(PROJECT_NAME).out
 
-$(PROJECT_NAME).out: ../src/main.F90 mod_global.mod mod_verlet.mod mod_pair.mod	mod_unit_tests.mod mod_photo_emission.mod mod_field_emission.mod
-		$(FCOMPILER) $(FFLAGS) ../src/main.F90 mod_global.o mod_verlet.o mod_pair.o mod_unit_tests.o mod_photo_emission.o mod_field_emission.o \
+$(PROJECT_NAME).out: ../src/main.F90 mod_global.mod mod_verlet.mod mod_pair.mod	\
+			mod_unit_tests.mod mod_photo_emission.mod mod_field_emission.mod mod_field_emission_tip.mod
+		$(FCOMPILER) $(FFLAGS) ../src/main.F90 mod_global.o mod_verlet.o mod_pair.o \
+			mod_unit_tests.o mod_photo_emission.o mod_field_emission.o \
+			mod_field_emission_tip.o mod_hyperboloid_tip.o \
 			-lpthread -lm -ldl -o $(PROJECT_NAME).out
 
 mod_global.mod: ../src/mod_global.F90
@@ -82,6 +85,12 @@ mod_photo_emission.mod: ../src/mod_photo_emission.f90 mod_global.mod mod_verlet.
 
 mod_field_emission.mod: ../src/mod_field_emission.f90 mod_global.mod mod_verlet.mod mod_pair.mod
 		$(FCOMPILER) -c $(FFLAGS) ../src/mod_field_emission.f90
+
+mod_field_emission_tip.mod: ../src/mod_field_emission_tip.f90 mod_global.mod mod_verlet.mod mod_pair.mod mod_hyperboloid_tip.mod
+		$(FCOMPILER) -c $(FFLAGS) ../src/mod_field_emission_tip.f90
+
+mod_hyperboloid_tip.mod: ../src/mod_hyperboloid_tip.f90 mod_global.mod
+		$(FCOMPILER) -c $(FFLAGS) ../src/mod_hyperboloid_tip.f90
 
 mod_therminoic_emission.mod: ../src/mod_thermionic_emission.f90 mod_global.mod mod_verlet.mod mod_pair.mod
 		$(FCOMPILER) -c $(FFLAGS) ../src/mod_thermionic_emission.f90
