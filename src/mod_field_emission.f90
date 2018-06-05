@@ -35,7 +35,7 @@ Module mod_field_emission
   double precision, parameter :: l_const = q_0 / (4.0d0*pi*epsilon_0)
 
   ! The work function. Unit [ eV ]
-  double precision, parameter :: w_theta = 2.0d0
+  double precision, parameter :: w_theta = 4.7d0
 
   ! Use image Charge or not
   logical, parameter          :: image_charge = .true.

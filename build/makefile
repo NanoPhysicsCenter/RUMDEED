@@ -10,7 +10,7 @@ FCOMPILER=gfortran
 endif
 
 #UNIT_TEST = 1
-OPENMP = 0
+#OPENMP = 1
 
 # Compile flags
 # UNKNOWN COMPILERS
@@ -34,7 +34,7 @@ endif
 # GNU FORTRAN
 ifeq ($(FCOMPILER),gfortran)
 $(info Using GNU Fortran)
-FFLAGS=-Ofast -fopenmp -m64 -funroll-loops -flto -march=native
+FFLAGS=-Ofast -m64 -funroll-loops -flto -march=native
 #FFLAGS=-g -fcheck=all -Wall -fbacktrace -ffpe-trap=zero,overflow,underflow,denormal
 ifdef OPENMP
 FFLAGS+=-fopenmp

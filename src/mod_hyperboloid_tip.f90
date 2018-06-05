@@ -19,7 +19,7 @@ Module mod_hyperboloid_tip
   double precision            :: h_tip ! Height of the tip from base
   double precision            :: R_base ! Base radius
   double precision            :: pre_fac_E_tip
-  double precision            :: xi_0 = 1.0124d0 ! 99.9% Emission area
+  !double precision            :: xi_0 = 1.0124d0 ! 99.9% Emission area
 
 contains
   double precision elemental function x_coor(xi, eta, phi)

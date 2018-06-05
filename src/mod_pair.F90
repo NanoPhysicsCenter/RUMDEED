@@ -121,7 +121,7 @@ contains
 
           ! Write out the x and y position of the particle along with which emitter it came from.
           !$OMP CRITICAL(DENSITY_ABSORB)
-          write(unit=ud_density_absorb) particles_cur_pos(1, i), particles_cur_pos(2, i), particles_emitter(i)
+          write(unit=ud_density_absorb_top) particles_cur_pos(1, i), particles_cur_pos(2, i), particles_emitter(i)
           !$OMP END CRITICAL(DENSITY_ABSORB)
         CASE (remove_bot)
           !$OMP ATOMIC UPDATE
@@ -129,6 +129,11 @@ contains
 
           !$OMP ATOMIC UPDATE
           nrElec_remove_bot = nrElec_remove_bot + 1
+
+          ! Write out the x and y position of the particle along with which emitter it came from.
+          !$OMP CRITICAL(DENSITY_ABSORB)
+          write(unit=ud_density_absorb_bot) particles_cur_pos(1, i), particles_cur_pos(2, i), particles_emitter(i)
+          !$OMP END CRITICAL(DENSITY_ABSORB)
         CASE DEFAULT
           print *, 'Error unkown remove case ', m
       END SELECT
@@ -339,6 +344,30 @@ contains
     & cur_time, step, ramo_cur, V_d, nrPart, nrElec, nrHole, (ramo_current_emit(i)/cur_scale, i = 1, nrEmit)
 
   end subroutine Write_Ramo_current
+
+  !-----------------------------------------------------------------------------
+  ! Write the current position of all particles to a file
+  subroutine Write_Position(step)
+    integer, intent(in)              :: step
+    integer                          :: i
+    double precision, dimension(1:3) :: par_pos
+
+    if (step == 1) then
+      ! Write at the start of the file the total number of time steps
+      write(unit=ud_pos) steps
+    end if
+
+    ! Write out what time step we are on and the current number of particles
+    write(unit=ud_pos) step, nrPart
+
+    do i = 1, nrPart
+      par_pos(:) = particles_cur_pos(:, i) ! Position of the particle
+
+      ! Write out x, y, z and which emitter the particle came from
+      write(unit=ud_pos) par_pos(1), par_pos(2), par_pos(3), particles_emitter(i)
+    end do
+
+  end subroutine Write_Position
 
   !-----------------------------------------------------------------------------
   ! Write out the positions

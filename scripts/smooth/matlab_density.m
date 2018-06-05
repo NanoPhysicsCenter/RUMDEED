@@ -8,8 +8,8 @@ clear all
 close all
 
 % File names for the binary files containing the data 
-file_emit = '../../data/FE-Test/out/density_emit.bin';
-file_abs = '../../data/FE-Test/out/density_absorb.bin';
+file_emit = '../../data/Test-Tip/out/density_emit.bin';
+file_abs = '../../data/Test-Tip/out/density_absorb_bot.bin';
 
 %--------------------------------------------------------------------------
 % Emission

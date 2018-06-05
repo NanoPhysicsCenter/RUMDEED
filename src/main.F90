@@ -89,6 +89,7 @@ program VacuumMD
     ! Update the position of all particles
     !print *, 'Update position'
     call Update_Position(i)
+    call Write_Position(i)
 
     ! Remove particles from the system
     call Remove_Particles(i)
@@ -331,11 +332,11 @@ contains
 
 
     ! Open data file for writing
-    !open(newunit=ud_pos, iostat=IFAIL, file='position.dt', status='REPLACE', action='write')
-    !if (IFAIL /= 0) then
-    !  print *, 'Vacuum: Failed to open file position.dt. ABORTING'
-    !  stop
-    !end if
+    open(newunit=ud_pos, iostat=IFAIL, file='out/position.bin', status='REPLACE', action='write', access='STREAM')
+    if (IFAIL /= 0) then
+      print *, 'Vacuum: Failed to open file position.bin. ABORTING'
+      stop
+    end if
 
     ! open(newunit=ud_vel, iostat=IFAIL, file='velocity.dt', status='REPLACE', action='write')
     ! if (IFAIL /= 0) then
@@ -415,15 +416,24 @@ contains
     !  stop
     !end if
 
-    open(newunit=ud_density_emit, iostat=IFAIL, file='out/density_emit.bin', status='REPLACE', action='WRITE', access='STREAM')
+    open(newunit=ud_density_emit, iostat=IFAIL, file='out/density_emit.bin', &
+         status='REPLACE', action='WRITE', access='STREAM')
     if (IFAIL /= 0) then
       print *, 'Vacuum: Failed to open file density_emit.dt. ABORTING'
       stop
     end if
 
-    open(newunit=ud_density_absorb, iostat=IFAIL, file='out/density_absorb.bin', status='REPLACE', action='WRITE', access='STREAM')
+    open(newunit=ud_density_absorb_top, iostat=IFAIL, file='out/density_absorb_top.bin', &
+         status='REPLACE', action='WRITE', access='STREAM')
     if (IFAIL /= 0) then
-      print *, 'Vacuum: Failed to open file density_absorb.dt. ABORTING'
+      print *, 'Vacuum: Failed to open file density_absorb_top.dt. ABORTING'
+      stop
+    end if
+
+    open(newunit=ud_density_absorb_bot, iostat=IFAIL, file='out/density_absorb_bot.bin', &
+         status='REPLACE', action='WRITE', access='STREAM')
+    if (IFAIL /= 0) then
+      print *, 'Vacuum: Failed to open file density_absorb_bot.dt. ABORTING'
       stop
     end if
 
@@ -437,7 +447,8 @@ contains
     flush(ud_absorb)
     flush(ud_volt)
     flush(ud_density_emit)
-    flush(ud_density_absorb)
+    flush(ud_density_absorb_top)
+    flush(ud_density_absorb_bot)
 
   end subroutine Flush_Data
 
@@ -538,7 +549,8 @@ contains
     !close(unit=ud_density_map_hole, iostat=IFAIL, status='keep')
     !close(unit=ud_density_map_total, iostat=IFAIL, status='keep')
     close(unit=ud_density_emit, iostat=IFAIL, status='keep')
-    close(unit=ud_density_absorb, iostat=IFAIL, status='keep')
+    close(unit=ud_density_absorb_top, iostat=IFAIL, status='keep')
+    close(unit=ud_density_absorb_bot, iostat=IFAIL, status='keep')
 
     ! Deallocate arrays
     deallocate(particles_cur_pos)

@@ -9,6 +9,7 @@ Module mod_field_emission_tip
   use mod_hyperboloid_tip
   use mod_verlet
   use mod_pair
+  use ieee_arithmetic
   implicit none
 
   ! ----------------------------------------------------------------------------
@@ -35,7 +36,7 @@ Module mod_field_emission_tip
   double precision, parameter :: l_const = q_0 / (4.0d0*pi*epsilon_0)
 
   ! The work function. Unit [ eV ]
-  double precision, parameter :: w_theta = 2.0d0
+  double precision, parameter :: w_theta = 4.7d0
 
   ! Use image Charge or not
   logical, parameter          :: image_charge = .true.
@@ -58,9 +59,9 @@ contains
 
     ! Tip Parameters
 
-    d_tip = emitters_dim(1, 1) * length_scale
-    R_base = emitters_dim(2, 1) * length_scale
-    h_tip = emitters_dim(3, 1) * length_scale
+    d_tip = emitters_dim(1, 1)
+    R_base = emitters_dim(2, 1)
+    h_tip = emitters_dim(3, 1)
 
     d = d_tip + h_tip
     E_z = -1.0d0*V_s/d
@@ -78,17 +79,66 @@ contains
     pre_fac_E_tip = log( (1.0d0 + eta_1)/(1.0d0 - eta_1) * (1.0d0 - eta_2)/(1.0d0 + eta_2) )
     pre_fac_E_tip = 2.0d0 * V_s / (a_foci * pre_fac_E_tip)
 
-
-    !xi_len = (max_xi - 1.0d0) / (xi_div - 1)
   end subroutine Init_Field_Emission_Tip
 
   subroutine Clean_Up_Field_Emission_Tip()
     ! Nothing to do here
   end subroutine Clean_Up_Field_Emission_Tip
 
+  subroutine Do_Field_Emission_Tip(step)
+    integer, intent(in) :: step
+    integer             :: IFAIL
+
+    posInit = 0
+    nrEmitted = 0
+
+    if (emitters_Type(1) == 1) then
+      call Do_Field_Emission_Tip_1(step)
+    else
+      ! Reverse the voltage
+      call Do_Field_Emission_Tip_2(step)
+    end if
+
+    cur_time = time_step * step / time_scale ! Scaled in units of time_scale
+    write (ud_emit, "(E14.6, *(tr8, i6))", iostat=IFAIL) cur_time, step, posInit, &
+    & nrEmitted, nrElec
+  end subroutine Do_Field_Emission_Tip
+
+!----------------------------------------------------------------------------------------
+subroutine Do_Field_Emission_Tip_2(step)
+  integer, intent(in)              :: step
+  double precision, dimension(1:3) :: par_pos, par_vel
+  integer                          :: nrElecEmit, emit
+  double precision                 :: x, y
+
+  nrElecEmit = 0
+
+  par_pos(1:2) = box_muller(0.0d0, 10.0d0*length_scale) ! Random x and y
+  par_pos(3) = d - 1.0d0*length_scale ! 1 nm below the plane in z
+
+  x = par_pos(1)
+  y = par_pos(2)
+  if ((x > 0.0d0) .and. (y > 0.0d0)) then
+    emit = 1
+  else if ((x > 0.0d0) .and. (y < 0.0d0)) then
+    emit = 2
+  else if ((x < 0.0d0) .and. (y > 0.0d0)) then
+    emit = 3
+  else
+    emit = 4
+  end if
+
+  par_vel = 0.0d0
+  call Add_Particle(par_pos, par_vel, species_elec, step, emit)
+  nrElecEmit = nrElecEmit + 1
+
+  posInit = posInit + nrElecEmit
+  nrEmitted = nrEmitted + nrElecEmit
+end subroutine Do_Field_Emission_Tip_2
+
 !----------------------------------------------------------------------------------------
 
-  subroutine Do_Field_Emission_Tip(step)
+  subroutine Do_Field_Emission_Tip_1(step)
     integer, intent(in)              :: step
     double precision                 :: F
     double precision, dimension(1:3) :: par_pos, surf_norm, par_vel
@@ -101,7 +151,7 @@ contains
     double precision                 :: xi_1, phi_1, xi_2, phi_2, xi_c, phi_c
     double precision, dimension(1:3) :: field
 
-    !$OMP SINGLE
+    !!!$OMP SINGLE
     emit = 0
 
     nr_phi = 100
@@ -115,17 +165,10 @@ contains
     nrElecEmit = 0
 
     !par_pos = 0.0d0
-    !n_s = 0.0d0
+    n_s = 0.0d0
     !F_avg = 0.0d0
 
-    par_pos(1) = 0.0d0
-    par_pos(2) = 0.0d0
-    par_pos(3) = h_tip
-    field = Calc_Field_at(par_pos)
-    print *, field
-    pause
-
-    !$OMP END SINGLE
+    !!!$OMP END SINGLE
 
     !!!!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(i, j, par_pos, par_elec, xi_c, phi_c, xi_1, phi_1, xi_2, phi_2, A_f, F, n_add, s, D_f, surf_norm)
 
@@ -165,15 +208,15 @@ contains
         end if
 
         n_s = n_s + n_add
-        !$OMP CRITICAL
-        print *, n_s
-        !$OMP END CRITICAL
+        !!$OMP CRITICAL
+        !print *, n_s
+        !!$OMP END CRITICAL
       end do
     end do
     !$OMP END PARALLEL DO
 
-    !$OMP SINGLE
-    print *, 'F_avg = ', F_avg
+    !!$OMP SINGLE
+    !print *, 'F_avg = ', F_avg
     F_avg = F_avg / (nr_phi*nr_xi)
     write (ud_debug, "(i8, tr2, E16.8)", iostat=IFAIL) step, F_avg
 
@@ -189,7 +232,10 @@ contains
       stop
     end if
 
-    !$OMP END SINGLE
+    !!!$OMP END SINGLE
+
+    print *, 'Doing emission'
+    print *, n_r
 
     !$OMP PARALLEL DO PRIVATE(s, ndim, par_pos, field, F, D_f, surf_norm, xi_1, phi_1)
     do s = 1, n_r
@@ -217,6 +263,9 @@ contains
       end if
 
       CALL RANDOM_NUMBER(rnd)
+      print *, 'rnd ', rnd
+      print *, 'D_f ', D_f
+      print *, ''
       if (rnd <= D_f) then
         !par_pos(3) = par_pos(3) + 1.0d0*length
         surf_norm = surface_normal(par_pos)
@@ -236,19 +285,23 @@ contains
 
           !nrElec = nrElec + 1
           nrElecEmit = nrElecEmit + 1
+          print *, 'Particle emitted'
         !$OMP END CRITICAL
       end if
     end do
     !$OMP END PARALLEL DO
 
-    !$OMP MASTER
+    !!!$OMP MASTER
 
     posInit = posInit + nrElecEmit
     nrEmitted = nrEmitted + nrElecEmit
-    !$OMP END MASTER
+    print *, 'Emission done'
+    print *, posInit
+    print *, ''
+    !!!$OMP END MASTER
 
     !!!$OMP END PARALLEL
-  end subroutine Do_Field_Emission_Tip
+  end subroutine Do_Field_Emission_Tip_1
 
   function Metro_algo_tip(ndim, xi, phi)
     integer, intent(in)                          :: ndim
@@ -303,6 +356,13 @@ contains
     !   print *, 'IFAIL'
     !   print *, 'ndim = ', ndim
     ! end if
+
+    do i = 1, ndim
+      par_pos(1:2) = box_muller(0.0d0, T(1, 1))
+      r(i, 1) = par_pos(1)
+      par_pos(1:2) = box_muller(0.0d0, T(2, 2))
+      r(i, 2) = par_pos(2)
+    end do
 
     !print *, 'Random end'
     !print *, ''
@@ -539,6 +599,17 @@ contains
       print *, 'Escape_prob = ', Escape_prob
       print *, ''
     end if
+    if (isnan(Escape_Prob)) then
+      print *, 'b_FN ', b_FN
+      print *, 'w_theta_xy ', w_theta_xy(pos)
+      print *, 'pos ', pos
+      print *, 'v_y ', v_y(F, pos)
+      print *, 'F ', F
+    end if
+    print *, 'Escape_Prob ', Escape_Prob
+    print *, isnan(Escape_Prob)
+    print *, ieee_is_nan(Escape_Prob)
+    print *, '-'
   end function Escape_Prob
 
   double precision function w_theta_xy(pos)
