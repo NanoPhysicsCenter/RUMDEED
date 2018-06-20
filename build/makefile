@@ -62,9 +62,10 @@ PROJECT_NAME=Vacuum-MD
 all: $(PROJECT_NAME).out
 
 $(PROJECT_NAME).out: ../src/main.F90 mod_global.mod mod_verlet.mod mod_pair.mod	\
-			mod_unit_tests.mod mod_photo_emission.mod mod_field_emission.mod mod_field_emission_tip.mod
+			mod_unit_tests.mod mod_photo_emission.mod mod_field_emission.mod mod_field_emission_tip.mod \
+			mod_field_emission_v2.mod
 		$(FCOMPILER) $(FFLAGS) ../src/main.F90 mod_global.o mod_verlet.o mod_pair.o \
-			mod_unit_tests.o mod_photo_emission.o mod_field_emission.o \
+			mod_unit_tests.o mod_photo_emission.o mod_field_emission.o mod_field_emission_v2.o \
 			mod_field_emission_tip.o mod_hyperboloid_tip.o \
 			-lpthread -lm -ldl -o $(PROJECT_NAME).out
 
@@ -85,6 +86,9 @@ mod_photo_emission.mod: ../src/mod_photo_emission.f90 mod_global.mod mod_verlet.
 
 mod_field_emission.mod: ../src/mod_field_emission.f90 mod_global.mod mod_verlet.mod mod_pair.mod
 		$(FCOMPILER) -c $(FFLAGS) ../src/mod_field_emission.f90
+
+mod_field_emission_v2.mod: ../src/mod_field_emission_v2.f90 mod_global.mod mod_verlet.mod mod_pair.mod
+		$(FCOMPILER) -c $(FFLAGS) ../src/mod_field_emission_v2.f90
 
 mod_field_emission_tip.mod: ../src/mod_field_emission_tip.f90 mod_global.mod mod_verlet.mod mod_pair.mod mod_hyperboloid_tip.mod
 		$(FCOMPILER) -c $(FFLAGS) ../src/mod_field_emission_tip.f90

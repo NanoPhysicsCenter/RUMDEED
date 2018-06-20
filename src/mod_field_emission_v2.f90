@@ -1,18 +1,18 @@
 !-------------------------------------------!
-! Module for emission                       !
+! Module for field emission                 !
+! Work function can vary with position      !
 ! Kristinn Torfason                         !
-! 05.04.13                                  !
+! 20.06.18                                  !
 !-------------------------------------------!
 
-Module mod_field_emission
+Module mod_field_emission_v2
   use mod_global
-  !use mod_hyperboloid_tip
   use mod_verlet
   use mod_pair
   implicit none
 
   PRIVATE
-  PUBLIC :: Init_Field_Emission, Clean_Up_Field_Emission
+  PUBLIC :: Init_Field_Emission_v2, Clean_Up_Field_Emission_v2
 
   ! ----------------------------------------------------------------------------
   ! Variables
@@ -40,13 +40,16 @@ Module mod_field_emission
   ! The work function. Unit [ eV ]
   double precision, parameter :: w_theta = 4.7d0
 
+  ! Constant used in MC integration
+  double precision :: time_step_div_q0
+
   ! Use image Charge or not
   logical, parameter          :: image_charge = .true.
 
 contains
   !-----------------------------------------------------------------------------
   ! Initialize the Field Emission
-  subroutine Init_Field_Emission()
+  subroutine Init_Field_Emission_v2()
     ! Allocate the number of emitters
     allocate(nrEmitted_emitters(1:nrEmit))
 
@@ -58,11 +61,14 @@ contains
 
     ! The function that does the emission
     ptr_Do_Emission => Do_Field_Emission
-  end subroutine Init_Field_Emission
 
-  subroutine Clean_Up_Field_Emission()
+    ! Parameters used in the module
+    time_step_div_q0 = time_step / q_0
+  end subroutine Init_Field_Emission_v2
+
+  subroutine Clean_Up_Field_Emission_v2()
     deallocate(nrEmitted_emitters)
-  end subroutine Clean_Up_Field_Emission
+  end subroutine Clean_Up_Field_Emission_v2
 
   !-----------------------------------------------------------------------------
   ! This subroutine gets called from main when the emitters should emit the electrons
@@ -85,7 +91,7 @@ contains
         !  call Do_Photo_Emission_Circle(step, i)
         !case (EMIT_RECTANGLE)
           !print *, 'Doing Rectangle'
-          call Do_Field_Emission_Plane_int_rec(step, i)
+          call Do_Field_Emission_Planar_rectangle(step, i)
         !case default
         !  print *, 'Vacuum: WARNING unknown emitter type!!'
         !  print *, emitters_type(i)
@@ -97,6 +103,171 @@ contains
     write (ud_emit, "(E14.6, *(tr8, i6))", iostat=IFAIL) cur_time, step, posInit, &
     & nrEmitted, nrElec, (nrEmitted_emitters(i), i = 1, nrEmit)
   end subroutine Do_Field_Emission
+
+  !-----------------------------------------------------------------------------
+  ! Do the field emission from a planar rectangular emitter
+  ! step: The current time step
+  ! emit: Number of the emitter to use
+  ! This version allows the work function to vary with position
+  subroutine Do_Field_Emission_Planar_rectangle(step, emit)
+    integer, intent(in)              :: step, emit
+
+    ! MC integration variables
+    double precision                 :: mc_err ! Error in the Monte Carlo integration
+    integer                          :: N_mc
+    double precision                 :: A ! Area of the emitter
+    double precision, dimension(1:3) :: par_pos, field, F_avg
+    double precision                 :: e_sup, e_sup_avg, e_sup_res
+    double precision                 :: e_sup2, e_sup_avg2
+    double precision                 :: N_sup_db
+    integer                          :: N_sup, N_res
+
+    ! Emission variables
+    double precision                 :: D_f, Df_avg, F, rnd
+    integer                          :: s, IFAIL
+    integer                          :: nrElecEmit
+    double precision, dimension(1:3) :: par_vel
+
+    ! Calculate the area of the emitter
+    A = emitters_dim(1, emit) * emitters_dim(2, emit)
+
+    !---------------------------------------------------------------------------
+    ! Use 2D Monte Carlo integration to calculate the electron supply.
+    ! We continue until the error in the integration is less than half an electron.
+    !
+    ! Monte Carlo Integration
+    ! N_sup = \int \Delta t / e * a_FN / (t_y**2*\phi) * F^2 dA
+    ! f = \Delta t / e * a_FN / (t_y**2\phi) * F^2
+    ! N_sup \approx = A <f> \pm A*sqrt((<f^2> - <f>^2)/N_mc)
+    ! <f> = 1/N_mc * sum f(x), <f^2> = 1/N_mc * sum f**2(x)
+
+    mc_err = 1.0d0 ! Set the error in the MC integration to some thing higher than 0.5
+    N_mc = 0 ! Number of points in the MC integration
+    e_sup = 0.0d0
+    F_avg = 0.0d0 ! The average field on the surface
+
+
+    do while (mc_err > 0.5d0)
+      ! Get a random position on the emitter
+      CALL RANDOM_NUMBER(par_pos(1:2))
+      par_pos(1:2) = emitters_pos(1:2, emit) + par_pos(1:2)*emitters_dim(1:2, emit)
+      par_pos(3) = 0.0d0 ! z = 0, emitter surface
+
+      ! Calculate the field on the emitter surface
+      field = Calc_Field_at(par_pos)
+
+      ! Check if the field is favourable for emission
+      if (field(3) < 0.0d0) then
+        F_avg(1:3) = F_avg(1:3) + field(1:3)
+        N_mc = N_mc + 1
+
+        !Calculate <f> and <f^2>
+        e_sup_res = Elec_Supply_V2(par_pos, field(3))
+        e_sup = e_sup + e_sup_res
+        e_sup2 = e_sup2 + e_sup_res**2
+
+        e_sup_avg = e_sup / N_mc
+        e_sup_avg2 = e_sup2 / N_mc
+
+        ! Always do at least 10000 points
+        if (N_mc > 1000) then
+          ! Calculate the error, A*\sqrt( (<f^2> - <f>^2) / N_mc )
+          mc_err = A*sqrt( (e_sup_avg2 - e_sup_avg**2) / N_mc )
+        end if
+      end if
+    end do
+
+    ! Finish calculating the average field on the surface
+    F_avg = F_avg / N_mc
+
+    ! Calculate the electron supply
+    N_sup_db = A*e_sup_avg
+    N_sup = nint(N_sup_db) ! Round the number to integer
+
+    print *, 'V_2'
+    print *, N_sup_db
+    print *, N_sup
+    print *, mc_err
+    print *, N_mc
+    pause
+
+    !---------------------------------------------------------------------------
+    ! Loop over the supply of electrons and place them on the emitter.
+    ! Then test the emission probability if we emit them.
+
+    nrElecEmit = 0
+    nrEmitted_emitters(emit) = 0
+
+    ! Set the average escape probability to zero.
+    df_avg = 0.0d0
+
+    ! Loop over the electrons to be emitted.
+    !$OMP PARALLEL DO PRIVATE(s, par_pos, field, F, D_f, rnd, par_vel) REDUCTION(+:df_avg)
+    do s = 1, N_sup
+
+      par_pos(1:2) = Metro_algo_rec(30, emit)
+      par_pos(3) = 0.0d0 * length_scale !Check in plane
+      field = Calc_Field_at(par_pos)
+
+      F = field(3)
+
+      ! Check if the field is favourable for emission or not
+      if (F >= 0.0d0) then
+        D_f = 0.0d0
+        !print *, 'Warning: F > 0.0d0'
+      else
+        D_f = Escape_Prob(F, par_pos)
+        if (D_f > 1.0d0) then
+          print *, 'Warning D_f > 1.0d0'
+          print *, 'D_f = ', D_f
+        end if
+      end if
+      df_avg = df_avg + D_f
+
+      CALL RANDOM_NUMBER(rnd)
+      if (rnd <= D_f) then
+        par_pos(3) = 1.0d0*length_scale
+        !$OMP CRITICAL(EMIT_PAR)
+
+          ! Add a particle to the system
+          par_vel = 0.0d0
+          call Add_Particle(par_pos, par_vel, species_elec, step, emit)
+
+          nrElecEmit = nrElecEmit + 1
+          nrEmitted_emitters(emit) = nrEmitted_emitters(emit) + 1
+          !call Add_Plane_Graph_emit(par_pos, step)
+          !call Add_Plane_Graph_emitt_xy(par_pos)
+        !$OMP END CRITICAL(EMIT_PAR)
+      end if
+    end do
+    !$OMP END PARALLEL DO
+
+    df_avg = df_avg / N_sup
+
+    write (ud_debug, "(i8, tr2, E16.8, tr2, E16.8, tr2, E16.8, tr2, i8, tr2, E16.8)", iostat=IFAIL) &
+                                      step, F_avg(1), F_avg(2), F_avg(3), N_sup, df_avg
+
+    posInit = posInit + nrElecEmit
+    nrEmitted = nrEmitted + nrElecEmit
+
+    print *, ''
+    print *, 'posInit'
+    print *, posInit
+    print *, ''
+    pause
+  end subroutine Do_Field_Emission_Planar_rectangle
+
+  !-----------------------------------------------------------------------------
+  ! A simple function that calculates
+  ! A_FN/(t**2(l)*w_theta(x,y)) F**2(x,y)
+  ! pos: Position to calculate the function
+  ! F: The z-component of the field at par_pos, it should be F < 0.0d0.
+  double precision function Elec_Supply_V2(pos, F)
+    double precision, dimension(1:3), intent(in) :: pos
+    double precision,                 intent(in) :: F
+
+    Elec_Supply_V2 = time_step_div_q0 * a_FN/(t_y(F, pos)**2*w_theta_xy(pos)) * F**2
+  end function Elec_Supply_V2
 
   !-----------------------------------------------------------------------------
   ! Do the field emission for a planar rectangular emitter
@@ -175,11 +346,6 @@ contains
     n_s = n_s - res_s
     n_r = nint(n_s) ! round the number
     res_s = n_r - n_s
-
-    print *, 'V_1'
-    print *, N_s
-    print *, N_r
-    stop
 
     ! Set the average escape probability to zero.
     df_avg = 0.0d0
@@ -548,7 +714,7 @@ contains
   !   end do
   ! end subroutine Write_Plane_Graph_emit
 
-  double precision function w_theta_xy(pos)
+  double precision pure function w_theta_xy(pos)
     double precision, dimension(1:3), intent(in) :: pos
 
     w_theta_xy = w_theta
@@ -560,4 +726,4 @@ contains
     !end if
   end function w_theta_xy
 
-end Module mod_field_emission
+end Module mod_field_emission_v2
