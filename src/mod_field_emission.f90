@@ -176,10 +176,10 @@ contains
     n_r = nint(n_s) ! round the number
     res_s = n_r - n_s
 
-    print *, 'V_1'
-    print *, N_s
-    print *, N_r
-    stop
+    !print *, 'V_1'
+    !print *, N_s
+    !print *, N_r
+    !stop
 
     ! Set the average escape probability to zero.
     df_avg = 0.0d0

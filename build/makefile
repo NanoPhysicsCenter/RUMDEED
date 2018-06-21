@@ -10,7 +10,7 @@ FCOMPILER=gfortran
 endif
 
 #UNIT_TEST = 1
-#OPENMP = 1
+OPENMP = 1
 
 # Compile flags
 # UNKNOWN COMPILERS
