@@ -46,12 +46,16 @@ program VacuumMD
     call Init_Photo_Emission()
   case(EMISSION_FIELD)
     print '(a)', 'Vacuum: Doing Field emission'
-    call Init_Field_Emission_v2()
+    call Init_Field_Emission()
   case(EMISSION_FIELD_TIP)
     print '(a)', 'Vacuum: Doing Field emission from a tip'
     call Init_Field_Emission_Tip()
+  case(EMISSION_TEST)
+    print '(a)', 'Vacuum: Doing Field emission DEV V2'
+    call Init_Field_Emission_v2()
   case DEFAULT
     print '(a)', 'Vaccum: ERROR UNKNOWN EMISSION MODEL'
+    print *, EMISSION_MODE
     stop
   END SELECT
 
@@ -139,9 +143,11 @@ program VacuumMD
   case(EMISSION_PHOTO)
     call Clean_Up_Photo_Emission()
   case(EMISSION_FIELD)
-    call Clean_Up_Field_Emission_v2()
+    call Clean_Up_Field_Emission()
   case(EMISSION_FIELD_TIP)
     call Clean_Up_Field_Emission_Tip()
+  case(EMISSION_TEST)
+    call Clean_Up_Field_Emission_v2()
   END SELECT
   call Clean_up()
 contains

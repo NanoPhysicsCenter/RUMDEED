@@ -1,4 +1,4 @@
-# Molecular Dyanmics code
+# Molecular Dynamics code
   Hello
 
 ## Input file

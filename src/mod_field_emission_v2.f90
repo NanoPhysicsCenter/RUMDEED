@@ -184,12 +184,12 @@ contains
     N_sup_db = A*e_sup_avg
     N_sup = nint(N_sup_db) ! Round the number to integer
 
-    print *, 'V_2'
-    print *, N_sup_db
-    print *, N_sup
-    print *, mc_err
-    print *, N_mc
-    pause
+    !print *, 'V_2'
+    !print *, N_sup_db
+    !print *, N_sup
+    !print *, mc_err
+    !print *, N_mc
+    !pause
 
     !---------------------------------------------------------------------------
     ! Loop over the supply of electrons and place them on the emitter.
@@ -250,11 +250,11 @@ contains
     posInit = posInit + nrElecEmit
     nrEmitted = nrEmitted + nrElecEmit
 
-    print *, ''
-    print *, 'posInit'
-    print *, posInit
-    print *, ''
-    pause
+    !print *, ''
+    !print *, 'posInit'
+    !print *, posInit
+    !print *, ''
+    !pause
   end subroutine Do_Field_Emission_Planar_rectangle
 
   !-----------------------------------------------------------------------------
