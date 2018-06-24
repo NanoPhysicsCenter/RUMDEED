@@ -806,7 +806,7 @@ contains
     if (pos(1) > pos(2)) then
       w_theta_xy = 4.7d0
     else
-      w_theta_xy = 4.69d0
+      w_theta_xy = 4.5d0
     end if
   end function w_theta_xy
 
