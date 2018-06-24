@@ -8,8 +8,8 @@ clear all
 close all
 
 % File names for the binary files containing the data 
-file_emit = '../../data/Test-Tip/out/density_emit.bin';
-file_abs = '../../data/Test-Tip/out/density_absorb_bot.bin';
+file_emit = 'C:\Users\Kristinn Torfason\Documents\Work\Vacuum-MD\data\test\out\density_emit.bin';
+file_abs = 'C:\Users\Kristinn Torfason\Documents\Work\Vacuum-MD\data\test\out\density_absorb_bot.bin';
 
 %--------------------------------------------------------------------------
 % Emission
@@ -100,6 +100,10 @@ length_scale = 1.0E-9; % 1 nm
 
 % Open the file for reading
 fid = fopen(filename);
+if (fid == -1)
+    disp('Unable to open file')
+    disp(filename)
+end
 
 %-----------------------------------
 % Figure out the length of the file

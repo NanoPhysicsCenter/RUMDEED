@@ -534,6 +534,9 @@ contains
       ! Find a new position
       new_pos(1:2) = cur_pos(1:2) + box_muller(0.0d0, std)
 
+      ! Make sure that the new position is within the limits of the emitter area.
+      call check_limits_metro_rec(new_pos, emit)
+
       ! Calculate the field at the new position
       field = Calc_Field_at(new_pos)
       F_out = field(3)
@@ -643,13 +646,6 @@ contains
     double precision                                :: d_x, d_y
 
 
-!     if ((new_pos(1) > emitters(1)%dim(1)) .or. (new_pos(1) < 0.0d0)) then
-!       new_pos(1) = par_pos(1)
-!     end if
-!     if ((new_pos(2) > emitters(1)%dim(2)) .or. (new_pos(2) < 0.0d0)) then
-!       new_pos(2) = par_pos(2)
-!     end if
-
     x_max = emitters_pos(1, emit) + emitters_dim(1, emit)
     x_min = emitters_pos(1, emit)
 
@@ -699,112 +695,17 @@ contains
     end if
   end subroutine check_limits_metro_rec
 
-
-  ! subroutine Add_Plane_Graph_emitt_xy(pos)
-  !   double precision, dimension(1:3), intent(in) :: pos
-  !   double precision                             :: x, y
-  !   integer                                      :: IFAIL
-  !
-  !   x = pos(1) / length_scale
-  !   y = pos(2) / length_scale
-  !
-  !   write (ud_plane_graph_emit, "(F7.2, tr2, F7.2)", iostat=IFAIL) x, y
-  ! end subroutine Add_Plane_Graph_emitt_xy
-  !
-  ! subroutine Add_Plane_Graph_emit(pos, step)
-  !   double precision, dimension(1:3), intent(in) :: pos
-  !   integer, intent(in) :: step
-  !   integer :: int_x, int_y
-  !
-  !   if ((pos(1) < int_end_x_emit) .and. (pos(1) > int_start_x_emit) &
-  !      .and. (pos(2) < int_end_y_emit) .and. (pos(2) > int_start_y_emit)) then
-  !     int_x = ceiling((pos(1)+abs(int_start_x_emit))/dx_emit)
-  !     int_y = ceiling((pos(2)+abs(int_start_y_emit))/dy_emit)
-  !
-  !     plane_graph_mesh_emit(int_x, int_y) = plane_graph_mesh_emit(int_x, int_y) + 1
-  !   else
-  !     print *, 'Vacuum: Add_Plane_Graph_emit() error particle outside range'
-  !     print *, 'x = ', pos(1)
-  !     print *, 'y = ', pos(2)
-  !     print *, 'step = ', step
-  !     print *, ''
-  !   end if
-  ! end subroutine Add_Plane_Graph_emit
-  !
-  ! subroutine Add_kdens_Graph_emit(pos, step)
-  !   double precision, dimension(1:3), intent(in) :: pos
-  !   integer, intent(in) :: step
-  !   integer          :: i, j
-  !   double precision :: x, y
-  !
-  !   do i = 1, (res_x_kdens+1)
-  !     x = dx_kdens_emit * (i-1) + int_start_x_emit
-  !     x = (x - pos(1)) / bandwidth_emit
-  !
-  !     do j = 1, (res_y_kdens+1)
-  !       y = dy_kdens_emit * (j-1) + int_start_y_emit
-  !       y = (y - pos(2)) / bandwidth_emit
-  !
-  !       plane_graph_kdens_emit(i, j) = plane_graph_kdens_emit(i, j) + exp(-0.5d0*(x**2 + y**2))
-  !     end do
-  !
-  !   end do
-  ! end subroutine Add_kdens_Graph_emit
-  !
-  ! subroutine Write_Plane_Graph_emit()
-  !   integer :: i, j, IFAIL
-  !   double precision :: x, y
-  !
-  !   !do j = 1, res_y
-  !   !    write (ud_plane_graph_matlab_emit, "(*(E16.8E3, tr8))", iostat=IFAIL) (plane_graph_mesh_emit(i, j), i = 1, res_x)
-  !   !end do
-  !
-  !   !do j = 1, (res_y_kdens+1)
-  !   !    write (ud_kdens_graph_matlab_emit, "(*(E16.8E3, tr8))", iostat=IFAIL) (plane_graph_kdens_emit(i, j), i = 1, (res_x_kdens+1))
-  !   !end do
-  !
-  !   !rewind(ud_plane_graph_emit)
-  !
-  !   do i = 1, res_x
-  !     x = ((i - res_x*0.5d0) + 0.5d0)*dx_emit
-  !     x = x / length_scale
-  !     do j = 1, res_y
-  !       y = ((j - res_y*0.5d0) + 0.5d0)*dy_emit
-  !       y = y / length_scale
-  !       !if (plane_graph_mesh(i, j) /= 0) then
-  !         write (ud_plane_graph_emit, "(i6, tr2, i6, tr2, E16.8, tr2, E16.8, tr2, i6)", iostat=IFAIL) &
-  !                                     i, j, x, y, plane_graph_mesh_emit(i, j)
-  !       !end if
-  !     end do
-  !
-  !     write (ud_plane_graph_emit, *) ''
-  !   end do
-  !
-  !   !rewind(ud_kdens_graph)
-  !
-  !   do i = 1, (res_x_kdens+1)
-  !     x = dx_kdens_emit * (i-1) + int_start_x_emit
-  !     x = x / length_scale
-  !
-  !     do j = 1, (res_y_kdens+1)
-  !       y = dy_kdens_emit * (j-1) + int_start_y_emit
-  !       y = y / length_scale
-  !
-  !       write (ud_kdens_graph_emit, "(i6, tr2, i6, tr2, E16.8, tr2, E16.8, tr2, E16.8E3)", iostat=IFAIL) &
-  !                                      i, j, x, y, plane_graph_kdens_emit(i, j)
-  !     end do
-  !
-  !     write (ud_kdens_graph_emit, *) ''
-  !   end do
-  ! end subroutine Write_Plane_Graph_emit
-
   double precision pure function w_theta_xy(pos)
     double precision, dimension(1:3), intent(in) :: pos
+    double precision                             :: x, y
+    double precision, parameter                  :: A = -0.10d0, B = 1.15d0
+    double precision, parameter                  :: x_c = 50.0d0*length_scale, y_c = 25.0d0*length_scale
 
-    !w_theta_xy = w_theta
+    x = pos(1)
+    y = pos(2)
 
-    if (pos(1) > pos(2)) then
-      w_theta_xy = 4.7d0
+    if (x > y) then
+      w_theta_xy = 4.7d0 + A*exp( -1.0d0*( (x-x_c)**2+(y-y_c)**2 )/(2.0d0*B**2) )
     else
       w_theta_xy = 4.5d0
     end if
