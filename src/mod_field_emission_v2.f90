@@ -698,17 +698,17 @@ contains
   double precision pure function w_theta_xy(pos)
     double precision, dimension(1:3), intent(in) :: pos
     double precision                             :: x, y
-    double precision, parameter                  :: A = -0.20d0, B = 10.15d0
-    double precision, parameter                  :: x_c = 50.0d0*length_scale, y_c = 25.0d0*length_scale
+    double precision, parameter                  :: A = -0.20d0, B = 10.0d0*length_scale
+    double precision, parameter                  :: x_c = 0.0d0*length_scale, y_c = 0.0d0*length_scale
 
     x = pos(1)
     y = pos(2)
 
-    if (x > y) then
-      w_theta_xy = 4.7d0 + A*exp( -1.0d0*( (x-x_c)**2+(y-y_c)**2 )/(2.0d0*B**2) )
-    else
-      w_theta_xy = 4.5d0
-    end if
+    !if (x > y) then
+      w_theta_xy = 4.7d0 + A*exp( -1.0d0*( (x-x_c)**2 + (y-y_c)**2 )/(2.0d0*B**2) )
+    !else
+    !  w_theta_xy = 4.5d0
+    !end if
   end function w_theta_xy
 
 end Module mod_field_emission_v2
