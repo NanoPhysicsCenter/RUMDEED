@@ -801,13 +801,13 @@ contains
   double precision pure function w_theta_xy(pos)
     double precision, dimension(1:3), intent(in) :: pos
 
-    w_theta_xy = w_theta
+    !w_theta_xy = w_theta
 
-    !if (pos(1) > pos(2)) then
-    !  w_theta_xy = 2.0d0
-    !else
-    !  w_theta_xy = 2.4d0
-    !end if
+    if (pos(1) > pos(2)) then
+      w_theta_xy = 4.7d0
+    else
+      w_theta_xy = 4.69d0
+    end if
   end function w_theta_xy
 
 end Module mod_field_emission_v2
