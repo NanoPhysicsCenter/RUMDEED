@@ -200,6 +200,10 @@ contains
         !print *, 'Warning: F > 0.0d0'
       else
         D_f = Escape_Prob(F, par_pos)
+        !print *, 'D_f = ', D_f
+        !print *, 'F = ', F
+        !print *, ''
+        !pause
         if (D_f > 1.0d0) then
           print *, 'Warning D_f > 1.0d0'
           print *, 'D_f = ', D_f

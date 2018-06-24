@@ -205,18 +205,17 @@ contains
     !$OMP PARALLEL DO PRIVATE(s, par_pos, field, F, D_f, rnd, par_vel) REDUCTION(+:df_avg)
     do s = 1, N_sup
 
-      par_pos(1:2) = Metro_algo_rec(30, emit)
-      par_pos(3) = 0.0d0 * length_scale !Check in plane
-      field = Calc_Field_at(par_pos)
-
-      F = field(3)
+      par_pos = Metropolis_Hastings_rectangle_v2(30, emit, D_f, F)
+      !print *, 'D_f = ', D_f
+      !print *, 'F = ', F
+      !print *, ''
+      !pause
 
       ! Check if the field is favourable for emission or not
       if (F >= 0.0d0) then
         D_f = 0.0d0
         !print *, 'Warning: F > 0.0d0'
       else
-        D_f = Escape_Prob(F, par_pos)
         if (D_f > 1.0d0) then
           print *, 'Warning D_f > 1.0d0'
           print *, 'D_f = ', D_f
@@ -491,8 +490,9 @@ contains
   !-----------------------------------------------------------------------------
   ! Metropolis-Hastings algorithm
   ! Includes that the work function can vary with position
-  function Metropolis_Hastings_rectangle_v2(ndim, emit)
+  function Metropolis_Hastings_rectangle_v2(ndim, emit, df_out, F_out)
     integer, intent(in)              :: ndim, emit
+    double precision, intent(out)    :: df_out, F_out
     double precision, dimension(1:3) :: Metropolis_Hastings_rectangle_v2
     integer                          :: count, i
     double precision                 :: std, rnd, alpha
@@ -518,6 +518,8 @@ contains
       end if
     end do
 
+    F_out = field(3)
+
     ! Calculate the escape probability at this location
     if (field(3) < 0.0d0) then
       df_cur = Escape_Prob(field(3), cur_pos)
@@ -534,6 +536,7 @@ contains
 
       ! Calculate the field at the new position
       field = Calc_Field_at(new_pos)
+      F_out = field(3)
 
       ! Check if the field is favourable for emission at the new position.
       ! If it is not then cycle, i.e. we reject this location and
@@ -550,6 +553,7 @@ contains
       if (df_new > df_cur) then
         cur_pos = new_pos ! New position becomes the current position
         df_cur = df_new
+        F_out = field(3)
       else
         alpha = df_new / df_cur
 
@@ -557,13 +561,14 @@ contains
         if (rnd < alpha) then
           cur_pos = new_pos ! New position becomes the current position
           df_cur = df_new
+          F_out = field(3)
         end if
       end if
     end do
 
     ! Return the current position
-    Metropolis_Hastings_rectangle_v2(1:2) = cur_pos(1:2)
-    Metropolis_Hastings_rectangle_v2(3) = df_cur
+    Metropolis_Hastings_rectangle_v2 = cur_pos
+    df_out = df_cur
   end function Metropolis_Hastings_rectangle_v2
 
   !-----------------------------------------------------------------------------
