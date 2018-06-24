@@ -698,7 +698,7 @@ contains
   double precision pure function w_theta_xy(pos)
     double precision, dimension(1:3), intent(in) :: pos
     double precision                             :: x, y
-    double precision, parameter                  :: A = -0.10d0, B = 1.15d0
+    double precision, parameter                  :: A = -0.20d0, B = 10.15d0
     double precision, parameter                  :: x_c = 50.0d0*length_scale, y_c = 25.0d0*length_scale
 
     x = pos(1)
