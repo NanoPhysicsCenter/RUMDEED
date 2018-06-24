@@ -38,7 +38,7 @@ Module mod_field_emission_v2
   double precision, parameter :: l_const = q_0 / (4.0d0*pi*epsilon_0)
 
   ! The work function. Unit [ eV ]
-  double precision, parameter :: w_theta = 4.7d0
+  double precision, parameter :: w_theta = 2.0d0
 
   ! Constant used in MC integration
   double precision :: time_step_div_q0
