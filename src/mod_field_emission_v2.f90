@@ -114,7 +114,7 @@ contains
 
     ! MC integration variables
     double precision                 :: mc_err ! Error in the Monte Carlo integration
-    integer                          :: N_mc
+    integer                          :: N_mc, Nmc_try
     double precision                 :: A ! Area of the emitter
     double precision, dimension(1:3) :: par_pos, field, F_avg
     double precision                 :: e_sup, e_sup_avg, e_sup_res
@@ -145,9 +145,9 @@ contains
     N_mc = 0 ! Number of points in the MC integration
     e_sup = 0.0d0
     F_avg = 0.0d0 ! The average field on the surface
+    Nmc_try = 0
 
-
-    do while (mc_err > 0.5d0)
+    do
       ! Get a random position on the emitter
       CALL RANDOM_NUMBER(par_pos(1:2))
       par_pos(1:2) = emitters_pos(1:2, emit) + par_pos(1:2)*emitters_dim(1:2, emit)
@@ -158,6 +158,7 @@ contains
 
       ! Check if the field is favourable for emission
       if (field(3) < 0.0d0) then
+        Nmc_try = 0
         F_avg(1:3) = F_avg(1:3) + field(1:3)
         N_mc = N_mc + 1
 
@@ -173,8 +174,30 @@ contains
         if (N_mc > 1000) then
           ! Calculate the error, A*\sqrt( (<f^2> - <f>^2) / N_mc )
           mc_err = A*sqrt( (e_sup_avg2 - e_sup_avg**2) / N_mc )
+          if (mc_err < 1.0d0) exit ! Stop if less than one electron in error
         end if
-      end if
+
+        ! Stop the integration if it is taking to long.
+        if (N_mc > 100000) then
+          print *, 'Vacuum: Warning MC integration taking to long, stoping it'
+          print *, 'mc_err = ', mc_err
+          print *, 'step = ', step
+          exit
+        end if
+
+      else ! field(3) < 0.0d0
+        Nmc_try = Nmc_try + 1
+
+        ! Stop if we are taking to long to find a favourable point.
+        ! This should be rare in field emission.
+        if (Nmc_try > 1000) then
+          print *, 'Vacuum: Warning to many field attempts at finding a favourable location in MC integration'
+          print *, 'mc_err = ', mc_err
+          print *, 'step = ', step
+          exit
+        end if
+
+      end if ! field(3) < 0.0d0
     end do
 
     ! Finish calculating the average field on the surface
