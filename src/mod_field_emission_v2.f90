@@ -178,7 +178,7 @@ contains
         end if
 
         ! Stop the integration if it is taking to long.
-        if (N_mc > 100000) then
+        if (N_mc > 10000000) then
           print *, 'Vacuum: Warning MC integration taking to long, stoping it'
           print *, 'mc_err = ', mc_err
           print *, 'step = ', step
