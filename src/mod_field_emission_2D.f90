@@ -32,7 +32,7 @@ Module mod_field_emission_2D
   double precision, parameter :: g_sv = 4.0d0 ! Spin-valley degeneracy []
   double precision, parameter :: m_eff = 0.03d0*m_0 ! Electron effective mass [kg]
 
-  double precision, parameter :: e_f = 0.1d0*q_0 ! Fermi-energy [eV -> J]
+  double precision, parameter :: e_f = 0.075d0*q_0 ! Fermi-energy [eV -> J]
   double precision, parameter :: v_f = 10.0d6 ! Fermi-velocity [m/s]
 
   double precision, parameter :: phi_B0 = 4.5d0*q_0 ! [eV -> J]
