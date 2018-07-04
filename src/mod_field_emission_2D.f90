@@ -33,12 +33,28 @@ Module mod_field_emission_2D
   double precision, parameter :: m_eff = 0.03d0*m_0 ! Electron effective mass [kg]
 
   double precision, parameter :: e_f = 0.1d0*q_0 ! Fermi-energy [eV -> J]
+  double precision, parameter :: v_f = 10.0d6 ! Fermi-velocity [m/s]
 
   double precision, parameter :: phi_B0 = 4.5d0*q_0 ! [eV -> J]
   double precision, parameter :: phi_B = phi_B0 - e_f ! [eV -> J]
 
+  double precision, parameter :: lambda = 10.0d-4 ! Strength of the NCLM scattering processes
+
   ! Use image Charge or not
   !logical, parameter          :: image_charge = .true.
+
+  interface
+    double precision function Elec_Supply(A)
+      double precision, intent(in) :: A ! Area of the emitter
+    end function Elec_Supply
+
+    double precision function Escape_Prob(F)
+      double precision, intent(in) :: F ! Electric field
+    end function Escape_prob
+  end interface
+
+  procedure(Elec_Supply), pointer    :: ptr_Elec_Supply => null()
+  procedure(Escape_Prob), pointer    :: ptr_Escape_Prob => null()
 
 contains
   !-----------------------------------------------------------------------------
@@ -55,6 +71,21 @@ contains
 
     ! The function that does the emission
     ptr_Do_Emission => Do_Field_Emission
+
+    SELECT CASE (EMISSION_MODE)
+    case(EMISSION_FIELD_2D_2DEG_C)
+      ptr_Elec_Supply => Elec_Supply_2DEG_C
+      ptr_Escape_Prob => Escape_Prob_2DEG_C
+    case(EMISSION_FIELD_2D_2DEG_NC)
+      ptr_Elec_Supply => Elec_Supply_2DEG_NC
+      ptr_Escape_Prob => Escape_Prob_2DEG_NC
+    case(EMISSION_FIELD_2D_DIRAC_C)
+      ptr_Elec_Supply => Elec_Supply_DIRAC_C
+      ptr_Escape_Prob => Escape_Prob_DIRAC_C
+    case(EMISSION_FIELD_2D_DIRAC_NC)
+      ptr_Elec_Supply => Elec_Supply_DIRAC_NC
+      ptr_Escape_Prob => Escape_Prob_DIRAC_NC
+    END SELECT
   end subroutine Init_Field_Emission_2D
 
   subroutine Clean_Up_Field_Emission_2D()
@@ -123,7 +154,7 @@ contains
     A = emitters_dim(1, emit) * emitters_dim(2, emit)
 
     ! Calculate the electron supply
-    N_sup_db = Elec_Supply(A)
+    N_sup_db = ptr_Elec_Supply(A)
     N_sup = nint(N_sup_db) ! Round the number to integer
 
     !print *, 'V_2'
@@ -213,19 +244,16 @@ contains
   ! equation with the area (A) and the time step (time_step). This gives
   ! the current. The divide that with the charge of the electron (q_0) to get
   ! the number of electrons.
-  double precision function Elec_Supply(A)
+  double precision function Elec_Supply_2DEG_C(A)
     double precision, intent(in)                 :: A
-    double precision                             :: n
 
-    !n = A * a_FN * F**2 * time_step / (q_0 * w_theta_xy(pos) * (t_y(F, pos))**2)
-    n = A*time_step/q_0 * v_o/L_o * g_sv*q_0*m_eff/(2.0d0*pi*h_bar**2) * e_f
+    Elec_supply_2DEG_C = A*time_step/q_0 * v_o/L_o * g_sv*q_0*m_eff/(2.0d0*pi*h_bar**2) * e_f
 
-    Elec_supply = n
-  end function Elec_supply
+  end function Elec_supply_2DEG_C
 
   ! This function returns the escape probability of the Electrons.
   ! Escape_prob = exp(-b_FN*w_theta^(3/2)*v_y/F) .
-  double precision function Escape_Prob(F)
+  double precision function Escape_Prob_2DEG_C(F)
     double precision, intent(in)                 :: F
     double precision                             :: d_f, Df
 
@@ -233,18 +261,110 @@ contains
     Df = exp(-2.0d0*phi_B/(3.0d0*d_f))
 
     !Escape_Prob = exp(b_FN * (sqrt(w_theta_xy(pos)))**3 * v_y(F, pos) / (-1.0d0*F))
-    Escape_Prob = Df * exp(-e_f/d_f)
+    Escape_Prob_2DEG_C = Df * exp(-e_f/d_f)
 
-    if (Escape_Prob > 1.0d0) then
+    if (Escape_Prob_2DEG_C > 1.0d0) then
       print *, 'Escape_prob is larger than 1.0'
-      print *, 'Escape_prob = ', Escape_prob
+      print *, 'Escape_prob = ', Escape_Prob_2DEG_C
       print *, ''
       !print *, 'F = ', F
       !print *, 'd_f = ', d_f
       !print *, 'Df = ', Df
       !pause
     end if
-  end function Escape_Prob
+  end function Escape_Prob_2DEG_C
+
+  double precision function Elec_Supply_DIRAC_C(A)
+    double precision, intent(in)                 :: A
+
+    Elec_supply_DIRAC_C = A*time_step/q_0 * v_o/L_o * g_sv*q_0/(2.0d0*pi*h_bar**2) * e_f**2/(2.0d0*v_f**2)
+
+  end function Elec_supply_DIRAC_C
+
+  ! This function returns the escape probability of the Electrons.
+  ! Escape_prob = exp(-b_FN*w_theta^(3/2)*v_y/F) .
+  double precision function Escape_Prob_DIRAC_C(F)
+    double precision, intent(in)                 :: F
+    double precision                             :: d_f, Df
+
+    d_f = q_0*h_bar*(-1.0d0*F)/(2.0d0*sqrt(2.0d0*m_0*phi_B))
+    Df = exp(-2.0d0*phi_B/(3.0d0*d_f))
+
+    !Escape_Prob = exp(b_FN * (sqrt(w_theta_xy(pos)))**3 * v_y(F, pos) / (-1.0d0*F))
+    Escape_Prob_DIRAC_C = Df * exp(-e_f/d_f)
+
+    if (Escape_Prob_DIRAC_C > 1.0d0) then
+      print *, 'Escape_prob is larger than 1.0'
+      print *, 'Escape_prob = ', Escape_Prob_DIRAC_C
+      print *, ''
+      !print *, 'F = ', F
+      !print *, 'd_f = ', d_f
+      !print *, 'Df = ', Df
+      !pause
+    end if
+  end function Escape_Prob_DIRAC_C
+
+
+  double precision function Elec_Supply_2DEG_NC(A)
+    double precision, intent(in)                 :: A
+
+    Elec_supply_2DEG_NC = lambda * Elec_Supply_2DEG_C(A)
+
+  end function Elec_supply_2DEG_NC
+
+  ! This function returns the escape probability of the Electrons.
+  ! Escape_prob = exp(-b_FN*w_theta^(3/2)*v_y/F) .
+  double precision function Escape_Prob_2DEG_NC(F)
+    double precision, intent(in)                 :: F
+    double precision                             :: d_f, Df
+
+    d_f = q_0*h_bar*(-1.0d0*F)/(2.0d0*sqrt(2.0d0*m_0*phi_B))
+    Df = exp(-2.0d0*phi_B/(3.0d0*d_f))
+
+    !Escape_Prob = exp(b_FN * (sqrt(w_theta_xy(pos)))**3 * v_y(F, pos) / (-1.0d0*F))
+    Escape_Prob_2DEG_NC = Df * (1.0d0 - exp(-e_f/d_f)) * d_f
+
+    if (Escape_Prob_2DEG_NC > 1.0d0) then
+      print *, 'Escape_prob is larger than 1.0'
+      print *, 'Escape_prob = ', Escape_Prob_2DEG_NC
+      print *, ''
+      !print *, 'F = ', F
+      !print *, 'd_f = ', d_f
+      !print *, 'Df = ', Df
+      !pause
+    end if
+  end function Escape_Prob_2DEG_NC
+
+  double precision function Elec_Supply_DIRAC_NC(A)
+    double precision, intent(in)                 :: A
+
+    Elec_supply_DIRAC_NC = lambda * Elec_Supply_DIRAC_C(A)
+
+  end function Elec_supply_DIRAC_NC
+
+  ! This function returns the escape probability of the Electrons.
+  ! Escape_prob = exp(-b_FN*w_theta^(3/2)*v_y/F) .
+  double precision function Escape_Prob_DIRAC_NC(F)
+    double precision, intent(in)                 :: F
+    double precision                             :: d_f, Df
+
+    d_f = q_0*h_bar*(-1.0d0*F)/(2.0d0*sqrt(2.0d0*m_0*phi_B))
+    Df = exp(-2.0d0*phi_B/(3.0d0*d_f))
+
+    !Escape_Prob = exp(b_FN * (sqrt(w_theta_xy(pos)))**3 * v_y(F, pos) / (-1.0d0*F))
+    Escape_Prob_DIRAC_NC = Df * (e_f/d_f + exp(-e_f/d_f) - 1.0d0)*d_f**2
+
+    if (Escape_Prob_DIRAC_NC > 1.0d0) then
+      print *, 'Escape_prob is larger than 1.0'
+      print *, 'Escape_prob = ', Escape_Prob_DIRAC_NC
+      print *, ''
+      !print *, 'F = ', F
+      !print *, 'd_f = ', d_f
+      !print *, 'Df = ', Df
+      !pause
+    end if
+  end function Escape_Prob_DIRAC_NC
+
 
   !-----------------------------------------------------------------------------
   ! Metropolis-Hastings algorithm
@@ -281,7 +401,7 @@ contains
 
     ! Calculate the escape probability at this location
     if (field(3) < 0.0d0) then
-      df_cur = Escape_Prob(field(3))
+      df_cur = ptr_Escape_Prob(field(3))
     else
       df_cur = 0.0d0 ! Zero escape probabilty if field is not favourable
     end if
@@ -307,7 +427,7 @@ contains
 
       ! Calculate the escape probability at the new position, to compair with
       ! the current position.
-      df_new = Escape_Prob(field(3))
+      df_new = ptr_Escape_Prob(field(3))
 
       ! If the escape probability is higher in the new location,
       ! then we jump to that location. If it is not then we jump to that

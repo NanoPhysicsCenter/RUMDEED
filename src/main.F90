@@ -51,7 +51,7 @@ program VacuumMD
   case(EMISSION_FIELD_TIP)
     print '(a)', 'Vacuum: Doing Field emission from a tip'
     call Init_Field_Emission_Tip()
-  case(EMISSION_FIELD_2D)
+  case(EMISSION_FIELD_2D_2DEG_C, EMISSION_FIELD_2D_2DEG_NC, EMISSION_FIELD_2D_DIRAC_C, EMISSION_FIELD_2D_DIRAC_NC)
     print '(a)', 'Vacuum: Doing Field emission from 2D material'
     call Init_Field_Emission_2D()
   case(EMISSION_TEST)
@@ -150,7 +150,7 @@ program VacuumMD
     call Clean_Up_Field_Emission()
   case(EMISSION_FIELD_TIP)
     call Clean_Up_Field_Emission_Tip()
-  case(EMISSION_FIELD_2D)
+  case(EMISSION_FIELD_2D_2DEG_C, EMISSION_FIELD_2D_2DEG_NC, EMISSION_FIELD_2D_DIRAC_C, EMISSION_FIELD_2D_DIRAC_NC)
     call Clean_Up_Field_Emission_2D()
   case(EMISSION_TEST)
     call Clean_Up_Field_Emission_v2()
