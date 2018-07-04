@@ -9,6 +9,7 @@ program VacuumMD
   use mod_field_emission
   use mod_field_emission_v2
   use mod_field_emission_tip
+  use mod_field_emission_2D
   !use mod_therminoic_emission
   use mod_pair
   use mod_unit_tests
@@ -50,6 +51,9 @@ program VacuumMD
   case(EMISSION_FIELD_TIP)
     print '(a)', 'Vacuum: Doing Field emission from a tip'
     call Init_Field_Emission_Tip()
+  case(EMISSION_FIELD_2D)
+    print '(a)', 'Vacuum: Doing Field emission from 2D material'
+    call Init_Field_Emission_2D()
   case(EMISSION_TEST)
     print '(a)', 'Vacuum: Doing Field emission DEV V2'
     call Init_Field_Emission_v2()
@@ -146,9 +150,12 @@ program VacuumMD
     call Clean_Up_Field_Emission()
   case(EMISSION_FIELD_TIP)
     call Clean_Up_Field_Emission_Tip()
+  case(EMISSION_FIELD_2D)
+    call Clean_Up_Field_Emission_2D()
   case(EMISSION_TEST)
     call Clean_Up_Field_Emission_v2()
   END SELECT
+
   call Clean_up()
 contains
 
@@ -218,7 +225,8 @@ contains
 
     ! Set the current scale to mA / micrometer^2
     !cur_scale = 1.0d-3 * (box_dim(1)*1.0d6) * (box_dim(2)*1.0d6) ! mA / micrometer^2
-    cur_scale = 1.0d-6 ! microAmper
+    !cur_scale = 1.0d-6 ! microAmper
+    cur_scale = 1.0d0 ! Ampers
 
     !time_step: The size of the time step
     time_step = time_step * time_scale
