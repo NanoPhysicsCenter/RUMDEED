@@ -120,7 +120,7 @@ contains
     double precision                 :: e_sup, e_sup_avg, e_sup_res
     double precision                 :: e_sup2, e_sup_avg2
     double precision                 :: N_sup_db
-    integer                          :: N_sup, N_res
+    integer                          :: N_sup
 
     ! Emission variables
     double precision                 :: D_f, Df_avg, F, rnd
@@ -727,11 +727,11 @@ contains
     x = pos(1)
     y = pos(2)
 
-    !if (x > y) then
-      w_theta_xy = 4.7d0 + A*exp( -1.0d0*( (x-x_c)**2 + (y-y_c)**2 )/(2.0d0*B**2) )
-    !else
-    !  w_theta_xy = 4.5d0
-    !end if
+    if (x > y) then
+      w_theta_xy = 4.7d0 !+ A*exp( -1.0d0*( (x-x_c)**2 + (y-y_c)**2 )/(2.0d0*B**2) )
+    else
+      w_theta_xy = 4.5d0
+    end if
   end function w_theta_xy
 
 end Module mod_field_emission_v2
