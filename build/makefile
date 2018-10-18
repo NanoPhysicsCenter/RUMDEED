@@ -95,8 +95,8 @@ mod_photo_emission.mod mod_photo_emission.o: ../src/mod_photo_emission.f90 mod_g
 mod_field_emission.mod mod_field_emission.o: ../src/mod_field_emission.f90 mod_global.mod mod_verlet.mod mod_pair.mod
 		$(FCOMPILER) -c $(FFLAGS) ../src/mod_field_emission.f90
 
-mod_field_emission_v2.mod mod_field_emission_v2.o: ../src/mod_field_emission_v2.f90 mod_global.mod mod_verlet.mod mod_pair.mod
-		$(FCOMPILER) -c $(FFLAGS) ../src/mod_field_emission_v2.f90
+mod_field_emission_v2.mod mod_field_emission_v2.o: ../src/mod_field_emission_v2.F90 mod_global.mod mod_verlet.mod mod_pair.mod
+		$(FCOMPILER) -c $(FFLAGS) ../src/mod_field_emission_v2.F90
 
 mod_field_emission_2D.mod mod_field_emission_2D.o: ../src/mod_field_emission_2D.f90 mod_global.mod mod_verlet.mod mod_pair.mod
 			$(FCOMPILER) -c $(FFLAGS) ../src/mod_field_emission_2D.f90

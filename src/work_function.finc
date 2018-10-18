@@ -1,0 +1,84 @@
+!-------------------------------------------!
+! File for position dependent work function !
+! Kristinn Torfason                         !
+! 19.10.18                                  !
+!-------------------------------------------!
+
+  double precision pure function w_theta_xy(pos)
+    double precision, dimension(1:3), intent(in) :: pos
+
+   
+    !w_theta_xy = w_theta_triangle(pos)
+    !w_theta_xy = w_theta_checkerboard_2x2(pos)
+    !w_theta_xy = w_theta_constant()
+    w_theta_xy = w_theta_gaussian(pos)
+
+  end function w_theta_xy
+
+  double precision pure function w_theta_constant()
+    w_theta_constant = 2.0d0
+  end function w_theta_constant
+
+  double precision pure function w_theta_gaussian(pos)
+    double precision, intent(in), dimension(1:3) :: pos
+    double precision, parameter                  :: A = -0.20d0, B = 25.0d0*length_scale
+    double precision, parameter                  :: x_c = 50.0d0*length_scale, y_c = 50.0d0*length_scale
+    double precision                             :: x, y
+
+    x = pos(1)
+    y = pos(2)
+
+    w_theta_gaussian = 4.70d0 + A*exp( -1.0d0*( (x-x_c)**2/(2*B**2) + (y-y_c)**2/(2*B**2) ) )
+  end function w_theta_gaussian
+
+  double precision pure function w_theta_triangle(pos)
+    double precision, intent(in), dimension(1:3) :: pos
+    double precision                             :: x, y
+
+    x = pos(1)
+    y = pos(2)
+
+    if (x > y) then
+      w_theta_triangle = 4.7d0 !+ A*exp( -1.0d0*( (x-x_c)**2 + (y-y_c)**2 )/(2.0d0*B**2) )
+    else
+      w_theta_triangle = 4.5d0
+    end if
+  end function w_theta_triangle
+
+  double precision pure function w_theta_checkerboard_2x2(pos)
+    double precision, intent(in), dimension(1:3) :: pos
+    double precision,             dimension(1:3) :: pos_scaled
+    double precision                             :: x, y
+    integer, parameter                           :: emit = 1
+
+    ! Scale x, y to unit square
+    pos_scaled(:) = (pos(:) - emitters_pos(1:3, emit)) / emitters_dim(:, emit)
+    x = pos_scaled(1)
+    y = pos_scaled(2)
+
+    !
+    ! |---|---|
+    ! | 1 | 2 |
+    ! |---|---|
+    ! | 3 | 4 |
+    ! |---|---|
+    !
+    ! Use unit square coordinates
+    if (x > 0.5d0) then
+      if (y > 0.5d0) then
+        ! 2
+        w_theta_checkerboard_2x2 = 4.75d0
+      else
+        ! 4
+        w_theta_checkerboard_2x2 = 4.68d0
+      end if
+    else
+      if (y > 0.5d0) then
+        ! 1
+        w_theta_checkerboard_2x2 = 4.65d0
+      else
+        ! 3
+        w_theta_checkerboard_2x2 = 4.72d0
+      end if
+    end if
+  end function w_theta_checkerboard_2x2
