@@ -1,0 +1,11 @@
+{
+	"folders": [
+		{
+			"path": "."
+		}
+	],
+	"settings": {
+		"fortran.gfortranExecutable": "gfortran-8",
+		"fortran.includePaths": ["/home/kristor/Work/Vacuum-MD/build"]
+	}
+}

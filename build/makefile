@@ -35,7 +35,7 @@ endif
 # ifeq ($(FCOMPILER),gfortran)
 ifneq (,$(findstring gfortran,$(FCOMPILER)))
 $(info Using GNU Fortran)
-FFLAGS=-Ofast -m64 -funroll-loops -flto -march=native
+FFLAGS=-Ofast -m64 -flto -march=native
 #FFLAGS=-g -fcheck=all -Wall -fbacktrace -ffpe-trap=zero,overflow,underflow,denormal
 ifdef OPENMP
 FFLAGS+=-fopenmp
@@ -74,6 +74,7 @@ $(PROJECT_NAME).out: ../src/main.F90 mod_global.mod mod_global.o \
 		$(FCOMPILER) $(FFLAGS) ../src/main.F90 mod_global.o mod_verlet.o mod_pair.o \
 			mod_unit_tests.o mod_photo_emission.o mod_field_emission.o mod_field_emission_v2.o \
 			mod_field_emission_tip.o mod_hyperboloid_tip.o mod_field_emission_2D.o \
+			/home/kristor/software/cuba-4.2/lib/libcuba.a \
 			-lpthread -lm -ldl -o $(PROJECT_NAME).out
 
 mod_global.mod mod_global.o: ../src/mod_global.F90

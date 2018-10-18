@@ -2,3 +2,8 @@
 __genmod.f90
 *.mod
 *.o
+*.bin
+*.dt
+*.mp4
+input
+run.sh
