@@ -412,6 +412,7 @@ contains
     Elec_supply = n
   end function Elec_supply
 
+  !-----------------------------------------------------------------------------
   ! This function returns the escape probability of the Electrons.
   ! Escape_prob = exp(-b_FN*w_theta^(3/2)*v_y/F) .
   double precision function Escape_Prob(F, pos)
@@ -579,6 +580,8 @@ contains
     Metro_algo_rec = par_pos(1:2)
   end function Metro_algo_rec
 
+  ! ----------------------------------------------------------------------------
+  !
   subroutine check_limits_metro_rec(par_pos, emit)
     double precision, dimension(1:3), intent(inout) :: par_pos
     integer, intent(in)                             :: emit
