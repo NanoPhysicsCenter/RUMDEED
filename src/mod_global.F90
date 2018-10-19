@@ -58,7 +58,8 @@ module mod_global
   ! ----------------------------------------------------------------------------
   ! Define constans
   integer, parameter :: MAX_PARTICLES = 500000 ! Maximum number of particles of each type allowed in the system
-  integer, parameter :: MAX_EMITTERS  = 10    ! Maximum number of emitters in the system
+  integer, parameter :: MAX_EMITTERS  = 10     ! Maximum number of emitters in the system
+  integer, parameter :: MAX_SECTIONS  = 100    ! Maximum number of sections and emitter can have
 
 
   !! ----------------------------------------------------------------------------
@@ -82,17 +83,20 @@ module mod_global
 
   ! ----------------------------------------------------------------------------
   ! Define storage arrays for particles
-  ! Fyrst dimension is x,y,z, second one is the number of the particle
+  ! Position and velocity of particles. Fyrst dimension is x,y,z, second one is the number of the particle
   double precision, dimension(:, :), allocatable :: particles_cur_pos    ! Current position (1:3, 1:MAX_PARTICLES)
   double precision, dimension(:, :), allocatable :: particles_prev_pos   ! Previous position
   double precision, dimension(:, :), allocatable :: particles_cur_vel    ! Current velocity
   double precision, dimension(:, :), allocatable :: particles_cur_accel  ! Current acceleration
   double precision, dimension(:, :), allocatable :: particles_prev_accel ! Previous acceleration
+
+  ! Other information about particles, the dimension if the number of particles
   double precision, dimension(:)   , allocatable :: particles_charge     ! Charge
   integer         , dimension(:)   , allocatable :: particles_species    ! Type of particle
   double precision, dimension(:)   , allocatable :: particles_mass       ! Mass
   integer         , dimension(:)   , allocatable :: particles_step       ! Time step when particle was created
   integer         , dimension(:)   , allocatable :: particles_emitter    ! The emitter the particle came from
+  integer         , dimension(:)   , allocatable :: particles_section    ! The section of the emitter the particles came from
   logical         , dimension(:)   , allocatable :: particles_mask       ! Mask array used to indicate which particles should be removed
                                                                          ! .true. means that the particle is active,
                                                                          ! .false. means it is inactive and should be removed
@@ -102,6 +106,7 @@ module mod_global
   ! Fyrst dimension is x,y,z, second one is the number of the emitter
   double precision, dimension(:, :), allocatable :: emitters_pos         ! Position of the emitters (1:3, 1:MAX_EMITTERS)
   double precision, dimension(:, :), allocatable :: emitters_dim         ! Dimensions of the emitters
+  ! Dimension is the number of emitters
   integer,          dimension(:),    allocatable :: emitters_Type        ! The type of emitter
   integer,          dimension(:),    allocatable :: emitters_delay       ! The time step the emitters become active
 
@@ -163,7 +168,7 @@ module mod_global
 
 
   double precision, dimension(:), allocatable :: ramo_current
-  double precision, dimension(:), allocatable :: ramo_current_emit
+  double precision, dimension(:, :), allocatable :: ramo_current_emit
   double precision :: ramo_cur_prev
   double precision :: ramo_integral
 

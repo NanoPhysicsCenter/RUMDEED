@@ -30,9 +30,10 @@ contains
   ! par_species: The type of particle, search for species_elec in mod_global to see a list
   ! step: The current time step, i.e. when the particle is emitted
   ! emit: The number of the emitter that the particle came from
-  subroutine Add_Particle(par_pos, par_vel, par_species, step, emit)
+  subroutine Add_Particle(par_pos, par_vel, par_species, step, emit, sec)
     double precision, dimension(1:3), intent(in) :: par_pos, par_vel
     integer, intent(in)                          :: par_species, step, emit
+    integer, intent(in), optional                :: sec
 
     ! Check if we have reach the maximum number of paticles allowed
     if (nrPart+1 > MAX_PARTICLES) then
@@ -50,6 +51,17 @@ contains
       particles_mask(nrPart+1) = .true.
       particles_species(nrPart+1) = par_species
       particles_emitter(nrPart+1) = emit
+      if (present(sec) .eqv. .true.) then
+        if (sec > MAX_SECTIONS) then
+          particles_section(nrPart+1) = MAX_SECTIONS
+          print '(a)', 'Vacuum: WARNING MAX_SECTIONS REACHED. INCREASE MAX_SECTIONS'
+        else
+          particles_section(nrPart+1) = sec
+        end if
+      else
+        ! To do: Have some default section rules, like 10x10 for square emitters?
+        particles_section(nrPart+1) = 1
+      end if
 
       if (par_species == species_elec) then ! Electron
         particles_charge(nrPart+1) = -1.0d0*q_0
@@ -121,7 +133,8 @@ contains
 
           ! Write out the x and y position of the particle along with which emitter it came from.
           !$OMP CRITICAL(DENSITY_ABSORB)
-          write(unit=ud_density_absorb_top) particles_cur_pos(1, i), particles_cur_pos(2, i), particles_emitter(i)
+          write(unit=ud_density_absorb_top) particles_cur_pos(1, i), particles_cur_pos(2, i), &
+                                          & particles_emitter(i), particles_section(i)
           !$OMP END CRITICAL(DENSITY_ABSORB)
         CASE (remove_bot)
           !$OMP ATOMIC UPDATE
@@ -132,7 +145,8 @@ contains
 
           ! Write out the x and y position of the particle along with which emitter it came from.
           !$OMP CRITICAL(DENSITY_ABSORB)
-          write(unit=ud_density_absorb_bot) particles_cur_pos(1, i), particles_cur_pos(2, i), particles_emitter(i)
+          write(unit=ud_density_absorb_bot) particles_cur_pos(1, i), particles_cur_pos(2, i), &
+                                          & particles_emitter(i), particles_section(i)
           !$OMP END CRITICAL(DENSITY_ABSORB)
         CASE DEFAULT
           print *, 'Error unkown remove case ', m
@@ -229,6 +243,10 @@ contains
 
         !$OMP TASK FIRSTPRIVATE(k, m) SHARED(particles_emitter, particles_mask)
         call compact_array(particles_emitter, particles_mask, k, m)
+        !$OMP END TASK
+
+        !$OMP TASK FIRSTPRIVATE(k, m) SHARED(particles_section, particles_mask)
+        call compact_array(particles_section, particles_mask, k, m)
         !$OMP END TASK
 
         ! Wait for all tasks to finish
@@ -330,7 +348,7 @@ contains
   ! step -- The current time step
   subroutine Write_Ramo_Current(step)
     integer, intent(in) :: step
-    integer             :: i, IFAIL
+    integer             :: i, j, IFAIL
     double precision    :: ramo_cur = 0.0d0
 
     !ramo_cur = 0.0d0
@@ -341,7 +359,7 @@ contains
     ramo_cur = sum(ramo_current) / cur_scale
 
     write (ud_ramo, fmt="(ES12.4, tr2, i8, tr2, E12.4, tr2, E12.4, tr2, i6, tr2, i6, tr2, i6, *(tr2, ES12.4))", iostat=IFAIL) &
-    & cur_time, step, ramo_cur, V_d, nrPart, nrElec, nrHole, (ramo_current_emit(i)/cur_scale, i = 1, nrEmit)
+    & cur_time, step, ramo_cur, V_d, nrPart, nrElec, nrHole, ((ramo_current_emit(j,i)/cur_scale, j=1, MAX_SECTIONS), i = 1, nrEmit)
 
   end subroutine Write_Ramo_current
 
@@ -364,7 +382,7 @@ contains
       par_pos(:) = particles_cur_pos(:, i) ! Position of the particle
 
       ! Write out x, y, z and which emitter the particle came from
-      write(unit=ud_pos) par_pos(1), par_pos(2), par_pos(3), particles_emitter(i)
+      write(unit=ud_pos) par_pos(1), par_pos(2), par_pos(3), particles_emitter(i), particles_section(i)
     end do
 
   end subroutine Write_Position
