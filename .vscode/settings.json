@@ -2,5 +2,5 @@
     "fortran.includePaths": [
         "/home/kristor/Work/Vacuum-MD/build"
     ],
-    "fortran.gfortranExecutable": "gfortran-8"
+    "fortran.gfortranExecutable": "gfortran"
 }
