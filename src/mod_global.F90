@@ -214,7 +214,10 @@ module mod_global
   !integer :: ud_density_map_elec ! Density maps for electrons
   !integer :: ud_density_map_hole ! Density maps for holes
   !integer :: ud_density_map_total ! Density maps for holes - electrons
-  integer :: ud_density_emit
+  integer :: ud_density_emit_x
+  integer :: ud_density_emit_y
+  integer :: ud_density_emit_e
+  integer :: ud_density_emit_s
   integer :: ud_density_absorb_top
   integer :: ud_density_absorb_bot
 
