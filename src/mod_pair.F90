@@ -30,16 +30,29 @@ contains
   ! par_species: The type of particle, search for species_elec in mod_global to see a list
   ! step: The current time step, i.e. when the particle is emitted
   ! emit: The number of the emitter that the particle came from
-  subroutine Add_Particle(par_pos, par_vel, par_species, step, emit, sec)
+  subroutine Add_Particle(par_pos, par_vel, par_species, step, emit, opt_sec)
     double precision, dimension(1:3), intent(in) :: par_pos, par_vel
     integer, intent(in)                          :: par_species, step, emit
-    integer, intent(in), optional                :: sec
+    integer, intent(in), optional                :: opt_sec
+    integer                                      :: sec
 
     ! Check if we have reach the maximum number of paticles allowed
     if (nrPart+1 > MAX_PARTICLES) then
       print '(a)', 'Vacuum: WARNING MAX_PARTICLES REACHED. INCREASE MAX_PARTICLES'
       ! Add code to reallocate arrays to larger size?
     else
+
+      if (present(opt_sec) .eqv. .true.) then
+        if (opt_sec > MAX_SECTIONS) then
+          sec = MAX_SECTIONS
+          print '(a)', 'Vacuum: WARNING MAX_SECTIONS REACHED. INCREASE MAX_SECTIONS'
+        else
+          sec = opt_sec
+        end if
+      else
+        ! To do: Have some default section rules, like 10x10 for square emitters?
+        sec = 1
+      end if
 
       ! Add the particle
       particles_cur_pos(:, nrPart+1) = par_pos
@@ -51,17 +64,7 @@ contains
       particles_mask(nrPart+1) = .true.
       particles_species(nrPart+1) = par_species
       particles_emitter(nrPart+1) = emit
-      if (present(sec) .eqv. .true.) then
-        if (sec > MAX_SECTIONS) then
-          particles_section(nrPart+1) = MAX_SECTIONS
-          print '(a)', 'Vacuum: WARNING MAX_SECTIONS REACHED. INCREASE MAX_SECTIONS'
-        else
-          particles_section(nrPart+1) = sec
-        end if
-      else
-        ! To do: Have some default section rules, like 10x10 for square emitters?
-        particles_section(nrPart+1) = 1
-      end if
+      particles_section(nrPart+1) = sec
 
       if (par_species == species_elec) then ! Electron
         particles_charge(nrPart+1) = -1.0d0*q_0
@@ -85,8 +88,8 @@ contains
 
       ! Write out the x and y position of the emitted particle
       ! along with which emitter it came from.
-      write(unit=ud_density_emit_x) par_pos(1)
-      write(unit=ud_density_emit_y) par_pos(2)
+      write(unit=ud_density_emit_x) (par_pos(1) / length_scale)
+      write(unit=ud_density_emit_y) (par_pos(2) / length_scale)
       write(unit=ud_density_emit_e) emit
       write(unit=ud_density_emit_s) sec
     end if
