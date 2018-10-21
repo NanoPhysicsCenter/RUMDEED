@@ -2,15 +2,10 @@
 ! Submodule for Monte Carlo Integration     !
 ! routines                                  !
 ! Kristinn Torfason                         !
-! 19.10.18                                  !
+! 21.10.18                                  !
 !-------------------------------------------!
 submodule (mod_field_emission_v2) smod_mc_integration
-  !interface
-  !  double precision function t_y(F, pos)
-  !    double precision, intent(in)                 :: F
-  !    double precision, dimension(1:3), intent(in) :: pos
-  !  end function t_y
-  !end interface
+
 contains
   ! ----------------------------------------------------------------------------
   ! This function is called to do the surface integration.

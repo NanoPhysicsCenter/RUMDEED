@@ -72,11 +72,12 @@ $(PROJECT_NAME).out: ../src/main.F90 mod_global.mod mod_global.o \
 			mod_field_emission_v2.mod mod_field_emission_v2.o \
 			mod_field_emission_2D.mod mod_field_emission_2D.o \
 			mod_field_emission_v2@smod_work_function.smod smod_work_function.o \
-			mod_field_emission_v2@smod_mc_integration.smod smod_mc_integration.o
+			mod_field_emission_v2@smod_mc_integration.smod smod_mc_integration.o \
+			mod_field_emission_v2@smod_metro_algo.smod smod_metro_algo.o
 		$(FCOMPILER) $(FFLAGS) ../src/main.F90 mod_global.o mod_verlet.o mod_pair.o \
 			mod_unit_tests.o mod_photo_emission.o mod_field_emission.o mod_field_emission_v2.o \
 			mod_field_emission_tip.o mod_hyperboloid_tip.o mod_field_emission_2D.o \
-			smod_work_function.o smod_mc_integration.o \
+			smod_work_function.o smod_mc_integration.o smod_metro_algo.o \
 			/home/kristor/software/cuba-4.2/lib/libcuba.a \
 			-lpthread -lm -ldl -o $(PROJECT_NAME).out
 
@@ -113,11 +114,14 @@ mod_hyperboloid_tip.mod mod_hyperboloid_tip.o: ../src/mod_hyperboloid_tip.f90 mo
 mod_therminoic_emission.mod mod_therminoic_emission.o: ../src/mod_thermionic_emission.f90 mod_global.mod mod_verlet.mod mod_pair.mod
 		$(FCOMPILER) -c $(FFLAGS) ../src/mod_thermionic_emission.f90
 
-mod_field_emission_v2@smod_work_function.smod smod_work_function.o: ../src/smod_work_function.f90 mod_global.mod mod_field_emission_v2.mod
+mod_field_emission_v2@smod_work_function.smod smod_work_function.o: ../src/smod_work_function.f90 mod_field_emission_v2.mod
 		$(FCOMPILER) -c $(FFLAGS) ../src/smod_work_function.f90
 
-mod_field_emission_v2@smod_mc_integration.smod smod_mc_integration.o: ../src/smod_mc_integration.f90 mod_global.mod mod_field_emission_v2.mod
+mod_field_emission_v2@smod_mc_integration.smod smod_mc_integration.o: ../src/smod_mc_integration.f90 mod_field_emission_v2.mod
 		$(FCOMPILER) -c $(FFLAGS) ../src/smod_mc_integration.f90
+
+mod_field_emission_v2@smod_metro_algo.smod smod_metro_algo.o: ../src/smod_metro_algo.f90 mod_field_emission_v2.mod
+		$(FCOMPILER) -c $(FFLAGS) ../src/smod_metro_algo.f90
 
 clean:
 		rm -f *.o

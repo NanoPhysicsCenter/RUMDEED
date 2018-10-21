@@ -2,7 +2,7 @@
 ! Submodule for position dependent          !
 ! work function                             !
 ! Kristinn Torfason                         !
-! 19.10.18                                  !
+! 21.10.18                                  !
 !-------------------------------------------!
 submodule (mod_field_emission_v2) smod_work_function
 

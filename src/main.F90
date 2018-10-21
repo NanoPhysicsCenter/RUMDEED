@@ -588,12 +588,8 @@ contains
     close(unit=ud_absorb_bot, iostat=IFAIL, status='keep')
     close(unit=ud_ramo, iostat=IFAIL, status='keep')
     close(unit=ud_volt, iostat=IFAIL, status='keep')
-    !close(unit=ud_dipole_pos, iostat=IFAIL, status='keep')
-    !close(unit=ud_dipole_vec, iostat=IFAIL, status='keep')
     close(unit=ud_field, iostat=IFAIL, status='keep')
-    !close(unit=ud_density_map_elec, iostat=IFAIL, status='keep')
-    !close(unit=ud_density_map_hole, iostat=IFAIL, status='keep')
-    !close(unit=ud_density_map_total, iostat=IFAIL, status='keep')
+
     close(unit=ud_density_emit_x, iostat=IFAIL, status='keep')
     close(unit=ud_density_emit_y, iostat=IFAIL, status='keep')
     close(unit=ud_density_emit_e, iostat=IFAIL, status='keep')
