@@ -139,7 +139,7 @@ contains
 
     ! Emission variables
     double precision                 :: D_f, Df_avg, F, rnd
-    integer                          :: s, IFAIL
+    integer                          :: s, sec, IFAIL
     integer                          :: nrElecEmit
     double precision, dimension(1:3) :: par_pos, par_vel
 
@@ -191,7 +191,8 @@ contains
 
           ! Add a particle to the system
           par_vel = 0.0d0
-          call Add_Particle(par_pos, par_vel, species_elec, step, emit)
+          rnd = w_theta_xy(par_pos, sec) ! Get the section
+          call Add_Particle(par_pos, par_vel, species_elec, step, emit, sec)
 
           nrElecEmit = nrElecEmit + 1
           nrEmitted_emitters(emit) = nrEmitted_emitters(emit) + 1

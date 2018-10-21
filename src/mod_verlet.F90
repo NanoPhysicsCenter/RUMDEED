@@ -118,6 +118,7 @@ contains
       !$OMP ATOMIC UPDATE
       ramo_current(k) = ramo_current(k) + q * E_zunit * particles_cur_vel(3, i)
 
+      ! We use OMP ATOMIC here because the indexes sec and emit are not loop indexes
       !$OMP ATOMIC UPDATE
       ramo_current_emit(sec, emit) = ramo_current_emit(sec, emit) + q * E_zunit * particles_cur_vel(3, i)
     end do
