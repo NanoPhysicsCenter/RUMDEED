@@ -1,20 +1,40 @@
 !-------------------------------------------!
-! File for Monte Carlo Integration routines !
+! Submodule for Monte Carlo Integration     !
+! routines                                  !
 ! Kristinn Torfason                         !
 ! 19.10.18                                  !
 !-------------------------------------------!
-
-! ----------------------------------------------------------------------------
-! This function is called to do the surface integration.
-! Here we select the method to do it.
-!
-subroutine Do_Surface_Integration(emit, N_sup)
+submodule (mod_field_emission_v2) smod_mc_integration
+  !interface
+  !  double precision function t_y(F, pos)
+  !    double precision, intent(in)                 :: F
+  !    double precision, dimension(1:3), intent(in) :: pos
+  !  end function t_y
+  !end interface
+contains
+  ! ----------------------------------------------------------------------------
+  ! This function is called to do the surface integration.
+  ! Here we select the method to do it.
+  !
+  subroutine Do_Surface_Integration(emit, N_sup)
     integer, intent(in)  :: emit ! The emitter to do the integration on
     integer, intent(out) :: N_sup ! Number of electrons
 
     !call Do_2D_MC_plain(emit, N_sup)
     call Do_Cuba_Suave(emit, N_sup)
   end subroutine Do_Surface_Integration
+
+  !-----------------------------------------------------------------------------
+  ! A simple function that calculates
+  ! A_FN/(t**2(l)*w_theta(x,y)) F**2(x,y)
+  ! pos: Position to calculate the function
+  ! F: The z-component of the field at par_pos, it should be F < 0.0d0.
+  double precision function Elec_Supply_V2(pos, F)
+    double precision, dimension(1:3), intent(in) :: pos
+    double precision,                 intent(in) :: F
+
+    Elec_Supply_V2 = time_step_div_q0 * a_FN/(t_y(F, pos)**2*w_theta_xy(pos)) * F**2
+  end function Elec_Supply_V2
 
   ! ----------------------------------------------------------------------------
   ! The integration function for the Cuba library
@@ -221,3 +241,5 @@ subroutine Do_Surface_Integration(emit, N_sup)
     N_sup_db = A*e_sup_avg
     N_sup = nint(N_sup_db) ! Round the number to integer
   end subroutine Do_2D_MC_plain
+
+end submodule smod_mc_integration

@@ -1,8 +1,12 @@
 !-------------------------------------------!
-! File for position dependent work function !
+! Submodule for position dependent          !
+! work function                             !
 ! Kristinn Torfason                         !
 ! 19.10.18                                  !
 !-------------------------------------------!
+submodule (mod_field_emission_v2) smod_work_function
+
+contains
 
   ! ----------------------------------------------------------------------------
   ! Function that returns the position dependant work function.
@@ -204,3 +208,5 @@
       sec = 0
     end if
   end function w_theta_checkerboard_2x2
+
+end submodule smod_work_function

@@ -12,7 +12,7 @@ Module mod_field_emission_v2
   implicit none
 
   PRIVATE
-  PUBLIC :: Init_Field_Emission_v2, Clean_Up_Field_Emission_v2
+  PUBLIC :: Init_Field_Emission_v2, Clean_Up_Field_Emission_v2, t_y, v_y
 
   ! ----------------------------------------------------------------------------
   ! Variables
@@ -47,6 +47,19 @@ Module mod_field_emission_v2
   ! Use image Charge or not
   logical, parameter          :: image_charge = .true.
 
+  interface
+      ! Interface for the work function submodule
+      module double precision function w_theta_xy(pos, sec)
+        double precision, intent(in), dimension(1:3) :: pos ! Position on the surface
+        integer, intent(out), optional               :: sec ! Return the section
+      end function w_theta_xy
+
+      ! Interface for the MC integration submodule
+      module subroutine Do_Surface_Integration(emit, N_sup)
+        integer, intent(in)  :: emit ! The emitter to do the integration on
+        integer, intent(out) :: N_sup ! Number of electrons
+      end subroutine Do_Surface_Integration
+  end interface
 contains
   !-----------------------------------------------------------------------------
   ! Initialize the Field Emission
@@ -196,19 +209,6 @@ contains
     !pause
   end subroutine Do_Field_Emission_Planar_rectangle
 
-  !-----------------------------------------------------------------------------
-  ! A simple function that calculates
-  ! A_FN/(t**2(l)*w_theta(x,y)) F**2(x,y)
-  ! pos: Position to calculate the function
-  ! F: The z-component of the field at par_pos, it should be F < 0.0d0.
-  double precision function Elec_Supply_V2(pos, F)
-    double precision, dimension(1:3), intent(in) :: pos
-    double precision,                 intent(in) :: F
-
-    Elec_Supply_V2 = time_step_div_q0 * a_FN/(t_y(F, pos)**2*w_theta_xy(pos)) * F**2
-  end function Elec_Supply_V2
-
-
 !----------------------------------------------------------------------------------------
 ! The functions v_y and t_y are because of the image charge effect in the FN equation.
 ! The approximation for v_y and t_y are taken from
@@ -254,31 +254,6 @@ contains
       t_y = 1.0d0
     end if
   end function t_y
-
-  !-----------------------------------------------------------------------------
-  ! The Fowler-Nordheim equation is
-  ! J = a_FN*F^2/(t_y^2*w_theta)*exp(-b_FN*w_theta^(3/2)*v_y/F)
-  ! We break it into two parts
-  ! J = Elec_Supply*Escape_Prob .
-  ! Elec_supply is the the part before the exponental
-  ! and Escape_prob is the exponental.
-
-  ! The electron supply part
-  ! This functions returns the number of electrons
-  ! Elec_supply = a_FN*F^2/(t_y^2*w_theta) * (A*time_step/q_0),
-  ! To get the number of electrons we multiply the first part of the FN
-  ! equation with the area (A) and the time step (time_step). This gives
-  ! the current. The divide that with the charge of the electron (q_0) to get
-  ! the number of electrons.
-  double precision function Elec_Supply(A, F, pos)
-    double precision, intent(in)                 :: A, F
-    double precision, dimension(1:3), intent(in) :: pos
-    double precision                             :: n
-
-    n = A * a_FN * F**2 * time_step / (q_0 * w_theta_xy(pos) * (t_y(F, pos))**2)
-
-    Elec_supply = n
-  end function Elec_supply
 
   !-----------------------------------------------------------------------------
   ! This function returns the escape probability of the Electrons.
@@ -440,8 +415,5 @@ contains
       end if
     end if
   end subroutine check_limits_metro_rec
-
-#include "work_function.finc"
-#include "mc_integration.finc"
 
 end Module mod_field_emission_v2
