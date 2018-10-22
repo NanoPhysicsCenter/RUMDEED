@@ -1,6 +1,7 @@
 *~
 __genmod.f90
 *.mod
+*.smod
 *.o
 *.bin
 *.dt

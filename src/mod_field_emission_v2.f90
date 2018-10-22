@@ -12,14 +12,13 @@ Module mod_field_emission_v2
   implicit none
 
   PRIVATE
-  PUBLIC :: Init_Field_Emission_v2, Clean_Up_Field_Emission_v2, t_y, v_y, escape_prob
+  PUBLIC :: Init_Field_Emission_v2, Clean_Up_Field_Emission_v2, t_y, v_y, escape_prob, F_avg
 
   ! ----------------------------------------------------------------------------
   ! Variables
   integer, dimension(:), allocatable :: nrEmitted_emitters
   integer                            :: posInit
   integer                            :: nrEmitted
-  double precision                   :: res_s ! residual
   double precision, dimension(1:3)   :: F_avg = 0.0d0
 
   ! ----------------------------------------------------------------------------
@@ -48,9 +47,9 @@ Module mod_field_emission_v2
   ! Use image Charge or not
   logical, parameter          :: image_charge = .true.
 
-  interface
+  interface 
       ! Interface for the work function submodule
-      module double precision function w_theta_xy(pos, sec)
+      double precision module function w_theta_xy(pos, sec)
         double precision, intent(in), dimension(1:3) :: pos ! Position on the surface
         integer, intent(out), optional               :: sec ! Return the section
       end function w_theta_xy
@@ -67,7 +66,7 @@ Module mod_field_emission_v2
         double precision, intent(out)    :: df_out, F_out
         double precision, dimension(1:3) :: Metropolis_Hastings_rectangle_v2
       end function Metropolis_Hastings_rectangle_v2
-  end interface
+  end interface 
 contains
   !-----------------------------------------------------------------------------
   ! Initialize the Field Emission

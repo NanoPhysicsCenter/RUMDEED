@@ -114,14 +114,14 @@ mod_hyperboloid_tip.mod mod_hyperboloid_tip.o: ../src/mod_hyperboloid_tip.f90 mo
 mod_therminoic_emission.mod mod_therminoic_emission.o: ../src/mod_thermionic_emission.f90 mod_global.mod mod_verlet.mod mod_pair.mod
 		$(FCOMPILER) -c $(FFLAGS) ../src/mod_thermionic_emission.f90
 
-mod_field_emission_v2@smod_work_function.smod smod_work_function.o: ../src/smod_work_function.f90 mod_field_emission_v2.mod
-		$(FCOMPILER) -c $(FFLAGS) ../src/smod_work_function.f90
+mod_field_emission_v2@smod_work_function.smod smod_work_function.o: ../src/smod_work_function.F90 mod_field_emission_v2.mod
+		$(FCOMPILER) -c $(FFLAGS) ../src/smod_work_function.F90
 
-mod_field_emission_v2@smod_mc_integration.smod smod_mc_integration.o: ../src/smod_mc_integration.f90 mod_field_emission_v2.mod
-		$(FCOMPILER) -c $(FFLAGS) ../src/smod_mc_integration.f90
+mod_field_emission_v2@smod_mc_integration.smod smod_mc_integration.o: ../src/smod_mc_integration.F90 mod_field_emission_v2.mod
+		$(FCOMPILER) -c $(FFLAGS) ../src/smod_mc_integration.F90
 
-mod_field_emission_v2@smod_metro_algo.smod smod_metro_algo.o: ../src/smod_metro_algo.f90 mod_field_emission_v2.mod
-		$(FCOMPILER) -c $(FFLAGS) ../src/smod_metro_algo.f90
+mod_field_emission_v2@smod_metro_algo.smod smod_metro_algo.o: ../src/smod_metro_algo.F90 mod_field_emission_v2.mod
+		$(FCOMPILER) -c $(FFLAGS) ../src/smod_metro_algo.F90
 
 clean:
 		rm -f *.o

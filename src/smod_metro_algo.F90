@@ -10,10 +10,12 @@ contains
   !-----------------------------------------------------------------------------
   ! Metropolis-Hastings algorithm
   ! Includes that the work function can vary with position
-  function Metropolis_Hastings_rectangle_v2(ndim, emit, df_out, F_out)
+  module function Metropolis_Hastings_rectangle_v2(ndim, emit, df_out, F_out)
     integer, intent(in)              :: ndim, emit
     double precision, intent(out)    :: df_out, F_out
-    !double precision, dimension(1:3) :: Metropolis_Hastings_rectangle_v2 ! The interface is declared in the parent module
+#if defined(__INTEL_COMPILER)
+    double precision, dimension(1:3) :: Metropolis_Hastings_rectangle_v2 ! The interface is declared in the parent module
+#endif
     integer                          :: count, i
     double precision                 :: std, rnd, alpha
     double precision, dimension(1:3) :: cur_pos, new_pos, field

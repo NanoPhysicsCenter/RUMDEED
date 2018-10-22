@@ -11,7 +11,7 @@ contains
   ! ----------------------------------------------------------------------------
   ! Function that returns the position dependant work function.
   ! Here we pick the method to be used.
-  double precision function w_theta_xy(pos, sec)
+  module double precision function w_theta_xy(pos, sec)
     double precision, dimension(1:3), intent(in) :: pos
     integer, intent(out), optional               :: sec
 
@@ -44,8 +44,9 @@ contains
   double precision function w_theta_gaussian(pos, sec)
     double precision, intent(in), dimension(1:3) :: pos
     integer, intent(out), optional               :: sec
-    double precision, parameter                  :: A = -0.20d0, B = 25.0d0*length_scale
-    double precision, parameter                  :: x_c = 50.0d0*length_scale, y_c = 50.0d0*length_scale
+    double precision                             :: A = -0.20d0
+    double precision                             :: B = 25.0d0*1.0d-9
+    double precision                             :: x_c = 50.0d0*1.0d-9, y_c = 50.0d0*1.0d-9
     double precision                             :: x, y
 
     x = pos(1)
@@ -121,7 +122,12 @@ contains
     w_theta_arr(4, 1:4) = (/ 4.65d0, 4.65d0, 4.65d0, 4.65d0 /)
 
     ! Scale x, y to unit square
-    pos_scaled(:) = (pos(:) - emitters_pos(1:3, emit)) / emitters_dim(:, emit)
+#if defined(__PGI)
+    pos_scaled(1) = (pos(1) - emitters_pos(1, emit)) / emitters_dim(1, emit)
+    pos_scaled(2) = (pos(2) - emitters_pos(2, emit)) / emitters_dim(2, emit)
+#else
+    pos_scaled(:) = (pos(:) - emitters_pos(:, emit)) / emitters_dim(:, emit)
+#endif
     x = pos_scaled(1)
     y = pos_scaled(2)
 
@@ -174,7 +180,12 @@ contains
     integer, parameter                           :: emit = 1
 
     ! Scale x, y to unit square
-    pos_scaled(:) = (pos(:) - emitters_pos(1:3, emit)) / emitters_dim(:, emit)
+#if defined(__PGI)
+    pos_scaled(1) = (pos(1) - emitters_pos(1, emit)) / emitters_dim(1, emit)
+    pos_scaled(2) = (pos(2) - emitters_pos(2, emit)) / emitters_dim(2, emit)
+#else
+    pos_scaled(:) = (pos(:) - emitters_pos(:, emit)) / emitters_dim(:, emit)
+#endif
     x = pos_scaled(1)
     y = pos_scaled(2)
 

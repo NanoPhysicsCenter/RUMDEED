@@ -11,7 +11,7 @@ contains
   ! This function is called to do the surface integration.
   ! Here we select the method to do it.
   !
-  subroutine Do_Surface_Integration(emit, N_sup)
+  module subroutine Do_Surface_Integration(emit, N_sup)
     integer, intent(in)  :: emit ! The emitter to do the integration on
     integer, intent(out) :: N_sup ! Number of electrons
 
@@ -52,14 +52,21 @@ contains
     ! Surface position
     ! Cuba does the intergration over the hybercube.
     ! It gives us coordinates between 0 and 1.
-    par_pos(1:2) = emitters_pos(1:2, userdata) + xx*emitters_dim(1:2, userdata) ! x and y position on the surface
+    par_pos(1) = emitters_pos(1, userdata) + xx(1)*emitters_dim(1, userdata) ! x and y position on the surface
+    par_pos(2) = emitters_pos(2, userdata) + xx(2)*emitters_dim(2, userdata) ! x and y position on the surface
     par_pos(3) = 0.0d0 ! Height, i.e. on the surface
 
     ! Calculate the electric field on the surface
     field = Calc_Field_at(par_pos)
 
     ! Add to the average field
+#if defined(__PGI)
+    F_avg(1) = F_avg(1) + field(1)
+    F_avg(2) = F_avg(2) + field(2)
+    F_avg(3) = F_avg(3) + field(3)
+#else
     F_avg = F_avg + field
+#endif
 
     ! Check if the field is favourable for emission
     if (field(3) < 0.0d0) then
