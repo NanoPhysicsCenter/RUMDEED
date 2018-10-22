@@ -255,7 +255,7 @@ contains
   ! allocate and initilize variables, open data files for writing, etc.
   subroutine Init()
     integer :: IFAIL, n
-    integer, dimension(:), allocatable :: my_seed
+    !integer, dimension(:), allocatable :: my_seed
 
     ! Allocate arrays
     allocate(particles_cur_pos(1:3, 1:MAX_PARTICLES))
@@ -333,11 +333,17 @@ contains
     progress(2) = nint(0.2d0*steps)
     progress(1) = nint(0.1d0*steps)
 
-    call RANDOM_SEED(size = n)
-    allocate(my_seed(n))
-    my_seed = SEED
-    call RANDOM_SEED(PUT = my_seed)
-    deallocate(my_seed)
+    ! call RANDOM_SEED(size = n)
+    ! allocate(my_seed(n))
+    ! if (SEED == 0) then
+    !   CALL SYSTEM_CLOCK(COUNT=clock)
+    ! else
+    !   my_seed = SEED
+    ! endif
+    ! call RANDOM_SEED(PUT = my_seed)
+    ! deallocate(my_seed)
+
+    call init_random_seed()
 
     ! Create folder for output files
 #if defined(__PGI)
@@ -480,6 +486,58 @@ contains
 
   end subroutine Init
 
+  !---------------------------------------------------------------------------------------
+  ! Set a random seed to use
+  ! Taken from
+  ! https://gcc.gnu.org/onlinedocs/gcc-4.7.4/gfortran/RANDOM_005fSEED.html
+  subroutine init_random_seed()
+    implicit none
+    integer, allocatable :: my_seed(:)
+    integer :: i, n, un, istat, dt(8), pid, t(2), s
+    integer(8) :: count, tms
+  
+    call random_seed(size = n)
+    allocate(my_seed(n))
+    ! First try if the OS provides a random number generator
+    open(newunit=un, file="/dev/urandom", access="stream", &
+         form="unformatted", action="read", status="old", iostat=istat)
+    if (istat == 0) then
+       read(un) my_seed
+       close(un)
+    else
+       ! Fallback to XOR:ing the current time and pid. The PID is
+       ! useful in case one launches multiple instances of the same
+       ! program in parallel.
+       call system_clock(count)
+       if (count /= 0) then
+          t = transfer(count, t)
+       else
+          call date_and_time(values=dt)
+          tms = (dt(1) - 1970) * 365_8 * 24 * 60 * 60 * 1000 &
+               + dt(2) * 31_8 * 24 * 60 * 60 * 1000 &
+               + dt(3) * 24 * 60 * 60 * 60 * 1000 &
+               + dt(5) * 60 * 60 * 1000 &
+               + dt(6) * 60 * 1000 + dt(7) * 1000 &
+               + dt(8)
+          t = transfer(tms, t)
+       end if
+       s = ieor(t(1), t(2))
+       pid = getpid() + 1099279 ! Add a prime
+       s = ieor(s, pid)
+       if (n >= 3) then
+          my_seed(1) = t(1) + 36269
+          my_seed(2) = t(2) + 72551
+          my_seed(3) = pid
+          if (n > 3) then
+             my_seed(4:) = s + 37 * (/ (i, i = 0, n - 4) /)
+          end if
+       else
+          my_seed = s + 37 * (/ (i, i = 0, n - 1 ) /)
+       end if
+    end if
+    call random_seed(put=my_seed)
+  end subroutine init_random_seed
+
   ! ----------------------------------------------------------------------------
   ! Flush data written to files such that it can be read
   subroutine Flush_Data()
@@ -546,7 +604,7 @@ contains
 
     write(ud_init, *) '---------------------------------------------------------'
     write(ud_init, fmt_int) 'MAX_PARTICLES       = ', MAX_PARTICLES, 'Maximum number of electrons in the system'
-    write(ud_init, fmt_int) 'SEED                = ', SEED,          'Seed value used in the random number generator'
+    !write(ud_init, fmt_int) 'SEED                = ', SEED,          'Seed value used in the random number generator'
     !write(ud_init, fmt_int) 'MAX_EMISSION_TRY    = ', MAX_EMISSION_TRY,    'Maximum number of failed emission attempts'
     !write(ud_init, fmt_int) 'MAX_TIME_STEP_WRITE = ', MAX_TIME_STEP_WRITE, 'Maximum number of times steps to output data'
     write(ud_init, *) '---------------------------------------------------------'

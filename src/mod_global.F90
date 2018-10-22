@@ -200,7 +200,7 @@ module mod_global
   ! ----------------------------------------------------------------------------
   ! Parameters for random number generators
   ! http://en.wikipedia.org/wiki/Mersenne_Twister#SFMT
-  integer                                            :: SEED = 2815
+  !integer                                            :: SEED = 2815
 
 
   ! ----------------------------------------------------------------------------
