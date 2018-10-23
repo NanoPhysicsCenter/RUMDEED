@@ -128,16 +128,18 @@ contains
 
   ! ----------------------------------------------------------------------------
   ! Acceleration
+  ! Update the acceleration for all the particles
   subroutine Calculate_Acceleration_Particles()
-    double precision, dimension(1:3) :: force_E, force_c
-    double precision, dimension(1:3) :: pos_1, pos_2, diff
+    double precision, dimension(1:3) :: force_E, force_c, force_ic, force_ic_N, force_ic_self
+    double precision, dimension(1:3) :: pos_1, pos_2, diff, pos_ic_a, pos_ic_b
     double precision                 :: r
     double precision                 :: q_1, q_2
     double precision                 :: im_1, im_2
-    double precision                 :: pre_fac_c
+    double precision                 :: pre_fac_c, pre_fac_ic
     integer                          :: i, j, k_1, k_2
 
-    !$OMP PARALLEL DO PRIVATE(i, j, k_1, k_2, pos_1, pos_2, diff, r, force_E, force_c, im_1, q_1, im_2, q_2, pre_fac_c) !!&
+    !$OMP PARALLEL DO PRIVATE(i, j, k_1, k_2, pos_1, pos_2, pos_ic_a, pos_ic_b, diff, r), &
+    !$OMP& PRIVATE(force_E, force_c, force_ic, force_ic_N, force_ic_self, im_1, q_1, im_2, q_2, pre_fac_c, pre_fac_ic)
     !!!$OMP& REDUCTION(+:particles_cur_accel) SCHEDULE(GUIDED)
     do i = 1, nrPart
       ! Information about the particle we are calculating the force/acceleration on
@@ -149,6 +151,10 @@ contains
       ! Acceleration due to electric field
       force_E = q_1 * ptr_field_E(pos_1)
 
+      ! Image charge effect from partner above the annode and below the cathode
+      force_ic_self(1:2) = 0.0d0
+      force_ic_self(3) = q_1**2*div_fac_c*0.25d0*( 1.0d0/(d - pos_1(3))**2 - 1.0d0/(pos_1(3))**2 )
+
       ! Loop over particles from i+1 to nrElec.
       ! There is no need to loop over all particles since
       ! The forces are equal but in opposite directions
@@ -156,9 +162,9 @@ contains
 
         ! Information about the particle that is acting on the particle at pos_1
         pos_2 = particles_cur_pos(:, j)
-        if (particles_mass(j) == 0.0d0) then
-          print *, 'Hi'
-        end if
+        !if (particles_mass(j) == 0.0d0) then
+        !  print *, 'Hi'
+        !end if
         im_2 = 1.0d0 / particles_mass(j)
         q_2 = particles_charge(j)
         k_2 = particles_species(j)
@@ -175,14 +181,38 @@ contains
         ! (diff / r) is a unit vector
         force_c = diff * r**(-3)
 
+        ! Calculate the effects of the image partner of particle j (2) on particle i (1)
+        pre_fac_ic = q_1*(-1.0d0*q_2) * div_fac_c ! Image charge partner will have oposite charge
+
+        ! Particle above
+        pos_ic_a = pos_2
+        pos_ic_a(3) = 2.0d0*d - pos_ic_a(3)
+
+        diff = pos_1 - pos_ic_a
+        r = NORM2(diff) + length_scale**3
+        force_ic = diff*r**(-3)
+
+        ! Particle below
+        pos_ic_b = pos_2
+        pos_ic_b(3) = -1.0d0*pos_ic_b(3)
+
+        diff = pos_1 - pos_ic_b
+        r = NORM2(diff) + length_scale**3
+        force_ic = force_ic + diff*r**(-3)
+
+        ! The image charge force of particle i on particle j is the same in the z-direction
+        ! but we reverse the x and y directions of the force due to symmetry
+        force_ic_N(1:2) = -1.0d0*force_ic(1:2)
+        force_ic_N(3)   =        force_ic(3)
+
         !$OMP CRITICAL(ACCEL_UPDATE)
-        particles_cur_accel(:, j) = particles_cur_accel(:, j) - pre_fac_c * force_c * im_2
-        particles_cur_accel(:, i) = particles_cur_accel(:, i) + pre_fac_c * force_c * im_1
+        particles_cur_accel(:, j) = particles_cur_accel(:, j) - pre_fac_c * force_c * im_2 + pre_fac_ic * force_ic_N * im_2
+        particles_cur_accel(:, i) = particles_cur_accel(:, i) + pre_fac_c * force_c * im_1 + pre_fac_ic * force_ic * im_1
         !$OMP END CRITICAL(ACCEL_UPDATE)
       end do
 
       !$OMP CRITICAL(ACCEL_UPDATE)
-      particles_cur_accel(:, i) = particles_cur_accel(:, i) + force_E * im_1
+      particles_cur_accel(:, i) = particles_cur_accel(:, i) + force_E * im_1 + force_ic_self * im_1
       !$OMP END CRITICAL(ACCEL_UPDATE)
     end do
     !$OMP END PARALLEL DO
@@ -190,17 +220,17 @@ contains
 
 
   !-----------------------------------------------------------------------------
-  ! Find field in point
-  ! Return the electric field in V/m
+  ! Find field in a point
+  ! Returns the electric field in V/m
   function Calc_Field_at(pos)
     double precision, dimension(1:3)             :: Calc_Field_at
     double precision, dimension(1:3), intent(in) :: pos
 
-    double precision, dimension(1:3) :: force_c, force_tot
-    double precision, dimension(1:3) :: pos_1, pos_2, diff
+    double precision, dimension(1:3) :: force_c, force_tot, force_ic
+    double precision, dimension(1:3) :: pos_1, pos_2, diff, pos_ic_a, pos_ic_b
     double precision                 :: r
-    double precision                 :: q_2
-    double precision                 :: pre_fac_c
+    double precision                 :: q_1, q_2
+    double precision                 :: pre_fac_c, pre_fac_ic
     integer                          :: j
 
     ! Position of the particle we are calculating the force/acceleration on
@@ -209,7 +239,7 @@ contains
     ! Electric field in the system
     force_tot = ptr_field_E(pos_1)
 
-    !$OMP PARALLEL DO PRIVATE(j, pos_2, diff, r, force_c, q_2, pre_fac_c) &
+    !$OMP PARALLEL DO PRIVATE(j, pos_2, diff, r, force_c, force_ic, q_2, pre_fac_c) &
     !$OMP& REDUCTION(+:force_tot) SCHEDULE(GUIDED)
     do j = 1, nrPart
 
@@ -229,13 +259,48 @@ contains
       ! (diff / r) is a unit vector
       force_c = diff * r**(-3)
 
-      force_tot = force_tot + pre_fac_c * force_c
+      ! Calculate the effects of the image partner of particle j on particle i
+      pre_fac_ic = (-1.0d0)*q_2 * div_fac_c
+        ! Particle above
+      pos_ic_a = pos_2
+      pos_ic_a(3) = 2.0d0*d - pos_2(3)
+
+      diff = pos_1 - pos_ic_a
+      r = NORM2(diff) + length_scale**3
+      force_ic = diff*r**(-3)
+
+      ! Particle below
+      pos_ic_b = pos_2
+      pos_ic_b(3) = -1.0d0*pos_2(3)
+
+      diff = pos_1 - pos_ic_b
+      r = NORM2(diff) + length_scale**3
+      force_ic = force_ic + diff*r**(-3)
+
+      ! The total force
+      ! The minus sign in front force_ic is because the image charge partners will
+      ! have the oposite charge
+      force_tot = force_tot + pre_fac_c * force_c + pre_fac_ic*force_ic
     end do
     !$OMP END PARALLEL DO
 
     Calc_Field_at = force_tot
 
   end function Calc_Field_at
+
+  !-----------------------------------------------------------------------------
+  ! Calculates the force due the image charge partners.
+  ! Takes into account the first image charge partner below the cathode and
+  ! the first image charge partner above the annode.
+  function Image_Charge_Force(par_pos, par_q)
+    double precision, intent(in), dimension(1:3) :: par_pos ! Position of the particle
+    double precision, intent(in)                 :: par_q ! Charge of the particle
+    double precision, dimension(1:3)             :: Image_Charge_Force ! The results
+
+    double precision, dimension(1:3)             :: ic_below, ic_above ! The image charge partner below/above the cathod/annode
+
+
+  end function Image_Charge_Force
 
 
   ! ----------------------------------------------------------------------------

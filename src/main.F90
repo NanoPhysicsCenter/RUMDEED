@@ -142,7 +142,7 @@ program VacuumMD
   call Write_Life_Time()
 #endif
 
-  print '(a)', 'Vacuum: Program finished'
+  print '(a)', 'Vacuum: Emission clean up'
   SELECT CASE (EMISSION_MODE)
   case(EMISSION_PHOTO)
     call Clean_Up_Photo_Emission()
@@ -156,7 +156,9 @@ program VacuumMD
     call Clean_Up_Field_Emission_v2()
   END SELECT
 
+  print '(a)', 'Vacuum: Final clean up'
   call Clean_up()
+  print '(a)', 'Vacuum: Program finished'
 contains
 
   subroutine PrintProgress(i)
@@ -235,6 +237,12 @@ contains
     ! steps: Number of time steps that the program will simulate
     if (steps <= 0) then
       print '(a)', 'ERROR: steps <= 0'
+      stop
+    end if
+
+    open(newunit=ud_field, iostat=IFAIL, file='field.dt', status='replace', action='write')
+    if (IFAIL /= 0) then
+      print '(a)', 'Vacuum: ERROR UNABLE TO OPEN file field.dt'
       stop
     end if
 
@@ -333,15 +341,11 @@ contains
     progress(2) = nint(0.2d0*steps)
     progress(1) = nint(0.1d0*steps)
 
-    ! call RANDOM_SEED(size = n)
-    ! allocate(my_seed(n))
-    ! if (SEED == 0) then
-    !   CALL SYSTEM_CLOCK(COUNT=clock)
-    ! else
-    !   my_seed = SEED
-    ! endif
-    ! call RANDOM_SEED(PUT = my_seed)
-    ! deallocate(my_seed)
+    !call RANDOM_SEED(size = n)
+    !allocate(my_seed(n))
+    !my_seed = SEED
+    !call RANDOM_SEED(PUT = my_seed)
+    !deallocate(my_seed)
 
     call init_random_seed()
 
@@ -545,6 +549,8 @@ contains
     flush(ud_emit)
     flush(ud_absorb)
     flush(ud_volt)
+    flush(ud_field)
+    flush(ud_debug)
 
     flush(ud_density_emit_x)
     flush(ud_density_emit_y)
@@ -647,6 +653,7 @@ contains
     close(unit=ud_ramo, iostat=IFAIL, status='keep')
     close(unit=ud_volt, iostat=IFAIL, status='keep')
     close(unit=ud_field, iostat=IFAIL, status='keep')
+    close(unit=ud_debug, iostat=IFAIL, status='keep')
 
     close(unit=ud_density_emit_x, iostat=IFAIL, status='keep')
     close(unit=ud_density_emit_y, iostat=IFAIL, status='keep')
