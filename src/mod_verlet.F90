@@ -290,17 +290,79 @@ contains
 
   !-----------------------------------------------------------------------------
   ! Calculates the force due the image charge partners.
-  ! Takes into account the first image charge partner below the cathode and
-  ! the first image charge partner above the annode.
-  function Image_Charge_Force(par_pos, par_q)
-    double precision, intent(in), dimension(1:3) :: par_pos ! Position of the particle
-    double precision, intent(in)                 :: par_q ! Charge of the particle
-    double precision, dimension(1:3)             :: Image_Charge_Force ! The results
+  ! From the old code
+  function Force_Image_charges(pos_1, pos_2)
+    double precision, dimension(1:3)             :: Force_Image_charges
+    double precision, dimension(1:3), intent(inout) :: pos_1, pos_2
+    double precision, dimension(1:3)             :: ic_pos, diff
+    double precision, dimension(1:3)             :: force
+    double precision                             :: r, r2
+    integer, parameter :: n = 2
+    integer            :: i
+    integer            :: ic_charge
 
-    double precision, dimension(1:3)             :: ic_below, ic_above ! The image charge partner below/above the cathod/annode
 
+!     ic_pos = pos_2
+!     ic_pos(3) = -1.0d0*pos_2(3)
+!     diff = pos_1 - ic_pos
 
-  end function Image_Charge_Force
+!     r2 = diff(1)**2 + diff(2)**2 + diff(3)**2 + 1.0d-22 ! Add a small value to prevent a singularity for r = 0
+!     r = sqrt(r2)
+
+!     !accel_c = accel_c - (diff/r)/(r2)
+!     force = diff/(r*r2)
+
+    ic_pos = pos_2
+    ic_pos(3) = -1.0d0*pos_2(3)
+    ic_charge = +1
+
+    diff = pos_1 - ic_pos
+    r2 = diff(1)**2 + diff(2)**2 + diff(3)**2 + 1.0d-16
+    r = sqrt(r2)
+    force = ic_charge * diff/(r*r2)
+
+    do i = 1, n
+      ! Image charges above z=d
+      ic_pos = pos_2
+      ic_pos(3) = 2.0d0*n*d - pos_2(3)
+      ic_charge = +1
+
+      diff = ic_pos - pos_1
+      r2 = diff(1)**2 + diff(2)**2 + diff(3)**2 + 1.0d-16
+      r = sqrt(r2)
+      force = force + ic_charge * diff/(r*r2)
+
+      ic_pos = pos_2
+      ic_pos(3) = 2.0d0*n*d + pos_2(3)
+      ic_charge = -1
+
+      diff = ic_pos - pos_1
+      r2 = diff(1)**2 + diff(2)**2 + diff(3)**2 + 1.0d-16
+      r = sqrt(r2)
+      force = force + ic_charge * diff/(r*r2)
+
+      !Image charges below z=0
+      ic_pos = pos_2
+      ic_pos(3) = -2.0d0*n*d + pos_2(3)
+      ic_charge = -1
+
+      diff = ic_pos - pos_1
+      r2 = diff(1)**2 + diff(2)**2 + diff(3)**2 + 1.0d-16
+      r = sqrt(r2)
+      force = force + ic_charge * diff/(r*r2)
+
+      ic_pos = pos_2
+      ic_pos(3) = -2.0d0*n*d - pos_2(3)
+      ic_charge = +1
+
+      diff = ic_pos - pos_1
+      r2 = diff(1)**2 + diff(2)**2 + diff(3)**2 + 1.0d-16
+      r = sqrt(r2)
+      force = force + ic_charge * diff/(r*r2)
+    end do
+
+    Force_Image_charges = force
+  end function Force_Image_charges
 
 
   ! ----------------------------------------------------------------------------
