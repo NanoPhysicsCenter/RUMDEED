@@ -173,7 +173,21 @@ contains
 
         ! Calculate the distance between the two particles
         diff = pos_1 - pos_2
-        r = NORM2(diff) + length_scale**3 ! Prevent singularity
+        ! There are fours ways to calculate the distance
+        ! Number 1: Use the intrinsic function NORM2(v)
+        ! Number 2: Use the equation for it sqrt( v(1)**2 + v(2)**2 + v(3)**2 )
+        ! Number 3: Or do sqrt( dot_product(v, v) )
+        ! Number 4: Or use sqrt( sum(v**2) )
+        ! It turns you number 1 is the slowest by far. Number 2, 3 and 4 are
+        ! often similar in speed. The difference is small and they fluctuate a lot,
+        ! with no clear winner.
+        !
+        ! We add a small number (length_scale**3) to the results to
+        ! prevent a singularity when calulating r**-3
+        !
+        r = sqrt( sum(diff**2) ) + length_scale**3
+        !r = sqrt( dot_product(diff, diff) ) + length_scale**3
+        !r = NORM2(diff) + length_scale**3
 
         ! Calculate the Coulomb force
         ! F = (r_1 - r_2) / |r_1 - r_2|^3
@@ -189,7 +203,9 @@ contains
         pos_ic_a(3) = 2.0d0*d - pos_ic_a(3)
 
         diff = pos_1 - pos_ic_a
-        r = NORM2(diff) + length_scale**3
+        r = sqrt( sum(diff**2) ) + length_scale**3
+        !r = sqrt( dot_product(diff, diff) ) + length_scale**3
+        !r = NORM2(diff) + length_scale**3
         force_ic = diff*r**(-3)
 
         ! Particle below
@@ -197,7 +213,9 @@ contains
         pos_ic_b(3) = -1.0d0*pos_ic_b(3)
 
         diff = pos_1 - pos_ic_b
-        r = NORM2(diff) + length_scale**3
+        r = sqrt( sum(diff**2) ) + length_scale**3
+        !r = sqrt( dot_product(diff, diff) ) + length_scale**3
+        !r = NORM2(diff) + length_scale**3
         force_ic = force_ic + diff*r**(-3)
 
         ! The image charge force of particle i on particle j is the same in the z-direction
@@ -251,7 +269,9 @@ contains
 
       ! Calculate the distance between the two particles
       diff = pos_1 - pos_2
-      r = NORM2(diff) + length_scale**3 ! distance + Prevent singularity
+      r = sqrt( sum(diff**2) ) + length_scale**3
+      !r = sqrt( dot_product(diff, diff) ) + length_scale**3
+      !r = NORM2(diff) + length_scale**3 ! distance + Prevent singularity
 
       ! Calculate the Coulomb force
       ! F = (r_1 - r_2) / |r_1 - r_2|^3
@@ -266,7 +286,9 @@ contains
       pos_ic_a(3) = 2.0d0*d - pos_2(3)
 
       diff = pos_1 - pos_ic_a
-      r = NORM2(diff) + length_scale**3
+      r = sqrt( sum(diff**2) ) + length_scale**3
+      !r = sqrt( dot_product(diff, diff) ) + length_scale**3
+      !r = NORM2(diff) + length_scale**3
       force_ic = diff*r**(-3)
 
       ! Particle below
@@ -274,7 +296,9 @@ contains
       pos_ic_b(3) = -1.0d0*pos_2(3)
 
       diff = pos_1 - pos_ic_b
-      r = NORM2(diff) + length_scale**3
+      r = sqrt( sum(diff**2) ) + length_scale**3
+      !r = sqrt( dot_product(diff, diff) ) + length_scale**3
+      !r = NORM2(diff) + length_scale**3
       force_ic = force_ic + diff*r**(-3)
 
       ! The total force
