@@ -152,8 +152,28 @@ contains
       force_E = q_1 * ptr_field_E(pos_1)
 
       ! Image charge effect from partner above the annode and below the cathode
-      force_ic_self(1:2) = 0.0d0
-      force_ic_self(3) = q_1**2*div_fac_c*0.25d0*( 1.0d0/(d - pos_1(3))**2 - 1.0d0/(pos_1(3))**2 )
+      pre_fac_ic = q_1*(-1.0d0*q_1) * div_fac_c ! Image charge partner will have oposite charge
+
+      ! Above
+      pos_ic_a = pos_1
+      pos_ic_a(3) = 2.0d0*d - pos_ic_a(3) ! Change the z-position
+      diff = pos_1 - pos_ic_a
+      !r = sqrt( dot_product(diff, diff) ) + length_scale**3
+      !r = NORM2(diff) + length_scale**3
+      r = sqrt( sum(diff**2) ) + length_scale**3
+      force_ic_self = diff*r**(-3)
+
+      ! Below
+      pos_ic_b = pos_1
+      pos_ic_b(3) = -1.0d0*pos_ic_b(3) ! Change the z-position
+      diff = pos_1 - pos_ic_b
+      r = sqrt( sum(diff**2) ) + length_scale**3
+      !r = sqrt( dot_product(diff, diff) ) + length_scale**3
+      !r = NORM2(diff) + length_scale**3
+      force_ic_self = pre_fac_ic*(force_ic_self + diff*r**(-3))
+
+      !force_ic_self(1:2) = 0.0d0
+      !force_ic_self(3) = q_1**2*div_fac_c*0.25d0*( 1.0d0/(d - pos_1(3))**2 - 1.0d0/(pos_1(3))**2 )
 
       ! Loop over particles from i+1 to nrElec.
       ! There is no need to loop over all particles since
@@ -221,7 +241,7 @@ contains
         ! The image charge force of particle i on particle j is the same in the z-direction
         ! but we reverse the x and y directions of the force due to symmetry
         force_ic_N(1:2) = -1.0d0*force_ic(1:2)
-        force_ic_N(3)   =        force_ic(3)
+        force_ic_N(3)   = +1.0d0*force_ic(3)
 
         !$OMP CRITICAL(ACCEL_UPDATE)
         particles_cur_accel(:, j) = particles_cur_accel(:, j) - pre_fac_c * force_c * im_2 + pre_fac_ic * force_ic_N * im_2
@@ -257,7 +277,7 @@ contains
     ! Electric field in the system
     force_tot = ptr_field_E(pos_1)
 
-    !$OMP PARALLEL DO PRIVATE(j, pos_2, diff, r, force_c, force_ic, q_2, pre_fac_c) &
+    !$OMP PARALLEL DO PRIVATE(j, pos_2, pos_ic_a, pos_ic_b, diff, r, force_c, force_ic, q_2, pre_fac_c, pre_fac_ic) &
     !$OMP& REDUCTION(+:force_tot) SCHEDULE(GUIDED)
     do j = 1, nrPart
 
@@ -282,7 +302,7 @@ contains
       ! Calculate the effects of the image partner of particle j on particle i
       pre_fac_ic = (-1.0d0)*q_2 * div_fac_c
         ! Particle above
-      pos_ic_a = pos_2
+      pos_ic_a(1:2) = pos_2(1:2)
       pos_ic_a(3) = 2.0d0*d - pos_2(3)
 
       diff = pos_1 - pos_ic_a
@@ -292,7 +312,7 @@ contains
       force_ic = diff*r**(-3)
 
       ! Particle below
-      pos_ic_b = pos_2
+      pos_ic_b(1:2) = pos_2(1:2)
       pos_ic_b(3) = -1.0d0*pos_2(3)
 
       diff = pos_1 - pos_ic_b

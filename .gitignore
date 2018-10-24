@@ -6,5 +6,6 @@ __genmod.f90
 *.bin
 *.dt
 *.mp4
+*.swp
 input
 run.sh

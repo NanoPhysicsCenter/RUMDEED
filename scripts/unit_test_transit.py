@@ -10,7 +10,6 @@ epsilon_0 = 1.0/(mu_0 * c**2) # Vacuum permittivity (F/m)
 m_0 = 9.10938356E-31 # Free electron mass (kg)
 q_0 = 1.6021766208E-19 # Standard charge (C)
 
-
 # Scale factors
 time_scale = 1.0E-12
 length_scale = 1.0E-9

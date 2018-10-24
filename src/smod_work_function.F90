@@ -34,7 +34,7 @@ contains
     w_theta_constant = 2.0d0
 
     if (present(sec) .eqv. .true.) then
-      sec = 0
+      sec = 1
     end if
   end function w_theta_constant
 
@@ -54,7 +54,7 @@ contains
 
     w_theta_gaussian = 4.70d0 + A*exp( -1.0d0*( (x-x_c)**2/(2*B**2) + (y-y_c)**2/(2*B**2) ) )
     if (present(sec) .eqv. .true.) then
-      sec = 0
+      sec = 1
     end if
   end function w_theta_gaussian
 
@@ -78,12 +78,12 @@ contains
     if (x > y) then
       w_theta_triangle = 4.7d0 !+ A*exp( -1.0d0*( (x-x_c)**2 + (y-y_c)**2 )/(2.0d0*B**2) )
       if (present(sec) .eqv. .true.) then
-        sec = 0
+        sec = 1
       end if
     else
       w_theta_triangle = 4.5d0
       if (present(sec) .eqv. .true.) then
-        sec = 1
+        sec = 2
       end if
     end if
   end function w_theta_triangle
@@ -122,12 +122,8 @@ contains
     w_theta_arr(4, 1:4) = (/ 4.65d0, 4.65d0, 4.65d0, 4.65d0 /)
 
     ! Scale x, y to unit square
-#if defined(__PGI)
-    pos_scaled(1) = (pos(1) - emitters_pos(1, emit)) / emitters_dim(1, emit)
-    pos_scaled(2) = (pos(2) - emitters_pos(2, emit)) / emitters_dim(2, emit)
-#else
     pos_scaled(:) = (pos(:) - emitters_pos(:, emit)) / emitters_dim(:, emit)
-#endif
+
     x = pos_scaled(1)
     y = pos_scaled(2)
 
@@ -169,7 +165,6 @@ contains
     ! Return the results
     w_theta_checkerboard = w_theta_arr(y_i, x_i)
 
-
   end function w_theta_checkerboard
 
   double precision function w_theta_checkerboard_2x2(pos, sec)
@@ -180,12 +175,8 @@ contains
     integer, parameter                           :: emit = 1
 
     ! Scale x, y to unit square
-#if defined(__PGI)
-    pos_scaled(1) = (pos(1) - emitters_pos(1, emit)) / emitters_dim(1, emit)
-    pos_scaled(2) = (pos(2) - emitters_pos(2, emit)) / emitters_dim(2, emit)
-#else
     pos_scaled(:) = (pos(:) - emitters_pos(:, emit)) / emitters_dim(:, emit)
-#endif
+
     x = pos_scaled(1)
     y = pos_scaled(2)
 
@@ -216,7 +207,7 @@ contains
     end if
 
     if (present(sec) .eqv. .true.) then
-      sec = 0
+      sec = 1
     end if
   end function w_theta_checkerboard_2x2
 

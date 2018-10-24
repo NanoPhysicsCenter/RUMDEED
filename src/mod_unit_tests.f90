@@ -97,12 +97,17 @@ contains
   ! Calculate Acceleration subroutine. The two are then compared to see if the
   ! optimizations and the OpenMP are working correctly.
   subroutine Test_Acceleration()
-    double precision, dimension(1:3) :: R_1, R_2, R_3
+    double precision, dimension(1:3) :: R_1, R_1a, R_1b
+    double precision, dimension(1:3) :: R_2, R_2a, R_2b
+    double precision, dimension(1:3) :: R_3, R_3a, R_3b
     double precision, dimension(1:3) :: E_test, par_vel, E_pos, E_python
 
     double precision, dimension(1:3) :: a_1, a_12, a_13, a_1E, a_1_res
     double precision, dimension(1:3) :: a_2, a_21, a_23, a_2E, a_2_res
     double precision, dimension(1:3) :: a_3, a_31, a_32, a_3E, a_3_res
+    double precision, dimension(1:3) :: a_11a, a_11b, a_12a, a_12b, a_13a, a_13b
+    double precision, dimension(1:3) :: a_21a, a_21b, a_22a, a_22b, a_23a, a_23b
+    double precision, dimension(1:3) :: a_31a, a_31b, a_32a, a_32b, a_33a, a_33b
 
     double precision, parameter      :: d_test = 100.0d0*length_scale
     double precision, parameter      :: V_test = 2.0d0 ! V
@@ -115,32 +120,107 @@ contains
     ! are private for each thread and are NOT shared.
     print *, 'Running test for acceleration'
 
-    R_1 = (/  3.0d0, -10.0d0, 101.0d0 /) * length_scale
-    R_3 = (/  6.0d0, -24.0d0, 118.0d0 /) * length_scale
-    R_2 = (/ -9.0d0,  26.0d0,  80.0d0 /) * length_scale
-
+    ! Electric field in the system
     E_test = (/ 0.0d0, 0.0d0, -1.0d0*V_test/d_test /)
 
-    ! Particle 1
-    a_12 = +1.0d0*pre_fac_c_test * (R_1 - R_2) / norm2(R_1 - R_2)**3
-    a_13 = -1.0d0*pre_fac_c_test * (R_1 - R_3) / norm2(R_1 - R_3)**3
-    a_1E = -1.0d0*pre_fac_E_test * E_test
+    !--------------------------------------------------------------------------
+    ! Location of particles
+    R_1 = (/  3.0d0, -10.0d0, 2.0d0 /) * length_scale
+    R_2 = (/ -9.0d0,  26.0d0, 80.0d0 /) * length_scale
+    R_3 = (/  6.0d0, -24.0d0, 56.53d0 /) * length_scale
 
-    a_1 = a_12 + a_13 + a_1E
+    ! Location of image charge partners
+    ! Particle 1
+    ! Above (Charge: Positive)
+    R_1a = R_1
+    R_1a(3) = 2.0d0*d_test - R_1a(3)
+
+    ! Below (Charge: Positive)
+    R_1b = R_1
+    R_1b(3) = -1.0d0*R_1b(3)
 
     ! Particle 2
-    a_21 = +1.0d0*pre_fac_c_test * (R_2 - R_1) / norm2(R_2 - R_1)**3
-    a_23 = -1.0d0*pre_fac_c_test * (R_2 - R_3) / norm2(R_2 - R_3)**3
-    a_2E = -1.0d0*pre_fac_E_test * E_test
+    ! Above (Charge: Positive)
+    R_2a = R_2
+    R_2a(3) = 2.0d0*d_test - R_2a(3)
 
-    a_2 = a_21 + a_23 + a_2E
+    ! Below (Charge: Positive)
+    R_2b = R_2
+    R_2b(3) = -1.0d0*R_2b(3)
 
     ! Particle 3
-    a_31 = -1.0d0*pre_fac_c_test * (R_3 - R_1) / norm2(R_3 - R_1)**3
-    a_32 = -1.0d0*pre_fac_c_test * (R_3 - R_2) / norm2(R_3 - R_2)**3
+    ! Above (Charge: Negative)
+    R_3a = R_3
+    R_3a(3) = 2.0d0*d_test - R_3a(3)
+
+    ! Below (Charge: Negative)
+    R_3b = R_3
+    R_3b(3) = -1.0d0*R_3b(3)
+
+    !--------------------------------------------------------------------------
+    ! Calculate the acceleration
+    ! Particle 1
+    ! Acceleration from other particles
+    a_12  = +1.0d0*pre_fac_c_test * (R_1 - R_2) / norm2(R_1 - R_2)**3
+    a_13  = -1.0d0*pre_fac_c_test * (R_1 - R_3) / norm2(R_1 - R_3)**3
+
+    ! Acceleration from image charge partners
+    ! Self (-q*+q = -q**2)
+    a_11a = -1.0d0*pre_fac_c_test * (R_1 - R_1a) / norm2(R_1 - R_1a)**3
+    a_11b = -1.0d0*pre_fac_c_test * (R_1 - R_1b) / norm2(R_1 - R_1b)**3
+    ! Other electron (-q*+q = -q**2)
+    a_12a = -1.0d0*pre_fac_c_test * (R_1 - R_2a) / norm2(R_1 - R_2a)**3
+    a_12b = -1.0d0*pre_fac_c_test * (R_1 - R_2b) / norm2(R_1 - R_2b)**3
+    ! Other hole (-q*-q = +q**2)
+    a_13a = +1.0d0*pre_fac_c_test * (R_1 - R_3a) / norm2(R_1 - R_3a)**3
+    a_13b = +1.0d0*pre_fac_c_test * (R_1 - R_3b) / norm2(R_1 - R_3b)**3
+
+    ! Acceleration from the electric field in the diode
+    a_1E = -1.0d0*pre_fac_E_test * E_test
+
+    a_1 = a_12 + a_13 + a_11a + a_11b + a_12a + a_12b + a_13a + a_13b + a_1E
+
+    ! Particle 2
+    ! Acceleration from other particles
+    a_21  = +1.0d0*pre_fac_c_test * (R_2 - R_1) / norm2(R_2 - R_1)**3
+    a_23  = -1.0d0*pre_fac_c_test * (R_2 - R_3) / norm2(R_2 - R_3)**3
+
+    ! Acceleration from image charge partners
+    ! Other electron (-q*+q = -q**2)
+    a_21a = -1.0d0*pre_fac_c_test * (R_2 - R_1a) / norm2(R_2 - R_1a)**3
+    a_21b = -1.0d0*pre_fac_c_test * (R_2 - R_1b) / norm2(R_2 - R_1b)**3
+    ! Self (-q*+q = -q**2)
+    a_22a = -1.0d0*pre_fac_c_test * (R_2 - R_2a) / norm2(R_2 - R_2a)**3
+    a_22b = -1.0d0*pre_fac_c_test * (R_2 - R_2b) / norm2(R_2 - R_2b)**3
+    ! Other hole (-q*-q = +q**2)
+    a_23a = +1.0d0*pre_fac_c_test * (R_2 - R_3a) / norm2(R_2 - R_3a)**3
+    a_23b = +1.0d0*pre_fac_c_test * (R_2 - R_3b) / norm2(R_2 - R_3b)**3
+
+    ! Acceleration from the electric field in the diode
+    a_2E = -1.0d0*pre_fac_E_test * E_test
+
+    a_2 = a_21 + a_23 + a_21a + a_21b + a_22a + a_22b + a_23a + a_23b + a_2E
+
+    ! Particle 3
+    ! Acceleration from other particles
+    a_31  = -1.0d0*pre_fac_c_test * (R_3 - R_1) / norm2(R_3 - R_1)**3
+    a_32  = -1.0d0*pre_fac_c_test * (R_3 - R_2) / norm2(R_3 - R_2)**3
+
+    ! Acceleration from image charge partners
+    ! Other electron (+q*+q = +q**2)
+    a_31a = +1.0*pre_fac_c_test * (R_3 - R_1a) / norm2(R_3 - R_1a)**3
+    a_31b = +1.0*pre_fac_c_test * (R_3 - R_1b) / norm2(R_3 - R_1b)**3
+    ! Other electron (+q*+q = +q**2) 
+    a_32a = +1.0*pre_fac_c_test * (R_3 - R_2a) / norm2(R_3 - R_2a)**3
+    a_32b = +1.0*pre_fac_c_test * (R_3 - R_2b) / norm2(R_3 - R_2b)**3
+    ! Self (+q*-q = -q**2) 
+    a_33a = -1.0*pre_fac_c_test * (R_3 - R_3a) / norm2(R_3 - R_3a)**3
+    a_33b = -1.0*pre_fac_c_test * (R_3 - R_3b) / norm2(R_3 - R_3b)**3
+
+    ! Acceleration from the electric field in the diode
     a_3E = +1.0d0*pre_fac_E_test * E_test
 
-    a_3 = a_31 + a_32 + a_3E
+    a_3 = a_31 + a_32 + a_31a + a_31b + a_32a + a_32b + a_33a + a_33b + a_3E
 
     ! Set input variables
     call Setup_Test_System(d_test, delta_t_test, 100, V_test)
@@ -153,9 +233,11 @@ contains
 
     call Calculate_Acceleration_Particles()
 
+    ! Test the field at this location
     par_vel = (/ -4.55, -2.34, 96.44 /) * length_scale
     E_pos = Calc_Field_at(par_vel)
 
+    ! Results from the acceleration
     a_1_res = particles_cur_accel(:, 1)
     a_2_res = particles_cur_accel(:, 2)
     a_3_res = particles_cur_accel(:, 3)
@@ -192,7 +274,8 @@ contains
       print *, ''
     end if
 
-    E_python = (/ 6192429.94450208d0,  -4866704.16373579d0, -17454923.69763095d0 /) ! Results from Python script
+    !E_python = (/ 6192429.94450208d0,  -4866704.16373579d0, -17454923.69763095d0 /) ! Results from Python script (no image charge)
+    E_python = (/ -102526.05673208d0, 421022.84663293d0, -20456407.74487634d0 /)
     if (all(abs(E_python - E_pos)/E_python < tolerance)) then
       print *, 'Electric field PASSED'
     else
@@ -215,8 +298,8 @@ contains
   ! pass before the electron is absorbed. This test is to see if the
   ! Verlet algorithm is working properly.
   subroutine Test_Transit_Time()
-    double precision, parameter      :: d_test = 100.0d0*length_scale
-    double precision, parameter      :: V_test = 2.0d0 ! V
+    double precision, parameter      :: d_test = 1000.0d0*length_scale
+    double precision, parameter      :: V_test = 2.0d3 ! V
     double precision, parameter      :: delta_t_test = 0.25d-15 ! Time step
 
     double precision                 :: time_exp ! Expected time
@@ -237,11 +320,11 @@ contains
     steps_exp = ceiling(time_exp / delta_t_test)
 
     ! Set input variables
-    call Setup_Test_System(d_test, delta_t_test, 1000, V_test)
+    call Setup_Test_System(d_test, delta_t_test, steps_exp+1000, V_test)
 
     ! Add particle
     par_vel = 0.0d0
-    call Add_Particle(R_1, par_vel, species_elec, 1, 0)
+    call Add_Particle(R_1, par_vel, species_elec, 1, 1)
 
     do i = 1, steps
 
@@ -273,10 +356,15 @@ contains
       end do
 
       print *, 'Transite time = ', steps_res
-      if (steps_res == steps_exp) then
+      print *, 'Exptected time = ', steps_exp
+      if (abs(steps_exp - steps_res)/steps_exp < 0.01) then
+      !if (steps_res == steps_exp) then
         print *, 'Transite time test PASSED'
+        print *, 'Difference was less than 1% or ', abs(steps_res - steps_exp)
       else
         print *, 'Transite time test FAILED'
+        print *, 'Expected = ', steps_exp
+        print *, 'Results = ', steps_res
       end if
 
       print *, 'Transit time test finished'

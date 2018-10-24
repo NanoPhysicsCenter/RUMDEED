@@ -67,7 +67,7 @@ print(a_2)
 print('')
 
 
-# Acceleration particles 2 -----------------------------------------------------
+# Acceleration particles 3 -----------------------------------------------------
 a_31 = -1.0*pre_fac_c * (R_3 - R_1) / np.linalg.norm(R_3 - R_1)**3
 a_32 = -1.0*pre_fac_c * (R_3 - R_2) / np.linalg.norm(R_3 - R_2)**3
 a_3E = +1.0*pre_fac_E * E

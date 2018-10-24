@@ -35,8 +35,8 @@ endif
 # ifeq ($(FCOMPILER),gfortran)
 ifneq (,$(findstring gfortran,$(FCOMPILER)))
 $(info Using GNU Fortran)
-FFLAGS=-Ofast -m64 -flto -march=native
-#FFLAGS=-g -fcheck=all -Wall -fbacktrace -ffpe-trap=zero,overflow,underflow,denormal
+#FFLAGS=-Ofast -m64 -flto -march=native
+FFLAGS=-g -fcheck=all -Wall -fbacktrace -ffpe-trap=zero,overflow,underflow,denormal
 ifdef OPENMP
 FFLAGS+=-fopenmp
 endif
@@ -52,9 +52,9 @@ FFLAGS+=-mp
 endif
 endif
 
-#ifdef UNIT_TEST
-#FFLAGS+=-D_UNIT_TEST_
-#endif
+ifdef UNIT_TEST
+FFLAGS+=-D_UNIT_TEST_
+endif
 
 # Name of the output file
 PROJECT_NAME=Vacuum-MD
