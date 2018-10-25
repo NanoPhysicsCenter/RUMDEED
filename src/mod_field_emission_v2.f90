@@ -143,7 +143,7 @@ contains
     double precision, dimension(1:3) :: par_pos, par_vel
 
     call Do_Surface_Integration(emit, N_sup)
-    call Calc_Field_old_method(step, emit)
+    !call Calc_Field_old_method(step, emit)
 
     !print *, 'V_2'
     !print *, N_sup_db

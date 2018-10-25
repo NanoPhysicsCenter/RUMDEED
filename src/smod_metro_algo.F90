@@ -5,6 +5,7 @@
 ! 21.10.18                                  !
 !-------------------------------------------!
 submodule (mod_field_emission_v2) smod_metro_algo
+use ziggurat
 
 contains
   !-----------------------------------------------------------------------------
@@ -21,11 +22,12 @@ contains
     double precision, dimension(1:3) :: cur_pos, new_pos, field
     double precision                 :: df_cur, df_new
 
-    std = (emitters_dim(1, emit)*0.05d0 + emitters_dim(2, emit)*0.05d0) / (2.0d0)
+    std = (emitters_dim(1, emit)*0.05d0 + emitters_dim(2, emit)*0.05d0) / 2.0d0
 
-    ! Get a random position on the surface
+    ! Get a random initial position on the surface.
+    ! We pick this location from a uniform distribution.
     count = 0
-    do ! Infinite loop
+    do ! Infinite loop, we try to find a favourable position to start from
       CALL RANDOM_NUMBER(cur_pos(1:2))
       cur_pos(1:2) = cur_pos(1:2)*emitters_dim(1:2, emit) + emitters_pos(1:2, emit)
       cur_pos(3) = 0.0d0 ! On the surface
@@ -33,7 +35,7 @@ contains
       ! Calculate the electric field at this position
       field = Calc_Field_at(cur_pos)
       if (field(3) < 0.0d0) then
-        exit ! The loop is infinite
+        exit ! We found a nice spot so we exit the infinite loop
       else
         count = count + 1
         if (count > 1000) exit ! The loop is infnite, must stop it at some point
@@ -54,19 +56,19 @@ contains
     ! current location. We do this ndim times.
     do i = 1, ndim
       ! Find a new position
-      new_pos(1:2) = cur_pos(1:2) + box_muller(0.0d0, std)
+      !new_pos(1:2) = cur_pos(1:2) + box_muller(0.0d0, std)
+      new_pos(1:2) = cur_pos(1:2) + ziggurat_normal(0.0d0, std)
 
       ! Make sure that the new position is within the limits of the emitter area.
       call check_limits_metro_rec(new_pos, emit)
 
       ! Calculate the field at the new position
       field = Calc_Field_at(new_pos)
-      F_out = field(3)
 
       ! Check if the field is favourable for emission at the new position.
       ! If it is not then cycle, i.e. we reject this location and
       ! pick another one.
-      if (field(3) > 0.0d0) cycle ! Do the next loop iteration
+      if (field(3) > 0.0d0) cycle ! Do the next loop iteration, i.e. find a new position.
 
       ! Calculate the escape probability at the new position, to compair with
       ! the current position.
@@ -83,6 +85,7 @@ contains
         alpha = df_new / df_cur
 
         CALL RANDOM_NUMBER(rnd)
+        ! Jump to this position with probability alpha, i.e. if rnd is less than alpha
         if (rnd < alpha) then
           cur_pos = new_pos ! New position becomes the current position
           df_cur = df_new
@@ -97,7 +100,7 @@ contains
   end function Metropolis_Hastings_rectangle_v2
 
   ! ----------------------------------------------------------------------------
-  !
+  ! Checks the limits of the rectangular region of the emitter
   subroutine check_limits_metro_rec(par_pos, emit)
     double precision, dimension(1:3), intent(inout) :: par_pos
     integer, intent(in)                             :: emit
@@ -153,5 +156,19 @@ contains
       end if
     end if
   end subroutine check_limits_metro_rec
+
+  ! ----------------------------------------------------------------------------
+  ! Generate random numbers using the Ziggurat method.
+  ! Normal distributed random numbers.
+  ! This is faster than the Box-Muller.
+  function ziggurat_normal(mean, std)
+    double precision, intent(in)     :: mean, std
+    double precision, dimension(1:2) :: ziggurat_normal
+
+    ziggurat_normal(1) = rnor()
+    ziggurat_normal(2) = rnor()
+
+    ziggurat_normal = mean + std*ziggurat_normal
+  end function ziggurat_normal
 
 end submodule smod_metro_algo

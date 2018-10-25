@@ -1,3 +1,7 @@
+!
+! Kristinn Torfason
+! Vacuum electronics molecular dynamics simulations
+!
 program VacuumMD
   use iso_fortran_env
 #if defined(_OPENMP)
@@ -13,6 +17,9 @@ program VacuumMD
   !use mod_therminoic_emission
   use mod_pair
   use mod_unit_tests
+#if defined(__INTEL_COMPILER)
+  use IFPORT ! Needed for getpid()
+#endif
   implicit none
 
   integer :: i, nthreads
