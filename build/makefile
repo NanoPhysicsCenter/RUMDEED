@@ -5,9 +5,11 @@
 # Compiler to use
 ifndef FCOMPILER
 #FCOMPILER=ifort
-FCOMPILER=gfortran
+FCOMPILER=gfortran-8
 #FCOMPILER=pgfortran
 endif
+
+CUBA_LIB=/home/kristor/software/cuba-4.2/lib/libcuba.a
 
 #UNIT_TEST = 1
 OPENMP = 1
@@ -78,8 +80,7 @@ $(PROJECT_NAME).out: ../src/main.F90 mod_global.mod mod_global.o \
 			mod_unit_tests.o mod_photo_emission.o mod_field_emission.o mod_field_emission_v2.o \
 			mod_field_emission_tip.o mod_hyperboloid_tip.o mod_field_emission_2D.o \
 			smod_work_function.o smod_mc_integration.o smod_metro_algo.o mod_ziggurat.o \
-			/home/kristor/software/cuba-4.2/lib/libcuba.a \
-			-lpthread -lm -ldl -o $(PROJECT_NAME).out
+			$(CUBA_LIB) -lpthread -lm -ldl -o $(PROJECT_NAME).out
 
 mod_global.mod mod_global.o: ../src/mod_global.F90
 		$(FCOMPILER) -c $(FFLAGS) ../src/mod_global.F90

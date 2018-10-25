@@ -18,11 +18,14 @@ contains
     double precision, dimension(1:3) :: Metropolis_Hastings_rectangle_v2 ! The interface is declared in the parent module
 #endif
     integer                          :: count, i
-    double precision                 :: std, rnd, alpha
+    double precision                 :: rnd, alpha
+    double precision, dimension(1:2) :: std
     double precision, dimension(1:3) :: cur_pos, new_pos, field
     double precision                 :: df_cur, df_new
 
-    std = (emitters_dim(1, emit)*0.05d0 + emitters_dim(2, emit)*0.05d0) / 2.0d0
+    !std = (emitters_dim(1, emit)*0.05d0 + emitters_dim(2, emit)*0.05d0) / 2.0d0
+    std(:) = emitters_dim(:, emit)*0.025d0 ! Standard deviation is 2.5% of the emitter length.
+                                           ! This means that 68% of jumps are less than this value.
 
     ! Get a random initial position on the surface.
     ! We pick this location from a uniform distribution.
@@ -55,9 +58,9 @@ contains
     ! We now pick a random distance and direction to jump to from our
     ! current location. We do this ndim times.
     do i = 1, ndim
-      ! Find a new position
+      ! Find a new position using a normal distribution.
+      new_pos(1:2) = ziggurat_normal(cur_pos(1:2), std)
       !new_pos(1:2) = cur_pos(1:2) + box_muller(0.0d0, std)
-      new_pos(1:2) = cur_pos(1:2) + ziggurat_normal(0.0d0, std)
 
       ! Make sure that the new position is within the limits of the emitter area.
       call check_limits_metro_rec(new_pos, emit)
@@ -162,13 +165,14 @@ contains
   ! Normal distributed random numbers.
   ! This is faster than the Box-Muller.
   function ziggurat_normal(mean, std)
-    double precision, intent(in)     :: mean, std
-    double precision, dimension(1:2) :: ziggurat_normal
+    double precision, intent(in), dimension(1:2) :: mean
+    double precision, intent(in), dimension(1:2) :: std
+    double precision, dimension(1:2)             :: ziggurat_normal
 
     ziggurat_normal(1) = rnor()
     ziggurat_normal(2) = rnor()
 
-    ziggurat_normal = mean + std*ziggurat_normal
+    ziggurat_normal(:) = mean(:) + std(:)*ziggurat_normal(:)
   end function ziggurat_normal
 
 end submodule smod_metro_algo
