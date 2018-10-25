@@ -9,6 +9,7 @@ Module mod_field_emission_v2
   use mod_global
   use mod_verlet
   use mod_pair
+  use ziggurat
   implicit none
 
   PRIVATE
@@ -43,9 +44,6 @@ Module mod_field_emission_v2
 
   ! Constant used in MC integration (function Elec_Supply_V2)
   double precision :: time_step_div_q0
-
-  ! Use image Charge or not
-  logical, parameter          :: image_charge = .true.
 
   interface 
       ! Interface for the work function submodule
@@ -85,6 +83,9 @@ contains
 
     ! Parameters used in the module
     time_step_div_q0 = time_step / q_0
+
+    ! Initialize the Ziggurat algorithm
+    call zigset(my_seed(1))
   end subroutine Init_Field_Emission_v2
 
   subroutine Clean_Up_Field_Emission_v2()

@@ -41,7 +41,7 @@ Module mod_field_emission
   double precision, parameter :: w_theta = 2.0d0
 
   ! Use image Charge or not
-  logical, parameter          :: image_charge = .true.
+  !logical, parameter          :: image_charge = .true.
 
 contains
   !-----------------------------------------------------------------------------

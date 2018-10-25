@@ -19,8 +19,7 @@ MODULE Ziggurat
 
    PRIVATE
 
-   !INTEGER,  PARAMETER  ::  DP=SELECTED_REAL_KIND( 12, 60 )
-   INTEGER,  PARAMETER  ::  DP=KIND( 1.0d0 )
+   INTEGER,  PARAMETER  ::  DP=SELECTED_REAL_KIND( 12, 60 )
    REAL(DP), PARAMETER  ::  m1=2147483648.0_DP,   m2=2147483648.0_DP,      &
                             half=0.5_DP
    REAL(DP)             ::  dn=3.442619855899_DP, tn=3.442619855899_DP,    &
@@ -103,12 +102,7 @@ END FUNCTION shr3
 FUNCTION uni( ) RESULT( fn_val )
    REAL(DP)  ::  fn_val
 
-   !fn_val = half + 0.2328306e-9_DP * shr3( )
-
-   ! Swapp this out for the random number generator in Fortran.
-   ! Then we don't have to call the zigset function before we use
-   ! the rnor function. We have already set a seed for the rng in Fortran.
-   call RANDOM_NUMBER( fn_val )
+   fn_val = half + 0.2328306e-9_DP * shr3( )
    RETURN
 END FUNCTION uni
 

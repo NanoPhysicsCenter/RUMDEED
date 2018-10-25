@@ -503,7 +503,7 @@ contains
   ! https://gcc.gnu.org/onlinedocs/gcc-4.7.4/gfortran/RANDOM_005fSEED.html
   subroutine init_random_seed()
     implicit none
-    integer, allocatable :: my_seed(:)
+    !integer, allocatable :: my_seed(:)
     integer :: i, n, un, istat, dt(8), pid, t(2), s
     integer(8) :: count, tms
   
@@ -695,6 +695,8 @@ contains
 
     deallocate(density_map_elec)
     deallocate(density_map_hole)
+
+    deallocate(my_seed)
 
     !Dipole arrays
     !deallocate(dipoles_theta)

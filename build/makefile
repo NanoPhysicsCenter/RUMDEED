@@ -100,7 +100,7 @@ mod_photo_emission.mod mod_photo_emission.o: ../src/mod_photo_emission.f90 mod_g
 mod_field_emission.mod mod_field_emission.o: ../src/mod_field_emission.f90 mod_global.mod mod_verlet.mod mod_pair.mod
 		$(FCOMPILER) -c $(FFLAGS) ../src/mod_field_emission.f90
 
-mod_field_emission_v2.mod mod_field_emission_v2.o: ../src/mod_field_emission_v2.f90 mod_global.mod mod_verlet.mod mod_pair.mod
+mod_field_emission_v2.mod mod_field_emission_v2.o: ../src/mod_field_emission_v2.f90 mod_global.mod mod_verlet.mod mod_pair.mod ziggurat.mod
 		$(FCOMPILER) -c $(FFLAGS) ../src/mod_field_emission_v2.f90
 
 mod_field_emission_2D.mod mod_field_emission_2D.o: ../src/mod_field_emission_2D.f90 mod_global.mod mod_verlet.mod mod_pair.mod
@@ -121,7 +121,7 @@ mod_field_emission_v2@smod_work_function.smod smod_work_function.o: ../src/smod_
 mod_field_emission_v2@smod_mc_integration.smod smod_mc_integration.o: ../src/smod_mc_integration.F90 mod_field_emission_v2.mod
 		$(FCOMPILER) -c $(FFLAGS) ../src/smod_mc_integration.F90
 
-mod_field_emission_v2@smod_metro_algo.smod smod_metro_algo.o: ../src/smod_metro_algo.F90 mod_field_emission_v2.mod ziggurat.mod
+mod_field_emission_v2@smod_metro_algo.smod smod_metro_algo.o: ../src/smod_metro_algo.F90 mod_field_emission_v2.mod
 		$(FCOMPILER) -c $(FFLAGS) ../src/smod_metro_algo.F90
 
 ziggurat.o ziggurat.mod: ../src/mod_ziggurat.f90

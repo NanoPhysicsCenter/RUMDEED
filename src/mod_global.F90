@@ -190,7 +190,8 @@ module mod_global
 
   integer            :: EMISSION_MODE           ! Parameter that defines the emission mode
 
-
+  ! Use image Charge or not
+  logical, parameter          :: image_charge = .true.
 
   ! ----------------------------------------------------------------------------
   ! Define run time constants
@@ -201,6 +202,7 @@ module mod_global
   ! Parameters for random number generators
   ! http://en.wikipedia.org/wiki/Mersenne_Twister#SFMT
   !integer                                            :: SEED = 2815
+  integer, allocatable :: my_seed(:)
 
 
   ! ----------------------------------------------------------------------------

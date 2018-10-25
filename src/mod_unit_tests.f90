@@ -393,7 +393,7 @@ contains
     open(newunit=ud_data, iostat=IFAIL, file='rand_pos_init.dt', status='OLD', action='read')
     if (IFAIL /= 0) then
       print '(a)', 'Vacuum: ERROR UNABLE TO OPEN file input'
-      stop
+      return
     end if
 
     do i = 1, n_par
