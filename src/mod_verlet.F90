@@ -244,7 +244,7 @@ contains
           r = sqrt( sum(diff**2) ) + length_scale**3
           !r = sqrt( dot_product(diff, diff) ) + length_scale**3
           !r = NORM2(diff) + length_scale**3
-          force_ic = force_ic + (-1.0d0)*diff*r**(-3)
+          force_ic = force_ic + (-1.0d0)*diff/r**3
 
           ! Particle below
           pos_ic_b = pos_2
@@ -263,7 +263,7 @@ contains
           r = sqrt( sum(diff**2) ) + length_scale**3
           !r = sqrt( dot_product(diff, diff) ) + length_scale**3
           !r = NORM2(diff) + length_scale**3
-          force_ic = force_ic + (-1.0d0)*diff*r**(-3)
+          force_ic = force_ic + (-1.0d0)*diff/r**3
 
           ! The image charge force of particle i on particle j is the same in the z-direction
           ! but we reverse the x and y directions of the force due to symmetry
@@ -346,6 +346,15 @@ contains
         !r = NORM2(diff) + length_scale**3
         force_ic = diff/r**3
 
+        pos_ic_a(1:2) = pos_2(1:2)
+        pos_ic_a(3) = 2.0d0*d + pos_2(3)
+
+        diff = pos_1 - pos_ic_a
+        r = sqrt( sum(diff**2) ) + length_scale**3
+        !r = sqrt( dot_product(diff, diff) ) + length_scale**3
+        !r = NORM2(diff) + length_scale**3
+        force_ic = force_ic + (-1.0d0)*diff/r**3
+
         ! Particle below
         pos_ic_b(1:2) = pos_2(1:2)
         pos_ic_b(3) = -1.0d0*pos_2(3)
@@ -355,6 +364,15 @@ contains
         !r = sqrt( dot_product(diff, diff) ) + length_scale**3
         !r = NORM2(diff) + length_scale**3
         force_ic = force_ic + diff/r**3
+
+        pos_ic_b(1:2) = pos_2(1:2)
+        pos_ic_b(3) = (-1.0d0)*(2.0d0*d - pos_2(3))
+
+        diff = pos_1 - pos_ic_b
+        r = sqrt( sum(diff**2) ) + length_scale**3
+        !r = sqrt( dot_product(diff, diff) ) + length_scale**3
+        !r = NORM2(diff) + length_scale**3
+        force_ic = force_ic + (-1.0d0)*diff/r**3
       else
         pre_fac_ic = 0.0d0
         force_ic = 0.0d0
