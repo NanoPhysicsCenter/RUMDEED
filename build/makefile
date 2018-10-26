@@ -23,7 +23,7 @@ endif
 # INTEL FORTRAN
 ifeq ($(FCOMPILER),ifort)
 $(info Using Intel Fortran)
-FFLAGS=-O2 -xHost -ip -ipo -prec-div -prec-sqrt -fp-model precise
+FFLAGS=-O2 -xHost -ip -ipo -prec-div -prec-sqrt -fp-model precise -g
 #-fltconsistency
 #-prec-div -prec-sqrt
 #-fp-model precise
@@ -37,7 +37,7 @@ endif
 # ifeq ($(FCOMPILER),gfortran)
 ifneq (,$(findstring gfortran,$(FCOMPILER)))
 $(info Using GNU Fortran)
-FFLAGS=-Ofast -m64 -flto -march=native
+FFLAGS=-Ofast -m64 -flto -march=native -g
 #FFLAGS=-g -fcheck=all -Wall -fbacktrace -ffpe-trap=zero,overflow,underflow,denormal
 ifdef OPENMP
 FFLAGS+=-fopenmp

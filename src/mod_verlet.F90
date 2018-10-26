@@ -60,7 +60,7 @@ contains
     integer, intent(in) :: step
     integer             :: i
 
-    !$OMP PARALLEL DO PRIVATE(i) SCHEDULE(STATIC)
+    !$OMP PARALLEL DO PRIVATE(i) SCHEDULE(AUTO)
     do i = startElecHoles, endElecHoles
       particles_prev_pos(:, i) = particles_cur_pos(:, i) ! Store the previous position
       particles_cur_pos(:, i)  = particles_cur_pos(:, i) + particles_cur_vel(:, i)*time_step &
@@ -140,7 +140,7 @@ contains
 
     !$OMP PARALLEL DO PRIVATE(i, j, k_1, k_2, pos_1, pos_2, pos_ic_a, pos_ic_b, diff, r), &
     !$OMP& PRIVATE(force_E, force_c, force_ic, force_ic_N, force_ic_self, im_1, q_1, im_2, q_2, pre_fac_c, pre_fac_ic)
-    !!!$OMP& REDUCTION(+:particles_cur_accel) SCHEDULE(GUIDED)
+    !!!$OMP& REDUCTION(+:particles_cur_accel) SCHEDULE(AUTO)
     do i = 1, nrPart
       ! Information about the particle we are calculating the force/acceleration on
       pos_1 = particles_cur_pos(:, i)
@@ -163,7 +163,7 @@ contains
         !r = sqrt( dot_product(diff, diff) ) + length_scale**3
         !r = NORM2(diff) + length_scale**3
         r = sqrt( sum(diff**2) ) + length_scale**3
-        force_ic_self = diff*r**(-3)
+        force_ic_self = diff/r**3
 
         ! Below
         pos_ic_b = pos_1
@@ -172,7 +172,7 @@ contains
         r = sqrt( sum(diff**2) ) + length_scale**3
         !r = sqrt( dot_product(diff, diff) ) + length_scale**3
         !r = NORM2(diff) + length_scale**3
-        force_ic_self = pre_fac_ic*(force_ic_self + diff*r**(-3))
+        force_ic_self = pre_fac_ic*(force_ic_self + diff/r**3)
 
         !force_ic_self(1:2) = 0.0d0
         !force_ic_self(3) = q_1**2*div_fac_c*0.25d0*( 1.0d0/(d - pos_1(3))**2 - 1.0d0/(pos_1(3))**2 )
@@ -210,7 +210,7 @@ contains
         ! with no clear winner.
         !
         ! We add a small number (length_scale**3) to the results to
-        ! prevent a singularity when calulating r**-3
+        ! prevent a singularity when calulating 1/r**3
         !
         r = sqrt( sum(diff**2) ) + length_scale**3
         !r = sqrt( dot_product(diff, diff) ) + length_scale**3
@@ -220,7 +220,7 @@ contains
         ! F = (r_1 - r_2) / |r_1 - r_2|^3
         ! F = (diff / r) * 1/r^2
         ! (diff / r) is a unit vector
-        force_c = diff * r**(-3)
+        force_c = diff / r**3
 
         ! Check if we are doing image charge effect
         if (image_charge .eqv. .true.) then
@@ -235,7 +235,7 @@ contains
           r = sqrt( sum(diff**2) ) + length_scale**3
           !r = sqrt( dot_product(diff, diff) ) + length_scale**3
           !r = NORM2(diff) + length_scale**3
-          force_ic = diff*r**(-3)
+          force_ic = diff/r**3
 
           pos_ic_a = pos_2
           pos_ic_a(3) = 2.0d0*d + pos_ic_a(3)
@@ -254,7 +254,7 @@ contains
           r = sqrt( sum(diff**2) ) + length_scale**3
           !r = sqrt( dot_product(diff, diff) ) + length_scale**3
           !r = NORM2(diff) + length_scale**3
-          force_ic = force_ic + diff*r**(-3)
+          force_ic = force_ic + diff/r**3
 
           pos_ic_b = pos_2
           pos_ic_b(3) = (-1.0d0)*(2.0d0*d - pos_ic_b(3))
@@ -310,7 +310,7 @@ contains
     force_tot = ptr_field_E(pos_1)
 
     !$OMP PARALLEL DO PRIVATE(j, pos_2, pos_ic_a, pos_ic_b, diff, r, force_c, force_ic, q_2, pre_fac_c, pre_fac_ic) &
-    !$OMP& REDUCTION(+:force_tot) SCHEDULE(GUIDED)
+    !$OMP& REDUCTION(+:force_tot) SCHEDULE(AUTO)
     do j = 1, nrPart
 
       ! Position of the particle that is acting on the particle at pos_1
@@ -329,7 +329,8 @@ contains
       ! F = (r_1 - r_2) / |r_1 - r_2|^3
       ! F = (diff / r) * 1/r^2
       ! (diff / r) is a unit vector
-      force_c = diff * r**(-3)
+      force_c = diff / r**3
+      !force_c = diff / (r*r*r)
 
       ! Check if we are doing image charge effect
       if (image_charge .eqv. .true.) then
@@ -343,7 +344,7 @@ contains
         r = sqrt( sum(diff**2) ) + length_scale**3
         !r = sqrt( dot_product(diff, diff) ) + length_scale**3
         !r = NORM2(diff) + length_scale**3
-        force_ic = diff*r**(-3)
+        force_ic = diff/r**3
 
         ! Particle below
         pos_ic_b(1:2) = pos_2(1:2)
@@ -353,7 +354,7 @@ contains
         r = sqrt( sum(diff**2) ) + length_scale**3
         !r = sqrt( dot_product(diff, diff) ) + length_scale**3
         !r = NORM2(diff) + length_scale**3
-        force_ic = force_ic + diff*r**(-3)
+        force_ic = force_ic + diff/r**3
       else
         pre_fac_ic = 0.0d0
         force_ic = 0.0d0
