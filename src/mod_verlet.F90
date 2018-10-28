@@ -131,15 +131,15 @@ contains
   ! Update the acceleration for all the particles
   subroutine Calculate_Acceleration_Particles()
     double precision, dimension(1:3) :: force_E, force_c, force_ic, force_ic_N, force_ic_self
-    double precision, dimension(1:3) :: pos_1, pos_2, diff, pos_ic_a, pos_ic_b
+    double precision, dimension(1:3) :: pos_1, pos_2, diff
     double precision                 :: r
     double precision                 :: q_1, q_2
     double precision                 :: im_1, im_2
-    double precision                 :: pre_fac_c, pre_fac_ic
+    double precision                 :: pre_fac_c
     integer                          :: i, j, k_1, k_2
 
-    !$OMP PARALLEL DO PRIVATE(i, j, k_1, k_2, pos_1, pos_2, pos_ic_a, pos_ic_b, diff, r), &
-    !$OMP& PRIVATE(force_E, force_c, force_ic, force_ic_N, force_ic_self, im_1, q_1, im_2, q_2, pre_fac_c, pre_fac_ic)
+    !$OMP PARALLEL DO PRIVATE(i, j, k_1, k_2, pos_1, pos_2, diff, r), &
+    !$OMP& PRIVATE(force_E, force_c, force_ic, force_ic_N, force_ic_self, im_1, q_1, im_2, q_2, pre_fac_c)
     !!!$OMP& REDUCTION(+:particles_cur_accel) SCHEDULE(AUTO)
     do i = 1, nrPart
       ! Information about the particle we are calculating the force/acceleration on
@@ -151,36 +151,8 @@ contains
       ! Acceleration due to electric field
       force_E = q_1 * ptr_field_E(pos_1)
 
-      ! Check if we should do image charge effect
-      if (image_charge .eqv. .true.) then
-        ! Image charge effect from partner above the annode and below the cathode
-        pre_fac_ic = q_1*(-1.0d0*q_1) * div_fac_c ! Image charge partner will have oposite charge
-
-        ! Above
-        pos_ic_a = pos_1
-        pos_ic_a(3) = 2.0d0*d - pos_ic_a(3) ! Change the z-position
-        diff = pos_1 - pos_ic_a
-        !r = sqrt( dot_product(diff, diff) ) + length_scale**3
-        !r = NORM2(diff) + length_scale**3
-        r = sqrt( sum(diff**2) ) + length_scale**3
-        force_ic_self = diff/r**3
-
-        ! Below
-        pos_ic_b = pos_1
-        pos_ic_b(3) = -1.0d0*pos_ic_b(3) ! Change the z-position
-        diff = pos_1 - pos_ic_b
-        r = sqrt( sum(diff**2) ) + length_scale**3
-        !r = sqrt( dot_product(diff, diff) ) + length_scale**3
-        !r = NORM2(diff) + length_scale**3
-        force_ic_self = pre_fac_ic*(force_ic_self + diff/r**3)
-
-        !force_ic_self(1:2) = 0.0d0
-        !force_ic_self(3) = q_1**2*div_fac_c*0.25d0*( 1.0d0/(d - pos_1(3))**2 - 1.0d0/(pos_1(3))**2 )
-      else
-        ! No image charge effect
-        force_ic_self = 0.0d0
-        pre_fac_ic = 0.0d0
-      end if
+      ! Do image charge
+      force_ic_self = Force_Image_charges_v2(pos_1, pos_1)
 
       ! Loop over particles from i+1 to nrElec.
       ! There is no need to loop over all particles since
@@ -222,69 +194,22 @@ contains
         ! (diff / r) is a unit vector
         force_c = diff / r**3
 
-        ! Check if we are doing image charge effect
-        if (image_charge .eqv. .true.) then
-          ! ! Calculate the effects of the image partner of particle j (2) on particle i (1)
-          ! pre_fac_ic = q_1*(-1.0d0*q_2) * div_fac_c ! Image charge partner will have oposite charge
+        ! Do image charge
+        force_ic = Force_Image_charges_v2(pos_1, pos_2)
 
-          ! ! Particle above
-          ! pos_ic_a = pos_2
-          ! pos_ic_a(3) = 2.0d0*d - pos_ic_a(3)
-
-          ! diff = pos_1 - pos_ic_a
-          ! r = sqrt( sum(diff**2) ) + length_scale**3
-          ! !r = sqrt( dot_product(diff, diff) ) + length_scale**3
-          ! !r = NORM2(diff) + length_scale**3
-          ! force_ic = diff/r**3
-
-          ! pos_ic_a = pos_2
-          ! pos_ic_a(3) = 2.0d0*d + pos_ic_a(3)
-
-          ! diff = pos_1 - pos_ic_a
-          ! r = sqrt( sum(diff**2) ) + length_scale**3
-          ! !r = sqrt( dot_product(diff, diff) ) + length_scale**3
-          ! !r = NORM2(diff) + length_scale**3
-          ! force_ic = force_ic + (-1.0d0)*diff/r**3
-
-          ! ! Particle below
-          ! pos_ic_b = pos_2
-          ! pos_ic_b(3) = -1.0d0*pos_ic_b(3)
-
-          ! diff = pos_1 - pos_ic_b
-          ! r = sqrt( sum(diff**2) ) + length_scale**3
-          ! !r = sqrt( dot_product(diff, diff) ) + length_scale**3
-          ! !r = NORM2(diff) + length_scale**3
-          ! force_ic = force_ic + diff/r**3
-
-          ! pos_ic_b = pos_2
-          ! pos_ic_b(3) = (-1.0d0)*(2.0d0*d - pos_ic_b(3))
-
-          ! diff = pos_1 - pos_ic_b
-          ! r = sqrt( sum(diff**2) ) + length_scale**3
-          ! !r = sqrt( dot_product(diff, diff) ) + length_scale**3
-          ! !r = NORM2(diff) + length_scale**3
-          ! force_ic = force_ic + (-1.0d0)*diff/r**3
-
-          force_ic = Force_Image_charges_v2(pos_1, pos_2)
-
-          ! The image charge force of particle i on particle j is the same in the z-direction
-          ! but we reverse the x and y directions of the force due to symmetry
-          force_ic_N(1:2) = -1.0d0*force_ic(1:2)
-          force_ic_N(3)   = +1.0d0*force_ic(3)
-        else
-          force_ic = 0.0d0
-          force_ic_N = 0.0d0
-          pre_fac_ic = 0.0d0
-        end if
+        ! The image charge force of particle i on particle j is the same in the z-direction
+        ! but we reverse the x and y directions of the force due to symmetry.
+        force_ic_N(1:2) = -1.0d0*force_ic(1:2)
+        force_ic_N(3)   = +1.0d0*force_ic(3)
 
         !$OMP CRITICAL(ACCEL_UPDATE)
-        particles_cur_accel(:, j) = particles_cur_accel(:, j) - pre_fac_c * force_c * im_2 + pre_fac_ic * force_ic_N * im_2
-        particles_cur_accel(:, i) = particles_cur_accel(:, i) + pre_fac_c * force_c * im_1 + pre_fac_ic * force_ic * im_1
+        particles_cur_accel(:, j) = particles_cur_accel(:, j) - pre_fac_c * force_c * im_2 + pre_fac_c * force_ic_N * im_2
+        particles_cur_accel(:, i) = particles_cur_accel(:, i) + pre_fac_c * force_c * im_1 + pre_fac_c * force_ic * im_1
         !$OMP END CRITICAL(ACCEL_UPDATE)
       end do
 
       !$OMP CRITICAL(ACCEL_UPDATE)
-      particles_cur_accel(:, i) = particles_cur_accel(:, i) + force_E * im_1 + force_ic_self * im_1
+      particles_cur_accel(:, i) = particles_cur_accel(:, i) + force_E * im_1 + pre_fac_c * force_ic_self * im_1
       !$OMP END CRITICAL(ACCEL_UPDATE)
     end do
     !$OMP END PARALLEL DO
@@ -334,53 +259,8 @@ contains
       force_c = diff / r**3
       !force_c = diff / (r*r*r)
 
-      ! Check if we are doing image charge effect
-      if (image_charge .eqv. .true.) then
-        ! ! Calculate the effects of the image partner of particle j on particle i
-        ! pre_fac_ic = (-1.0d0)*q_2 * div_fac_c
-        !   ! Particle above
-        ! pos_ic_a(1:2) = pos_2(1:2)
-        ! pos_ic_a(3) = 2.0d0*d - pos_2(3)
-
-        ! diff = pos_1 - pos_ic_a
-        ! r = sqrt( sum(diff**2) ) + length_scale**3
-        ! !r = sqrt( dot_product(diff, diff) ) + length_scale**3
-        ! !r = NORM2(diff) + length_scale**3
-        ! force_ic = diff/r**3
-
-        ! pos_ic_a(1:2) = pos_2(1:2)
-        ! pos_ic_a(3) = 2.0d0*d + pos_2(3)
-
-        ! diff = pos_1 - pos_ic_a
-        ! r = sqrt( sum(diff**2) ) + length_scale**3
-        ! !r = sqrt( dot_product(diff, diff) ) + length_scale**3
-        ! !r = NORM2(diff) + length_scale**3
-        ! force_ic = force_ic + (-1.0d0)*diff/r**3
-
-        ! ! Particle below
-        ! pos_ic_b(1:2) = pos_2(1:2)
-        ! pos_ic_b(3) = -1.0d0*pos_2(3)
-
-        ! diff = pos_1 - pos_ic_b
-        ! r = sqrt( sum(diff**2) ) + length_scale**3
-        ! !r = sqrt( dot_product(diff, diff) ) + length_scale**3
-        ! !r = NORM2(diff) + length_scale**3
-        ! force_ic = force_ic + diff/r**3
-
-        ! pos_ic_b(1:2) = pos_2(1:2)
-        ! pos_ic_b(3) = (-1.0d0)*(2.0d0*d - pos_2(3))
-
-        ! diff = pos_1 - pos_ic_b
-        ! r = sqrt( sum(diff**2) ) + length_scale**3
-        ! !r = sqrt( dot_product(diff, diff) ) + length_scale**3
-        ! !r = NORM2(diff) + length_scale**3
-        ! force_ic = force_ic + (-1.0d0)*diff/r**3
-
-        force_ic = Force_Image_charges_v2(pos_1, pos_2)
-      else
-        pre_fac_ic = 0.0d0
-        force_ic = 0.0d0
-      end if
+      ! Image charge effect
+      force_ic = Force_Image_charges_v2(pos_1, pos_2)
 
       ! The total force
       ! The minus sign in front force_ic is because the image charge partners will
@@ -398,9 +278,12 @@ contains
   ! the image charge partners of the particle at location pos_2.
   ! For particle 2, its image charge partners are located at the same x and y coordinates
   ! but the z coordinates change. If the particle is at z_0 then,
-  ! for partners with the opposite sign we have z_n = 2*n*d - z_0, n = 0,±1,±2,±3,... ,
-  ! for partners with the same sign we have z_n = 2*n*d + z_0, n = ±1, ±2, ±3, ... .
+  ! for partners with the opposite charge we have z_n = 2*n*d - z_0, n = 0,±1,±2,±3,... ,
+  ! for partners with the same charge we have z_n = 2*n*d + z_0, n = ±1, ±2, ±3, ... .
   !
+  ! This function return
+  ! F = (pos_1 - pos_ic)/r**3
+  ! i.e. without q_1*q_2/(4\pi\epsilon_0)
   function Force_Image_charges_v2(pos_1, pos_2)
     double precision, intent(in), dimension(1:3) :: pos_1, pos_2
     double precision, dimension(1:3)             :: Force_Image_charges_v2
@@ -409,119 +292,49 @@ contains
     double precision, dimension(1:3)             :: pos_ic, diff
     double precision                             :: r
 
-    ! Start with n = 0
-    n = 0
-    pos_ic(1:2) = pos_2(1:2) ! Same x and y
-    pos_ic(3) = -1.0d0*pos_2(3) ! Change z
+    ! Check if we are doing image charge or not
+    if (image_charge .eqv. .false.) then
+      ! Return 0 if we are not using image charge
+      Force_Image_charges_v2 = 0.0d0
+    else
+      ! Start with n = 0
+      n = 0
+      pos_ic(1:2) = pos_2(1:2) ! Same x and y
+      pos_ic(3) = -1.0d0*pos_2(3) ! Change z
 
-    diff = pos_1 - pos_ic
-    r = sqrt( sum(diff**2) ) + length_scale**3
-    Force_Image_charges_v2 = (-1.0d0)*diff/r**3 ! -1.0d0 because of the opposite charge
-
-    do n = 1, N_max
-      ! The charges with the opposite charges first
-      ! Plus n
-      pos_ic(3) = 2.0d0*n*d - pos_2(3)
       diff = pos_1 - pos_ic
       r = sqrt( sum(diff**2) ) + length_scale**3
-      Force_Image_charges_v2 = Force_Image_charges_v2 + (-1.0d0)*diff/r**3 ! -1.0d0 because of the opposite charge
+      Force_Image_charges_v2 = (-1.0d0)*diff/r**3 ! -1.0d0 because of the opposite charge
 
-      ! Negative n
-      pos_ic(3) = -2.0d0*n*d - pos_2(3)
-      diff = pos_1 - pos_ic
-      r = sqrt( sum(diff**2) ) + length_scale**3
-      Force_Image_charges_v2 = Force_Image_charges_v2 + (-1.0d0)*diff/r**3 ! -1.0d0 because of the opposite charge
+      do n = 1, N_max
+        ! The charges with the opposite charges first
+        ! Plus n
+        pos_ic(3) = 2.0d0*n*d - pos_2(3) ! Change z
+        diff = pos_1 - pos_ic
+        r = sqrt( sum(diff**2) ) + length_scale**3
+        Force_Image_charges_v2 = Force_Image_charges_v2 + (-1.0d0)*diff/r**3 ! -1.0d0 because of the opposite charge
 
-      ! Now do the charges with the same charge
-      ! Plus n
-      pos_ic(3) = 2.0d0*n*d + pos_2(3)
-      diff = pos_1 - pos_ic
-      r = sqrt( sum(diff**2) ) + length_scale**3
-      Force_Image_charges_v2 = Force_Image_charges_v2 + (+1.0d0)*diff/r**3 ! +1.0d0 because of the same charge
+        ! Negative n
+        pos_ic(3) = -2.0d0*n*d - pos_2(3) ! Change z
+        diff = pos_1 - pos_ic
+        r = sqrt( sum(diff**2) ) + length_scale**3
+        Force_Image_charges_v2 = Force_Image_charges_v2 + (-1.0d0)*diff/r**3 ! -1.0d0 because of the opposite charge
 
-      ! Negative n
-      pos_ic(3) = -2.0d0*n*d + pos_2(3)
-      diff = pos_1 - pos_ic
-      r = sqrt( sum(diff**2) ) + length_scale**3
-      Force_Image_charges_v2 = Force_Image_charges_v2 + (+1.0d0)*diff/r**3 ! +1.0d0 because of the same charge
-    end do
+        ! Now do the charges with the same charge
+        ! Plus n
+        pos_ic(3) = 2.0d0*n*d + pos_2(3) ! Change z
+        diff = pos_1 - pos_ic
+        r = sqrt( sum(diff**2) ) + length_scale**3
+        Force_Image_charges_v2 = Force_Image_charges_v2 + (+1.0d0)*diff/r**3 ! +1.0d0 because of the same charge
+
+        ! Negative n
+        pos_ic(3) = -2.0d0*n*d + pos_2(3) ! Change z
+        diff = pos_1 - pos_ic
+        r = sqrt( sum(diff**2) ) + length_scale**3
+        Force_Image_charges_v2 = Force_Image_charges_v2 + (+1.0d0)*diff/r**3 ! +1.0d0 because of the same charge
+      end do
+    end if
   end function Force_Image_charges_v2
-
-  !-----------------------------------------------------------------------------
-  ! Calculates the force due the image charge partners.
-  ! From the old code
-  function Force_Image_charges(pos_1, pos_2)
-    double precision, dimension(1:3)             :: Force_Image_charges
-    double precision, dimension(1:3), intent(inout) :: pos_1, pos_2
-    double precision, dimension(1:3)             :: ic_pos, diff
-    double precision, dimension(1:3)             :: force
-    double precision                             :: r, r2
-    integer, parameter :: n = 2
-    integer            :: i
-    integer            :: ic_charge
-
-
-!     ic_pos = pos_2
-!     ic_pos(3) = -1.0d0*pos_2(3)
-!     diff = pos_1 - ic_pos
-
-!     r2 = diff(1)**2 + diff(2)**2 + diff(3)**2 + 1.0d-22 ! Add a small value to prevent a singularity for r = 0
-!     r = sqrt(r2)
-
-!     !accel_c = accel_c - (diff/r)/(r2)
-!     force = diff/(r*r2)
-
-    ic_pos = pos_2
-    ic_pos(3) = -1.0d0*pos_2(3)
-    ic_charge = +1
-
-    diff = pos_1 - ic_pos
-    r2 = diff(1)**2 + diff(2)**2 + diff(3)**2 + 1.0d-16
-    r = sqrt(r2)
-    force = ic_charge * diff/(r*r2)
-
-    do i = 1, n
-      ! Image charges above z=d
-      ic_pos = pos_2
-      ic_pos(3) = 2.0d0*n*d - pos_2(3)
-      ic_charge = +1
-
-      diff = ic_pos - pos_1
-      r2 = diff(1)**2 + diff(2)**2 + diff(3)**2 + 1.0d-16
-      r = sqrt(r2)
-      force = force + ic_charge * diff/(r*r2)
-
-      ic_pos = pos_2
-      ic_pos(3) = 2.0d0*n*d + pos_2(3)
-      ic_charge = -1
-
-      diff = ic_pos - pos_1
-      r2 = diff(1)**2 + diff(2)**2 + diff(3)**2 + 1.0d-16
-      r = sqrt(r2)
-      force = force + ic_charge * diff/(r*r2)
-
-      !Image charges below z=0
-      ic_pos = pos_2
-      ic_pos(3) = -2.0d0*n*d + pos_2(3)
-      ic_charge = -1
-
-      diff = ic_pos - pos_1
-      r2 = diff(1)**2 + diff(2)**2 + diff(3)**2 + 1.0d-16
-      r = sqrt(r2)
-      force = force + ic_charge * diff/(r*r2)
-
-      ic_pos = pos_2
-      ic_pos(3) = -2.0d0*n*d - pos_2(3)
-      ic_charge = +1
-
-      diff = ic_pos - pos_1
-      r2 = diff(1)**2 + diff(2)**2 + diff(3)**2 + 1.0d-16
-      r = sqrt(r2)
-      force = force + ic_charge * diff/(r*r2)
-    end do
-
-    Force_Image_charges = force
-  end function Force_Image_charges
 
 
   ! ----------------------------------------------------------------------------
