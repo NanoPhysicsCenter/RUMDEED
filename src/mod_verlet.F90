@@ -152,7 +152,7 @@ contains
       force_E = q_1 * ptr_field_E(pos_1)
 
       ! Do image charge
-      force_ic_self = Force_Image_charges_v2(pos_1, pos_1)
+      force_ic_self = q_1**2*div_fac_c * Force_Image_charges_v2(pos_1, pos_1)
 
       ! Loop over particles from i+1 to nrElec.
       ! There is no need to loop over all particles since
@@ -168,6 +168,7 @@ contains
         q_2 = particles_charge(j)
         k_2 = particles_species(j)
 
+        ! Prefactor for Coloumb's law
         pre_fac_c = q_1*q_2 * div_fac_c ! q_1*q_2 / (4*pi*epsilon)
 
         ! Calculate the distance between the two particles
@@ -192,10 +193,10 @@ contains
         ! F = (r_1 - r_2) / |r_1 - r_2|^3
         ! F = (diff / r) * 1/r^2
         ! (diff / r) is a unit vector
-        force_c = diff / r**3
+        force_c = pre_fac_c * diff / r**3
 
         ! Do image charge
-        force_ic = Force_Image_charges_v2(pos_1, pos_2)
+        force_ic = pre_fac_c * Force_Image_charges_v2(pos_1, pos_2)
 
         ! The image charge force of particle i on particle j is the same in the z-direction
         ! but we reverse the x and y directions of the force due to symmetry.
@@ -203,13 +204,13 @@ contains
         force_ic_N(3)   = +1.0d0*force_ic(3)
 
         !$OMP CRITICAL(ACCEL_UPDATE)
-        particles_cur_accel(:, j) = particles_cur_accel(:, j) - pre_fac_c * force_c * im_2 + pre_fac_c * force_ic_N * im_2
-        particles_cur_accel(:, i) = particles_cur_accel(:, i) + pre_fac_c * force_c * im_1 + pre_fac_c * force_ic * im_1
+        particles_cur_accel(:, j) = particles_cur_accel(:, j) - force_c * im_2 + force_ic_N * im_2
+        particles_cur_accel(:, i) = particles_cur_accel(:, i) + force_c * im_1 + force_ic   * im_1
         !$OMP END CRITICAL(ACCEL_UPDATE)
       end do
 
       !$OMP CRITICAL(ACCEL_UPDATE)
-      particles_cur_accel(:, i) = particles_cur_accel(:, i) + force_E * im_1 + pre_fac_c * force_ic_self * im_1
+      particles_cur_accel(:, i) = particles_cur_accel(:, i) + force_E * im_1 + force_ic_self * im_1
       !$OMP END CRITICAL(ACCEL_UPDATE)
     end do
     !$OMP END PARALLEL DO
