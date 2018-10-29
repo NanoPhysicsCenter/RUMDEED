@@ -247,12 +247,6 @@ contains
       stop
     end if
 
-    open(newunit=ud_field, iostat=IFAIL, file='field.dt', status='replace', action='write')
-    if (IFAIL /= 0) then
-      print '(a)', 'Vacuum: ERROR UNABLE TO OPEN file field.dt'
-      stop
-    end if
-
     open(newunit=ud_debug, iostat=IFAIL, file='debug.dt', status='replace', action='write')
     if (IFAIL /= 0) then
       print '(a)', 'Vacuum: ERROR UNABLE TO OPEN file debug.dt'
@@ -413,41 +407,11 @@ contains
       stop
     end if
 
-    !open(newunit=ud_dipole_pos, iostat=IFAIL, file='out/dipole_pos.dt', status='REPLACE', action='write')
-    !if (IFAIL /= 0) then
-    !  print *, 'Vacuum: Failed to open file dipole_pos.dt. ABORTING'
-    !  stop
-    !end if
-
-    !open(newunit=ud_dipole_vec, iostat=IFAIL, file='out/dipole_vec.dt', status='REPLACE', action='write')
-    !if (IFAIL /= 0) then
-    !  print *, 'Vacuum: Failed to open file dipole_vec.dt. ABORTING'
-    !  stop
-    !end if
-
-    !open(newunit=ud_field, iostat=IFAIL, file='out/long_field.dt', status='REPLACE', action='write')
-    !if (IFAIL /= 0) then
-    !  print *, 'Vacuum: Failed to open file long_field.dt. ABORTING'
-    !  stop
-    !end if
-
-    !open(newunit=ud_density_map_elec, iostat=IFAIL, file='out/density_elec.dt', status='REPLACE', action='write')
-    !if (IFAIL /= 0) then
-    !  print *, 'Vacuum: Failed to open file density_elec.dt. ABORTING'
-    !  stop
-    !end if
-
-    !open(newunit=ud_density_map_hole, iostat=IFAIL, file='out/density_hole.dt', status='REPLACE', action='write')
-    !if (IFAIL /= 0) then
-    !  print *, 'Vacuum: Failed to open file density_hole.dt. ABORTING'
-    !  stop
-    !end if
-
-    !open(newunit=ud_density_map_total, iostat=IFAIL, file='out/density_total.dt', status='REPLACE', action='write')
-    !if (IFAIL /= 0) then
-    !  print *, 'Vacuum: Failed to open file density_total.dt. ABORTING'
-    !  stop
-    !end if
+    open(newunit=ud_field, iostat=IFAIL, file='out/field.dt', status='replace', action='write')
+    if (IFAIL /= 0) then
+      print '(a)', 'Vacuum: ERROR UNABLE TO OPEN file field.dt'
+      stop
+    end if
     
     !------------------------------------------------------------------------------------
     ! Emission density

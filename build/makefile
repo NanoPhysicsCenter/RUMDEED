@@ -9,7 +9,7 @@ FCOMPILER=gfortran-8
 #FCOMPILER=pgfortran
 endif
 
-CUBA_LIB=/home/kristor/software/cuba-4.2/lib/libcuba.a
+CUBA_LIB=~/software/cuba-4.2/lib/libcuba.a
 
 #UNIT_TEST = 1
 OPENMP = 1

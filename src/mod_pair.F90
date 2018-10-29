@@ -23,7 +23,7 @@ end interface
 contains
   ! ----------------------------------------------------------------------------
   ! Subroutine to add a particle to the system
-  ! note: This subroutine should be called inside a OpenMP ciritical section
+  ! note: This subroutine should be called inside a OpenMP critical section
   ! Keyword arguments:
   ! par_pos: Particle postion (x, y, z)
   ! par_vel: Particle initial velocity (v_x, v_y, v_z)
@@ -75,11 +75,6 @@ contains
         particles_mass(nrPart+1) = m_heff*m_0
         nrHole = nrHole + 1
       end if
-
-      !if (particles_mass(nrPart+1) == 0.0d0) then
-      !  print *, 'WTF'
-      !  pause
-      !end if
 
       ! Update the number of particles in the system
       nrElecHole = nrElec + nrHole

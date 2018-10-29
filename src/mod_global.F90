@@ -11,7 +11,7 @@ module mod_global
   ! Define material parameters
   !
   character(len=*), parameter :: material = 'Vacuum' ! Material used
-  double precision, parameter :: epsilon_r = 1.0d0! Relative permittivity
+  double precision, parameter :: epsilon_r = 1.0d0 ! Relative permittivity
   double precision, parameter :: m_eeff = 1.0d0 ! Effective mass for electrons
   double precision, parameter :: m_heff = 1.0d0 ! Effective mass for holes
 
@@ -20,32 +20,22 @@ module mod_global
   ! Define physical constants
   ! See http://physics.nist.gov/cuu/Constants/index.html
   double precision, parameter :: pi = 3.14159265358979324d0 ! Pi
-  double precision, parameter :: pi_2 = 2.0d0*pi ! 2*pi
-  double precision, parameter :: h = 6.626070040d-34 ! Planck's constant (Js)
+  double precision, parameter :: h = 6.626070040d-34 ! Planck's constant, h (Js)
   double precision, parameter :: k_b = 1.38064852d-23 ! Boltzmann constant (J/K)
   double precision, parameter :: c = 299792458.0d0 ! Speed of light (m/s)
-  double precision, parameter :: mu_0 = 4.0d0*pi * 1d-7 ! Vacuum permeability (H/m)
+  double precision, parameter :: mu_0 = 4.0d0*pi * 1.0d-7 ! Vacuum permeability (H/m)
   double precision, parameter :: epsilon_0 = 1.0d0/(mu_0 * c**2) ! Vacuum permittivity (F/m)
   !double precision, parameter :: epsilon_0 = 8.854187817d-12 ! Farads / meters
   double precision, parameter :: epsilon = epsilon_r * epsilon_0 ! Permittivity
   double precision, parameter :: m_u = 1.660539040d-27 ! Atomic mass unit (kg)
-  double precision, parameter :: h_bar = 1.054571726d-34
-
+  double precision, parameter :: h_bar = 1.054571726d-34 ! Planck's constant, h/(2*pi) (Js)
 
   double precision, parameter :: m_0 = 9.10938356d-31 ! Free electron mass (kg)
   !double precision, parameter :: m_e = m_eeff * m_0 ! m_e* Effective electron mass (kg)
   !double precision, parameter :: m_h = m_heff * m_0! m_h* Effective hole mass (kg)
 
-  double precision, parameter :: q_0 = 1.6021766208d-19 ! Standard charge (C)
-  double precision, parameter :: q_02 = q_0**2 ! Standard charge squared (C)
-  !double precision, parameter :: q_e = -1.0d0*q_e ! Electron charge (Coulomb)
-  !double precision, parameter :: q_h = 1.602176565d-19 ! Hole charge (Coulomb)
-
-  double precision, parameter :: hc_nm = h*c/(1.0d-9)
-  double precision, parameter :: hc_evnm = h*c/(q_0*1.0d-9) ! E_\lambda = h*c/lambda
-
-  double precision, parameter :: T_room = 300.0d0 ! Room temperature in Kelvin
-
+  double precision, parameter :: q_0 = 1.6021766208d-19 ! Elementary charge (C)
+  double precision, parameter :: q_02 = q_0**2 ! Elementary charge squared (C)
 
   ! ----------------------------------------------------------------------------
   ! Define scales used when reading and writing data
@@ -56,10 +46,11 @@ module mod_global
 
 
   ! ----------------------------------------------------------------------------
-  ! Define constans
-  integer, parameter :: MAX_PARTICLES = 500000 ! Maximum number of particles of each type allowed in the system
+  ! Define maximum size constants.
+  ! These can be increased if needed.
+  integer, parameter :: MAX_PARTICLES = 500000 ! Maximum number of particles allowed in the system
   integer, parameter :: MAX_EMITTERS  = 10     ! Maximum number of emitters in the system
-  integer, parameter :: MAX_SECTIONS  = 100    ! Maximum number of sections and emitter can have
+  integer, parameter :: MAX_SECTIONS  = 100    ! Maximum number of sections an emitter can have
 
 
   !! ----------------------------------------------------------------------------
