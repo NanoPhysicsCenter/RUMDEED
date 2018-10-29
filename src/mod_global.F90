@@ -194,8 +194,9 @@ module mod_global
   logical, parameter          :: image_charge = .true.
 
   ! ----------------------------------------------------------------------------
-  ! Define run time constants
-  double precision, parameter :: div_fac_c = 1.0d-7 * c**2 / epsilon_r ! 1/(4*pi*epsilon_0*epsilon_r)
+  ! Define constants
+  !double precision, parameter :: div_fac_c = 1.0d-7 * c**2 / epsilon_r ! 1/(4*pi*epsilon_0*epsilon_r)
+  double precision, parameter :: div_fac_c = 1.0d0/(4.0d0*pi*epsilon_0*epsilon_r) ! 1/(4*pi*epsilon_0*epsilon_r)
 
 
   ! ----------------------------------------------------------------------------

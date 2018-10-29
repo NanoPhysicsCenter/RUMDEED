@@ -152,7 +152,7 @@ contains
       force_E = q_1 * ptr_field_E(pos_1)
 
       ! Do image charge
-      force_ic_self = q_1**2*div_fac_c * Force_Image_charges_v2(pos_1, pos_1)
+      force_ic_self = q_1**2 * div_fac_c * Force_Image_charges_v2(pos_1, pos_1)
 
       ! Loop over particles from i+1 to nrElec.
       ! There is no need to loop over all particles since
