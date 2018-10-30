@@ -2,7 +2,7 @@
 # Kristinn Torfason
 # 02.09.09
 
-.PHONY: all clean test install doc
+.PHONY: all clean test install doc cuba
 
 all:
 	cd build; make all
@@ -14,3 +14,5 @@ install:
 	cd build; make install
 doc:
 	cd doc; make all
+cuba:
+	cd cuba; ./install-cuba.sh

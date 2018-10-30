@@ -9,3 +9,4 @@ __genmod.f90
 *.swp
 input
 run.sh
+cuba/
