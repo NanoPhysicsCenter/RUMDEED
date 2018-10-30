@@ -17,9 +17,9 @@ contains
 
    
     !w_theta_xy = w_theta_triangle(pos, sec)
-    !w_theta_xy = w_theta_checkerboard(pos, sec)
+    w_theta_xy = w_theta_checkerboard(pos, sec)
     !w_theta_xy = w_theta_checkerboard_2x2(pos, sec)
-    w_theta_xy = w_theta_constant(pos, sec)
+    !w_theta_xy = w_theta_constant(pos, sec)
     !w_theta_xy = w_theta_gaussian(pos, sec)
 
   end function w_theta_xy

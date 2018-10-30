@@ -288,7 +288,7 @@ contains
   function Force_Image_charges_v2(pos_1, pos_2)
     double precision, intent(in), dimension(1:3) :: pos_1, pos_2
     double precision, dimension(1:3)             :: Force_Image_charges_v2
-    integer, parameter                           :: N_max = 1
+    integer, parameter                           :: N_max = 2
     integer                                      :: n
     double precision, dimension(1:3)             :: pos_ic, diff
     double precision                             :: r

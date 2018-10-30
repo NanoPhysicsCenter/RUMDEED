@@ -9,7 +9,7 @@ FCOMPILER=gfortran-8
 #FCOMPILER=pgfortran
 endif
 
-CUBA_LIB=~/software/cuba-4.2/lib/libcuba.a
+CUBA_LIB=../cuba/lib/libcuba.a
 
 #UNIT_TEST = 1
 OPENMP = 1
@@ -64,7 +64,8 @@ PROJECT_NAME=Vacuum-MD
 # makefile
 all: $(PROJECT_NAME).out
 
-$(PROJECT_NAME).out: ../src/main.F90 mod_global.mod mod_global.o \
+$(PROJECT_NAME).out: ../src/main.F90 ../cuba/lib/libcuba.a \
+			mod_global.mod mod_global.o \
 			mod_verlet.mod mod_verlet.o \
 			mod_pair.mod mod_pair.o	\
 			mod_unit_tests.mod mod_unit_tests.o \
@@ -81,6 +82,9 @@ $(PROJECT_NAME).out: ../src/main.F90 mod_global.mod mod_global.o \
 			mod_field_emission_tip.o mod_hyperboloid_tip.o mod_field_emission_2D.o \
 			smod_work_function.o smod_mc_integration.o smod_metro_algo.o mod_ziggurat.o \
 			$(CUBA_LIB) -lpthread -lm -ldl -o $(PROJECT_NAME).out
+
+../cuba/lib/libcuba.a: ../cuba/install-cuba.sh
+		cd ../cuba/; ./install-cuba.sh
 
 mod_global.mod mod_global.o: ../src/mod_global.F90
 		$(FCOMPILER) -c $(FFLAGS) ../src/mod_global.F90
