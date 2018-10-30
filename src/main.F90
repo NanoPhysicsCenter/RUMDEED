@@ -111,27 +111,40 @@ program VacuumMD
     call Remove_Particles(i)
 
     ! Flush data
-    call Flush_Data()
+    !call Flush_Data()
 
-    if (i == progress(1)) then
-      call PrintProgress(1)
-    else if (i == progress(2)) then
-      call PrintProgress(2)
-    else if (i == progress(3)) then
-      call PrintProgress(3)
-    else if (i == progress(4)) then
-      call PrintProgress(4)
-    else if (i == progress(5)) then
-      call PrintProgress(5)
-    else if (i == progress(6)) then
-      call PrintProgress(6)
-    else if (i == progress(7)) then
-      call PrintProgress(7)
-    else if (i == progress(8)) then
-      call PrintProgress(8)
-    else if (i == progress(9)) then
-      call PrintProgress(9)
+    !do j = 1, 9
+    !  if (i == progress(j)) then
+    !    call PrintProgress(j)
+    !    call Flush_Data()
+    !    exit
+    !  end if
+    !end do
+
+    if (any(i .eq. progress) .eqv. .true.) then
+      call PrintProgress(nint(i*10.0d0/steps))
+      call Flush_Data
     end if
+
+    ! if (i == progress(1)) then
+    !   call PrintProgress(1)
+    ! else if (i == progress(2)) then
+    !   call PrintProgress(2)
+    ! else if (i == progress(3)) then
+    !   call PrintProgress(3)
+    ! else if (i == progress(4)) then
+    !   call PrintProgress(4)
+    ! else if (i == progress(5)) then
+    !   call PrintProgress(5)
+    ! else if (i == progress(6)) then
+    !   call PrintProgress(6)
+    ! else if (i == progress(7)) then
+    !   call PrintProgress(7)
+    ! else if (i == progress(8)) then
+    !   call PrintProgress(8)
+    ! else if (i == progress(9)) then
+    !   call PrintProgress(9)
+    ! end if
 
   end do
 
