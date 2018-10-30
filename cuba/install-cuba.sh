@@ -2,7 +2,7 @@
 
 installdir=$PWD
 cd 4.2
-./configure --prefix=$installdir
+./configure --prefix="$installdir"
 make
 make install
 make clean
