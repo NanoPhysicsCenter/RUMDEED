@@ -38,8 +38,8 @@ contains
     ! Input / output variables
     integer, intent(in) :: ndim ! Number of dimensions (Should be 2)
     integer, intent(in) :: ncomp ! Number of vector-components in the integrand (Always 1 here)
-    integer, intent(in) :: userdata ! Additional data passed to the integral function (The number of emitter)
-    double precision, intent(in), dimension(1:ndim)  :: xx ! Integration points, between 0 and 1
+    integer, intent(in) :: userdata ! Additional data passed to the integral function (In our case the number of the emitter)
+    double precision, intent(in), dimension(1:ndim)   :: xx ! Integration points, between 0 and 1
     double precision, intent(out), dimension(1:ncomp) :: ff ! Results of the integrand function
 
     ! Variables used for calculations
@@ -52,21 +52,14 @@ contains
     ! Surface position
     ! Cuba does the intergration over the hybercube.
     ! It gives us coordinates between 0 and 1.
-    par_pos(1) = emitters_pos(1, userdata) + xx(1)*emitters_dim(1, userdata) ! x and y position on the surface
-    par_pos(2) = emitters_pos(2, userdata) + xx(2)*emitters_dim(2, userdata) ! x and y position on the surface
+    par_pos(1:2) = emitters_pos(1:2, userdata) + xx(1:2)*emitters_dim(1:2, userdata) ! x and y position on the surface
     par_pos(3) = 0.0d0 ! Height, i.e. on the surface
 
     ! Calculate the electric field on the surface
     field = Calc_Field_at(par_pos)
 
     ! Add to the average field
-#if defined(__PGI)
-    F_avg(1) = F_avg(1) + field(1)
-    F_avg(2) = F_avg(2) + field(2)
-    F_avg(3) = F_avg(3) + field(3)
-#else
     F_avg = F_avg + field
-#endif
 
     ! Check if the field is favourable for emission
     if (field(3) < 0.0d0) then
