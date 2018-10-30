@@ -263,7 +263,7 @@ contains
   ! Initialize the program
   ! allocate and initilize variables, open data files for writing, etc.
   subroutine Init()
-    integer :: IFAIL, n
+    integer :: IFAIL
     !integer, dimension(:), allocatable :: my_seed
 
     ! Allocate arrays
