@@ -121,9 +121,11 @@ program VacuumMD
     !  end if
     !end do
 
+    ! Check the progress, if we are at 10%, 20%, 30%, ...
+    ! then print the progress and flush data
     if (any(i .eq. progress) .eqv. .true.) then
       call PrintProgress(nint(i*10.0d0/steps))
-      call Flush_Data
+      call Flush_Data()
     end if
 
     ! if (i == progress(1)) then

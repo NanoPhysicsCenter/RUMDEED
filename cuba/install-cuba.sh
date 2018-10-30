@@ -1,8 +1,9 @@
 #!/bin/bash
 
-installdir=~/software/cuba-4.2
-eval installdir=$installdir
+installdir=$PWD
 cd 4.2
 ./configure --prefix=$installdir
 make
 make install
+make clean
+rm config.h
