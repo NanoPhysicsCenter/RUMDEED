@@ -10,7 +10,7 @@ notes.aux: notes.tex
 	lualatex notes.tex
 
 notes.bbl: notes-ref.bib notes.aux
-	biber notes
+	bibtex notes
 
 clean:
 	rm -f *.log
