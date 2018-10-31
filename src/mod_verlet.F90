@@ -33,7 +33,7 @@ contains
     ! Reset the ramo current. Note, this should be done after set_voltage,
     ! since the ramo current may be used there.
     ramo_current = 0.0d0
-    ramo_current_emit(1:MAX_SECTIONS, 1:MAX_EMITTERS) = 0.0d0
+    ramo_current_emit = 0.0d0
 
 
     ! Update the position of particles (Electrons / Holes)
