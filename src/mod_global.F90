@@ -42,7 +42,7 @@ module mod_global
   double precision, parameter :: length_scale = 1.0d-9 ! Length scale (1 nanometer)
   double precision, parameter :: time_scale = 1.0d-12 ! Time scale (1 ps)
   double precision, parameter :: vel_scale = length_scale / time_scale ! Velocity scale (1 nm / 1 ps)
-  double precision            :: cur_scale  ! Current scale (1 mA/cm^2)
+  double precision, parameter :: cur_scale = 1.0d0 ! Current scale (1 A)
 
 
   ! ----------------------------------------------------------------------------
@@ -105,7 +105,7 @@ module mod_global
   integer, dimension(:, :), allocatable :: density_map_elec
   integer, dimension(:, :), allocatable :: density_map_hole
   integer, parameter                    :: N_x_densmap = 100, N_y_densmap = 100
-  double precision                      :: dens_x_d, dens_y_d
+  !double precision                      :: dens_x_d, dens_y_d
 
 
   ! ----------------------------------------------------------------------------
@@ -265,10 +265,12 @@ module mod_global
   procedure(Do_Emission), pointer    :: ptr_Do_Emission => null()
 contains
 
+  ! Check if a number is infinit.
   logical function isinf(a)
     double precision, intent(in) :: a
 
-    ! if the number is infinity then the results is always infinity
+    ! if the number is infinity then the results is always infinity,
+    ! .i.e inf - 1 = inf
     if ((a-1.0d0) == a) then
       isinf = .true.
     else

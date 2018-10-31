@@ -219,38 +219,42 @@ contains
     nrElec_remove_top_emit(1:MAX_EMITTERS) = 0
 
     ! Read the input file
+    ! We read in
+    ! V_s: Voltage over the system
+    ! box_dim: Size of the system
+    ! time_step: Size of the time step, given in ps
+    ! steps: Number of time_steps to do
+    ! nrEmit: Number of emitters
+    ! emitters_pos: Positions of emitters (x and y, z is ignored)
+    ! emitters_dim: Dimensions of emitters (x and y, z is ignored)
+    ! emitters_type: Type of emitter (Circle or square)
+    ! emitters_delay: When the emitter should start emitting ()
+    ! EMISSION_MODE: What emission to do (Photo/CL, Field emission, e.t.c)
     read(ud_input, NML=input)
 
     ! Close the 'input' file
     close(unit=ud_input, iostat=IFAIL, status='keep')
 
-    ! V: Voltage over the gap
     ! box_dim: Dimensions of the system
     ! d: Gap spacing
     box_dim = box_dim * length_scale
     d = box_dim(3)
 
+    ! V_s: Voltage over the gap, d
     V_d = V_s
+    ! Electric field in the system for a planar case
     E_z = -1.0d0*V_d/d
-    !print *, E_z
 
+    ! Electric field for unit voltage (See ramo current)
     E_zunit = -1.0d0/d
 
+    ! Emitters position and dimensions are given in length_scale (nm)
     emitters_dim = emitters_dim * length_scale
     emitters_pos = emitters_pos * length_scale
 
-    ! Set the dimensions of the box used
-    !box_dim(1) = d
-    !box_dim(2) = d
-    !box_dim(3) = d
-
-    dens_x_d = box_dim(1) / (N_x_densmap-1)
-    dens_y_d = box_dim(2) / (N_y_densmap-1)
-
-    ! Set the current scale to mA / micrometer^2
-    !cur_scale = 1.0d-3 * (box_dim(1)*1.0d6) * (box_dim(2)*1.0d6) ! mA / micrometer^2
-    !cur_scale = 1.0d-6 ! microAmper
-    cur_scale = 1.0d0 ! Ampers
+    
+    !dens_x_d = box_dim(1) / (N_x_densmap-1)
+    !dens_y_d = box_dim(2) / (N_y_densmap-1)
 
     !time_step: The size of the time step
     time_step = time_step * time_scale

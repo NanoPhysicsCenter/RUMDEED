@@ -79,11 +79,8 @@ contains
     E_z = -1.0d0*V_d/d
     E_zunit = -1.0d0/d
 
-    dens_x_d = box_dim(1) / (N_x_densmap-1)
-    dens_y_d = box_dim(2) / (N_y_densmap-1)
-
-    ! Set the current scale to mA / cm^2
-    cur_scale = 1.0d-3 * (box_dim(1)*1.0d2) * (box_dim(3)*1.0d2) ! mA / cm^2
+    !dens_x_d = box_dim(1) / (N_x_densmap-1)
+    !dens_y_d = box_dim(2) / (N_y_densmap-1)
 
     !time_step: The size of the time step
     !time_step = time_step * time_scale
