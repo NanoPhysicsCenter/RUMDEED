@@ -181,8 +181,19 @@ module mod_global
 
   integer            :: EMISSION_MODE           ! Parameter that defines the emission mode
 
-  ! Use image Charge or not
+  ! ----------------------------------------------------------------------------
+  ! Parameters for image charge
+  ! image_charge: Use image Charge or not.
+  !               It is checked in mod_verlet in Force_Image_Charge_v2 to decide if
+  !               to include image charge partners or not.
+  !               It is also checked in mod_field_emission to check if to use the
+  !               image charge approximations for the Fowler-Nordheim equation
+  ! N_ic_max: How many image charge partners to use in the calulations.
+  !           N_ic_max = 0 means use 1 image charge partners.
+  !           N_ic_max = 1 means use 5 image charge partners.
+  !           See the function Force_Image_Charge_v2 in mod_verlet for details.
   logical, parameter          :: image_charge = .true.
+  integer, parameter          :: N_ic_max = 1
 
   ! ----------------------------------------------------------------------------
   ! Define constants
@@ -192,13 +203,12 @@ module mod_global
 
   ! ----------------------------------------------------------------------------
   ! Parameters for random number generators
-  ! http://en.wikipedia.org/wiki/Mersenne_Twister#SFMT
   !integer                                            :: SEED = 2815
   integer, allocatable :: my_seed(:)
 
 
   ! ----------------------------------------------------------------------------
-  ! unit descriptors for data files
+  ! unit descriptors for data files (Text)
   integer :: ud_pos ! Position file
   integer :: ud_emit ! File for emitted electrons and holes
   integer :: ud_absorb ! File for absorbed electrons and holes
@@ -209,24 +219,23 @@ module mod_global
   integer :: ud_debug ! File for debuging and testing
   integer :: ud_field ! File for surface field
 
-  integer :: ud_density_emit_x
-  integer :: ud_density_emit_y
-  integer :: ud_density_emit_e
-  integer :: ud_density_emit_s
+  ! Emission density (binary files)
+  integer :: ud_density_emit_x ! x coordinate
+  integer :: ud_density_emit_y ! y coordinate
+  integer :: ud_density_emit_e ! Emitter
+  integer :: ud_density_emit_s ! Section
+
+  ! Absorption density (binary files)
   integer :: ud_density_absorb_top
   integer :: ud_density_absorb_bot
-
-  !--
-  ! Used in Calc_Field_at in the Verlet module. Needs to be shared between threads.
-  ! Can we move it into the function? ToDo...
-  double precision, dimension(1:3) :: force_tot
 
   !-----------------------------------------------------------------------------
   ! Nodal Analysis
   double precision, dimension(1:5) :: V_cur, V_prev ! Voltage and branch currents for the nodal analysis
 
   ! ----------------------------------------------------------------------------
-  ! Define namelist
+  ! Define namelist for the input file
+  ! These variables are read for the input file.
   namelist /input/ V_s, box_dim, time_step, steps, &
                    nrEmit, emitters_pos, emitters_dim, &
                    emitters_type, emitters_delay, EMISSION_MODE
@@ -250,6 +259,7 @@ module mod_global
     end subroutine Do_Emission
   end interface
 
+  ! Pointers
   procedure(Check_Boundary), pointer :: ptr_Check_Boundary => null()
   procedure(Electric_Field), pointer :: ptr_field_E => null()
   procedure(Do_Emission), pointer    :: ptr_Do_Emission => null()
