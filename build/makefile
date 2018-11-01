@@ -83,7 +83,7 @@ $(PROJECT_NAME).out: ../src/main.F90 ../cuba/lib/libcuba.a \
 			smod_work_function.o smod_mc_integration.o smod_metro_algo.o mod_ziggurat.o \
 			$(CUBA_LIB) -lpthread -lm -ldl -o $(PROJECT_NAME).out
 
-../cuba/lib/libcuba.a: ../cuba/install-cuba.sh
+../cuba/lib/libcuba.a:
 		cd ../cuba/; ./install-cuba.sh
 
 mod_global.mod mod_global.o: ../src/mod_global.F90
