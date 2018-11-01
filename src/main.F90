@@ -29,6 +29,10 @@ program VacuumMD
                 compiler_version(), ' using the options ', &
                 compiler_options()
 
+#if defined(_GIT_VERSION_)
+  print '(2a)', 'GIT version: ', _GIT_VERSION_
+#endif
+
 #if defined(_OPENMP)
   print '(a)', 'Vacuum: Using OpenMP'
   nthreads = omp_get_max_threads()

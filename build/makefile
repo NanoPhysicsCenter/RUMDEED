@@ -9,7 +9,7 @@ FCOMPILER=gfortran-8
 #FCOMPILER=pgfortran
 endif
 
-GIT_VERSION := $(shell git describe --abbrev=4 --dirty --always --tags)
+GIT_VERSION := $(shell git describe --dirty --always --tags)
 
 CUBA_LIB=../cuba/lib/libcuba.a
 
@@ -79,7 +79,7 @@ $(PROJECT_NAME).out: ../src/main.F90 ../cuba/lib/libcuba.a \
 			mod_field_emission_v2@smod_work_function.smod smod_work_function.o \
 			mod_field_emission_v2@smod_mc_integration.smod smod_mc_integration.o \
 			mod_field_emission_v2@smod_metro_algo.smod smod_metro_algo.o mod_ziggurat.o
-		$(FCOMPILER) $(FFLAGS) -D_GIT_VERSION_=${GIT_VERSION} \
+		$(FCOMPILER) $(FFLAGS) -D_GIT_VERSION_=\"${GIT_VERSION}\" \
 		    ../src/main.F90 mod_global.o mod_verlet.o mod_pair.o \
 			mod_unit_tests.o mod_photo_emission.o mod_field_emission.o mod_field_emission_v2.o \
 			mod_field_emission_tip.o mod_hyperboloid_tip.o mod_field_emission_2D.o \
