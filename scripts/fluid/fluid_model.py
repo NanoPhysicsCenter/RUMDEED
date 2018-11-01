@@ -13,10 +13,10 @@ from scipy.integrate import nquad
 #
 
 # System Parameters
-V_0 = 20E3 # Voltage
-d = 2500E-9 # Gap spaceing
-N_L = 10
-L = np.linspace(10, 100, N_L) * 1E-9 # Length of emitter
+V_0 = 20.0E3 # Voltage
+d = 2500.0E-9 # Gap spaceing
+N_L = 2
+L = np.linspace(10, 50, N_L) * 1.0E-9 # Length of emitter
 
 # Mixing weight
 x = 0.15
@@ -25,7 +25,7 @@ x = 0.15
 a_FN = e**2/(16*pi**2*hbar)
 b_FN = -4/(3*hbar) * np.sqrt(2*m_e*e)
 l_const = e / (4*pi*epsilon_0)
-w_theta = 4.7
+w_theta = 4.65
 
 E_vac = V_0 / d
 F = 1.0 # F is scaled in E_vac
@@ -55,10 +55,14 @@ def v_y(l: float) -> float:
     val = 1 - l + 1/6 * l * np.log(l)
     return val
 
-# The function to integrate
+# We want to integrate the charge density over x, y and z
+# to get the electric field in center of the emitter.
+# The function to integrate is
 # J/(9\pi) * z / (\sqrt(z) * (x^2 + y^2 + z^2)^(3/2)  )
-# Fyrst we integrate over x to obtain, ( a = L/(2*d) )
-# J/(9\pi) * 2*a \sqrt(z) / ( (x^2 + z^2) \sqrt(y^2 + z^2 + a^2) )
+# First we do the x integration by hand and then do the
+# y and z integrations numerically.
+# When we do the x integration we obtain, ( a = L/(2*d) )
+# J/(9\pi) * 2*a \sqrt(z) / ( (y^2 + z^2) \sqrt(y^2 + z^2 + a^2) ).
 # This is the function we integrate numerically below. z = [0, 1], y = [0, a]
 def int_fun(y: float, z: float, a: float) -> float:
     val = np.sqrt(z) / ((y**2 + z**2)*np.sqrt(a**2 + y**2 + z**2))
@@ -99,16 +103,19 @@ for k in range(N_L):
         E_z, abserr = nquad(int_fun, [[0.0, a], [0.0, 1.0]], args=(a,), opts=[options, options])
         E_z = J/(9*pi) * 4*a * E_z
 
-        # Set F to out new value. The factor 2 due to image-charge effects
+        # Set F to new value. The factor 2 is due to image-charge effects
+        # F = F_vac - 2*E_z,
+        # but we scale the field with F_vac so
+        # F = 1 - 2*E_z
         F = 1 - 2*E_z
 
-        # Set values that we want to keep
+        # Store the values that we want to keep
         F_keep[i] = F
         J_keep[i] = J
         J_old = J
 
     # Check the convergance
-    if np.abs((J_keep[N-1] - J_keep[N-2])) > 1E-3:
+    if np.abs((J_keep[N-1] - J_keep[N-2])) > 1.0E-3:
         print('Warning error > 1E-3')
     else:
         print('k = ' + str(k) + ' done')
@@ -119,7 +126,10 @@ for k in range(N_L):
 
 # Plot the results
 print('Ploting results')
-plt.plot(L/1E-9, J_L*J_CL)
+plt.plot(L/1.0E-9, J_L*J_CL)
 plt.xlabel('L [nm]')
 plt.ylabel('J [A/m^2]')
 plt.show()
+
+print(L/1.0E-9)
+print(J_L*J_CL)
