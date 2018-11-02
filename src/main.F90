@@ -424,7 +424,7 @@ contains
       stop
     end if
 
-    open(newunit=ud_ramo_sec, iostat=IFAIL, file='out/ramo_current.bin', status='REPLACE', action='write')
+    open(newunit=ud_ramo_sec, iostat=IFAIL, file='out/ramo_current.bin', status='REPLACE', action='write', access='STREAM')
     if (IFAIL /= 0) then
       print *, 'Vacuum: Failed to open file ramo_current.bin. ABORTING'
       stop
