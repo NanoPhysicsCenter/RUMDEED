@@ -234,18 +234,11 @@ module mod_global
   double precision, dimension(1:5) :: V_cur, V_prev ! Voltage and branch currents for the nodal analysis
 
   ! ----------------------------------------------------------------------------
-  ! Define namelist for the input file and system variables
+  ! Define namelist for the input file
   ! These variables are read for the input file.
   namelist /input/ V_s, box_dim, time_step, steps, &
                    nrEmit, emitters_pos, emitters_dim, &
                    emitters_type, emitters_delay, EMISSION_MODE
-
-  ! These variables are written to the init.nml file
-  namelist /system/ V_s, box_dim, time_step, steps, nrEmit, emitters_pos, emitters_dim, &
-                    emitters_type, emitters_delay, EMISSION_MODE, epsilon_r, m_eeff, m_heff, &
-                    length_scale, time_scale, vel_scale, cur_scale, MAX_PARTICLES, MAX_EMITTERS, &
-                    MAX_SECTIONS, MAX_LIFE_TIME
-
 
   ! ----------------------------------------------------------------------------
   ! Prodecure interfaces and pointers

@@ -611,13 +611,16 @@ contains
     ! Close file 'init.dt'
     close(unit=ud_init, iostat=IFAIL, status='keep')
 
-    open(newunit=ud_init, iostat=IFAIL, file='out/init.nml', status='REPLACE', action='write')
+    open(newunit=ud_init, iostat=IFAIL, file='out/init.bin', status='REPLACE', action='write')
     if (IFAIL /= 0) then
       print *, 'Failed to open file init.dt. ABORTING'
       stop
     end if
 
-    write(unit=ud_init, nml=system)
+    write(unit=ud_init) V_s, box_dim, time_step, steps, nrEmit, emitters_pos, emitters_dim, &
+                        emitters_type, emitters_delay, EMISSION_MODE, epsilon_r, m_eeff, m_heff, &
+                        length_scale, time_scale, vel_scale, cur_scale, MAX_PARTICLES, MAX_EMITTERS, &
+                        MAX_SECTIONS, MAX_LIFE_TIME
 
     close(unit=ud_init, iostat=IFAIL, status='keep')
   end subroutine Write_Initial_Variables
