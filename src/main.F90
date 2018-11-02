@@ -611,7 +611,7 @@ contains
     ! Close file 'init.dt'
     close(unit=ud_init, iostat=IFAIL, status='keep')
 
-    open(newunit=ud_init, iostat=IFAIL, file='out/init.bin', status='REPLACE', action='write')
+    open(newunit=ud_init, iostat=IFAIL, file='out/init.bin', status='REPLACE', action='write', access='STREAM')
     if (IFAIL /= 0) then
       print *, 'Failed to open file init.dt. ABORTING'
       stop
