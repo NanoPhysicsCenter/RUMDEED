@@ -438,31 +438,10 @@ contains
     
     !------------------------------------------------------------------------------------
     ! Emission density
-    open(newunit=ud_density_emit_x, iostat=IFAIL, file='out/density_emit_x.bin', &
+    open(newunit=ud_density_emit, iostat=IFAIL, file='out/density_emit.bin', &
     status='REPLACE', action='WRITE', access='STREAM')
     if (IFAIL /= 0) then
-      print *, 'Vacuum: Failed to open file density_emit_x.dt. ABORTING'
-      stop
-    end if
-
-    open(newunit=ud_density_emit_y, iostat=IFAIL, file='out/density_emit_y.bin', &
-    status='REPLACE', action='WRITE', access='STREAM')
-    if (IFAIL /= 0) then
-      print *, 'Vacuum: Failed to open file density_emit_y.dt. ABORTING'
-      stop
-    end if
-
-    open(newunit=ud_density_emit_e, iostat=IFAIL, file='out/density_emit_e.bin', &
-    status='REPLACE', action='WRITE', access='STREAM')
-    if (IFAIL /= 0) then
-      print *, 'Vacuum: Failed to open file density_emit_e.dt. ABORTING'
-      stop
-    end if
-
-    open(newunit=ud_density_emit_s, iostat=IFAIL, file='out/density_emit_s.bin', &
-    status='REPLACE', action='WRITE', access='STREAM')
-    if (IFAIL /= 0) then
-      print *, 'Vacuum: Failed to open file density_emit_s.dt. ABORTING'
+      print *, 'Vacuum: Failed to open file density_emit.dt. ABORTING'
       stop
     end if
 
@@ -546,10 +525,7 @@ contains
     flush(ud_field)
     flush(ud_debug)
 
-    flush(ud_density_emit_x)
-    flush(ud_density_emit_y)
-    flush(ud_density_emit_e)
-    flush(ud_density_emit_s)
+    flush(ud_density_emit)
 
     flush(ud_density_absorb_top)
     flush(ud_density_absorb_bot)
@@ -649,10 +625,7 @@ contains
     close(unit=ud_field, iostat=IFAIL, status='keep')
     close(unit=ud_debug, iostat=IFAIL, status='keep')
 
-    close(unit=ud_density_emit_x, iostat=IFAIL, status='keep')
-    close(unit=ud_density_emit_y, iostat=IFAIL, status='keep')
-    close(unit=ud_density_emit_e, iostat=IFAIL, status='keep')
-    close(unit=ud_density_emit_s, iostat=IFAIL, status='keep')
+    close(unit=ud_density_emit, iostat=IFAIL, status='keep')
     close(unit=ud_density_absorb_top, iostat=IFAIL, status='keep')
     close(unit=ud_density_absorb_bot, iostat=IFAIL, status='keep')
 

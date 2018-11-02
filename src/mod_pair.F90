@@ -83,10 +83,7 @@ contains
 
       ! Write out the x and y position of the emitted particle
       ! along with which emitter it came from.
-      write(unit=ud_density_emit_x) (par_pos(1) / length_scale)
-      write(unit=ud_density_emit_y) (par_pos(2) / length_scale)
-      write(unit=ud_density_emit_e) emit
-      write(unit=ud_density_emit_s) sec
+      write(unit=ud_density_emit) (par_pos(1) / length_scale), (par_pos(2) / length_scale), emit, sec
     end if
   end subroutine Add_Particle
 

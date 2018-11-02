@@ -220,10 +220,7 @@ module mod_global
   integer :: ud_field ! File for surface field
 
   ! Emission density (binary files)
-  integer :: ud_density_emit_x ! x coordinate
-  integer :: ud_density_emit_y ! y coordinate
-  integer :: ud_density_emit_e ! Emitter
-  integer :: ud_density_emit_s ! Section
+  integer :: ud_density_emit
 
   ! Absorption density (binary files)
   integer :: ud_density_absorb_top
