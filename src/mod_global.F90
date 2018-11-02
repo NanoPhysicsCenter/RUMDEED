@@ -208,7 +208,7 @@ module mod_global
 
 
   ! ----------------------------------------------------------------------------
-  ! unit descriptors for data files (Text)
+  ! unit descriptors for data files (text files)
   integer :: ud_pos ! Position file
   integer :: ud_emit ! File for emitted electrons and holes
   integer :: ud_absorb ! File for absorbed electrons and holes
@@ -218,6 +218,9 @@ module mod_global
   integer :: ud_volt ! Voltage in the system
   integer :: ud_debug ! File for debuging and testing
   integer :: ud_field ! File for surface field
+
+  ! unit descriptors for data files (binary files)
+  integer :: ud_ramo_sec ! File for the ramo current broken down into emitters and sections
 
   ! Emission density (binary files)
   integer :: ud_density_emit
@@ -231,11 +234,18 @@ module mod_global
   double precision, dimension(1:5) :: V_cur, V_prev ! Voltage and branch currents for the nodal analysis
 
   ! ----------------------------------------------------------------------------
-  ! Define namelist for the input file
+  ! Define namelist for the input file and system variables
   ! These variables are read for the input file.
   namelist /input/ V_s, box_dim, time_step, steps, &
                    nrEmit, emitters_pos, emitters_dim, &
                    emitters_type, emitters_delay, EMISSION_MODE
+
+  ! These variables are written to the init.nml file
+  namelist /system/ V_s, box_dim, time_step, steps, nrEmit, emitters_pos, emitters_dim, &
+                    emitters_type, emitters_delay, EMISSION_MODE, epsilon_r, m_eeff, m_heff, &
+                    length_scale, time_scale, vel_scale, cur_scale, MAX_PARTICLES, MAX_EMITTERS, &
+                    MAX_SECTIONS, MAX_LIFE_TIME
+
 
   ! ----------------------------------------------------------------------------
   ! Prodecure interfaces and pointers

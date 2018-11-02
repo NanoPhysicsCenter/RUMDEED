@@ -424,6 +424,12 @@ contains
       stop
     end if
 
+    open(newunit=ud_ramo_sec, iostat=IFAIL, file='out/ramo_current.bin', status='REPLACE', action='write')
+    if (IFAIL /= 0) then
+      print *, 'Vacuum: Failed to open file ramo_current.bin. ABORTING'
+      stop
+    end if
+
     open(newunit=ud_volt, iostat=IFAIL, file='out/volt.dt', status='REPLACE', action='write')
     if (IFAIL /= 0) then
       print *, 'Vacuum: Failed to open file volt.dt. ABORTING'
@@ -537,7 +543,7 @@ contains
   ! Write out parameters, constants and initial variables used when the program starts
   subroutine Write_Initial_Variables()
     implicit none
-    integer :: ud_init, IFAIL
+    integer                     :: ud_init, IFAIL
     character(len=*), parameter :: fmt_int = "(a, tr8, i8, tr6, a)"
     character(len=*), parameter :: fmt_rel = "(a, tr2, ES16.6, tr2, a)"
     !character(len=*), parameter :: fmt_cmp = "(a, tr2, '(', G16.6, ',', G16.6, ')', tr2, a)"
@@ -604,6 +610,16 @@ contains
 
     ! Close file 'init.dt'
     close(unit=ud_init, iostat=IFAIL, status='keep')
+
+    open(newunit=ud_init, iostat=IFAIL, file='out/init.nml', status='REPLACE', action='write')
+    if (IFAIL /= 0) then
+      print *, 'Failed to open file init.dt. ABORTING'
+      stop
+    end if
+
+    write(unit=ud_init, nml=system)
+
+    close(unit=ud_init, iostat=IFAIL, status='keep')
   end subroutine Write_Initial_Variables
 
 
@@ -611,23 +627,23 @@ contains
   ! Clean up after the program
   ! Deallocate variables, close files, etc.
   subroutine Clean_up()
-    integer :: IFAIL
 
     ! Close file descriptors
-    close(unit=ud_pos, iostat=IFAIL, status='keep')
+    close(unit=ud_pos, status='keep')
     !close(unit=ud_vel, iostat=IFAIL, status='keep')
-    close(unit=ud_emit, iostat=IFAIL, status='keep')
-    close(unit=ud_absorb, iostat=IFAIL, status='keep')
-    close(unit=ud_absorb_top, iostat=IFAIL, status='keep')
-    close(unit=ud_absorb_bot, iostat=IFAIL, status='keep')
-    close(unit=ud_ramo, iostat=IFAIL, status='keep')
-    close(unit=ud_volt, iostat=IFAIL, status='keep')
-    close(unit=ud_field, iostat=IFAIL, status='keep')
-    close(unit=ud_debug, iostat=IFAIL, status='keep')
+    close(unit=ud_emit,  status='keep')
+    close(unit=ud_absorb,  status='keep')
+    close(unit=ud_absorb_top, status='keep')
+    close(unit=ud_absorb_bot, status='keep')
+    close(unit=ud_ramo, status='keep')
+    close(unit=ud_ramo_sec, status='keep')
+    close(unit=ud_volt, status='keep')
+    close(unit=ud_field,status='keep')
+    close(unit=ud_debug, status='keep')
 
-    close(unit=ud_density_emit, iostat=IFAIL, status='keep')
-    close(unit=ud_density_absorb_top, iostat=IFAIL, status='keep')
-    close(unit=ud_density_absorb_bot, iostat=IFAIL, status='keep')
+    close(unit=ud_density_emit, status='keep')
+    close(unit=ud_density_absorb_top, status='keep')
+    close(unit=ud_density_absorb_bot, status='keep')
 
     ! Deallocate arrays
     deallocate(particles_cur_pos)
@@ -657,12 +673,6 @@ contains
     deallocate(density_map_hole)
 
     deallocate(my_seed)
-
-    !Dipole arrays
-    !deallocate(dipoles_theta)
-    !deallocate(dipoles_omega)
-    !deallocate(dipoles_alpha)
-    !deallocate(dipoles_center)
 
   end subroutine Clean_up
 end program VacuumMD
