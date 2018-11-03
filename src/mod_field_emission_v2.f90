@@ -52,6 +52,12 @@ Module mod_field_emission_v2
         integer, intent(out), optional               :: sec ! Return the section
       end function w_theta_xy
 
+      module subroutine Read_work_function()
+      end subroutine Read_work_function
+
+      module subroutine Work_fun_cleanup()
+      end subroutine Work_fun_cleanup
+
       ! Interface for the MC integration submodule
       module subroutine Do_Surface_Integration(emit, N_sup)
         integer, intent(in)  :: emit ! The emitter to do the integration on
@@ -81,6 +87,8 @@ contains
     ! The function that does the emission
     ptr_Do_Emission => Do_Field_Emission
 
+    call Read_work_function()
+
     ! Parameters used in the module
     time_step_div_q0 = time_step / q_0
 
@@ -90,6 +98,8 @@ contains
 
   subroutine Clean_Up_Field_Emission_v2()
     deallocate(nrEmitted_emitters)
+
+    call Work_fun_cleanup()
   end subroutine Clean_Up_Field_Emission_v2
 
   !-----------------------------------------------------------------------------

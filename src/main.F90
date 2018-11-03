@@ -607,6 +607,9 @@ contains
     write(ud_init, fmt_int) 'NrEmit        = ', NrEmit,        'Number of emitters'
     write(ud_init, fmt_int) 'EMISSION_MODE = ', EMISSION_MODE, 'The emission mechanism'
     write(ud_init, *) '---------------------------------------------------------'
+#if defined(_GIT_VERSION_)
+    write(ud_init, *) _GIT_VERSION_
+#endif
 
     ! Close file 'init.dt'
     close(unit=ud_init, iostat=IFAIL, status='keep')

@@ -5,19 +5,83 @@
 ! 21.10.18                                  !
 !-------------------------------------------!
 submodule (mod_field_emission_v2) smod_work_function
+  integer                                        :: y_num, x_num, WORK_TYPE
+  double precision, allocatable, dimension(:, :) :: w_theta_arr ! 1:y_num, 1:x_num
+  double precision                               :: x_len, y_len
 
+  integer, parameter :: WORK_CHECKBOARD = 1
+
+  interface
+    double precision function Work_fun(pos, sec)
+      double precision, dimension(1:3), intent(in) :: pos
+      integer, intent(out), optional               :: sec
+    end function Work_fun
+  end interface
+  procedure(Work_fun), pointer :: ptr_Work_fun => null()
 contains
+
+  module subroutine Read_work_function()
+    integer :: ud_work, IFAIL, i
+
+    ! Open the file that contains information about the work function
+    open(unit=ud_work, iostat=IFAIL, file='w_theta', status='OLD', form='FORMATTED', access='SEQUENTIAL', action='READ')
+    if (IFAIL /= 0) then
+      print *, 'Vacuum: Failed to open file w_theta. ABORTING'
+      print *, IFAIL
+      stop
+    end if
+
+    ! Read the type of work function to use
+    read(unit=ud_work, FMT=*) WORK_TYPE
+
+    SELECT CASE (WORK_TYPE)
+    case (WORK_CHECKBOARD)
+      ! Checkerboard work function
+      ptr_Work_fun => w_theta_checkerboard
+
+      ! Read the size of matrix from the file
+      read(unit=ud_work, FMT=*) y_num, x_num
+
+      ! Length of each section
+      x_len = 1.0d0/x_num
+      y_len = 1.0d0/y_num
+
+      ! Allocate the matrix
+      allocate(w_theta_arr(1:y_num, 1:x_num))
+
+      ! Read the matrix from the file
+      do i = 1, y_num
+        read(unit=ud_work, FMT=*) w_theta_arr(i, :)
+      end do
+
+    case DEFAULT
+      print '(a)', 'Vaccum: ERROR UNKNOWN WORK FUNCTION TYPE'
+      print *, WORK_TYPE
+      stop
+    END SELECT
+
+    close(unit=ud_work)
+  end subroutine Read_work_function
+
+  ! Clean up stuff
+  module subroutine Work_fun_cleanup()
+    if (WORK_TYPE == WORK_CHECKBOARD) then
+      deallocate(w_theta_arr)
+    end if
+  end subroutine Work_fun_cleanup
 
   ! ----------------------------------------------------------------------------
   ! Function that returns the position dependant work function.
-  ! Here we pick the method to be used.
+  ! This function simply calls the function that was set in Read_work_function.
   module double precision function w_theta_xy(pos, sec)
     double precision, dimension(1:3), intent(in) :: pos
     integer, intent(out), optional               :: sec
 
+    ! Call the function set in Read_work_function
+    w_theta_xy = ptr_Work_fun(pos, sec)
    
     !w_theta_xy = w_theta_triangle(pos, sec)
-    w_theta_xy = w_theta_checkerboard(pos, sec)
+    !w_theta_xy = w_theta_checkerboard(pos, sec)
     !w_theta_xy = w_theta_checkerboard_2x2(pos, sec)
     !w_theta_xy = w_theta_constant(pos, sec)
     !w_theta_xy = w_theta_gaussian(pos, sec)
@@ -104,17 +168,14 @@ contains
     integer, intent(out), optional                :: sec
     double precision,             dimension(1:3)  :: pos_scaled
     double precision                              :: x, y
-    double precision                              :: x_len, y_len
     integer                                       :: x_i, y_i
     integer, parameter                            :: emit = 1 ! Assume emitter nr. 1 for now
-    integer, parameter                            :: y_num = 4, x_num = 4
-    double precision, dimension(1:y_num, 1:x_num) :: w_theta_arr
 
     ! To do: Read this from a file
-    w_theta_arr(1, 1:4) = (/ 4.70d0, 4.70d0, 4.70d0, 4.70d0 /)
-    w_theta_arr(2, 1:4) = (/ 4.70d0, 4.60d0, 4.60d0, 4.70d0 /)
-    w_theta_arr(3, 1:4) = (/ 4.70d0, 4.60d0, 4.60d0, 4.70d0 /)
-    w_theta_arr(4, 1:4) = (/ 4.70d0, 4.70d0, 4.70d0, 4.70d0 /)
+    !w_theta_arr(1, 1:4) = (/ 4.70d0, 4.70d0, 4.70d0, 4.70d0 /)
+    !w_theta_arr(2, 1:4) = (/ 4.70d0, 4.60d0, 4.60d0, 4.70d0 /)
+    !w_theta_arr(3, 1:4) = (/ 4.70d0, 4.60d0, 4.60d0, 4.70d0 /)
+    !w_theta_arr(4, 1:4) = (/ 4.70d0, 4.70d0, 4.70d0, 4.70d0 /)
 
     !w_theta_arr(1, 1:4) = (/ 4.65d0, 4.65d0, 4.65d0, 4.65d0 /)
     !w_theta_arr(2, 1:4) = (/ 4.65d0, 4.70d0, 4.70d0, 4.65d0 /)
@@ -136,10 +197,6 @@ contains
 
     x = pos_scaled(1)
     y = pos_scaled(2)
-
-    ! Length of each section
-    x_len = 1.0d0/x_num
-    y_len = 1.0d0/y_num
 
     ! Calculate the position in the matrix
     x_i = floor(x/x_len) + 1
