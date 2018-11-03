@@ -9,7 +9,9 @@ submodule (mod_field_emission_v2) smod_work_function
   double precision, allocatable, dimension(:, :) :: w_theta_arr ! 1:y_num, 1:x_num
   double precision                               :: x_len, y_len
 
+  ! Type of work function models
   integer, parameter :: WORK_CHECKBOARD = 1
+  integer, parameter :: WORK_GAUSS      = 2
 
   interface
     double precision function Work_fun(pos, sec)
@@ -37,6 +39,7 @@ contains
     SELECT CASE (WORK_TYPE)
     case (WORK_CHECKBOARD)
       ! Checkerboard work function
+      print '(a)', 'Vacuum: Using checkerboard work function model'
       ptr_Work_fun => w_theta_checkerboard
 
       ! Read the size of matrix from the file
@@ -53,9 +56,15 @@ contains
       do i = 1, y_num
         read(unit=ud_work, FMT=*) w_theta_arr(i, :)
       end do
-
+    case (WORK_GAUSS)
+      ! Gaussian work function
+      print '(a)', 'Vacuum: Using Gaussian work function model'
+      ptr_Work_fun => w_theta_gaussian
+      ! Read base work function
+      ! Read number of gaussian points
+      ! Read them one by one, x, y, height, width
     case DEFAULT
-      print '(a)', 'Vaccum: ERROR UNKNOWN WORK FUNCTION TYPE'
+      print '(a)', 'Vacuum: ERROR UNKNOWN WORK FUNCTION TYPE'
       print *, WORK_TYPE
       stop
     END SELECT

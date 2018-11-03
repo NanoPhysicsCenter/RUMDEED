@@ -69,7 +69,7 @@ program VacuumMD
     print '(a)', 'Vacuum: Doing Field emission DEV V2'
     call Init_Field_Emission_v2()
   case DEFAULT
-    print '(a)', 'Vaccum: ERROR UNKNOWN EMISSION MODEL'
+    print '(a)', 'Vacuum: ERROR UNKNOWN EMISSION MODEL'
     print *, EMISSION_MODE
     stop
   END SELECT
@@ -620,10 +620,8 @@ contains
       stop
     end if
 
-    write(unit=ud_init) V_s, box_dim, time_step, steps, nrEmit, emitters_pos, emitters_dim, &
-                        emitters_type, emitters_delay, EMISSION_MODE, epsilon_r, m_eeff, m_heff, &
-                        length_scale, time_scale, vel_scale, cur_scale, MAX_PARTICLES, MAX_EMITTERS, &
-                        MAX_SECTIONS, MAX_LIFE_TIME
+    write(unit=ud_init) epsilon_r, m_eeff, m_heff, length_scale, time_scale, vel_scale, cur_scale, &
+                        MAX_PARTICLES, MAX_EMITTERS, MAX_SECTIONS, MAX_LIFE_TIME
 
     close(unit=ud_init, iostat=IFAIL, status='keep')
   end subroutine Write_Initial_Variables
