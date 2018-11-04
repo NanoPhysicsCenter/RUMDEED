@@ -103,7 +103,7 @@ contains
     integer             :: i, k, emit, sec
     double precision    :: q
 
-    !$OMP PARALLEL DO PRIVATE(i, q, k)
+    !$OMP PARALLEL DO PRIVATE(i, q, k) SCHEDULE(AUTO)
     do i = startElecHoles, endElecHoles
       particles_cur_vel(:, i) = particles_cur_vel(:, i) &
                             & + 0.5d0*( particles_prev_accel(:, i) &

@@ -174,7 +174,7 @@ contains
     df_avg = 0.0d0
 
     ! Loop over the electrons to be emitted.
-    !$OMP PARALLEL DO PRIVATE(s, par_pos, F, D_f, rnd, par_vel) REDUCTION(+:df_avg)
+    !$OMP PARALLEL DO PRIVATE(s, par_pos, F, D_f, rnd, par_vel) REDUCTION(+:df_avg) SCHEDULE(AUTO)
     do s = 1, N_sup
 
       par_pos = Metropolis_Hastings_rectangle_v2(30, emit, D_f, F)
@@ -187,11 +187,11 @@ contains
       if (F >= 0.0d0) then
         D_f = 0.0d0
         !print *, 'Warning: F > 0.0d0'
-      else
-        if (D_f > 1.0d0) then
-          print *, 'Warning D_f > 1.0d0'
-          print *, 'D_f = ', D_f
-        end if
+      !else
+      !  if (D_f > 1.0d0) then
+      !    print *, 'Warning D_f > 1.0d0'
+      !    print *, 'D_f = ', D_f
+      !  end if
       end if
       df_avg = df_avg + D_f
 
