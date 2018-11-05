@@ -86,7 +86,7 @@ contains
   ! ----------------------------------------------------------------------------
   ! Checks the boundary conditions of the box.
   ! Check which particles to remove
-  ! Enforce periodic boundary conditions (ToDo)
+  ! Enforce periodic boundary conditions (ToDo, Edwald sum in slab?)
   subroutine Check_Boundary_ElecHole_Planar(i)
     integer, intent(in) :: i
     double precision    :: z
