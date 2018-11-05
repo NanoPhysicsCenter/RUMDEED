@@ -296,6 +296,7 @@ contains
     !allocate(particles_prev_vel(1:3, 1:MAX_PARTICLES))
     allocate(particles_cur_accel(1:3, 1:MAX_PARTICLES))
     allocate(particles_prev_accel(1:3, 1:MAX_PARTICLES))
+    allocate(particles_prev2_accel(1:3, 1:MAX_PARTICLES))
     allocate(particles_charge(1:MAX_PARTICLES))
     allocate(particles_species(1:MAX_PARTICLES))
     allocate(particles_mass(1:MAX_PARTICLES))
@@ -315,6 +316,7 @@ contains
     particles_cur_vel = 0.0d0
     particles_cur_accel = 0.0d0
     particles_prev_accel = 0.0d0
+    particles_prev2_accel = 0.0d0
     particles_charge = 0.0d0
     particles_species = 0
     particles_mass = 0.0d0
@@ -656,6 +658,7 @@ contains
     !deallocate(particles_prev_vel)
     deallocate(particles_cur_accel)
     deallocate(particles_prev_accel)
+    deallocate(particles_prev2_accel)
     deallocate(particles_charge)
     deallocate(particles_species)
     deallocate(particles_mass)

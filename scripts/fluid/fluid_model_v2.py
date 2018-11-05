@@ -1,10 +1,11 @@
 import matplotlib.pyplot as plt
 import numpy as np
-from scipy.constants import *
+from scipy.constants import pi, hbar, e, m_e, epsilon_0
 from scipy.integrate import nquad
 
 # Fluid model code
 # Kristinn Torfason (29.11.2017) (Converted from Current_density_scaled.m)
+# Revised (5.11.2018)
 #
 # This code calculates the fluid model for the field emission
 # The continuity equation, \rho(z) p/m_e = J
@@ -30,11 +31,11 @@ w_theta = 4.60
 E_vac = V_0 / d
 F = 1.0 # F is scaled in E_vac
 
-# Number of iterations
-N = 50
+# Maximum number of iterations
+N_max = 500
 
-J_keep = np.zeros(N)
-F_keep = np.zeros(N)
+J_keep = np.zeros(N_max)
+F_keep = np.zeros(N_max)
 
 J_L = np.zeros(N_L)
 F_L = np.zeros(N_L)
@@ -80,8 +81,18 @@ for k in range(N_L):
     J_keep[:] = 0.0
     F_keep[:] = 0.0
 
+    # Set a = L / (2*d)
+    a = LD_C[k]
+
+    options={'limit': 100} # Increase the number of subintervals in the integration
+    # nquad does an N-dimensional integration
+    # https://docs.scipy.org/doc/scipy/reference/generated/scipy.integrate.nquad.html
+    # integrate int_fun, y=0..a, z=0..1, with extra arguments (a,) passed to the function
+    # We change the integration on y from [-a, a] to [0, a] and multiply with 2 instead (4a = 2*2a).
+    E_const, abserr = nquad(int_fun, [[0.0, a], [0.0, 1.0]], args=(a,), opts=[options, options])
+
     # Loop for the iteration to converge the current density
-    for i in range(N):
+    for i in range(N_max):
         F = E_vac * F
         l = l_const * F / w_theta**2
 
@@ -92,16 +103,7 @@ for k in range(N_L):
         J_new = elec_supply * esc_prob / J_CL
         J = x*J_new + (1-x)*J_old # Mixing for better convergance
 
-        # Set a = L / (2*d)
-        a = LD_C[k]
-
-        options={'limit': 100} # Increase the number of subintervals in the integration
-        # nquad does an N-dimensional integration
-        # https://docs.scipy.org/doc/scipy/reference/generated/scipy.integrate.nquad.html
-        # integrate int_fun, y=0..a, z=0..1, with extra arguments (a,) passed to the function
-        # We change the integration on y from [-a, a] to [0, a] and multiply with 2 instead (4a = 2*2a).
-        E_z, abserr = nquad(int_fun, [[0.0, a], [0.0, 1.0]], args=(a,), opts=[options, options])
-        E_z = J/(9*pi) * 4*a * E_z
+        E_z = J/(9*pi) * 4*a * E_const
 
         # Set F to new value. The factor 2 is due to image-charge effects
         # F = F_vac - 2*E_z,
@@ -114,11 +116,14 @@ for k in range(N_L):
         J_keep[i] = J
         J_old = J
 
+        if (i >= 2):
+            if np.abs((J_keep[i-1] - J_keep[i-2])) < 1.0E-12:
+                print('k = ' + str(k) + ' done ' + str(i))
+                break
+
     # Check the convergance
-    if np.abs((J_keep[N-1] - J_keep[N-2])) > 1.0E-3:
-        print('Warning error > 1E-3')
-    else:
-        print('k = ' + str(k) + ' done')
+    if np.abs((J_keep[i-1] - J_keep[i-2])) > 1.0E-12:
+        print('Warning error > 1E-12')
 
     # Set values that we want to keep
     J_L[k] = J

@@ -59,7 +59,7 @@ where \(v_0\) is the initial velocity.
   then calculate the acceleration \(a_{n+1}\) using \(x_{n+1}\) and finaly
   update the velocity,
   \begin{equation}
-    v_{n+1} = v_n \frac{a_n + a_{n+1}}{2}{\Delta t}^2\, .
+    v_{n+1} = v_n + \frac{a_n + a_{n+1}}{2}{\Delta t}^2\, .
   \end{equation}
   Note this method assumes that \(a_{n+1}\) dose not depend on \(v_{n+1}\).
   This could be a problem when using a magnetic field which depends on the
@@ -119,6 +119,19 @@ where \(v_0\) is the initial velocity.
   \begin{equation}
     \mathbf{a}_{13} = -\frac{e^2}{4\pi m\epsilon_0} \frac{\mathbf{R}_1 - \mathbf{R}_3}{|\mathbf{R}_1 - \mathbf{R}_3|^3}
   \end{equation}
+  
+\section{Beeman's algorithm}
+Beeman's algorithm is a variant of the Verlet algorithm.
+See~\cite{LEVITT1983617} and Beemans paper~\cite{BEEMAN1976130}, also \url{https://en.wikipedia.org/wiki/Beeman's_algorithm}.
+
+Step one is to calculate the positions
+\begin{equation}
+ x_{n+1} = x_n + v_n\Delta t + \frac{1}{6}\left( 4a_n - a_{n-1}\right)\Delta t^2
+\end{equation}
+then updated acceleration and finaly calculate the velocity
+\begin{equation}
+ v_{n+1} = v_n + \frac{1}{6}\left( 2a_{n+1} + 5a_n - a_{n-1} \right)\Delta t
+\end{equation}
 
 \clearpage
 \section{Field Emission}
@@ -165,7 +178,7 @@ we must multiply it with a factor of \((1/e)^{-3/2}\) and obtain
  b_{FN} = \frac{8\pi\sqrt{2m_e e}}{3h} = \frac{4}{3\hbar}\sqrt{2em_e}
 \end{equation}
 
-\subsection{Surface Field Calculations}
+\subsection{Surface Field Calculations / Fluid model}
 If we assume a box with height \(d\) in \(z\), length \(L\) in \(x\) and \(y\), with a charge density \(\sigma(z)\).
 Then the surface field at the middle of the bottom in the \(z\) direction is given by
 \begin{equation}
@@ -182,6 +195,22 @@ The field is scaled by the vacuum field \(E_0 = -V_0/d\), we then obtain
     \frac{\sqrt{\hat{z}}}{(\hat{x}^2 + \hat{y}^2 + \hat{z}^2)^{3/2}}\, \ud \hat{x}\, \ud \hat{y}\, \ud \hat{z}\, .
 \end{equation}
 Calculated iteratively
+
+\subsubsection{Charge density}
+The charge density can be found by using the equation for the current density,
+\begin{equation}
+ J = \rho v\, ,
+\end{equation}
+where \(\rho\) is the charge density and \(v\) the velocity. We rewrite this as
+\(J = \rho \frac{P}{m_e}\). Next we use the convervation of energy
+\begin{equation}
+ \frac{p^2}{2m_e} = eV_0\frac{z}{d}\, .
+\end{equation}
+If we combine the two we get
+\begin{equation}
+ \rho(z) = \frac{J}{\sqrt{m_e d / (2eV_0 z)}}\, .
+\end{equation}
+
 
 \subsection{Prolate spheroidal coordinates}
   The prolate spheroidal coordinates are defined as

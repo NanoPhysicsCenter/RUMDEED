@@ -80,6 +80,7 @@ module mod_global
   double precision, dimension(:, :), allocatable :: particles_cur_vel    ! Current velocity
   double precision, dimension(:, :), allocatable :: particles_cur_accel  ! Current acceleration
   double precision, dimension(:, :), allocatable :: particles_prev_accel ! Previous acceleration
+  double precision, dimension(:, :), allocatable :: particles_prev2_accel ! Previous acceleration
 
   ! Other information about particles, the dimension if the number of particles
   double precision, dimension(:)   , allocatable :: particles_charge     ! Charge

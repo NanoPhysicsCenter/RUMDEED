@@ -59,6 +59,7 @@ contains
       particles_prev_pos(:, nrPart+1) = -1.0d0*length_scale
       particles_cur_accel(:, nrPart+1) = 0.0d0
       particles_prev_accel(:, nrPart+1) = 0.0d0
+      particles_prev2_accel(:, nrPart+1) = 0.0d0
       particles_cur_vel(:, nrPart+1) = par_vel
       particles_step(nrPart+1) = step
       particles_mask(nrPart+1) = .true.
@@ -224,6 +225,10 @@ contains
 
         !$OMP TASK FIRSTPRIVATE(k, m) SHARED(particles_prev_accel, particles_mask)
         call compact_array(particles_prev_accel, particles_mask, k, m)
+        !$OMP END TASK
+
+        !$OMP TASK FIRSTPRIVATE(k, m) SHARED(particles_prev2_accel, particles_mask)
+        call compact_array(particles_prev2_accel, particles_mask, k, m)
         !$OMP END TASK
 
         !$OMP TASK FIRSTPRIVATE(k, m, step) SHARED(particles_species, particles_step, particles_mask, life_time)
