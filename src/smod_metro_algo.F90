@@ -23,7 +23,7 @@ contains
     double precision                 :: df_cur, df_new
 
     !std = (emitters_dim(1, emit)*0.05d0 + emitters_dim(2, emit)*0.05d0) / 2.0d0
-    std(:) = emitters_dim(:, emit)*0.025d0 ! Standard deviation is 2.5% of the emitter length.
+    std(1:2) = emitters_dim(1:2, emit)*0.025d0 ! Standard deviation is 2.5% of the emitter length.
                                            ! This means that 68% of jumps are less than this value.
 
     ! Get a random initial position on the surface.

@@ -104,6 +104,7 @@ program VacuumMD
   do i = 1, steps
 
     ! Do Emission
+    !print *, 'Emission'
     call ptr_Do_Emission(i)
 
     ! Update the position of all particles
@@ -112,6 +113,7 @@ program VacuumMD
     !call Write_Position(i)
 
     ! Remove particles from the system
+    !print *, 'Remove particles'
     call Remove_Particles(i)
 
     ! Flush data

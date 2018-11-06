@@ -193,8 +193,8 @@ module mod_global
   !           N_ic_max = 0 means use 1 image charge partners.
   !           N_ic_max = 1 means use 5 image charge partners.
   !           See the function Force_Image_Charge_v2 in mod_verlet for details.
-  logical, parameter          :: image_charge = .true.
-  integer, parameter          :: N_ic_max = 1
+  logical           :: image_charge = .true.
+  integer           :: N_ic_max = 1
 
   ! ----------------------------------------------------------------------------
   ! Define constants
