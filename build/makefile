@@ -4,8 +4,8 @@
 
 # Compiler to use
 ifndef FCOMPILER
-#FCOMPILER=ifort
-FCOMPILER=gfortran-8
+FCOMPILER=ifort
+#FCOMPILER=gfortran-8
 #FCOMPILER=pgfortran
 endif
 
@@ -25,11 +25,11 @@ endif
 # INTEL FORTRAN
 ifeq ($(FCOMPILER),ifort)
 $(info Using Intel Fortran)
-FFLAGS=-O2 -xHost -ip -ipo -prec-div -prec-sqrt -fp-model precise -g
+#FFLAGS=-O2 -xHost -ip -ipo -prec-div -prec-sqrt -fp-model precise -g
 #-fltconsistency
 #-prec-div -prec-sqrt
 #-fp-model precise
-#FFLAGS=-check all -g -warn interfaces -warn all
+FFLAGS=-check all -g -warn interfaces -warn all -traceback
 ifdef OPENMP
 FFLAGS+=-qopenmp
 endif
@@ -39,7 +39,7 @@ endif
 # ifeq ($(FCOMPILER),gfortran)
 ifneq (,$(findstring gfortran,$(FCOMPILER)))
 $(info Using GNU Fortran)
-FFLAGS=-Ofast -m64 -flto -march=native
+FFLAGS=-Ofast -m64 -flto -march=native -fcheck=all
 #FFLAGS=-g -fcheck=all -Wall -fbacktrace -ffpe-trap=zero,overflow,underflow,denormal,invalid
 ifdef OPENMP
 FFLAGS+=-fopenmp
