@@ -34,7 +34,7 @@ submodule (mod_field_emission_v2) smod_work_function
 contains
 
   module subroutine Read_work_function()
-    integer :: ud_work, IFAIL, i
+    integer :: ud_work, IFAIL, i, j
     character(256) :: iomsg
 
     ! Open the file that contains information about the work function
@@ -68,7 +68,7 @@ contains
 
       ! Read the matrix from the file
       do i = 1, y_num
-        read(unit=ud_work, FMT=*) w_theta_arr(i, :)
+        read(unit=ud_work, FMT=*) (w_theta_arr(i, j), j = 1, x_num)
       end do
     case (WORK_GAUSS)
       ! Gaussian work function
@@ -244,7 +244,7 @@ contains
   double precision function w_theta_checkerboard(pos, sec)
     double precision, intent(in), dimension(1:3)  :: pos
     integer, intent(out), optional                :: sec
-    double precision,             dimension(1:3)  :: pos_scaled
+    double precision, dimension(1:3)              :: pos_scaled
     double precision                              :: x, y
     integer                                       :: x_i, y_i
     integer, parameter                            :: emit = 1 ! Assume emitter nr. 1 for now
@@ -271,7 +271,7 @@ contains
     !w_theta_arr(4, 1:4) = (/ 4.70d0, 4.70d0, 4.70d0, 4.70d0 /)
 
     ! Scale x, y to unit square
-    pos_scaled(:) = (pos(:) - emitters_pos(:, emit)) / emitters_dim(:, emit)
+    pos_scaled(1:2) = (pos(1:2) - emitters_pos(1:2, emit)) / emitters_dim(1:2, emit)
 
     x = pos_scaled(1)
     y = pos_scaled(2)
@@ -320,7 +320,7 @@ contains
     integer, parameter                           :: emit = 1
 
     ! Scale x, y to unit square
-    pos_scaled(:) = (pos(:) - emitters_pos(:, emit)) / emitters_dim(:, emit)
+    pos_scaled(1:2) = (pos(1:2) - emitters_pos(1:2, emit)) / emitters_dim(1:2, emit)
 
     x = pos_scaled(1)
     y = pos_scaled(2)
