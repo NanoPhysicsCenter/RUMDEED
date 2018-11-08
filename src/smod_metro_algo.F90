@@ -22,9 +22,9 @@ contains
     double precision, dimension(1:3) :: cur_pos, new_pos, field
     double precision                 :: df_cur, df_new
 
-    !std = (emitters_dim(1, emit)*0.05d0 + emitters_dim(2, emit)*0.05d0) / 2.0d0
-    std(1:2) = emitters_dim(1:2, emit)*0.025d0 ! Standard deviation is 2.5% of the emitter length.
-                                           ! This means that 68% of jumps are less than this value.
+    std(1:2) = emitters_dim(1:2, emit)*0.05d0 ! Standard deviation for the normal distribution is 5% of the emitter length.
+    ! This means that 68% of jumps are less than this value.
+    ! The expected value of the absolute value of the normal distribution is std*sqrt(2/pi).
 
     ! Get a random initial position on the surface.
     ! We pick this location from a uniform distribution.
@@ -37,10 +37,11 @@ contains
       ! Calculate the electric field at this position
       field = Calc_Field_at(cur_pos)
       if (field(3) < 0.0d0) then
-        exit ! We found a nice spot so we exit the infinite loop
+        exit ! We found a nice spot so we exit the loop
       else
         count = count + 1
-        if (count > 1000) exit ! The loop is infnite, must stop it at some point
+        if (count > 10000) exit ! The loop is infnite, must stop it at some point.
+        ! In field emission it is rare the we reach the CL limit.
       end if
     end do
 
@@ -121,20 +122,18 @@ contains
       d_x = par_pos(1) - x_max
       par_pos(1) = x_max - d_x
 
-      if(d_x > emitters_dim(1, emit)) then
-        print *, 'Warning: d_x to large >'
-        print *, d_x
-      end if
-    end if
-
-    if (par_pos(1) < x_min) then
+      !if(d_x > emitters_dim(1, emit)) then
+      !  print *, 'Warning: d_x to large >'
+      !  print *, d_x
+      !end if
+    else if (par_pos(1) < x_min) then
       d_x = x_min - par_pos(1)
       par_pos(1) = d_x + x_min
 
-      if(d_x > emitters_dim(1, emit)) then
-        print *, 'Warning: d_x to large <'
-        print *, d_x
-      end if
+      !if(d_x > emitters_dim(1, emit)) then
+      !  print *, 'Warning: d_x to large <'
+      !  print *, d_x
+      !end if
     end if
 
     !Check y ----------------------------------------
@@ -142,20 +141,18 @@ contains
       d_y = par_pos(2) - y_max
       par_pos(2) = y_max - d_y
 
-      if(d_y > emitters_dim(2, emit)) then
-        print *, 'Warning: d_y to large >'
-        print *, d_y
-      end if
-    end if
-
-    if (par_pos(2) < y_min) then
+      !if(d_y > emitters_dim(2, emit)) then
+      !  print *, 'Warning: d_y to large >'
+      !  print *, d_y
+      !end if
+    else if (par_pos(2) < y_min) then
       d_y = y_min - par_pos(2)
       par_pos(2) = d_y + y_min
 
-      if(d_y > emitters_dim(2, emit)) then
-        print *, 'Warning: d_x to large <'
-        print *, d_y
-      end if
+      !if(d_y > emitters_dim(2, emit)) then
+      !  print *, 'Warning: d_x to large <'
+      !  print *, d_y
+      !end if
     end if
   end subroutine check_limits_metro_rec
 

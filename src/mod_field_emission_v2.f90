@@ -18,9 +18,10 @@ Module mod_field_emission_v2
   ! ----------------------------------------------------------------------------
   ! Variables
   integer, dimension(:), allocatable :: nrEmitted_emitters
-  integer                            :: posInit
-  integer                            :: nrEmitted
+  integer                            :: nrElecEmitAll
+  !integer                            :: nrEmitted
   double precision, dimension(1:3)   :: F_avg = 0.0d0
+  integer, parameter                 :: N_MH_step = 30 ! Number of steps to do in the MH algorithm
 
   ! ----------------------------------------------------------------------------
   ! Constants for field emission
@@ -78,6 +79,9 @@ contains
     ! Allocate the number of emitters
     allocate(nrEmitted_emitters(1:nrEmit))
 
+    ! Initialize variables
+    nrEmitted_emitters = 0 ! Number of electrons emitted from emitter number i in this time step
+
     ! Function that checks the boundary conditions for the System
     ptr_Check_Boundary => Check_Boundary_ElecHole_Planar
 
@@ -94,6 +98,8 @@ contains
 
     ! Initialize the Ziggurat algorithm
     call zigset(my_seed(1))
+
+    
   end subroutine Init_Field_Emission_v2
 
   subroutine Clean_Up_Field_Emission_v2()
@@ -109,7 +115,7 @@ contains
     integer             :: i, IFAIL
     double precision    :: cur_time
 
-    posInit = 0
+    nrElecEmitAll = 0
     nrEmitted_emitters = 0
 
     ! Loop through all of the emitters
@@ -132,8 +138,8 @@ contains
     end do
 
     cur_time = time_step * step / time_scale ! Scaled in units of time_scale
-    write (ud_emit, "(E14.6, *(tr8, i6))", iostat=IFAIL) cur_time, step, posInit, &
-    & nrEmitted, nrElec, (nrEmitted_emitters(i), i = 1, nrEmit)
+    write (ud_emit, "(E14.6, *(tr8, i6))", iostat=IFAIL) cur_time, step, nrElecEmitAll, nrElec, &
+                                                       & (nrEmitted_emitters(i), i = 1, nrEmit)
   end subroutine Do_Field_Emission
 
   !-----------------------------------------------------------------------------
@@ -177,7 +183,7 @@ contains
     !$OMP PARALLEL DO PRIVATE(s, par_pos, F, D_f, rnd, par_vel) REDUCTION(+:df_avg) SCHEDULE(AUTO)
     do s = 1, N_sup
 
-      par_pos = Metropolis_Hastings_rectangle_v2(30, emit, D_f, F)
+      par_pos = Metropolis_Hastings_rectangle_v2(N_MH_step, emit, D_f, F)
       !print *, 'D_f = ', D_f
       !print *, 'F = ', F
       !print *, ''
@@ -219,14 +225,8 @@ contains
     write (ud_field, "(i8, tr2, E16.8, tr2, E16.8, tr2, E16.8, tr2, i8, tr2, E16.8)", iostat=IFAIL) &
                                       step, F_avg(1), F_avg(2), F_avg(3), N_sup, df_avg
 
-    posInit = posInit + nrElecEmit
-    nrEmitted = nrEmitted + nrElecEmit
-
-    !print *, ''
-    !print *, 'posInit'
-    !print *, posInit
-    !print *, ''
-    !pause
+    nrElecEmitAll = nrElecEmitAll + nrElecEmit
+    !nrEmitted = nrEmitted + nrElecEmit
   end subroutine Do_Field_Emission_Planar_rectangle
 
   !----------------------------------------------------------------------------------------

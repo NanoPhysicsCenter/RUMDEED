@@ -351,7 +351,7 @@ contains
   ! step -- The current time step
   subroutine Write_Ramo_Current(step)
     integer, intent(in) :: step
-    integer             :: i, j, IFAIL
+    integer             :: IFAIL
     double precision    :: ramo_cur = 0.0d0
 
     !ramo_cur = 0.0d0
