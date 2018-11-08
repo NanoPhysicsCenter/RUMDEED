@@ -29,7 +29,7 @@ $(info Using Intel Fortran)
 #-fltconsistency
 #-prec-div -prec-sqrt
 #-fp-model precise
-FFLAGS=-check all -g -warn interfaces -warn all -traceback
+FFLAGS=-check all -g -warn interfaces -warn all -traceback -ftrapuv
 ifdef OPENMP
 FFLAGS+=-qopenmp
 endif
