@@ -130,9 +130,10 @@ contains
           !$OMP ATOMIC UPDATE
           nrElec_remove_top_emit(emit) = nrElec_remove_top_emit(emit) + 1
 
-          ! Write out the x and y position of the particle along with which emitter it came from.
+          ! Write out the transverse position of the particle, its velocity and which emitter/section it came from.
           !$OMP CRITICAL(DENSITY_ABSORB)
           write(unit=ud_density_absorb_top) particles_cur_pos(1, i), particles_cur_pos(2, i), &
+                                          & particles_cur_vel(1, i), particles_cur_vel(2, i), particles_cur_vel(3, i), &
                                           & particles_emitter(i), particles_section(i)
           !$OMP END CRITICAL(DENSITY_ABSORB)
         CASE (remove_bot)
