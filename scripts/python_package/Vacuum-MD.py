@@ -1,3 +1,6 @@
+import numpy as np
+import pandas as pd
+
 # ----------------------------------------------------------------
 # Calculates the emittance
 # Input is a pandas dataframe that has columns called x and x'.
