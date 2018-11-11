@@ -30,27 +30,22 @@ contains
     ! Update the voltage in the system
     call Set_Voltage(step)
 
-    ! Reset the ramo current. Note, this should be done after set_voltage,
-    ! since the ramo current may be used there.
-    ramo_current = 0.0d0
-    ramo_current_emit = 0.0d0
-
-
     ! Update the position of particles (Electrons / Holes)
-    if (nrElecHole > 0) then
+    !if (nrElecHole > 0) then
       call Update_ElecHole_Position(step)
 
       call Calculate_Acceleration_Particles()
 
+      ! Reset the ramo current. Note, this should be done after set_voltage,
+      ! since the ramo current may be used there.
+      wait(ud_ramo_sec) ! ud_ramo_sec is done asynchronously. We must make sure it is finished.
+      ramo_current = 0.0d0
+      ramo_current_emit = 0.0d0
       call Update_Velocity(step)
-    end if
+    !end if
 
     ! Write out the current in the system
     call Write_Ramo_Current(step)
-
-    ! Write out the field in the system
-    !call Write_Field_Longitudinal(step)
-    !call Write_Density_Map(step)
 
   end subroutine Velocity_Verlet
 

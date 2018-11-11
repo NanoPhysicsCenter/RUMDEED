@@ -355,16 +355,13 @@ contains
     integer             :: IFAIL
     double precision    :: ramo_cur = 0.0d0
 
-    !ramo_cur = 0.0d0
+    ! Write out the current for each emitter and section
+    write(unit=ud_ramo_sec, asynchronous='YES') ramo_current_emit
 
-    !do i = 1, nrSpecies
-    !  ramo_cur = ramo_cur + ramo_current(i)
-    !end do
+    ! Write the total current along with other data
     ramo_cur = sum(ramo_current) / cur_scale
-
-    write(unit=ud_ramo, fmt="(ES12.4, tr2, i8, tr2, E12.4, tr2, E12.4, tr2, i6, tr2, i6, tr2, i6, *(tr2, ES12.4))", iostat=IFAIL) &
+    write(unit=ud_ramo, fmt="(ES12.4, tr2, i8, tr2, E12.4, tr2, E12.4, tr2, i6, tr2, i6, tr2, i6)", iostat=IFAIL) &
     & cur_time, step, ramo_cur, V_d, nrPart, nrElec, nrHole
-    write(unit=ud_ramo_sec) ramo_current_emit
 
   end subroutine Write_Ramo_current
 
