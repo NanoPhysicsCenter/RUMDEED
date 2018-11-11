@@ -65,14 +65,13 @@ contains
       ! Beeman
       particles_prev_pos(:, i) = particles_cur_pos(:, i) ! Store the previous position
       particles_cur_pos(:, i)  = particles_cur_pos(:, i) + particles_cur_vel(:, i)*time_step &
-                             & + 1.0d0/6.0d0*(4.0d0*particles_cur_accel(:, i) - particles_prev_accel(:, i))*time_step2
+                             & + 1.0d0/6.0d0*( 4.0d0*particles_cur_accel(:, i) - particles_prev_accel(:, i) )*time_step2
 
       particles_prev2_accel(:, i) = particles_prev_accel(:, i) ! Beeman
       particles_prev_accel(:, i) = particles_cur_accel(:, i)
       particles_cur_accel(:, i)  = 0.0d0
 
       ! Mark particles that should be removed with .false. in the mask array
-      !call Check_Boundary_ElecHole(i)
       call ptr_Check_Boundary(i)
     end do
     !$OMP END PARALLEL DO
