@@ -5,7 +5,7 @@ import pandas as pd
 # Calculates the emittance
 # Input is a pandas dataframe that has columns called x and x'.
 # It returns the Emittance, sigma_w, sigma_wp and theta
-# emittance [units of x * x'] [nm mrad]
+# emittance [units of x * x'] [nm-mrad]
 # sigma_w is the semi-major axis of the ellipse [units of x]
 # sigma_wp is the semi-minor axis of the ellipse [units of x']
 # theta is the rotation of the ellipse [deg]
