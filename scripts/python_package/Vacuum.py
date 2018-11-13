@@ -20,7 +20,7 @@ def Calc_Emittance(df_emitt):
     r = df_emitt.corr(method='pearson')['x']["x'"]
     
     #emittance = sigma_x*sigma_xp*np.sqrt(1.0-r**2)
-    #emittance = np.sqrt(sigma_x**2*sigma_xp**2 - cov_xxp**2)
+    emittance = np.sqrt(sigma_x**2*sigma_xp**2 - cov_xxp**2)
     
     sigma_w  = np.sqrt( 0.5*(sigma_x**2 + sigma_xp**2 + np.sqrt( (sigma_x**2 - sigma_xp**2)**2 + (2.0*cov_xxp)**2 )) )
     sigma_wp = np.sqrt( 0.5*(sigma_x**2 + sigma_xp**2 - np.sqrt( (sigma_x**2 - sigma_xp**2)**2 + (2.0*cov_xxp)**2 )) )
