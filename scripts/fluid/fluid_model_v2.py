@@ -1,7 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy.constants import pi, hbar, e, m_e, epsilon_0
-from scipy.integrate import nquad
+from scipy.integrate import nquad, quad
 
 # Fluid model code
 # Kristinn Torfason (29.11.2017) (Converted from Current_density_scaled.m)
@@ -16,8 +16,8 @@ from scipy.integrate import nquad
 # System Parameters
 V_0 = 20.0E3 # Voltage
 d = 2500.0E-9 # Gap spaceing
-N_L = 2
-L = np.linspace(10, 100.0, N_L) * 1.0E-9 # Length of emitter
+N_L = 10
+L = np.linspace(10, 50.0, N_L) * 1.0E-9 # Length of emitter
 
 # Mixing weight
 x = 0.15
@@ -69,6 +69,15 @@ def int_fun(y: float, z: float, a: float) -> float:
     val = np.sqrt(z) / ((y**2 + z**2)*np.sqrt(a**2 + y**2 + z**2))
     return val
 
+# We can also do the y integration. Matlab gives the answer below.
+def int_fun_z(z: float, x_c: float, y_c: float, x_1: float, x_2: float, y_1: float, y_2: float) -> float:
+    def fun_z(z: float, x_c: float, y_c: float, x_p: float, y_p: float) -> float:
+        val = np.arctan( (x_c - x_p)*(y_c - y_p)/(z*np.sqrt(z**2 + (x_c - x_p)**2 + (y_c - y_p)**2 )) )
+        return val
+
+    val = 1.0/np.sqrt(z)*( fun_z(z, x_c, y_c, x_2, y_2) - fun_z(z, x_c, y_c, x_1, y_2) - fun_z(z, x_c, y_c, x_2, y_1) + fun_z(z, x_c, y_c, x_1, y_1) )
+    return val
+
 print('Starting calculations')
 print('k upto ' + str(N_L))
 # Loop over L values
@@ -84,12 +93,20 @@ for k in range(N_L):
     # Set a = L / (2*d)
     a = LD_C[k]
 
+    x_c = 0.0/d
+    y_c = 0.0/d
+    x_1 = -L[k]/(2*d)
+    x_2 = L[k]/(2*d)
+    y_1 = -L[k]/(2*d)
+    y_2 = L[k]/(2*d)
+
     options={'limit': 100} # Increase the number of subintervals in the integration
     # nquad does an N-dimensional integration
     # https://docs.scipy.org/doc/scipy/reference/generated/scipy.integrate.nquad.html
     # integrate int_fun, y=0..a, z=0..1, with extra arguments (a,) passed to the function
     # We change the integration on y from [-a, a] to [0, a] and multiply with 2 instead (4a = 2*2a).
-    E_const, abserr = nquad(int_fun, [[0.0, a], [0.0, 1.0]], args=(a,), opts=[options, options])
+    #E_const, abserr = nquad(int_fun, [[0.0, a], [0.0, 1.0]], args=(a,), opts=[options, options])
+    E_const, abserr = quad(int_fun_z, a=0.0, b=1.0, args=(x_c, y_c, x_1, x_2, y_1, y_2))
 
     # Loop for the iteration to converge the current density
     for i in range(N_max):
@@ -103,7 +120,8 @@ for k in range(N_L):
         J_new = elec_supply * esc_prob / J_CL
         J = x*J_new + (1-x)*J_old # Mixing for better convergance
 
-        E_z = J/(9*pi) * 4*a * E_const
+        #E_z = J/(9*pi) * 4*a * E_const
+        E_z = J/(9*pi) * E_const
 
         # Set F to new value. The factor 2 is due to image-charge effects
         # F = F_vac - 2*E_z,

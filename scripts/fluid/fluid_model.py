@@ -6,6 +6,7 @@ from scipy.integrate import nquad
 # Fluid model code
 # Kristinn Torfason (29.11.2017) (Converted from Current_density_scaled.m)
 #
+#
 # This code calculates the fluid model for the field emission
 # The continuity equation, \rho(z) p/m_e = J
 # Conservation of energy, p^2 / (2m_e) = eV_0 z/d
@@ -25,7 +26,7 @@ x = 0.15
 a_FN = e**2/(16*pi**2*hbar)
 b_FN = -4/(3*hbar) * np.sqrt(2*m_e*e)
 l_const = e / (4*pi*epsilon_0)
-w_theta = 4.60
+w_theta = 4.70
 
 E_vac = V_0 / d
 F = 1.0 # F is scaled in E_vac
