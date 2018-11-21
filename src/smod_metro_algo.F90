@@ -10,17 +10,15 @@ contains
   !-----------------------------------------------------------------------------
   ! Metropolis-Hastings algorithm
   ! Includes that the work function can vary with position
-  module function Metropolis_Hastings_rectangle_v2(ndim, emit, df_out, F_out)
-    integer, intent(in)              :: ndim, emit
-    double precision, intent(out)    :: df_out, F_out
-#if defined(__INTEL_COMPILER)
-    double precision, dimension(1:3) :: Metropolis_Hastings_rectangle_v2 ! The interface is declared in the parent module
-#endif
-    integer                          :: count, i
-    double precision                 :: rnd, alpha
-    double precision, dimension(1:2) :: std
-    double precision, dimension(1:3) :: cur_pos, new_pos, field
-    double precision                 :: df_cur, df_new
+  module subroutine Metropolis_Hastings_rectangle_v2(ndim, emit, df_out, F_out, pos_out)
+    integer, intent(in)                           :: ndim, emit
+    double precision, intent(out)                 :: df_out, F_out
+    double precision, intent(out), dimension(1:3) :: pos_out ! The interface is declared in the parent module
+    integer                                       :: count, i
+    double precision                              :: rnd, alpha
+    double precision, dimension(1:2)              :: std
+    double precision, dimension(1:3)              :: cur_pos, new_pos, field
+    double precision                              :: df_cur, df_new
 
     std(1) = emitters_dim(1, emit)*0.05d0 ! Standard deviation for the normal distribution is 5% of the emitter length.
     std(2) = emitters_dim(2, emit)*0.05d0 ! Standard deviation for the normal distribution is 5% of the emitter length.
@@ -100,9 +98,9 @@ contains
     end do
 
     ! Return the current position
-    Metropolis_Hastings_rectangle_v2 = cur_pos
+    pos_out = cur_pos
     df_out = df_cur
-  end function Metropolis_Hastings_rectangle_v2
+  end subroutine Metropolis_Hastings_rectangle_v2
 
   ! ----------------------------------------------------------------------------
   ! Checks the limits of the rectangular region of the emitter
