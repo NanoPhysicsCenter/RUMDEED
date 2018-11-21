@@ -304,7 +304,8 @@ contains
     !w_theta_arr(4, 1:4) = (/ 4.70d0, 4.70d0, 4.70d0, 4.70d0 /)
 
     ! Scale x, y to unit square
-    pos_scaled(1:2) = (pos(1:2) - emitters_pos(1:2, emit)) / emitters_dim(1:2, emit)
+    pos_scaled(1) = (pos(1) - emitters_pos(1, emit)) / emitters_dim(1, emit)
+    pos_scaled(2) = (pos(2) - emitters_pos(2, emit)) / emitters_dim(2, emit)
 
     x = pos_scaled(1)
     y = pos_scaled(2)
@@ -353,7 +354,8 @@ contains
     integer, parameter                           :: emit = 1
 
     ! Scale x, y to unit square
-    pos_scaled(1:2) = (pos(1:2) - emitters_pos(1:2, emit)) / emitters_dim(1:2, emit)
+    pos_scaled(1) = (pos(1) - emitters_pos(1, emit)) / emitters_dim(1, emit)
+    pos_scaled(2) = (pos(2) - emitters_pos(2, emit)) / emitters_dim(2, emit)
 
     x = pos_scaled(1)
     y = pos_scaled(2)

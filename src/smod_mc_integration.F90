@@ -40,7 +40,8 @@ contains
     ! Surface position
     ! Cuba does the intergration over the hybercube.
     ! It gives us coordinates between 0 and 1.
-    par_pos(1:2) = emitters_pos(1:2, userdata) + xx(1:2)*emitters_dim(1:2, userdata) ! x and y position on the surface
+    par_pos(1) = emitters_pos(1, userdata) + xx(1)*emitters_dim(1, userdata) ! x position on the surface
+    par_pos(2) = emitters_pos(2, userdata) + xx(2)*emitters_dim(2, userdata) ! y position on the surface
     par_pos(3) = 0.0d0 ! Height, i.e. on the surface
 
     ! Calculate the electric field on the surface
@@ -167,7 +168,8 @@ contains
     do
       ! Get a random position on the emitter
       CALL RANDOM_NUMBER(par_pos(1:2))
-      par_pos(1:2) = emitters_pos(1:2, emit) + par_pos(1:2)*emitters_dim(1:2, emit)
+      par_pos(1) = emitters_pos(1, emit) + par_pos(1)*emitters_dim(1, emit)
+      par_pos(2) = emitters_pos(2, emit) + par_pos(2)*emitters_dim(2, emit)
       par_pos(3) = 0.0d0 ! z = 0, emitter surface
 
       ! Calculate the field on the emitter surface

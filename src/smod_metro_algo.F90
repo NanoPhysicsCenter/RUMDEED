@@ -22,7 +22,8 @@ contains
     double precision, dimension(1:3) :: cur_pos, new_pos, field
     double precision                 :: df_cur, df_new
 
-    std(1:2) = emitters_dim(1:2, emit)*0.05d0 ! Standard deviation for the normal distribution is 5% of the emitter length.
+    std(1) = emitters_dim(1, emit)*0.05d0 ! Standard deviation for the normal distribution is 5% of the emitter length.
+    std(2) = emitters_dim(2, emit)*0.05d0 ! Standard deviation for the normal distribution is 5% of the emitter length.
     ! This means that 68% of jumps are less than this value.
     ! The expected value of the absolute value of the normal distribution is std*sqrt(2/pi).
 
@@ -31,7 +32,8 @@ contains
     count = 0
     do ! Infinite loop, we try to find a favourable position to start from
       CALL RANDOM_NUMBER(cur_pos(1:2))
-      cur_pos(1:2) = cur_pos(1:2)*emitters_dim(1:2, emit) + emitters_pos(1:2, emit)
+      cur_pos(1) = cur_pos(1)*emitters_dim(1, emit) + emitters_pos(1, emit)
+      cur_pos(2) = cur_pos(2)*emitters_dim(2, emit) + emitters_pos(2, emit)
       cur_pos(3) = 0.0d0 ! On the surface
 
       ! Calculate the electric field at this position
