@@ -150,7 +150,7 @@ contains
     integer, intent(in)              :: step, emit
 
     ! Integration
-    integer                          :: N_sup
+    integer                          :: N_sup = 0
 
     ! Emission variables
     double precision                 :: D_f, Df_avg, F, rnd

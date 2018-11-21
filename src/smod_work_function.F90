@@ -5,6 +5,9 @@
 ! 21.10.18                                  !
 !-------------------------------------------!
 submodule (mod_field_emission_v2) smod_work_function
+  use mod_global
+
+  implicit none
   integer                                                 :: y_num, x_num, WORK_TYPE
 
   ! Checkerboard

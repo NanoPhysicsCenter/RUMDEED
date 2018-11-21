@@ -5,7 +5,11 @@
 ! 21.10.18                                  !
 !-------------------------------------------!
 submodule (mod_field_emission_v2) smod_metro_algo
+  use mod_global
+  use mod_verlet
+  use ziggurat
 
+  implicit none
 contains
   !-----------------------------------------------------------------------------
   ! Metropolis-Hastings algorithm

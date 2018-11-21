@@ -5,7 +5,10 @@
 ! 21.11.18                                  !
 !-------------------------------------------!
 submodule (mod_therminoic_emission) smod_mc_integration_te
+  use mod_global
+  use mod_verlet
 
+  implicit none
 contains
   ! ----------------------------------------------------------------------------
   ! This function is called to do the surface integration.
@@ -40,7 +43,8 @@ contains
     ! Surface position
     ! Cuba does the intergration over the hybercube.
     ! It gives us coordinates between 0 and 1.
-    par_pos(1:2) = emitters_pos(1:2, userdata) + xx(1:2)*emitters_dim(1:2, userdata) ! x and y position on the surface
+    par_pos(1) = emitters_pos(1, userdata) + xx(1)*emitters_dim(1, userdata) ! x and y position on the surface
+    par_pos(2) = emitters_pos(2, userdata) + xx(2)*emitters_dim(2, userdata) ! x and y position on the surface
     par_pos(3) = 0.0d0 ! Height, i.e. on the surface
 
     ! Calculate the electric field on the surface
@@ -63,7 +67,7 @@ contains
     ! integration over the hybercube, i.e. from 0 to 1.
     ff(1) = A*ff(1)
     
-    integrand_cuba = 0 ! Return value to Cuba, 0 = success
+    integrand_cuba_te = 0 ! Return value to Cuba, 0 = success
   end function integrand_cuba_te
 
   ! ----------------------------------------------------------------------------

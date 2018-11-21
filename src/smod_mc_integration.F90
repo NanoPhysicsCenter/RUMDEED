@@ -5,7 +5,10 @@
 ! 21.10.18                                  !
 !-------------------------------------------!
 submodule (mod_field_emission_v2) smod_mc_integration
+  use mod_global
+  use mod_verlet
 
+  implicit none
 contains
   ! ----------------------------------------------------------------------------
   ! This function is called to do the surface integration.
@@ -65,7 +68,7 @@ contains
     ! integration over the hybercube, i.e. from 0 to 1.
     ff(1) = A*ff(1)
     
-    integrand_cuba = 0 ! Return value to Cuba, 0 = success
+    integrand_cuba_fe = 0 ! Return value to Cuba, 0 = success
   end function integrand_cuba_fe
 
   ! ----------------------------------------------------------------------------

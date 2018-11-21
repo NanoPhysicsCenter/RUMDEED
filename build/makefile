@@ -49,7 +49,7 @@ endif
 # PGI FORTRAN
 ifeq ($(FCOMPILER),pgfortran)
 $(info Using PGI Fortran)
-FFLAGS=-O2 -fast
+FFLAGS=-fast -Minfo
 #FFLAGS=-g -gopt -Mbounds -Mchkfpstk -Mchkfpstk -Mchkfpstk -Melf -traceback
 ifdef OPENMP
 FFLAGS+=-mp

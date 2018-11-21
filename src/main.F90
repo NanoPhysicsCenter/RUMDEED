@@ -21,6 +21,13 @@ program VacuumMD
   use IFPORT ! Needed for getpid()
 #endif
   implicit none
+#if defined(__PGI)
+  interface
+    integer function getpid()
+    end function getpid
+  end interface
+#endif
+
 
   integer :: i, nthreads
   integer, dimension(1:9) :: progress
