@@ -21,7 +21,7 @@ Module mod_field_emission_v2
   integer                            :: nrElecEmitAll
   !integer                            :: nrEmitted
   double precision, dimension(1:3)   :: F_avg = 0.0d0
-  integer, parameter                 :: N_MH_step = 30 ! Number of steps to do in the MH algorithm
+  integer, parameter                 :: N_MH_step = 10 ! Number of steps to do in the MH algorithm
 
   ! ----------------------------------------------------------------------------
   ! Constants for field emission

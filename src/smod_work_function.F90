@@ -102,6 +102,7 @@ contains
                                 & w_gaussians_std_x(i), w_gaussians_std_y(i)
       end do
     case (WORK_CIRCLE)
+      print '(a)', 'Vacuum: Using circle work function model'
       ptr_Work_fun => w_theta_circle
     case DEFAULT
       print '(a)', 'Vacuum: ERROR UNKNOWN WORK FUNCTION TYPE'
@@ -209,23 +210,23 @@ contains
 
   integer                                      :: sec_
   double precision                             :: r
-  double precision, parameter                  :: r_1 = 20.0d0, r_2 = 50.0d0, r_3 = 100.0d0
+  double precision, parameter                  :: r_1 = 150.0d0, r_2 = 333.0d0, r_3 = 600.0d0
 
-  r = sqrt(pos(1)**2 + pos(2)**2) 
+  r = sqrt(pos(1)**2 + pos(2)**2) / length_scale
 
 
   if (r <= r_1) then
-    w_theta_circle = 2.0d0
+    w_theta_circle = 2.40d0
     sec_ = 1
   else if (r <= r_2) then
-    w_theta_circle = 1.0d0
+    w_theta_circle = 1.40d0
     sec_ = 2
   else if (r <= r_3) then
-    w_theta_circle = 3.0d0
+    w_theta_circle = 2.20d0
     sec_ = 3
   else
-    w_theta_circle = 3.0d0
-    sec = 4
+    w_theta_circle = 2.20d0
+    sec_ = 4
   end if
 
   if (present(sec) .eqv. .true.) then

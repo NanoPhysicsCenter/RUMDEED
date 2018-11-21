@@ -11,6 +11,9 @@ Module mod_therminoic_emission
   use ziggurat
   implicit none
 
+  PRIVATE
+  PUBLIC :: Init_Thermionic_Emission, Clean_Up_Thermionic_Emission, Richardson_Dushman
+
   ! ----------------------------------------------------------------------------
   ! Variables
   integer, dimension(:), allocatable :: nrEmitted_emitters
@@ -129,15 +132,13 @@ contains
     double precision,                 intent(in) :: F
     double precision, dimension(1:3), intent(in) :: pos
 
-    Elec_Supply = A_G * T_k**2 * time_step_div_q0
+    Elec_Supply = A_G * T_k**2
   end function Elec_Supply
 
-  double precision pure function Richardson_Dushman(F, pos, A_emit)
+  double precision pure function Richardson_Dushman(F, pos)
     double precision, dimension(1:3), intent(in) :: pos     ! Position of particle
     double precision                , intent(in) :: F       ! Field strength at pos
-    double precision,                 intent(in) :: A_emit  ! Emitter area
-    double precision                             :: n_s
 
-    Richardson_Dushman = A_emit * Elec_Supply(F, pos) * Escape_Prob(F, pos)
+    Richardson_Dushman = Elec_Supply(F, pos) * Escape_Prob(F, pos)
   end function Richardson_Dushman
 end module mod_therminoic_emission

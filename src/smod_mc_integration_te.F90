@@ -52,8 +52,7 @@ contains
     ! Check if the field is favourable for emission
     if (field(3) < 0.0d0) then
       ! The field is favourable for emission
-      ! Calculate the electron supply at this point
-      ff(1) = Elec_Supply(field(3), par_pos)
+      ff(1) = Richardson_Dushman(field(3), par_pos)
     else
       ! The field is NOT favourable for emission
       ! This point does not contribute
