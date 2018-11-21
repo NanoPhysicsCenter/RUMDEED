@@ -76,14 +76,16 @@ $(PROJECT_NAME).out: ../src/main.F90 ../cuba/lib/libcuba.a \
 			mod_field_emission_tip.mod mod_field_emission_tip.o \
 			mod_field_emission_v2.mod mod_field_emission_v2.o \
 			mod_field_emission_2D.mod mod_field_emission_2D.o \
+			mod_thermionic_emission.mod mod_thermionic_emission.o \
 			mod_field_emission_v2@smod_work_function.smod smod_work_function.o \
 			mod_field_emission_v2@smod_mc_integration.smod smod_mc_integration.o \
+			mod_thermionic_emission@smod_mc_integration_te.smod smod_mc_integration_te.o \
 			mod_field_emission_v2@smod_metro_algo.smod smod_metro_algo.o mod_ziggurat.o
 		$(FCOMPILER) $(FFLAGS) -D_GIT_VERSION_=\"${GIT_VERSION}\" \
 		    ../src/main.F90 mod_global.o mod_verlet.o mod_pair.o \
 			mod_unit_tests.o mod_photo_emission.o mod_field_emission.o mod_field_emission_v2.o \
-			mod_field_emission_tip.o mod_hyperboloid_tip.o mod_field_emission_2D.o \
-			smod_work_function.o smod_mc_integration.o smod_metro_algo.o mod_ziggurat.o \
+			mod_field_emission_tip.o mod_hyperboloid_tip.o mod_field_emission_2D.o mod_thermionic_emission.o \
+			smod_work_function.o smod_mc_integration.o smod_mc_integration_te.o smod_metro_algo.o mod_ziggurat.o \
 			$(CUBA_LIB) -lpthread -lm -ldl -o $(PROJECT_NAME).out
 
 ../cuba/lib/libcuba.a:
@@ -119,7 +121,7 @@ mod_field_emission_tip.mod mod_field_emission_tip.o: ../src/mod_field_emission_t
 mod_hyperboloid_tip.mod mod_hyperboloid_tip.o: ../src/mod_hyperboloid_tip.f90 mod_global.mod
 		$(FCOMPILER) -c $(FFLAGS) ../src/mod_hyperboloid_tip.f90
 
-mod_therminoic_emission.mod mod_therminoic_emission.o: ../src/mod_thermionic_emission.f90 mod_global.mod mod_verlet.mod mod_pair.mod
+mod_thermionic_emission.mod mod_thermionic_emission.o: ../src/mod_thermionic_emission.f90 mod_global.mod mod_verlet.mod mod_pair.mod ziggurat.mod
 		$(FCOMPILER) -c $(FFLAGS) ../src/mod_thermionic_emission.f90
 
 mod_field_emission_v2@smod_work_function.smod smod_work_function.o: ../src/smod_work_function.F90 mod_field_emission_v2.mod
@@ -127,6 +129,9 @@ mod_field_emission_v2@smod_work_function.smod smod_work_function.o: ../src/smod_
 
 mod_field_emission_v2@smod_mc_integration.smod smod_mc_integration.o: ../src/smod_mc_integration.F90 mod_field_emission_v2.mod
 		$(FCOMPILER) -c $(FFLAGS) ../src/smod_mc_integration.F90
+
+mod_thermionic_emission@smod_mc_integration_te.smod smod_mc_integration_te.o: ../src/smod_mc_integration_te.F90 mod_thermionic_emission.mod
+		$(FCOMPILER) -c $(FFLAGS) ../src/smod_mc_integration_te.F90
 
 mod_field_emission_v2@smod_metro_algo.smod smod_metro_algo.o: ../src/smod_metro_algo.F90 mod_field_emission_v2.mod
 		$(FCOMPILER) -c $(FFLAGS) ../src/smod_metro_algo.F90

@@ -14,7 +14,7 @@ program VacuumMD
   use mod_field_emission_v2
   use mod_field_emission_tip
   use mod_field_emission_2D
-  !use mod_therminoic_emission
+  use mod_therminoic_emission
   use mod_pair
   use mod_unit_tests
 #if defined(__INTEL_COMPILER)
@@ -65,6 +65,9 @@ program VacuumMD
   case(EMISSION_FIELD_2D_2DEG_C, EMISSION_FIELD_2D_2DEG_NC, EMISSION_FIELD_2D_DIRAC_C, EMISSION_FIELD_2D_DIRAC_NC)
     print '(a)', 'Vacuum: Doing Field emission from 2D material'
     call Init_Field_Emission_2D()
+  case(EMISSION_THERMIONIC)
+    print '(a)', 'Vacuum: Doing Thermionic emission'
+    call Init_Thermionic_Emission()
   case(EMISSION_TEST)
     print '(a)', 'Vacuum: Doing Field emission DEV V2'
     call Init_Field_Emission_v2()
@@ -180,6 +183,8 @@ program VacuumMD
     call Clean_Up_Field_Emission_Tip()
   case(EMISSION_FIELD_2D_2DEG_C, EMISSION_FIELD_2D_2DEG_NC, EMISSION_FIELD_2D_DIRAC_C, EMISSION_FIELD_2D_DIRAC_NC)
     call Clean_Up_Field_Emission_2D()
+  case(EMISSION_THERMIONIC)
+    call Clean_Up_Thermionic_Emission()
   case(EMISSION_TEST)
     call Clean_Up_Field_Emission_v2()
   END SELECT

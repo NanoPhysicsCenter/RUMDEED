@@ -13,7 +13,7 @@ Module mod_field_emission_v2
   implicit none
 
   PRIVATE
-  PUBLIC :: Init_Field_Emission_v2, Clean_Up_Field_Emission_v2, t_y, v_y, escape_prob, F_avg
+  PUBLIC :: Init_Field_Emission_v2, Clean_Up_Field_Emission_v2, t_y, v_y, Escape_Prob, F_avg, Elec_Supply_V2
 
   ! ----------------------------------------------------------------------------
   ! Variables
@@ -60,10 +60,10 @@ Module mod_field_emission_v2
       end subroutine Work_fun_cleanup
 
       ! Interface for the MC integration submodule
-      module subroutine Do_Surface_Integration(emit, N_sup)
+      module subroutine Do_Surface_Integration_FE(emit, N_sup)
         integer, intent(in)  :: emit ! The emitter to do the integration on
         integer, intent(out) :: N_sup ! Number of electrons
-      end subroutine Do_Surface_Integration
+      end subroutine Do_Surface_Integration_FE
 
       ! Interface for the Metropolis-Hastings submodule
       module function Metropolis_Hastings_rectangle_v2(ndim, emit, df_out, F_out)
@@ -71,7 +71,7 @@ Module mod_field_emission_v2
         double precision, intent(out)    :: df_out, F_out
         double precision, dimension(1:3) :: Metropolis_Hastings_rectangle_v2
       end function Metropolis_Hastings_rectangle_v2
-  end interface 
+  end interface
 contains
   !-----------------------------------------------------------------------------
   ! Initialize the Field Emission
@@ -99,7 +99,6 @@ contains
     ! Initialize the Ziggurat algorithm
     call zigset(my_seed(1))
 
-    
   end subroutine Init_Field_Emission_v2
 
   subroutine Clean_Up_Field_Emission_v2()
@@ -159,7 +158,7 @@ contains
     integer                          :: nrElecEmit
     double precision, dimension(1:3) :: par_pos, par_vel
 
-    call Do_Surface_Integration(emit, N_sup)
+    call Do_Surface_Integration_FE(emit, N_sup)
     !call Calc_Field_old_method(step, emit)
 
     !print *, 'V_2'
@@ -324,5 +323,17 @@ contains
       print *, ''
     end if
   end function Escape_Prob
+
+  !-----------------------------------------------------------------------------
+  ! A simple function that calculates
+  ! A_FN/(t**2(l)*w_theta(x,y)) F**2(x,y)
+  ! pos: Position to calculate the function
+  ! F: The z-component of the field at par_pos, it should be F < 0.0d0.
+  double precision function Elec_Supply_V2(F, pos)
+    double precision, dimension(1:3), intent(in) :: pos
+    double precision,                 intent(in) :: F
+
+    Elec_Supply_V2 = time_step_div_q0 * a_FN/(t_y(F, pos)**2*w_theta_xy(pos)) * F**2
+  end function Elec_Supply_V2
 
 end Module mod_field_emission_v2

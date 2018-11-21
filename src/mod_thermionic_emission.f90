@@ -8,33 +8,81 @@ Module mod_therminoic_emission
   use mod_global
   use mod_verlet
   use mod_pair
+  use ziggurat
   implicit none
 
   ! ----------------------------------------------------------------------------
   ! Variables
   integer, dimension(:), allocatable :: nrEmitted_emitters
-  integer                                     :: posInit
-  logical                                     :: EmitGauss = .false.
-  integer                                     :: maxElecEmit = -1
-  integer                                     :: nrEmitted
-
-  integer                                     :: ud_gauss
+  integer                            :: nrElecEmitAll
+  !integer                            :: nrEmitted
 
   ! ----------------------------------------------------------------------------
   ! Parameters
-  integer, parameter                          :: MAX_EMISSION_TRY = 100
+  double precision, parameter :: lambda = 0.5d0 ! Material paramater []
+  double precision, parameter :: A_0 = 4.0d0*pi*m_0*k_b**2*q_0 / h**3 ! Constant for the RD eq. [A m^-2 K^-2]
+  double precision, parameter :: A_G = lambda*A_0 ! Constant for the RD eq. [A m^-2 K^-2]
+  double precision, parameter :: B_Sch_eV_prefix = q_0/(4.0d0*pi*epsilon_0) ! Schottky effect prefix [m V]
 
-  double precision, parameter :: A_g = 4.0d0*pi*m_e*k_b**2*(-1.0d0*q_e) / h**3
-  double precision, parameter :: B_Sch_eV_prefix = sqrt(-1.0d0*q_e**3/(4.0d0*pi*epsilon_0)) / (-1.0d0*q_e)
+  double precision :: w_theta = 2.0d0 ! Work function [eV]
+  double precision :: T_k = 100.0d0 ! Temperature [K]
+  double precision :: k_b_eV = 8.6173303d-5 ! Boltzman constant [eV K^-1]
+
+  ! Constant used in MC integration (function Elec_Supply_V2)
+  double precision :: time_step_div_q0
+
+  double precision, dimension(1:3)   :: F_avg = 0.0d0
+
+  interface 
+      ! Interface for the work function submodule
+      !double precision module function w_theta_xy(pos, sec)
+      !  double precision, intent(in), dimension(1:3) :: pos ! Position on the surface
+      !  integer, intent(out), optional               :: sec ! Return the section
+      !end function w_theta_xy
+
+      ! Interface for the MC integration submodule
+      module subroutine Do_Surface_Integration_TE(emit, N_sup)
+        integer, intent(in)  :: emit ! The emitter to do the integration on
+        integer, intent(out) :: N_sup ! Number of electrons
+      end subroutine Do_Surface_Integration_TE
+
+      ! Interface for the Metropolis-Hastings submodule
+      !module function Metropolis_Hastings_rectangle_v2(ndim, emit, df_out, F_out)
+      !  integer, intent(in)              :: ndim, emit
+      !  double precision, intent(out)    :: df_out, F_out
+      !  double precision, dimension(1:3) :: Metropolis_Hastings_rectangle_v2
+      !end function Metropolis_Hastings_rectangle_v2
+  end interface
 
 contains
-  subroutine Init_Photo_Emission()
+  subroutine Init_Thermionic_Emission()
+! Allocate the number of emitters
     allocate(nrEmitted_emitters(1:nrEmit))
-  end subroutine Init_Photo_Emission
 
-  subroutine Clean_Up_Photo_Emission()
+    ! Initialize variables
+    nrEmitted_emitters = 0 ! Number of electrons emitted from emitter number i in this time step
+
+    ! Function that checks the boundary conditions for the System
+    ptr_Check_Boundary => Check_Boundary_ElecHole_Planar
+
+    ! Function for the electric field in the system
+    ptr_field_E => field_E_planar
+
+    ! The function that does the emission
+    ptr_Do_Emission => Do_Thermionic_Emission
+
+    !call Read_work_function()
+
+    ! Parameters used in the module
+    time_step_div_q0 = time_step / q_0
+
+    ! Initialize the Ziggurat algorithm
+    call zigset(my_seed(1))
+  end subroutine Init_Thermionic_Emission
+
+  subroutine Clean_Up_Thermionic_Emission()
     deallocate(nrEmitted_emitters)
-  end subroutine Clean_Up_Photo_Emission
+  end subroutine Clean_Up_Thermionic_Emission
 
   subroutine Do_Thermionic_Emission(step)
     integer, intent(in) :: step
@@ -42,7 +90,7 @@ contains
     double precision    :: cur_time
     double precision, dimension(1:3) :: pos
 
-    posInit = 0
+    nrElecEmitAll = 0
     nrEmitted_emitters = 0
 
     ! Loop through all of the emitters
@@ -55,132 +103,41 @@ contains
     end do
 
     cur_time = time_step * step / time_scale ! Scaled in units of time_scale
-    write (ud_emit, "(E14.6, *(tr8, i6))", iostat=IFAIL) cur_time, step, posInit, &
-    & nrEmitted, nrElec, (nrEmitted_emitters(i), i = 1, nrEmit), maxElecEmit
+    write (ud_emit, "(E14.6, *(tr8, i6))", iostat=IFAIL) cur_time, step, nrElecEmitAll, &
+                                                       & nrElec, (nrEmitted_emitters(i), i = 1, nrEmit)
   end subroutine Do_Thermionic_Emission
 
   subroutine Do_Thermionic_Emission_Rectangle(step, nrEmit)
     integer, intent(in) :: step, nrEmit
+    integer             :: N_sup
 
-    double precision                 :: F
-    double precision, dimension(1:3) :: par_pos
-    !double precision, allocatable, dimension(:) :: rnd
-    integer                          :: i, j, s, IFAIL, nrElecEmit, n_r
-    double precision                 :: A_f, n_s, n_add, res_s
-    double precision                 :: len_x, len_y
-    integer                          :: nr_x, nr_y
+    call Do_Surface_Integration_TE(nrEmit, N_sup)
 
-    nr_x = 1000
-    nr_y = nr_x
-    len_x = emitters(emit)%dim(1) / nr_x
-    len_y = emitters(emit)%dim(2) / nr_y
-
-    A_f = len_x*len_y
-
-    nrElecEmit = 0
-
-    par_pos = 0.0d0
-    n_s = 0.0d0
-
-    !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(i, j, s, par_pos, par_elec, F, n_add, D_f)
-
-    !$OMP DO REDUCTION(+:n_s,F_avg)
-    do i = 1, nr_x
-      do j = 1, nr_y
-        par_pos(1) = (i - 0.5d0)*len_x + emitters(emit)%pos(1)
-        par_pos(2) = (j - 0.5d0)*len_y + emitters(emit)%pos(2)
-        par_pos(3) = 0.0d0
-
-        field = Calc_Field_at(par_pos)
-        F = field(3)
-
-        if (F >= 0.0d0) then
-          n_add = 0.0d0
-        else
-          n_add = Richardson_Dushman(par_pos, F, A)
-        end if
-
-        n_s = n_s + n_add
-      end do
-    end do
-    !$OMP END DO
-
-    print *, 'n_s = ', n_s
-    pause
-
-
-    !$OMP SINGLE
-    n_s = n_s - res_s
-    n_r = nint(n_s)
-    res_s = n_r - n_s
-    !$OMP END SINGLE
-
-    ! !$OMP DO REDUCTION(+:df_avg)
-    ! do s = 1, n_r
-    !
-    !   !par_pos(1:2) = Metro_algo_circle(30)
-    !   par_pos(1:2) = Metro_algo_rec(30, emit)
-    !   !if (isnan(par_pos(1)) == .true.) then
-    !   !  print *, par_pos
-    !   !  pause
-    !   !end if
-    !   par_pos(3) = 0.0d0*length
-    !   !particles(nrElec+1)%cur_pos = par_pos
-    !   !call Calculate_Acceleration(nrElec+1)
-    !   par_elec%cur_pos = par_pos
-    !   call Calculate_Acceleration_particle(par_elec)
-    !   F = par_elec%accel(3) * pre_fac_a
-    !   !F = E_z
-    !
-    !   !print *, 'F = ', F
-    !   !print *, 's = ', s
-    !   !print *, 'nrElec = ', nrElec
-    !   !pause
-    !
-    !   if (F >= 0.0d0) then
-    !     D_f = 0.0d0
-    !     !print *, 'Warning: F > 0.0d0'
-    !   else
-    !     D_f = Escape_Prob(F, par_pos)
-    !     if (D_f > 1.0d0) then
-    !       print *, 'Warning D_f > 1.0d0'
-    !       print *, 'D_f = ', D_f
-    !     end if
-    !   end if
-    !
-    !   CALL RANDOM_NUMBER(rnd)
-    !   if (rnd <= D_f) then
-    !     par_pos(3) = 1.0d0*length
-    !     !$OMP CRITICAL
-    !     particles(nrElec+1)%cur_pos = par_pos
-    !     particles(nrElec+1)%in_step = step
-    !     nrElec = nrElec + 1
-    !     nrElecEmit = nrElecEmit + 1
-    !     call Add_Plane_Graph_emit(par_pos, step)
-    !     !call Add_Plane_Graph_emitt_xy(par_pos)
-    !     !$OMP END CRITICAL
-    !   end if
-    ! end do
-    ! !$OMP END DO
-
-    !$OMP END PARALLEL
-
-    posInit = posInit + nrElecEmit
-    nrEmitted = nrEmitted + nrElecEmit
   end subroutine Do_Thermionic_Emission_Rectangle
 
-  double precision pure function Richardson_Dushman(pos, F, A_emit)
+  double precision pure function Escape_Prob(F, pos)
+    double precision,                 intent(in) :: F
+    double precision, dimension(1:3), intent(in) :: pos
+    double precision                             :: delta_W ! Schottky effect
+
+    delta_W = sqrt(B_Sch_eV_prefix*(-1.0d0*F)) ! Units: mV*V/m = V^2, sqrt(V^2) = V = J/C = eV
+    Escape_Prob = exp( -1.0d0*(w_theta - delta_W)/(k_b_eV*T_k) )
+
+  end function Escape_Prob
+
+  double precision pure function Elec_Supply(F, pos)
+    double precision,                 intent(in) :: F
+    double precision, dimension(1:3), intent(in) :: pos
+
+    Elec_Supply = A_G * T_k**2 * time_step_div_q0
+  end function Elec_Supply
+
+  double precision pure function Richardson_Dushman(F, pos, A_emit)
     double precision, dimension(1:3), intent(in) :: pos     ! Position of particle
     double precision                , intent(in) :: F       ! Field strength at pos
     double precision,                 intent(in) :: A_emit  ! Emitter area
-    double precision                             :: delta_W ! Schottky effect
-    double precision                             :: n_s, escape_prob
+    double precision                             :: n_s
 
-    delta_W = B_Sch_eV_prefix*sqrt(-1.0d0*F)
-
-    n_s = A_g * T_k**2 * A_emit * time_step / (-1.0d0*q_e)
-    escape_prob = exp(-(w_theta - delta_W)/(k_b_eV*T_k) )
-
-    Richardson_Dushman = n_s * escape_prob
+    Richardson_Dushman = A_emit * Elec_Supply(F, pos) * Escape_Prob(F, pos)
   end function Richardson_Dushman
 end module mod_therminoic_emission

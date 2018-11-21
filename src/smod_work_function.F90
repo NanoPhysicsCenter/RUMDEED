@@ -23,6 +23,7 @@ submodule (mod_field_emission_v2) smod_work_function
   ! Type of work function models
   integer, parameter :: WORK_CHECKBOARD = 1
   integer, parameter :: WORK_GAUSS      = 2
+  integer, parameter :: WORK_CIRCLE     = 3
 
   interface
     double precision function Work_fun(pos, sec)
@@ -100,6 +101,8 @@ contains
                                 & w_gaussians_x(i), w_gaussians_y(i), &
                                 & w_gaussians_std_x(i), w_gaussians_std_y(i)
       end do
+    case (WORK_CIRCLE)
+      ptr_Work_fun => w_theta_circle
     case DEFAULT
       print '(a)', 'Vacuum: ERROR UNKNOWN WORK FUNCTION TYPE'
       print *, WORK_TYPE
@@ -199,6 +202,36 @@ contains
       sec = 1
     end if
   end function w_theta_gaussian
+
+  double precision function w_theta_circle(pos, sec)
+  double precision, intent(in), dimension(1:3) :: pos
+  integer, intent(out), optional               :: sec
+
+  integer                                      :: sec_
+  double precision                             :: r
+  double precision, parameter                  :: r_1 = 20.0d0, r_2 = 50.0d0, r_3 = 100.0d0
+
+  r = sqrt(pos(1)**2 + pos(2)**2) 
+
+
+  if (r <= r_1) then
+    w_theta_circle = 2.0d0
+    sec_ = 1
+  else if (r <= r_2) then
+    w_theta_circle = 1.0d0
+    sec_ = 2
+  else if (r <= r_3) then
+    w_theta_circle = 3.0d0
+    sec_ = 3
+  else
+    w_theta_circle = 3.0d0
+    sec = 4
+  end if
+
+  if (present(sec) .eqv. .true.) then
+    sec = sec_
+  end if
+  end function w_theta_circle
 
   ! ----------------------------------------------------------------------------
   ! Triangle work function that splits the emitter in two

@@ -1,28 +1,28 @@
 !-------------------------------------------!
 ! Submodule for Monte Carlo Integration     !
-! routines for field emission               !
+! routines for thermionic emission          !
 ! Kristinn Torfason                         !
-! 21.10.18                                  !
+! 21.11.18                                  !
 !-------------------------------------------!
-submodule (mod_field_emission_v2) smod_mc_integration
+submodule (mod_therminoic_emission) smod_mc_integration_te
 
 contains
   ! ----------------------------------------------------------------------------
   ! This function is called to do the surface integration.
   ! Here we select the method to do it.
   !
-  module subroutine Do_Surface_Integration_FE(emit, N_sup)
+  module subroutine Do_Surface_Integration_TE(emit, N_sup)
     integer, intent(in)  :: emit ! The emitter to do the integration on
     integer, intent(out) :: N_sup ! Number of electrons
 
     !call Do_2D_MC_plain(emit, N_sup)
-    call Do_Cuba_Suave_FE(emit, N_sup)
-  end subroutine Do_Surface_Integration_FE
+    call Do_Cuba_Suave_TE(emit, N_sup)
+  end subroutine Do_Surface_Integration_TE
 
   ! ----------------------------------------------------------------------------
   ! The integration function for the Cuba library
   !
-  integer function integrand_cuba_fe(ndim, xx, ncomp, ff, userdata)
+  integer function integrand_cuba_te(ndim, xx, ncomp, ff, userdata)
     ! Input / output variables
     integer, intent(in) :: ndim ! Number of dimensions (Should be 2)
     integer, intent(in) :: ncomp ! Number of vector-components in the integrand (Always 1 here)
@@ -53,7 +53,7 @@ contains
     if (field(3) < 0.0d0) then
       ! The field is favourable for emission
       ! Calculate the electron supply at this point
-      ff(1) = Elec_Supply_V2(field(3), par_pos)
+      ff(1) = Elec_Supply(field(3), par_pos)
     else
       ! The field is NOT favourable for emission
       ! This point does not contribute
@@ -65,13 +65,13 @@ contains
     ff(1) = A*ff(1)
     
     integrand_cuba = 0 ! Return value to Cuba, 0 = success
-  end function integrand_cuba_fe
+  end function integrand_cuba_te
 
   ! ----------------------------------------------------------------------------
   ! Use the Cuba library to do the surface integration
   ! http://www.feynarts.de/cuba/
   !
-  subroutine Do_Cuba_Suave_FE(emit, N_sup)
+  subroutine Do_Cuba_Suave_TE(emit, N_sup)
     ! Input / output variables
     integer, intent(in)  :: emit
     integer, intent(out) :: N_sup
@@ -109,7 +109,7 @@ contains
     ! Pass the number of the emitter being integraded over to the integrand as userdata
     userdata = emit
 
-    call suave(ndim, ncomp, integrand_cuba_fe, userdata, nvec, &
+    call suave(ndim, ncomp, integrand_cuba_te, userdata, nvec, &
      & epsrel, epsabs, flags, seed, &
      & mineval, maxeval, nnew, nmin, flatness, &
      & statefile, spin, &
@@ -127,102 +127,6 @@ contains
 
      ! Finish calculating the average field
      F_avg = F_avg / neval
-  end subroutine Do_Cuba_Suave_FE
+  end subroutine Do_Cuba_Suave_TE
 
-  ! ----------------------------------------------------------------------------
-  ! Plain 2D Monte Carlo integration
-  !
-  subroutine Do_2D_MC_plain_FE(emit, N_sup)
-    integer, intent(in)  :: emit ! The emitter to do the integration on
-    integer, intent(out) :: N_sup ! Number of electrons
-
-    ! MC integration variables
-    double precision                 :: mc_err ! Error in the Monte Carlo integration
-    integer                          :: N_mc, Nmc_try
-    double precision                 :: A ! Area of the emitter
-    double precision, dimension(1:3) :: par_pos, field
-    double precision                 :: e_sup, e_sup_avg, e_sup_res
-    double precision                 :: e_sup2, e_sup_avg2
-    double precision                 :: N_sup_db
-
-    ! Calculate the area of the emitter
-    A = emitters_dim(1, emit) * emitters_dim(2, emit)
-
-    !---------------------------------------------------------------------------
-    ! Use 2D Monte Carlo integration to calculate the electron supply.
-    ! We continue until the error in the integration is less than half an electron.
-    !
-    ! Monte Carlo Integration
-    ! N_sup = \int \Delta t / e * a_FN / (t_y**2*\phi) * F^2 dA
-    ! f = \Delta t / e * a_FN / (t_y**2\phi) * F^2
-    ! N_sup \approx = A <f> \pm A*sqrt((<f^2> - <f>^2)/N_mc)
-    ! <f> = 1/N_mc * sum f(x), <f^2> = 1/N_mc * sum f**2(x)
-
-    mc_err = 1.0d0 ! Set the error in the MC integration to some thing higher than 0.5
-    N_mc = 0 ! Number of points in the MC integration
-    e_sup = 0.0d0
-    F_avg = 0.0d0 ! The average field on the surface
-    Nmc_try = 0
-
-    do
-      ! Get a random position on the emitter
-      CALL RANDOM_NUMBER(par_pos(1:2))
-      par_pos(1:2) = emitters_pos(1:2, emit) + par_pos(1:2)*emitters_dim(1:2, emit)
-      par_pos(3) = 0.0d0 ! z = 0, emitter surface
-
-      ! Calculate the field on the emitter surface
-      field = Calc_Field_at(par_pos)
-
-      ! Check if the field is favourable for emission
-      if (field(3) < 0.0d0) then
-        Nmc_try = 0
-        F_avg(1:3) = F_avg(1:3) + field(1:3)
-        N_mc = N_mc + 1
-
-        !Calculate <f> and <f^2>
-        e_sup_res = Elec_Supply_V2(field(3), par_pos)
-        e_sup = e_sup + e_sup_res
-        e_sup2 = e_sup2 + e_sup_res**2
-
-        e_sup_avg = e_sup / N_mc
-        e_sup_avg2 = e_sup2 / N_mc
-
-        ! Always do at least 10000 points
-        if (N_mc > 1000) then
-          ! Calculate the error, A*\sqrt( (<f^2> - <f>^2) / N_mc )
-          mc_err = A*sqrt( (e_sup_avg2 - e_sup_avg**2) / N_mc )
-          if (mc_err < 1.0d0) exit ! Stop if less than one electron in error
-        end if
-
-        ! Stop the integration if it is taking to long.
-        if (N_mc > 10000000) then
-          print *, 'Vacuum: Warning MC integration taking to long, stoping it'
-          print *, 'mc_err = ', mc_err
-          !print *, 'step = ', step
-          exit
-        end if
-
-      else ! field(3) < 0.0d0
-        Nmc_try = Nmc_try + 1
-
-        ! Stop if we are taking to long to find a favourable point.
-        ! This should be rare in field emission.
-        if (Nmc_try > 1000) then
-          print *, 'Vacuum: Warning to many field attempts at finding a favourable location in MC integration'
-          print *, 'mc_err = ', mc_err
-          !print *, 'step = ', step
-          exit
-        end if
-
-      end if ! field(3) < 0.0d0
-    end do
-
-    ! Finish calculating the average field on the surface
-    F_avg = F_avg / N_mc
-
-    ! Calculate the electron supply
-    N_sup_db = A*e_sup_avg
-    N_sup = nint(N_sup_db) ! Round the number to integer
-  end subroutine Do_2D_MC_plain_FE
-
-end submodule smod_mc_integration
+end submodule smod_mc_integration_te
