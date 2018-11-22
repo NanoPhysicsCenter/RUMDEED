@@ -71,6 +71,12 @@ Module mod_field_emission_v2
         double precision, intent(out)                 :: df_out, F_out
         double precision, intent(out), dimension(1:3) :: pos_out
       end subroutine Metropolis_Hastings_rectangle_v2
+
+      module subroutine Metropolis_Hastings_rectangle_v2_field(ndim, emit, df_out, F_out, pos_out)
+        integer, intent(in)                           :: ndim, emit
+        double precision, intent(out)                 :: df_out, F_out
+        double precision, intent(out), dimension(1:3) :: pos_out
+      end subroutine Metropolis_Hastings_rectangle_v2_field
   end interface
 contains
   !-----------------------------------------------------------------------------
@@ -182,7 +188,8 @@ contains
     !$OMP PARALLEL DO PRIVATE(s, par_pos, F, D_f, rnd, par_vel) REDUCTION(+:df_avg) SCHEDULE(AUTO)
     do s = 1, N_sup
 
-      call Metropolis_Hastings_rectangle_v2(N_MH_step, emit, D_f, F, par_pos)
+      !call Metropolis_Hastings_rectangle_v2(N_MH_step, emit, D_f, F, par_pos)
+      call Metropolis_Hastings_rectangle_v2_field(N_MH_step, emit, D_f, F, par_pos)
       !print *, 'D_f = ', D_f
       !print *, 'F = ', F
       !print *, ''

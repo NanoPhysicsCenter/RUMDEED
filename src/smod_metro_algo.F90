@@ -14,11 +14,11 @@ contains
   !-----------------------------------------------------------------------------
   ! Metropolis-Hastings algorithm
   ! Includes that the work function can vary with position
-
   module subroutine Metropolis_Hastings_rectangle_v2(ndim, emit, df_out, F_out, pos_out)
+    ! The interface is declared in the parent module
     integer, intent(in)                           :: ndim, emit
     double precision, intent(out)                 :: df_out, F_out
-    double precision, intent(out), dimension(1:3) :: pos_out ! The interface is declared in the parent module
+    double precision, intent(out), dimension(1:3) :: pos_out
     integer                                       :: count, i
     double precision                              :: rnd, alpha
     double precision, dimension(1:2)              :: std
@@ -64,6 +64,7 @@ contains
       ! Find a new position using a normal distribution.
       !new_pos(1:2) = ziggurat_normal(cur_pos(1:2), std)
       new_pos(1:2) = box_muller(cur_pos(1:2), std)
+      new_pos(3) = 0.0d0 ! At the surface
 
       ! Make sure that the new position is within the limits of the emitter area.
       call check_limits_metro_rec(new_pos, emit)
@@ -105,6 +106,82 @@ contains
     pos_out = cur_pos
     df_out = df_cur
   end subroutine Metropolis_Hastings_rectangle_v2
+
+  module subroutine Metropolis_Hastings_rectangle_v2_field(ndim, emit, df_out, F_out, pos_out)
+    ! The interface is declared in the parent module
+    integer, intent(in)                           :: ndim, emit
+    double precision, intent(out)                 :: df_out, F_out
+    double precision, intent(out), dimension(1:3) :: pos_out
+
+    double precision, dimension(1:3)              :: cur_field, new_field
+    double precision, dimension(1:3)              :: cur_pos, new_pos
+    double precision, dimension(1:2)              :: std
+    double precision                              :: rnd, alpha
+    integer                                       :: i, count
+
+    std(1:2) = emitters_dim(1:2, emit)*0.075d0/100.d0 ! Standard deviation for the normal distribution is 0.075% of the emitter length.
+    ! This means that 68% of jumps are less than this value.
+    ! The expected value of the absolute value of the normal distribution is std*sqrt(2/pi).
+
+    ! Get a random initial position on the surface.
+    ! We pick this location from a uniform distribution.
+    count = 0
+    do ! Infinite loop, we try to find a favourable position to start from
+      CALL RANDOM_NUMBER(cur_pos(1:2))
+      cur_pos(1:2) = cur_pos(1:2)*emitters_dim(1:2, emit) + emitters_pos(1:2, emit)
+      cur_pos(3) = 0.0d0 ! On the surface
+
+      ! Calculate the electric field at this position
+      cur_field = Calc_Field_at(cur_pos)
+      if (cur_field(3) < 0.0d0) then
+        exit ! We found a nice spot so we exit the loop
+      else
+        count = count + 1
+        if (count > 10000) exit ! The loop is infnite, must stop it at some point.
+        ! In field emission it is rare the we reach the CL limit.
+      end if
+    end do
+
+    do i = 1, ndim
+      ! Find a new position using a normal distribution.
+      !new_pos(1:2) = ziggurat_normal(cur_pos(1:2), std)
+      new_pos(1:2) = box_muller(cur_pos(1:2), std)
+      new_pos(3) = 0.0d0 ! At the surface
+
+      ! Make sure that the new position is within the limits of the emitter area.
+      call check_limits_metro_rec(new_pos, emit)
+
+      ! Calculate the field at the new position
+      new_field = Calc_Field_at(new_pos)
+
+      ! Check if the field is favourable for emission at the new position.
+      ! If it is not then cycle, i.e. we reject this location and
+      ! pick another one.
+      if (new_field(3) > 0.0d0) cycle ! Do the next loop iteration, i.e. find a new position.
+
+      ! Keep in mind that the field is negative
+      ! -2 < -1 = True (More negative field is more favourable for emission)
+      if (new_field(3) < cur_field(3)) then
+        cur_pos = new_pos ! New position becomes the current position
+        cur_field = new_field
+      else
+        ! Here we have some thing like -2 < -3
+        ! so alpha = -2/-3 = 2/3 = 0.67
+        alpha = new_field(3) / cur_field(3)
+        CALL RANDOM_NUMBER(rnd)
+        ! Jump to this position with probability alpha, i.e. if rnd is less than alpha
+        if (rnd < alpha) then
+          cur_pos = new_pos
+          cur_field = new_field
+        end if
+      end if
+
+    end do
+
+    F_out = cur_field(3)
+    df_out = Escape_Prob(F_out, cur_pos)
+    pos_out = cur_pos
+  end subroutine Metropolis_Hastings_rectangle_v2_field
 
   ! ----------------------------------------------------------------------------
   ! Checks the limits of the rectangular region of the emitter
