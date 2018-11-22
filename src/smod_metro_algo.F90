@@ -25,8 +25,7 @@ contains
     double precision, dimension(1:3)              :: cur_pos, new_pos, field
     double precision                              :: df_cur, df_new
 
-    std(1) = emitters_dim(1, emit)*0.05d0 ! Standard deviation for the normal distribution is 5% of the emitter length.
-    std(2) = emitters_dim(2, emit)*0.05d0 ! Standard deviation for the normal distribution is 5% of the emitter length.
+    std(1:2) = emitters_dim(1:2, emit)*0.05d0 ! Standard deviation for the normal distribution is 5% of the emitter length.
     ! This means that 68% of jumps are less than this value.
     ! The expected value of the absolute value of the normal distribution is std*sqrt(2/pi).
 
@@ -35,8 +34,7 @@ contains
     count = 0
     do ! Infinite loop, we try to find a favourable position to start from
       CALL RANDOM_NUMBER(cur_pos(1:2))
-      cur_pos(1) = cur_pos(1)*emitters_dim(1, emit) + emitters_pos(1, emit)
-      cur_pos(2) = cur_pos(2)*emitters_dim(2, emit) + emitters_pos(2, emit)
+      cur_pos(1:2) = cur_pos(1:2)*emitters_dim(1:2, emit) + emitters_pos(1:2, emit)
       cur_pos(3) = 0.0d0 ! On the surface
 
       ! Calculate the electric field at this position
@@ -54,7 +52,7 @@ contains
 
     ! Calculate the escape probability at this location
     if (field(3) < 0.0d0) then
-      df_cur = -1.0d0*log(Escape_Prob(field(3), cur_pos))
+      df_cur = Escape_Prob(field(3), cur_pos)
     else
       df_cur = 0.0d0 ! Zero escape probabilty if field is not favourable
     end if
@@ -80,7 +78,7 @@ contains
 
       ! Calculate the escape probability at the new position, to compair with
       ! the current position.
-      df_new = -1.0d0*log(Escape_Prob(field(3), new_pos))
+      df_new = Escape_Prob(field(3), new_pos)
 
       ! If the escape probability is higher in the new location,
       ! then we jump to that location. If it is not then we jump to that
@@ -105,7 +103,7 @@ contains
     ! Return the current position
 
     pos_out = cur_pos
-    df_out = exp(-1.0d0*df_cur)
+    df_out = df_cur
   end subroutine Metropolis_Hastings_rectangle_v2
 
   ! ----------------------------------------------------------------------------
