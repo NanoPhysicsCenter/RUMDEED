@@ -411,7 +411,7 @@ contains
     ! current location. We do this ndim times.
     do i = 1, ndim
       ! Find a new position
-      new_pos(1:2) = cur_pos(1:2) + box_muller(0.0d0, std)
+      new_pos(1:2) = box_muller(cur_pos(1:2), (/std, std/))
 
       ! Make sure that the new position is within the limits of the emitter area.
       call check_limits_metro_rec(new_pos, emit)

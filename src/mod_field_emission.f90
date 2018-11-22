@@ -331,13 +331,14 @@ contains
   ! https://en.wikipedia.org/wiki/Metropolis%E2%80%93Hastings_algorithm
   function Metro_algo_rec(ndim, emit)
     integer, intent(in)                          :: ndim, emit
-    double precision, dimension(1:2)             :: Metro_algo_rec
+    double precision, dimension(1:2)             :: Metro_algo_rec, std
     double precision, dimension(1:3)             :: par_pos, new_pos, field
-    double precision                             :: old_val, new_val, alpha, std, rnd
+    double precision                             :: old_val, new_val, alpha, rnd
     integer                                      :: old_val_s, new_val_s
     integer                                      :: i
 
-    std = (emitters_dim(1, emit)*0.05d0 + emitters_dim(2, emit)*0.05d0) / (2.0d0)
+    std(1) = (emitters_dim(1, emit)*0.05d0 + emitters_dim(2, emit)*0.05d0) / (2.0d0)
+    std(2) = (emitters_dim(1, emit)*0.05d0 + emitters_dim(2, emit)*0.05d0) / (2.0d0)
 
     CALL RANDOM_NUMBER(par_pos)
 
@@ -355,7 +356,7 @@ contains
     new_pos = 0.0d0
     do i = 1, ndim
       !IFAIL = vdRngGaussianMV(VSL_RNG_METHOD_GAUSSIANMV_ICDF, stream, 1, r(:, 1:2), 2, VSL_MATRIX_STORAGE_FULL, par_pos(1:2), T)
-      new_pos(1:2) = par_pos(1:2) + box_muller(0.0d0, std)
+      new_pos(1:2) = box_muller(par_pos(1:2), std)
       call check_limits_metro_rec(new_pos, emit)
 
       field = Calc_Field_at(par_pos)*(-1.0d0) ! This code assumes it is using the acceleration

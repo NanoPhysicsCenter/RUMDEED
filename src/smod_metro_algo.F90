@@ -25,7 +25,7 @@ contains
     double precision, dimension(1:3)              :: cur_pos, new_pos, field
     double precision                              :: df_cur, df_new
 
-    std(1:2) = emitters_dim(1:2, emit)*0.05d0 ! Standard deviation for the normal distribution is 5% of the emitter length.
+    std(1:2) = emitters_dim(1:2, emit)*0.075d0/100.d0 ! Standard deviation for the normal distribution is 0.075% of the emitter length.
     ! This means that 68% of jumps are less than this value.
     ! The expected value of the absolute value of the normal distribution is std*sqrt(2/pi).
 
@@ -62,8 +62,8 @@ contains
     ! current location. We do this ndim times.
     do i = 1, ndim
       ! Find a new position using a normal distribution.
-      new_pos(1:2) = ziggurat_normal(cur_pos(1:2), std)
-      !new_pos(1:2) = cur_pos(1:2) + box_muller(0.0d0, std)
+      !new_pos(1:2) = ziggurat_normal(cur_pos(1:2), std)
+      new_pos(1:2) = box_muller(cur_pos(1:2), std)
 
       ! Make sure that the new position is within the limits of the emitter area.
       call check_limits_metro_rec(new_pos, emit)

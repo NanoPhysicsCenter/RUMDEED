@@ -22,9 +22,9 @@ Module mod_therminoic_emission
 
   ! ----------------------------------------------------------------------------
   ! Parameters
-  double precision, parameter :: lambda = 0.5d0 ! Material paramater []
+  double precision, parameter :: lambda_R = 0.5d0 ! Material paramater []
   double precision, parameter :: A_0 = 4.0d0*pi*m_0*k_b**2*q_0 / h**3 ! Constant for the RD eq. [A m^-2 K^-2]
-  double precision, parameter :: A_G = lambda*A_0 ! Constant for the RD eq. [A m^-2 K^-2]
+  double precision, parameter :: A_G = lambda_R*A_0 ! Constant for the RD eq. [A m^-2 K^-2]
   double precision, parameter :: B_Sch_eV_prefix = q_0/(4.0d0*pi*epsilon_0) ! Schottky effect prefix [m V]
 
   double precision :: w_theta = 2.0d0 ! Work function [eV]
@@ -77,7 +77,7 @@ contains
     !call Read_work_function()
 
     ! Parameters used in the module
-    time_step_div_q0 = time_step / q_0
+    !time_step_div_q0 = time_step / q_0
 
     ! Initialize the Ziggurat algorithm
     call zigset(my_seed(1))
@@ -91,7 +91,6 @@ contains
     integer, intent(in) :: step
     integer             :: i, IFAIL
     double precision    :: cur_time
-    double precision, dimension(1:3) :: pos
 
     nrElecEmitAll = 0
     nrEmitted_emitters = 0
@@ -112,7 +111,7 @@ contains
 
   subroutine Do_Thermionic_Emission_Rectangle(step, nrEmit)
     integer, intent(in) :: step, nrEmit
-    integer             :: N_sup
+    integer             :: N_sup ! Number of electrons to emit
 
     call Do_Surface_Integration_TE(nrEmit, N_sup)
 

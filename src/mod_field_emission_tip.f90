@@ -113,7 +113,7 @@ subroutine Do_Field_Emission_Tip_2(step)
 
   nrElecEmit = 0
 
-  par_pos(1:2) = box_muller(0.0d0, 10.0d0*length_scale) ! Random x and y
+  par_pos(1:2) = box_muller((/0.0d0, 0.0d0/), (/10.0d0*length_scale, 10.0d0*length_scale/)) ! Random x and y
   par_pos(3) = d - 1.0d0*length_scale ! 1 nm below the plane in z
 
   x = par_pos(1)
@@ -358,18 +358,18 @@ end subroutine Do_Field_Emission_Tip_2
     ! end if
 
     do i = 1, ndim
-      par_pos(1:2) = box_muller(0.0d0, T(1, 1))
+      par_pos(1:2) = box_muller((/0.0d0, 0.0d0/), (/T(1,1), T(1, 1)/))
       r(i, 1) = par_pos(1)
-      par_pos(1:2) = box_muller(0.0d0, T(2, 2))
+      par_pos(1:2) = box_muller((/0.0d0, 0.0d0/), (/T(2, 2), T(2, 2)/))
       r(i, 2) = par_pos(2)
     end do
 
     !print *, 'Random end'
     !print *, ''
-    par_pos(1:2) = box_muller(0.0d0, T(1, 1))
+    par_pos(1:2) = box_muller((/0.0d0, 0.0d0/), (/T(1, 1), T(1, 1)/))
     xi = (max_xi - 1.0d0)*par_pos(1) + 1.0d0
 
-    par_pos(1:2) = box_muller(0.0d0, T(2, 2))
+    par_pos(1:2) = box_muller((/0.0d0, 0.0d0/), (/T(2, 2), T(2, 2)/))
     phi = 2.0d0*pi*par_pos(2)
     !xi = 1.0d0
     !phi = 0.0d0

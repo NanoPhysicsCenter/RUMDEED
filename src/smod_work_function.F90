@@ -219,10 +219,10 @@ contains
 
 
   if (r <= r_1) then
-    w_theta_circle = 2.40d0
+    w_theta_circle = 2.20d0
     sec_ = 1
   else if (r <= r_2) then
-    w_theta_circle = 1.40d0
+    w_theta_circle = 1.60d0
     sec_ = 2
   else if (r <= r_3) then
     w_theta_circle = 2.20d0

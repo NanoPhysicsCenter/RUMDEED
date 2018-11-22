@@ -193,8 +193,8 @@ module mod_global
   !           N_ic_max = 0 means use 1 image charge partners.
   !           N_ic_max = 1 means use 5 image charge partners.
   !           See the function Force_Image_Charge_v2 in mod_verlet for details.
-  logical           :: image_charge = .false.
-  integer           :: N_ic_max = 1
+  logical           :: image_charge = .true.
+  integer           :: N_ic_max = 2
 
   ! ----------------------------------------------------------------------------
   ! Define constants
@@ -239,7 +239,8 @@ module mod_global
   ! These variables are read for the input file.
   namelist /input/ V_s, box_dim, time_step, steps, &
                    nrEmit, emitters_pos, emitters_dim, &
-                   emitters_type, emitters_delay, EMISSION_MODE
+                   emitters_type, emitters_delay, EMISSION_MODE, &
+                   image_charge, N_ic_max
 
   ! ----------------------------------------------------------------------------
   ! Prodecure interfaces and pointers
@@ -312,9 +313,9 @@ contains
 ! given a source of uniformly distributed random numbers."
 ! See https://en.wikipedia.org/wiki/Box%E2%80%93Muller_transform
 function box_muller(mean, std)
-  double precision, dimension(1:2) :: box_muller
-  double precision, intent(in)     :: mean, std
-  double precision                 :: x_1, x_2, w, y_1, y_2
+  double precision, dimension(1:2)             :: box_muller
+  double precision, dimension(1:2), intent(in) :: mean, std
+  double precision                             :: x_1, x_2, w, y_1, y_2
 
   do
     CALL RANDOM_NUMBER(x_1)
@@ -330,8 +331,8 @@ function box_muller(mean, std)
   y_1 = x_1 * w
   y_2 = x_2 * w
 
-  box_muller(1) = y_1*std + mean
-  box_muller(2) = y_2*std + mean
+  box_muller(1) = y_1*std(1) + mean(1)
+  box_muller(2) = y_2*std(2) + mean(2)
 end function box_muller
 
 !***********************************************************************************************************************************
