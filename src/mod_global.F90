@@ -312,27 +312,24 @@ contains
 ! standard, normally distributed (zero expectation, unit variance) random numbers,
 ! given a source of uniformly distributed random numbers."
 ! See https://en.wikipedia.org/wiki/Box%E2%80%93Muller_transform
+! and https://en.wikipedia.org/wiki/Marsaglia_polar_method
 function box_muller(mean, std)
   double precision, dimension(1:2)             :: box_muller
   double precision, dimension(1:2), intent(in) :: mean, std
-  double precision                             :: x_1, x_2, w, y_1, y_2
+  double precision                             :: w
+  double precision, dimension(1:2)             :: x, y
 
   do
-    CALL RANDOM_NUMBER(x_1)
-    CALL RANDOM_NUMBER(x_2)
+    call random_number(x)
 
-    x_1 = 2.0d0 * x_1 - 1.0d0
-    x_2 = 2.0d0 * x_2 - 1.0d0
-    w = x_1**2 + x_2**2
+    x = 2.0d0*x - 1.0d0
+    w = x(1)**2 + x(2)**2
+
     if (w < 1.0d0) exit
   end do
 
-  w = sqrt( (-2.0d0 * log( w ) ) / w )
-  y_1 = x_1 * w
-  y_2 = x_2 * w
-
-  box_muller(1) = y_1*std(1) + mean(1)
-  box_muller(2) = y_2*std(2) + mean(2)
+  y = x*sqrt( (-2.0d0 * log( w ) ) / w )
+  box_muller = y*std + mean
 end function box_muller
 
 !***********************************************************************************************************************************
