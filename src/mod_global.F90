@@ -194,11 +194,11 @@ module mod_global
   !           N_ic_max = 1 means use 5 image charge partners.
   !           See the function Force_Image_Charge_v2 in mod_verlet for details.
   logical           :: image_charge = .true.
-  integer           :: N_ic_max = 2
+  integer           :: N_ic_max = 0
 
   ! ----------------------------------------------------------------------------
   ! Define constants
-  !double precision, parameter :: div_fac_c = 1.0d-7 * c**2 / epsilon_r ! 1/(4*pi*epsilon_0*epsilon_r)
+  ! The constant in front of Coulomb's law, often called k
   double precision, parameter :: div_fac_c = 1.0d0/(4.0d0*pi*epsilon_0*epsilon_r) ! 1/(4*pi*epsilon_0*epsilon_r)
 
 

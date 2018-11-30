@@ -22,7 +22,7 @@ Module mod_photo_emission
 
   ! ----------------------------------------------------------------------------
   ! Parameters
-  integer, parameter                          :: MAX_EMISSION_TRY = 100
+  integer, parameter                          :: MAX_EMISSION_TRY = 1000
 
 contains
   subroutine Init_Photo_Emission()
@@ -112,20 +112,21 @@ contains
         exit
       end if
 
-      CALL RANDOM_NUMBER(par_pos(1:2)) ! Gives a random number [0,1]
+      CALL RANDOM_NUMBER(par_pos(1:2)) ! Gives a random number between [0,1]
 
       r_e = emitters_dim(1, emit) * par_pos(1)
       theta_e = 2.0d0*pi * par_pos(2)
       par_pos(1) = r_e * cos(theta_e) + emitters_pos(1, emit)
       par_pos(2) = r_e * sin(theta_e) + emitters_pos(2, emit)
 
-      nrTry = nrTry + 1
+      nrTry = nrTry + 1 ! Add one more try
       par_pos(3) = 0.0d0 * length_scale ! Check in plane
       field = Calc_Field_at(par_pos)
 
+      ! Check if the field is favourable at this point
       if (field(3) < 0.0d0) then
         par_pos(3) = 1.0d0 * length_scale ! Place above plane
-        par_vel = 0.0d0
+        par_vel = 0.0d0 ! Set the velocity
         call Add_Particle(par_pos, par_vel, species_elec, step, emit)
 
         nrElecEmit = nrElecEmit + 1
