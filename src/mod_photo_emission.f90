@@ -68,17 +68,18 @@ contains
 
       ! Check the type of the emitter CIRCLE / RECTANGLE
       if (emitters_delay(i) < step) then
-        !select case (emitters_type(i))
-        !case (EMIT_CIRCLE)
+        select case (emitters_type(i))
+        case (EMIT_CIRCLE)
           !print *, 'Doing Circle'
-        !  call Do_Photo_Emission_Circle(step, i)
-        !case (EMIT_RECTANGLE)
+          call Do_Photo_Emission_Circle(step, i)
+        case (EMIT_RECTANGLE)
           !print *, 'Doing Rectangle'
           call Do_Photo_Emission_Rectangle(step, i)
-        !case default
-        !  print *, 'Vacuum: WARNING unknown emitter type!!'
-        !  print *, emitters_type(i)
-        !end select
+        case default
+          print *, 'Vacuum: ERROR unknown emitter type!!'
+          stop
+          print *, emitters_type(i)
+        end select
       end if
     end do
 
@@ -100,7 +101,12 @@ contains
     nrEmitted_emitters(emit) = 0
 
     do while (nrTry <= MAX_EMISSION_TRY)
-    !do i = 1, MAX_EMISSION_TRY
+      ! Check if we have reached the max number
+      ! of electrons to be emitted
+      if ((nrElecEmit >= maxElecEmit) .and. (maxElecEmit /= -1)) then
+        exit
+      end if
+
       if (nrElec == MAX_PARTICLES-1) then
         print *, 'WARNING: Reached maximum number of electrons!!!'
         exit
@@ -119,8 +125,8 @@ contains
 
       if (field(3) < 0.0d0) then
         par_pos(3) = 1.0d0 * length_scale ! Place above plane
+        par_vel = 0.0d0
         call Add_Particle(par_pos, par_vel, species_elec, step, emit)
-        !call Add_Plane_Graph_emitt(par_pos, par_vel)
 
         nrElecEmit = nrElecEmit + 1
         nrEmitted_emitters(emit) = nrEmitted_emitters(emit) + 1
