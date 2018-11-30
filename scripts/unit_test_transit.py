@@ -15,7 +15,7 @@ time_scale = 1.0E-12
 length_scale = 1.0E-9
 
 # System parameters
-d = 100.0*length_scale # Gap spacing (nm)
+d = 2000.0*length_scale # Gap spacing (nm)
 V = 2.0 # Voltage over gap (V)
 delta_t = 0.25E-3*time_scale # Time step (ps)
 

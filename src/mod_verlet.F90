@@ -58,14 +58,14 @@ contains
     !$OMP PARALLEL DO PRIVATE(i) SCHEDULE(AUTO)
     do i = startElecHoles, endElecHoles
       ! Verlet
-      !particles_prev_pos(:, i) = particles_cur_pos(:, i) ! Store the previous position
-      !particles_cur_pos(:, i)  = particles_cur_pos(:, i) + particles_cur_vel(:, i)*time_step &
-      !                       & + 0.5d0*particles_cur_accel(:, i)*time_step2
-
-      ! Beeman
       particles_prev_pos(:, i) = particles_cur_pos(:, i) ! Store the previous position
       particles_cur_pos(:, i)  = particles_cur_pos(:, i) + particles_cur_vel(:, i)*time_step &
-                             & + 1.0d0/6.0d0*( 4.0d0*particles_cur_accel(:, i) - particles_prev_accel(:, i) )*time_step2
+                             & + 0.5d0*particles_cur_accel(:, i)*time_step2
+
+      ! Beeman
+      !particles_prev_pos(:, i) = particles_cur_pos(:, i) ! Store the previous position
+      !particles_cur_pos(:, i)  = particles_cur_pos(:, i) + particles_cur_vel(:, i)*time_step &
+      !                       & + 1.0d0/6.0d0*( 4.0d0*particles_cur_accel(:, i) - particles_prev_accel(:, i) )*time_step2
 
       particles_prev2_accel(:, i) = particles_prev_accel(:, i) ! Beeman
       particles_prev_accel(:, i) = particles_cur_accel(:, i)
@@ -107,15 +107,15 @@ contains
     !$OMP PARALLEL DO PRIVATE(i, q, k) SCHEDULE(AUTO)
     do i = startElecHoles, endElecHoles
       ! Verlet
-      !particles_cur_vel(:, i) = particles_cur_vel(:, i) &
-      !                      & + 0.5d0*( particles_prev_accel(:, i) &
-      !                      & + particles_cur_accel(:, i) )*time_step
+      particles_cur_vel(:, i) = particles_cur_vel(:, i) &
+                            & + 0.5d0*( particles_prev_accel(:, i) &
+                            & + particles_cur_accel(:, i) )*time_step
 
       ! Beeman
-      particles_cur_vel(:, i) = particles_cur_vel(:, i) &
-                            & + 1.0d0/6.0d0*( 2.0d0*particles_cur_accel(:, i) &
-                            & + 5.0d0*particles_prev_accel(:, i) & 
-                            & - particles_prev2_accel(:, i) )*time_step
+      !particles_cur_vel(:, i) = particles_cur_vel(:, i) &
+      !                      & + 1.0d0/6.0d0*( 2.0d0*particles_cur_accel(:, i) &
+      !                      & + 5.0d0*particles_prev_accel(:, i) & 
+      !                      & - particles_prev2_accel(:, i) )*time_step
 
       q = particles_charge(i)
       k = particles_species(i)
