@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+from scipy.constants import pi, m_e, hbar, e, epsilon_0
 
 # ----------------------------------------------------------------
 # Calculates the emittance
@@ -31,3 +32,28 @@ def Calc_Emittance(df_emitt):
     #emittance = sigma_w*sigma_wp
     
     return emittance, sigma_w, sigma_wp, theta
+
+
+#------------------------------------------------------------------------------------------
+a_FN = e**2/(16.0*pi**2*hbar) # A eV V^{-2}
+b_FN = -4.0/(3.0*hbar) * np.sqrt(2.0*m_e*e) # eV^{-3/2} V m^{-1}
+l_const = e / (4.0*pi*epsilon_0) # eV^{2} V^{-1} m
+
+def t_y(F, w_theta):
+    l = l_const * F / w_theta**2 # l = y^2, y = 3.79E-4 * sqrt(F_old) / w_theta
+    t_y = 1.0 + l*( 1.0/9.0 - 1.0/18.0*np.log(l) )
+    return t_y
+
+def v_y(F, w_theta):
+    l = l_const * F / w_theta**2 # l = y^2, y = 3.79E-4 * sqrt(F_old) / w_theta
+    v_y = 1.0 - l + 1.0/6.0 * l * np.log(l)
+    return v_y
+
+# ----------------------------------------------------------------
+# Calculates the Fowler-Nordheim current density
+# F the field in V/m
+# w_theta the work function in eV
+def J_FN(F_, w_theta):
+    F = np.abs(F_)
+    J = a_FN/(w_theta*t_y(F, w_theta)**2)*F**2 * np.exp(v_y(F, w_theta)*b_FN*w_theta**(3/2)/F)
+    return J

@@ -21,7 +21,7 @@ Module mod_field_emission_v2
   integer                            :: nrElecEmitAll
   !integer                            :: nrEmitted
   double precision, dimension(1:3)   :: F_avg = 0.0d0
-  integer, parameter                 :: N_MH_step = 10 ! Number of steps to do in the MH algorithm
+  integer, parameter                 :: N_MH_step = 20 ! Number of steps to do in the MH algorithm
 
   ! ----------------------------------------------------------------------------
   ! Constants for field emission
@@ -188,8 +188,8 @@ contains
     !$OMP PARALLEL DO PRIVATE(s, par_pos, F, D_f, rnd, par_vel) REDUCTION(+:df_avg) SCHEDULE(AUTO)
     do s = 1, N_sup
 
-      !call Metropolis_Hastings_rectangle_v2(N_MH_step, emit, D_f, F, par_pos)
-      call Metropolis_Hastings_rectangle_v2_field(N_MH_step, emit, D_f, F, par_pos)
+      call Metropolis_Hastings_rectangle_v2(N_MH_step, emit, D_f, F, par_pos)
+      !call Metropolis_Hastings_rectangle_v2_field(N_MH_step, emit, D_f, F, par_pos)
       !print *, 'D_f = ', D_f
       !print *, 'F = ', F
       !print *, ''
