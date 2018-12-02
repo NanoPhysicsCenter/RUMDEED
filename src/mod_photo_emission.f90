@@ -125,9 +125,20 @@ contains
 
       ! Check if the field is favourable at this point
       if (field(3) < 0.0d0) then
+
+        par_vel(1:2) = box_muller((/1.0d0, 1.0d0/), (/0.25d0, 0.25d0/))
+        if (par_vel(1) < 0.0d0) then
+          if (par_vel(2) < 0.0d0) then
+            par_pos(3) = 0.0d-6 * length_scale
+          else
+            par_pos(2) = par_vel(2) * length_scale
+          end if
+        else
+          par_pos(3) = par_vel(1) * length_scale
+        end if
         !CALL RANDOM_NUMBER(par_pos(3))
         !par_pos(3) = (par_pos(3) + 1.0d0)*0.5d0 * length_scale ! Place above plane
-        par_pos(3) = 1.0d0*length_scale ! Place 1 nm above plane
+        !par_pos(3) = 1.0d0*length_scale ! Place 1 nm above plane
         par_vel = 0.0d0 ! Set the velocity
 
         ! Escape velocity from image charge partner
