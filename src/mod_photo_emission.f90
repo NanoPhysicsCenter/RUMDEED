@@ -125,9 +125,9 @@ contains
 
       ! Check if the field is favourable at this point
       if (field(3) < 0.0d0) then
-        CALL RANDOM_NUMBER(par_pos(3))
-        par_pos(3) = (par_pos(3) + 1.0d0)*0.5d0 * length_scale ! Place above plane
-        !par_pos(3) = 1.0d0*length_scale ! Place 1 nm above plane
+        !CALL RANDOM_NUMBER(par_pos(3))
+        !par_pos(3) = (par_pos(3) + 1.0d0)*0.5d0 * length_scale ! Place above plane
+        par_pos(3) = 1.0d0*length_scale ! Place 1 nm above plane
         par_vel = 0.0d0 ! Set the velocity
 
         ! Escape velocity from image charge partner
