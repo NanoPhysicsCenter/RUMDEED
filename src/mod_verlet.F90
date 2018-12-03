@@ -272,9 +272,7 @@ contains
       force_ic = Force_Image_charges_v2(pos_1, pos_2)
 
       ! The total force
-      ! The minus sign in front force_ic is because the image charge partners will
-      ! have the oposite charge
-      force_tot = force_tot + pre_fac_c * force_c + pre_fac_c*force_ic
+      force_tot = force_tot + pre_fac_c * force_c + pre_fac_c * force_ic
     end do
     !$OMP END PARALLEL DO
 

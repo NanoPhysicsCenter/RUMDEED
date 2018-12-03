@@ -131,7 +131,7 @@ contains
           if (par_vel(2) < 0.0d0) then
             par_pos(3) = 0.0d-6 * length_scale
           else
-            par_pos(2) = par_vel(2) * length_scale
+            par_pos(3) = par_vel(2) * length_scale
           end if
         else
           par_pos(3) = par_vel(1) * length_scale
@@ -142,10 +142,10 @@ contains
         par_vel = 0.0d0 ! Set the velocity
 
         ! Escape velocity from image charge partner
-        par_vel(3) = q_0 / sqrt(8.0d0*pi*epsilon_0*epsilon_r*m_0*par_pos(3)) 
+        !par_vel(3) = q_0 / sqrt(8.0d0*pi*epsilon_0*epsilon_r*m_0*par_pos(3)) 
         
         ! Speed needed to reach over the gap spacing. Includes image charge partners behind the cathode and annode but not the electric field.
-        !par_vel(3) = q_0/(4.0d0*sqrt(pi*epsilon_0*epsilon_r*m_0))*(d-2.0d0*par_pos(3))/sqrt(d*par_pos(3)*(d-par_pos(3)))
+        par_vel(3) = q_0/(4.0d0*sqrt(pi*epsilon_0*epsilon_r*m_0))*(d-2.0d0*par_pos(3))/sqrt(d*par_pos(3)*(d-par_pos(3)))
         
         call Add_Particle(par_pos, par_vel, species_elec, step, emit)
 

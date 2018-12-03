@@ -36,11 +36,11 @@ E = np.array([0.0, 0.0, -V/d])
 
 # Particle locations
 # Electrons
-R_1 = np.array([3.0, -10.0, 101.0])*length_scale
+R_1 = np.array([3.0, -10.0, 2.0])*length_scale
 R_2 = np.array([-9.0, 26.0, 80.0])*length_scale
 
 # Holes
-R_3 = np.array([6.0, -24.0, 118.0])*length_scale
+R_3 = np.array([6.0, -24.0, 56.53])*length_scale
 
 
 # Acceleration particles 1 ----------------------------------------------------
@@ -86,9 +86,13 @@ E_1 = -1.0*pre_fac_F * (R_4 - R_1) / np.linalg.norm(R_4 - R_1)**3
 E_2 = -1.0*pre_fac_F * (R_4 - R_2) / np.linalg.norm(R_4 - R_2)**3
 E_3 = +1.0*pre_fac_F * (R_4 - R_3) / np.linalg.norm(R_4 - R_3)**3
 
-print('pre_fac_F = ', pre_fac_F)
+#print('pre_fac_F = ', pre_fac_F)
 print('diff = ', (R_4 - R_1))
-print('r = ', np.linalg.norm(R_4 - R_1))
+#print('r = ', np.linalg.norm(R_4 - R_1))
+print('E_1 = ', E_1)
+#print('E_2 = ', E_2)
+#print('E_3 = ', E_3)
+#print('E = ', E)
 
 E_tot = E_1 + E_2 + E_3 + E
 print('Electric field')
