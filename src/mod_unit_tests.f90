@@ -283,9 +283,11 @@ contains
     double precision, parameter      :: q_1 = -1.0d0*q_0, q_2 = +1.0d0*q_0
     double precision, parameter      :: q_1_ic = -1.0d0*q_1, q_2_ic = -1.0d0*q_2
     double precision, dimension(1:3) :: R_1, R_2, R_1_IC, R_2_IC
+    double precision, dimension(1:3) :: R_1_IC_1, R_1_IC_2, R_1_IC_3, R_1_IC_4, R_1_IC_5
+    double precision                 :: q_1_IC_1, q_1_IC_2, q_1_IC_3, q_1_IC_4, q_1_IC_5
 
     ! Calculation results
-    double precision, dimension(1:3) :: F_R1, F_R2, F_IC_12, F_IC_21
+    double precision, dimension(1:3) :: F_R1, F_R2, F_IC_11, F_IC_12, F_IC_21, F_IC_13, F_IC_14, F_IC_15
     double precision, dimension(1:3) :: force_ic_11, force_ic_22, force_ic_12, force_ic_21
 
     print *, 'Testing image charge function "Force_Image_charges_v2(pos_1, pos_2)"'
@@ -388,14 +390,11 @@ contains
       print *, 'Image charge interaction on particle 2 from particle 1 PASSED'
     else
       print *, 'Image charge interaction on particle 2 from particle 1 FAILED'
-      print *, 'F_IC_21 = ', F_IC_21(3)
-      print *, 'force_ic_21 = ', force_ic_21(3)
+      print *, 'F_IC_21 = ', F_IC_21
+      print *, 'force_ic_21 = ', force_ic_21
       print *, 'abs(force_ic_21 - F_IC_21)/F_IC_21 = ', abs(force_ic_21 - F_IC_21)/F_IC_21
       print *, ''
     end if
-
-    print *, 'Image charge function "Force_Image_charges_v2(pos_1, pos_2)" test finished'
-    print *, ''
 
     !-------------------------------------------------------------------------------------------
     ! Test 5 image charge partners of each particle
@@ -405,14 +404,56 @@ contains
     ! n =  0: z = -z_0 (+)
     ! n = -1: z = -2d-z_0 (+), z = -2d+z_0 (-)
     ! n = +1: z =  2d-z_0 (+), z =  2d+z_0 (-)
+
+    R_1_IC_1 = R_1
+    R_1_IC_1(3) = -1.0d0*R_1_IC_1(3)
+    q_1_IC_1 = -1.0d0*q_1
+
+    R_1_IC_2 = R_1
+    R_1_IC_2(3) = -2.0d0*d_test - R_1_IC_2(3)
+    q_1_IC_2 = -1.0d0*q_1
+
+    R_1_IC_3 = R_1
+    R_1_IC_3(3) = -2.0d0*d_test + R_1_IC_3(3)
+    q_1_IC_2 = -1.0d0*q_1
+
+    R_1_IC_4 = R_1
+    R_1_IC_4(3) = 2.0d0*d_test - R_1_IC_4(3)
+    q_1_IC_2 = -1.0d0*q_1
+    
+    R_1_IC_5 = R_1
+    R_1_IC_5(3) = 2.0d0*d_test + R_1_IC_5(3)
+    q_1_IC_2 = -1.0d0*q_1
+
+    F_IC_11 = q_1*q_1_IC_1/(4.0d0*pi*epsilon_0) * (R_1 - R_1_IC_1) / norm2(R_1 - R_1_IC_1)**3
+    F_IC_12 = q_1*q_1_IC_2/(4.0d0*pi*epsilon_0) * (R_1 - R_1_IC_2) / norm2(R_1 - R_1_IC_2)**3
+    F_IC_13 = q_1*q_1_IC_3/(4.0d0*pi*epsilon_0) * (R_1 - R_1_IC_3) / norm2(R_1 - R_1_IC_3)**3
+    F_IC_14 = q_1*q_1_IC_4/(4.0d0*pi*epsilon_0) * (R_1 - R_1_IC_4) / norm2(R_1 - R_1_IC_4)**3
+    F_IC_15 = q_1*q_1_IC_5/(4.0d0*pi*epsilon_0) * (R_1 - R_1_IC_5) / norm2(R_1 - R_1_IC_5)**3
+
+    F_R1 = F_IC_11 + F_IC_12 + F_IC_13 + F_IC_14 + F_IC_15
+
+    force_ic_11 = q_1**2 * div_fac_c * Force_Image_charges_v2(R_1, R_1)
+
+    if (all(abs(force_ic_11 - F_R1)/F_R1 < tolerance_rel)) then
+      print *, 'Image charge interaction on particle 2 from particle 1 PASSED'
+    else
+      print *, 'Image charge interaction on particle 2 from particle 1 FAILED'
+      print *, 'F_R1 = ', F_R1
+      print *, 'force_ic_11 = ', force_ic_11
+      print *, 'abs(force_ic_11 - F_R1)/F_R1 = ', abs(force_ic_11 - F_R1)/F_R1
+      print *, ''
+    end if
+
+    print *, 'Image charge function "Force_Image_charges_v2(pos_1, pos_2)" test finished'
+    print *, ''
   end subroutine Test_Image_Charge
 
   !-----------------------------------------------------------------------------
   ! Test the Acceleration calculations
   ! Two electrons and one hole are placed in the system
   ! The acceleration is calculated using Coulomb's law and also with the
-  ! Calculate Acceleration subroutine. The two are then compared to see if the
-  ! optimizations and the OpenMP are working correctly.
+  ! Calculate Acceleration subroutine.
   subroutine Test_Acceleration_With_Image_Charge()
     double precision, dimension(1:3) :: R_1, R_1a, R_1b
     double precision, dimension(1:3) :: R_2, R_2a, R_2b
