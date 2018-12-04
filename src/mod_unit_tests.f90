@@ -512,6 +512,29 @@ contains
       print *, ''
     end if
 
+    !--------------------------------------------------------------------------------------
+    ! Testing interaction on particle 1 from particle 2 with N_IC_MAX = 1
+
+    F_IC_11 = q_1*q_2_IC_1/(4.0d0*pi*epsilon_0) * (R_1 - R_2_IC_1) / norm2(R_1 - R_2_IC_1)**3
+    F_IC_12 = q_1*q_2_IC_2/(4.0d0*pi*epsilon_0) * (R_1 - R_2_IC_2) / norm2(R_1 - R_2_IC_2)**3
+    F_IC_13 = q_1*q_2_IC_3/(4.0d0*pi*epsilon_0) * (R_1 - R_2_IC_3) / norm2(R_1 - R_2_IC_3)**3
+    F_IC_14 = q_1*q_2_IC_4/(4.0d0*pi*epsilon_0) * (R_1 - R_2_IC_4) / norm2(R_1 - R_2_IC_4)**3
+    F_IC_15 = q_1*q_2_IC_5/(4.0d0*pi*epsilon_0) * (R_1 - R_2_IC_5) / norm2(R_1 - R_2_IC_5)**3
+
+    F_R1 = F_IC_11 + F_IC_12 + F_IC_13 + F_IC_14 + F_IC_15
+
+    force_ic_12 = q_1*q_2 * div_fac_c * Force_Image_charges_v2(R_1, R_2)
+
+    if (all(abs(force_ic_12 - F_R1)/F_R1 < tolerance_rel)) then
+      print *, 'Image charge interaction on particle 1 from particle 2 (N_IC_MAX = 1) PASSED'
+    else
+      print *, 'Image charge interaction on particle 1 from particle 2 (N_IC_MAX = 1) FAILED'
+      print *, 'F_IC_21 = ', F_R1
+      print *, 'force_ic_12 = ', force_ic_12
+      print *, 'abs(force_ic_12 - F_R1)/F_R1 = ', abs(force_ic_12 - F_R1)/F_R1
+      print *, ''
+    end if
+
     print *, 'Image charge function "Force_Image_charges_v2(pos_1, pos_2)" test finished'
     print *, ''
   end subroutine Test_Image_Charge
