@@ -5,8 +5,8 @@
 # Compiler to use
 ifndef FCOMPILER
 #FCOMPILER=ifort
-FCOMPILER=gfortran-8
-#FCOMPILER=pgfortran
+#FCOMPILER=gfortran-8
+FCOMPILER=pgfortran
 endif
 
 GIT_VERSION := $(shell git describe --dirty --always --tags)
@@ -53,7 +53,9 @@ FFLAGS=-fast
 #FFLAGS=-fast -Minfo -Mllvm
 #FFLAGS=-g -gopt -Mbounds -Mchkfpstk -Mchkfpstk -Mchkfpstk -Melf -traceback
 ifdef OPENMP
-FFLAGS+=-mp
+#FFLAGS+=-mp
+FFLAGS+=-acc -ta=tesla:managed -Minfo=accel
+#FFLAGS+=-acc -ta=tesla -Minfo=accel
 endif
 endif
 

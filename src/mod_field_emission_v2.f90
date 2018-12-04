@@ -164,6 +164,8 @@ contains
     integer                          :: nrElecEmit
     double precision, dimension(1:3) :: par_pos, par_vel
 
+    !$acc data copyin(particles_cur_pos, particles_charge, d, nrPart)
+
     call Do_Surface_Integration_FE(emit, N_sup)
     !call Calc_Field_old_method(step, emit)
 
@@ -216,6 +218,7 @@ contains
           par_vel = 0.0d0
           rnd = w_theta_xy(par_pos, sec) ! Get the section
           call Add_Particle(par_pos, par_vel, species_elec, step, emit, sec)
+          !$acc update device(particles_charge, particles_cur_pos, nrPart)
 
           nrElecEmit = nrElecEmit + 1
           nrEmitted_emitters(emit) = nrEmitted_emitters(emit) + 1
@@ -225,6 +228,8 @@ contains
       end if
     end do
     !$OMP END PARALLEL DO
+
+    !$acc end data
 
     df_avg = df_avg / N_sup
 

@@ -114,6 +114,7 @@ module mod_global
   double precision :: V_d     ! Voltage over the gap
   double precision :: V_s     ! Voltage from the source
   double precision :: d       ! Gap spacing
+  !$acc declare create(d)
   double precision :: E_z     ! Electric field in the y-direction (E_z = -V/d)
   double precision :: E_zunit ! Unit electric field (E_zunit = -1/d) (See Ramo Current)
 
@@ -194,7 +195,9 @@ module mod_global
   !           N_ic_max = 1 means use 5 image charge partners.
   !           See the function Force_Image_Charge_v2 in mod_verlet for details.
   logical           :: image_charge = .true.
+  !$acc declare create(image_charge)
   integer           :: N_ic_max = 0
+  !$acc declare create(N_ic_max)
 
   ! ----------------------------------------------------------------------------
   ! Define constants

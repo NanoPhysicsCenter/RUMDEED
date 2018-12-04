@@ -233,10 +233,10 @@ contains
     double precision, dimension(1:3), intent(in) :: pos
 
     double precision, dimension(1:3) :: force_c, force_tot, force_ic
-    double precision, dimension(1:3) :: pos_1, pos_2, diff, pos_ic_a, pos_ic_b
+    double precision, dimension(1:3) :: pos_1, pos_2, diff
     double precision                 :: r
-    double precision                 :: q_1, q_2
-    double precision                 :: pre_fac_c, pre_fac_ic
+    double precision                 :: q_2
+    double precision                 :: pre_fac_c
     integer                          :: j
 
     ! Position of the particle we are calculating the force/acceleration on
@@ -244,9 +244,12 @@ contains
 
     ! Electric field in the system
     force_tot = ptr_field_E(pos_1)
+    
+    !$acc data copyin(pos_1) copy(force_tot) present(particles_cur_pos, particles_charge, nrPart, d)
 
-    !$OMP PARALLEL DO PRIVATE(j, pos_2, pos_ic_a, pos_ic_b, diff, r, force_c, force_ic, q_2, pre_fac_c, pre_fac_ic) &
+    !$OMP PARALLEL DO PRIVATE(j, pos_2, diff, r, force_c, force_ic, q_2, pre_fac_c) &
     !$OMP& REDUCTION(+:force_tot) SCHEDULE(AUTO)
+    !$acc parallel loop private(j, pos_2, q_2, pre_fac_c, diff, r, force_c, force_ic)
     do j = 1, nrPart
 
       ! Position of the particle that is acting on the particle at pos_1
@@ -272,9 +275,20 @@ contains
       force_ic = Force_Image_charges_v2(pos_1, pos_2)
 
       ! The total force
-      force_tot = force_tot + pre_fac_c * force_c + pre_fac_c * force_ic
+      !$acc atomic update
+      force_tot(1) = force_tot(1) + pre_fac_c * (force_c(1) + force_ic(1))
+      !$acc end atomic
+      !$acc atomic update
+      force_tot(2) = force_tot(2) + pre_fac_c * (force_c(2) + force_ic(2))
+      !$acc end atomic
+      !$acc atomic update
+      force_tot(3) = force_tot(3) + pre_fac_c * (force_c(3) + force_ic(3))
+      !$acc end atomic
     end do
+    !$acc end parallel
     !$OMP END PARALLEL DO
+
+    !$acc end data
 
     Calc_Field_at = force_tot
 
@@ -297,7 +311,7 @@ contains
     integer                                      :: n
     double precision, dimension(1:3)             :: pos_ic, diff
     double precision                             :: r
-
+    !$acc routine seq
     ! Check if we are doing image charge or not
     if (image_charge .eqv. .false.) then
       ! Return 0 if we are not using image charge
