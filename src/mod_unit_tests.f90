@@ -246,10 +246,16 @@ contains
       print *, ''
     end if
 
-    if (all(abs(E_test - E_F)/E_test < tolerance_rel)) then
-      print *, 'Electric field without particles PASSED'
+    if (abs(E_test(3) - E_F(3))/E_test(3) < tolerance_rel) then
+      if ( (abs(E_test(1) - 0.0d0) < tolerance_abs) .and. (abs(E_test(2) - 0.0d0) < tolerance_abs) ) then
+        print *, 'Electric field without particles PASSED'
+      else
+        print *, 'Electric field without particles FAILED'
+        print *, 'x and y component not zero'
+      end if
     else
       print *, 'Electric field without particles FAILED'
+      print *, 'z component not correct'
       print *, 'E_test = ', E_test
       print *, 'E_F = ', E_F
       print *, 'abs(E_test - E_F)/E_test = ', abs(E_test - E_F)/E_test
@@ -299,7 +305,7 @@ contains
     ! We have two particles, an electron at,
     R_1 = (/  3.0d0, -10.0d0, 2.0d0 /) * length_scale
     ! and hole at,
-    R_2 = (/  6.0d0, -24.0d0, 56.53d0 /) * length_scale
+    R_2 = (/  6.0d0, -24.0d0, 98.53d0 /) * length_scale
 
     ! Let's test the self interaction first
     force_ic_11 = q_1**2 * div_fac_c * Force_Image_charges_v2(R_1, R_1)
@@ -320,13 +326,13 @@ contains
         print *, 'Self interaction on particle 1 PASSED'
       else
         print *, 'Self interaction on particle 1 FAILED'
-        print *, 'x and y factors are not zero'
+        print *, 'x and y component are not zero'
         print *, 'force_ic_11(1) = ', force_ic_11(1)
         print *, 'force_ic_11(2) = ', force_ic_11(2)
       endif
     else
       print *, 'Self interaction on image charge particle 1 FAILED'
-      print *, 'z factor not correct'
+      print *, 'z component not correct'
       print *, 'F_R1 = ', F_R1(3)
       print *, 'force_ic_11 = ', force_ic_11(3)
       print *, 'abs(force_ic_11 - F_R1)/F_R1 = ', abs(F_R1(3) - force_ic_11(3))/F_R1(3)
@@ -345,13 +351,13 @@ contains
         print *, 'Self interaction on particle 2 PASSED'
       else
         print *, 'Self interaction on particle 2 FAILED'
-        print *, 'x and y factors are not zero'
+        print *, 'x and y component are not zero'
         print *, 'force_ic_22(1) = ', force_ic_22(1)
         print *, 'force_ic_22(2) = ', force_ic_22(2)
       endif
     else
       print *, 'Self interaction on image charge particle 2 FAILED'
-      print *, 'z factor not correct'
+      print *, 'z component not correct'
       print *, 'F_R2 = ', F_R2(3)
       print *, 'force_ic_22 = ', force_ic_22(3)
       print *, 'abs(force_ic_22 - F_R1)/F_R1 = ', abs(F_R2(3) - force_ic_22(3))/F_R2(3)
@@ -407,23 +413,23 @@ contains
 
     R_1_IC_1 = R_1
     R_1_IC_1(3) = -1.0d0*R_1_IC_1(3)
-    q_1_IC_1 = -1.0d0*q_1
+    q_1_IC_1 = +1.0d0*q_0
 
     R_1_IC_2 = R_1
     R_1_IC_2(3) = -2.0d0*d_test - R_1_IC_2(3)
-    q_1_IC_2 = -1.0d0*q_1
+    q_1_IC_2 = +1.0d0*q_0
 
     R_1_IC_3 = R_1
     R_1_IC_3(3) = -2.0d0*d_test + R_1_IC_3(3)
-    q_1_IC_2 = -1.0d0*q_1
+    q_1_IC_2 = -1.0d0*q_0
 
     R_1_IC_4 = R_1
     R_1_IC_4(3) = 2.0d0*d_test - R_1_IC_4(3)
-    q_1_IC_2 = -1.0d0*q_1
+    q_1_IC_2 = +1.0d0*q_0
     
     R_1_IC_5 = R_1
     R_1_IC_5(3) = 2.0d0*d_test + R_1_IC_5(3)
-    q_1_IC_2 = -1.0d0*q_1
+    q_1_IC_2 = -1.0d0*q_0
 
     F_IC_11 = q_1*q_1_IC_1/(4.0d0*pi*epsilon_0) * (R_1 - R_1_IC_1) / norm2(R_1 - R_1_IC_1)**3
     F_IC_12 = q_1*q_1_IC_2/(4.0d0*pi*epsilon_0) * (R_1 - R_1_IC_2) / norm2(R_1 - R_1_IC_2)**3
@@ -435,13 +441,20 @@ contains
 
     force_ic_11 = q_1**2 * div_fac_c * Force_Image_charges_v2(R_1, R_1)
 
-    if (all(abs(force_ic_11 - F_R1)/F_R1 < tolerance_rel)) then
-      print *, 'Image charge interaction on particle 2 from particle 1 PASSED'
+    if (abs(force_ic_11(3) - F_R1(3))/F_R1(3) < tolerance_rel) then
+      if ( (abs(force_ic_11(1) - 0.0d0) < tolerance_abs) .and. (abs(force_ic_11(2) - 0.0d0) < tolerance_abs) ) then
+        print *, 'Self interaction on particle 1 PASSED (N_IC_MAX = 1)'
+      else
+        print *, 'x and y component are not zero'
+        print *, 'force_ic_11(1) = ', force_ic_11(1)
+        print *, 'force_ic_11(2) = ', force_ic_11(2)
+      end if
     else
-      print *, 'Image charge interaction on particle 2 from particle 1 FAILED'
-      print *, 'F_R1 = ', F_R1
-      print *, 'force_ic_11 = ', force_ic_11
-      print *, 'abs(force_ic_11 - F_R1)/F_R1 = ', abs(force_ic_11 - F_R1)/F_R1
+      print *, 'Self interaction on particle 1 FAILED (N_IC_MAX = 1)'
+      print *, 'z component if not correct'
+      print *, 'F_R1(3) = ', F_R1(3)
+      print *, 'force_ic_11(3) = ', force_ic_11(3)
+      print *, 'abs(force_ic_11(3) - F_R1(3))/F_R1(3) = ', abs(force_ic_11(3) - F_R1(3))/F_R1(3)
       print *, ''
     end if
 
