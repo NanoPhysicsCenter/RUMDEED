@@ -77,10 +77,14 @@ contains
         nrHole = nrHole + 1
       end if
 
+      !$acc update device(particles_charge(nrPart:nrPart+1), particles_cur_pos(:, nrPart:nrPart+1))
+
       ! Update the number of particles in the system
       nrElecHole = nrElec + nrHole
       nrPart = nrElecHole
       endElecHoles = nrPart
+
+      !$acc update device(nrPart)
 
       ! Write out the x and y position of the emitted particle
       ! along with which emitter and section it came from.
