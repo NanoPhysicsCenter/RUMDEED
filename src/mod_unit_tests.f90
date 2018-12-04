@@ -445,14 +445,14 @@ contains
 
     if (abs(force_ic_11(3) - F_R1(3))/F_R1(3) < tolerance_rel) then
       if ( (abs(force_ic_11(1) - 0.0d0) < tolerance_abs) .and. (abs(force_ic_11(2) - 0.0d0) < tolerance_abs) ) then
-        print *, 'Self interaction on particle 1 PASSED (N_IC_MAX = 1)'
+        print *, 'Self interaction on particle 1 (N_IC_MAX = 1) PASSED'
       else
         print *, 'x and y component are not zero'
         print *, 'force_ic_11(1) = ', force_ic_11(1)
         print *, 'force_ic_11(2) = ', force_ic_11(2)
       end if
     else
-      print *, 'Self interaction on particle 1 FAILED (N_IC_MAX = 1)'
+      print *, 'Self interaction on particle 1 (N_IC_MAX = 1) FAILED'
       print *, 'z component if not correct'
       print *, 'F_R1(3) = ', F_R1(3)
       print *, 'force_ic_11(3) = ', force_ic_11(3)
@@ -497,14 +497,14 @@ contains
 
     if (abs(force_ic_22(3) - F_R2(3))/F_R2(3) < tolerance_rel) then
       if ( (abs(force_ic_22(1) - 0.0d0) < tolerance_abs) .and. (abs(force_ic_22(2) - 0.0d0) < tolerance_abs) ) then
-        print *, 'Self interaction on particle 2 PASSED (N_IC_MAX = 1)'
+        print *, 'Self interaction on particle 2 (N_IC_MAX = 1) PASSED'
       else
         print *, 'x and y component are not zero'
         print *, 'force_ic_11(1) = ', force_ic_22(1)
         print *, 'force_ic_11(2) = ', force_ic_22(2)
       end if
     else
-      print *, 'Self interaction on particle 2 FAILED (N_IC_MAX = 1)'
+      print *, 'Self interaction on particle 2 (N_IC_MAX = 1) FAILED'
       print *, 'z component if not correct'
       print *, 'F_R2 = ', F_R2
       print *, 'force_ic_22 = ', force_ic_22
