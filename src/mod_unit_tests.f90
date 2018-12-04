@@ -290,7 +290,9 @@ contains
     double precision, parameter      :: q_1_ic = -1.0d0*q_1, q_2_ic = -1.0d0*q_2
     double precision, dimension(1:3) :: R_1, R_2, R_1_IC, R_2_IC
     double precision, dimension(1:3) :: R_1_IC_1, R_1_IC_2, R_1_IC_3, R_1_IC_4, R_1_IC_5
+    double precision, dimension(1:3) :: R_2_IC_1, R_2_IC_2, R_2_IC_3, R_2_IC_4, R_2_IC_5
     double precision                 :: q_1_IC_1, q_1_IC_2, q_1_IC_3, q_1_IC_4, q_1_IC_5
+    double precision                 :: q_2_IC_1, q_2_IC_2, q_2_IC_3, q_2_IC_4, q_2_IC_5
 
     ! Calculation results
     double precision, dimension(1:3) :: F_R1, F_R2, F_IC_11, F_IC_12, F_IC_21, F_IC_13, F_IC_14, F_IC_15
@@ -421,15 +423,15 @@ contains
 
     R_1_IC_3 = R_1
     R_1_IC_3(3) = -2.0d0*d_test + R_1_IC_3(3)
-    q_1_IC_2 = -1.0d0*q_0
+    q_1_IC_3 = -1.0d0*q_0
 
     R_1_IC_4 = R_1
     R_1_IC_4(3) = 2.0d0*d_test - R_1_IC_4(3)
-    q_1_IC_2 = +1.0d0*q_0
+    q_1_IC_4 = +1.0d0*q_0
     
     R_1_IC_5 = R_1
     R_1_IC_5(3) = 2.0d0*d_test + R_1_IC_5(3)
-    q_1_IC_2 = -1.0d0*q_0
+    q_1_IC_5 = -1.0d0*q_0
 
     F_IC_11 = q_1*q_1_IC_1/(4.0d0*pi*epsilon_0) * (R_1 - R_1_IC_1) / norm2(R_1 - R_1_IC_1)**3
     F_IC_12 = q_1*q_1_IC_2/(4.0d0*pi*epsilon_0) * (R_1 - R_1_IC_2) / norm2(R_1 - R_1_IC_2)**3
@@ -455,6 +457,58 @@ contains
       print *, 'F_R1(3) = ', F_R1(3)
       print *, 'force_ic_11(3) = ', force_ic_11(3)
       print *, 'abs(force_ic_11(3) - F_R1(3))/F_R1(3) = ', abs(force_ic_11(3) - F_R1(3))/F_R1(3)
+      print *, ''
+    end if
+
+    ! Test self interaction of particle 2 (+)
+    ! n =  0: z = -z_0 (-)
+    ! n = -1: z = -2d-z_0 (-), z = -2d+z_0 (+)
+    ! n = +1: z =  2d-z_0 (-), z =  2d+z_0 (+)
+
+    R_2_IC_1 = R_2
+    R_2_IC_1(3) = -1.0d0*R_2_IC_1(3)
+    q_2_IC_1 = -1.0d0*q_0
+
+    R_2_IC_2 = R_2
+    R_2_IC_2(3) = -2.0d0*d_test - R_2_IC_2(3)
+    q_2_IC_2 = -1.0d0*q_0
+
+    R_2_IC_3 = R_2
+    R_2_IC_3(3) = -2.0d0*d_test + R_2_IC_3(3)
+    q_2_IC_3 = +1.0d0*q_0
+
+    R_2_IC_4 = R_2
+    R_2_IC_4(3) = 2.0d0*d_test - R_2_IC_4(3)
+    q_2_IC_4 = -1.0d0*q_0
+    
+    R_2_IC_5 = R_2
+    R_2_IC_5(3) = 2.0d0*d_test + R_2_IC_5(3)
+    q_2_IC_5 = +1.0d0*q_0
+
+    F_IC_11 = q_2*q_2_IC_1/(4.0d0*pi*epsilon_0) * (R_2 - R_2_IC_1) / norm2(R_2 - R_2_IC_1)**3
+    F_IC_12 = q_2*q_2_IC_2/(4.0d0*pi*epsilon_0) * (R_2 - R_2_IC_2) / norm2(R_2 - R_2_IC_2)**3
+    F_IC_13 = q_2*q_2_IC_3/(4.0d0*pi*epsilon_0) * (R_2 - R_2_IC_3) / norm2(R_2 - R_2_IC_3)**3
+    F_IC_14 = q_2*q_2_IC_4/(4.0d0*pi*epsilon_0) * (R_2 - R_2_IC_4) / norm2(R_2 - R_2_IC_4)**3
+    F_IC_15 = q_2*q_2_IC_5/(4.0d0*pi*epsilon_0) * (R_2 - R_2_IC_5) / norm2(R_2 - R_2_IC_5)**3
+
+    F_R2 = F_IC_11 + F_IC_12 + F_IC_13 + F_IC_14 + F_IC_15
+
+    force_ic_22 = q_2**2 * div_fac_c * Force_Image_charges_v2(R_2, R_2)
+
+    if (abs(force_ic_22(3) - F_R2(3))/F_R2(3) < tolerance_rel) then
+      if ( (abs(force_ic_22(1) - 0.0d0) < tolerance_abs) .and. (abs(force_ic_22(2) - 0.0d0) < tolerance_abs) ) then
+        print *, 'Self interaction on particle 2 PASSED (N_IC_MAX = 1)'
+      else
+        print *, 'x and y component are not zero'
+        print *, 'force_ic_11(1) = ', force_ic_22(1)
+        print *, 'force_ic_11(2) = ', force_ic_22(2)
+      end if
+    else
+      print *, 'Self interaction on particle 2 FAILED (N_IC_MAX = 1)'
+      print *, 'z component if not correct'
+      print *, 'F_R2 = ', F_R2
+      print *, 'force_ic_22 = ', force_ic_22
+      print *, 'abs(force_ic_22(3) - F_R2(3))/F_R2(3) = ', abs(force_ic_22(3) - F_R2(3))/F_R2(3)
       print *, ''
     end if
 
