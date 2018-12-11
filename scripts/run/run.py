@@ -37,14 +37,14 @@ def Write_W(W):
 def Write_Input():
     nml = f90nml.Namelist({'input': {'v_s': 2000.0}})
     nml['input']['box_dim'] = [0.0, 0.0, 1000.0]
-    nml['input']['time_step'] = 0.25E-3
-    nml['input']['steps'] = 1000
+    nml['input']['time_step'] = 1.00E-4
+    nml['input']['steps'] = 10000
     nml['input']['emission_mode'] = 99
     nml['input']['NrEmit'] = 1
     nml['input']['image_charge'] = True
-    nml['input']['N_IC_MAX'] = 2
-    nml['input']['emitters_dim'] = [[100.0, 100.0, 0.0]]
-    nml['input']['emitters_pos'] = [[-50.0, -50.0, 0.0]]
+    nml['input']['N_IC_MAX'] = 1
+    nml['input']['emitters_dim'] = [[1000.0, 1000.0, 0.0]]
+    nml['input']['emitters_pos'] = [[-500.0, -500.0, 0.0]]
     nml['input']['emitters_type'] = [2]
     nml['input']['emitters_delay'] = [0]
 
@@ -63,6 +63,7 @@ A = W.copy()
 for i in range(N):
     print('')
     print('Creating directory')
+    print(folders[i])
     try:
         os.mkdir(folders[i])
     except:
