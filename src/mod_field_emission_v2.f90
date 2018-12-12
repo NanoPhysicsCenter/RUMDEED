@@ -209,12 +209,22 @@ contains
 
       CALL RANDOM_NUMBER(rnd)
       if (rnd <= D_f) then
+        !par_vel(1:2) = box_muller((/1.0d0, 1.0d0/), (/0.25d0, 0.25d0/))
+        !if (par_vel(1) < 0.0d0) then
+        !  if (par_vel(2) < 0.0d0) then
+        !    par_pos(3) = 0.0d-6 * length_scale
+        !  else
+        !    par_pos(3) = par_vel(2) * length_scale
+        !  end if
+        !else
+        !  par_pos(3) = par_vel(1) * length_scale
+        !end if
         par_pos(3) = 1.0d0*length_scale
+        par_vel = 0.0d0
+        rnd = w_theta_xy(par_pos, sec) ! Get the section
         !$OMP CRITICAL(EMIT_PAR)
 
           ! Add a particle to the system
-          par_vel = 0.0d0
-          rnd = w_theta_xy(par_pos, sec) ! Get the section
           call Add_Particle(par_pos, par_vel, species_elec, step, emit, sec)
 
           nrElecEmit = nrElecEmit + 1
@@ -234,40 +244,6 @@ contains
     nrElecEmitAll = nrElecEmitAll + nrElecEmit
     !nrEmitted = nrEmitted + nrElecEmit
   end subroutine Do_Field_Emission_Planar_rectangle
-
-  !----------------------------------------------------------------------------------------
-  ! The old ways, for comparison
-  subroutine Calc_Field_old_method(step, emit)
-    integer, intent(in)              :: step, emit
-    integer                          :: nr_x, nr_y, i, j, IFAIL
-    double precision                 :: len_x, len_y
-    double precision, dimension(1:3) :: par_pos, F, F_avg
-
-    nr_x = 1000
-    nr_y = nr_x
-    len_x = emitters_dim(1, emit) / nr_x
-    len_y = emitters_dim(2, emit) / nr_y
-
-    F_avg = 0.0d0
-
-    !$OMP PARALLEL DO PRIVATE(i, j, par_pos, F) REDUCTION(+:F_avg)
-    do i = 1, nr_x
-      do j = 1, nr_y
-        par_pos(1) = (i - 0.5d0)*len_x + emitters_pos(1, emit)
-        par_pos(2) = (j - 0.5d0)*len_y + emitters_pos(2, emit)
-        par_pos(3) = 0.0d0
-        
-        F = Calc_Field_at(par_pos)
-        F_avg(1:3) = F_avg(1:3) + F(1:3)
-      end do
-    end do
-    !$OMP END PARALLEL DO
-
-    F_avg(1:3) = F_avg(1:3) / (nr_x*nr_y)
-
-    write (ud_debug, "(i8, tr2, E16.8, tr2, E16.8, tr2, E16.8, tr2, i8, tr2, E16.8)", iostat=IFAIL) &
-                                      step, F_avg(1), F_avg(2), F_avg(3)
-  end subroutine Calc_Field_old_method
 
 !----------------------------------------------------------------------------------------
 ! The functions v_y and t_y are because of the image charge effect in the FN equation.

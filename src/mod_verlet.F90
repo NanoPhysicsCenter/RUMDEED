@@ -159,8 +159,14 @@ contains
       ! Acceleration due to electric field
       force_E = q_1 * ptr_field_E(pos_1)
 
-      ! Do image charge
-      force_ic_self = q_1**2 * div_fac_c * Force_Image_charges_v2(pos_1, pos_1)
+      ! Do image charge, self interaction
+      ! It is questionable if the self interaction of the image charge is valid at these
+      ! short distances. The escape velocity for an electron at z = 1nm from its image charge partner
+      ! is v_esc = e/sqrt(8*pi*epsilon_0*m_e*z) = 355853 m/s. This gives a de Broglie wavelength of
+      ! w_l = h/(m_e*v_esc) = 2.04 nm. This equal to the distance between the electron and its
+      ! image charge partner.
+      !force_ic_self = q_1**2 * div_fac_c * Force_Image_charges_v2(pos_1, pos_1)
+      force_ic_self = 0.0d0
 
       ! Loop over particles from i+1 to nrElec.
       ! There is no need to loop over all particles since
