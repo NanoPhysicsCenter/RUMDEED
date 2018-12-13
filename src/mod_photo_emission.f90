@@ -22,7 +22,7 @@ Module mod_photo_emission
 
   ! ----------------------------------------------------------------------------
   ! Parameters
-  integer, parameter                          :: MAX_EMISSION_TRY = 1000
+  integer, parameter                          :: MAX_EMISSION_TRY = 100
 
 contains
   subroutine Init_Photo_Emission()
@@ -100,19 +100,19 @@ contains
     nrElecEmit = 0
     nrEmitted_emitters(emit) = 0
 
-    do while (nrTry <= MAX_EMISSION_TRY)
+    do while ((nrTry <= MAX_EMISSION_TRY) .or. ((nrElecEmit >= maxElecEmit) .and. (maxElecEmit /= -1)))
       ! Check if we have reached the max number
       ! of electrons to be emitted
-      if ((nrElecEmit >= maxElecEmit) .and. (maxElecEmit /= -1)) then
-        exit
-      end if
+      !if ((nrElecEmit >= maxElecEmit) .and. (maxElecEmit /= -1)) then
+      !  exit
+      !end if
 
-      if (nrElec == MAX_PARTICLES-1) then
-        print *, 'WARNING: Reached maximum number of electrons!!!'
-        exit
-      end if
+      !if (nrElec == MAX_PARTICLES-1) then
+      !  print *, 'WARNING: Reached maximum number of electrons!!!'
+      !  exit
+      !end if
 
-      CALL RANDOM_NUMBER(par_pos(1:2)) ! Gives a random number between [0,1]
+      CALL RANDOM_NUMBER(par_pos(1:2)) ! Gives a random number between 0 and 1
 
       r_e = emitters_dim(1, emit) * par_pos(1)
       theta_e = 2.0d0*pi * par_pos(2)
