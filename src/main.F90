@@ -126,6 +126,9 @@ program VacuumMD
     !print *, 'Remove particles'
     call Remove_Particles(i)
 
+    ! Do Collisions
+    call Do_Collisions()
+
     ! Flush data
     !call Flush_Data()
 
