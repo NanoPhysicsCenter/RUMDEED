@@ -164,8 +164,7 @@ contains
     integer                          :: nrElecEmit
     double precision, dimension(1:3) :: par_pos, par_vel
 
-    !$acc data copyin(particles_cur_pos(:, 1:nrPart), particles_charge(1:nrPart), d, nrPart)
-
+    !$acc wait
     call Do_Surface_Integration_FE(emit, N_sup)
     !call Calc_Field_old_method(step, emit)
 
@@ -227,8 +226,6 @@ contains
       end if
     end do
     !$OMP END PARALLEL DO
-
-    !$acc end data
 
     df_avg = df_avg / N_sup
 

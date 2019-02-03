@@ -76,22 +76,35 @@ module mod_global
   ! Define storage arrays for particles
   ! Position and velocity of particles. Fyrst dimension is x,y,z, second one is the number of the particle
   double precision, dimension(:, :), allocatable :: particles_cur_pos    ! Current position (1:3, 1:MAX_PARTICLES)
+  !$acc declare create(particles_cur_pos)
   double precision, dimension(:, :), allocatable :: particles_prev_pos   ! Previous position
+  !$acc declare create(particles_prev_pos)
   double precision, dimension(:, :), allocatable :: particles_cur_vel    ! Current velocity
+  !$acc declare create(particles_cur_vel)
   double precision, dimension(:, :), allocatable :: particles_cur_accel  ! Current acceleration
+  !$acc declare create(particles_cur_accel)
   double precision, dimension(:, :), allocatable :: particles_prev_accel ! Previous acceleration
+  !$acc declare create(particles_prev_accel)
   double precision, dimension(:, :), allocatable :: particles_prev2_accel ! Previous acceleration
+  !$acc declare create(particles_prev2_accel)
 
   ! Other information about particles, the dimension if the number of particles
   double precision, dimension(:)   , allocatable :: particles_charge     ! Charge
+  !$acc declare create(particles_charge)
   integer         , dimension(:)   , allocatable :: particles_species    ! Type of particle
+  !$acc declare create(particles_species)
   double precision, dimension(:)   , allocatable :: particles_mass       ! Mass
+  !$acc declare create(particles_mass)
   integer         , dimension(:)   , allocatable :: particles_step       ! Time step when particle was created
+  !$acc declare create(particles_step)
   integer         , dimension(:)   , allocatable :: particles_emitter    ! The emitter the particle came from
+  !$acc declare create(particles_emitter)
   integer         , dimension(:)   , allocatable :: particles_section    ! The section of the emitter the particles came from
+  !$acc declare create(particles_section)
   logical         , dimension(:)   , allocatable :: particles_mask       ! Mask array used to indicate which particles should be removed
                                                                          ! .true. means that the particle is active,
                                                                          ! .false. means it is inactive and should be removed
+  !$acc declare create(particles_mask)
 
   ! ----------------------------------------------------------------------------
   ! Define storage arrays for emitters
@@ -119,9 +132,12 @@ module mod_global
   double precision :: E_zunit ! Unit electric field (E_zunit = -1/d) (See Ramo Current)
 
   double precision, dimension(1:3) :: box_dim ! Dimensions of the cell
+  !$acc declare create(box_dim)
 
   double precision :: time_step  ! Size of the time_step
+  !$acc declare create(time_step)
   double precision :: time_step2 ! time_step squared
+  !$acc declare create(time_step2)
 
   integer          :: steps      ! Number of time steps in the simulation
 
@@ -129,6 +145,7 @@ module mod_global
   ! ----------------------------------------------------------------------------
   ! Define run time variables
   integer :: nrPart ! Number of particles in the system (nrPart = nrElec + nrHole + nrFixedPart)
+  !$acc declare create(nrPart)
   integer :: nrElec ! Number of electrons in the system
   integer :: nrHole ! Number of holes in the system
   integer :: nrElecHole
@@ -293,7 +310,7 @@ contains
   end function isnan
 #endif
 
-! So far the PGI compiler (v. 18.4) has not implemented the NORM2 function
+! So far the PGI compiler (v. 18.10) has not implemented the NORM2 function
 ! from the Fortran 2008 Standard
 #if defined(__PGI)
   double precision function norm2(a)

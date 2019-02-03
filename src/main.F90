@@ -111,6 +111,8 @@ program VacuumMD
   cur_time = 0
   call Set_Voltage(0) ! Set voltage for time step 0
 
+  !$acc data copyin(particles_cur_pos, particles_charge, d, nrPart, time_step, time_step2, box_dim)
+
   do i = 1, steps
 
     ! Do Emission
@@ -165,6 +167,8 @@ program VacuumMD
     ! end if
 
   end do
+
+  !$acc end data
 
   call PrintProgress(10)
   print '(a)', 'Vacuum: Main loop finished'

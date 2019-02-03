@@ -77,18 +77,20 @@ contains
         nrHole = nrHole + 1
       end if
 
-      !$acc update device(particles_charge(nrPart:nrPart+1), particles_cur_pos(:, nrPart:nrPart+1))
+      !$acc update device(particles_charge(nrPart:nrPart+1), particles_cur_pos(:, nrPart:nrPart+1)) async
 
       ! Update the number of particles in the system
       nrElecHole = nrElec + nrHole
       nrPart = nrElecHole
       endElecHoles = nrPart
 
-      !$acc update device(nrPart)
+      !$acc update device(nrPart) async
 
       ! Write out the x and y position of the emitted particle
       ! along with which emitter and section it came from.
       write(unit=ud_density_emit) (par_pos(1) / length_scale), (par_pos(2) / length_scale), emit, sec
+
+      !$ acc wait
     end if
   end subroutine Add_Particle
 
@@ -101,6 +103,7 @@ contains
   subroutine Mark_Particles_Remove(i, m)
     integer, intent(in) :: i, m
     integer             :: emit
+    !$acc routine seq
 
     ! Check if the particle has already been marked for removal
     ! if so just return
@@ -214,6 +217,7 @@ contains
         !$OMP TASK FIRSTPRIVATE(k, m) SHARED(particles_cur_pos, particles_mask)
         !call compact_array_2D_double_verbal(particles_cur_pos, particles_mask, k, m)
         call compact_array(particles_cur_pos, particles_mask, k, m)
+        !$acc update device(particles_cur_pos(:, 1:nrPart)) async
         !$OMP END TASK
 
         !$OMP TASK FIRSTPRIVATE(k, m) SHARED(particles_prev_pos, particles_mask)
@@ -247,6 +251,7 @@ contains
 
         !$OMP TASK FIRSTPRIVATE(k, m) SHARED(particles_charge, particles_mask)
         call compact_array(particles_charge, particles_mask, k, m)
+        !$acc update device(particles_charge(1:nrPart)) async
         !$OMP END TASK
 
         !$OMP TASK FIRSTPRIVATE(k, m) SHARED(particles_emitter, particles_mask)
@@ -262,6 +267,8 @@ contains
 
         !$OMP END SINGLE
         !$OMP END PARALLEL
+
+        !$acc wait
       end if
 
       ! !Sanity check
@@ -294,6 +301,7 @@ contains
 
       nrElecHole = nrElec + nrHole
       nrPart = nrElecHole
+      !$acc update device(nrPart)
 
       startElecHoles = 1
       endElecHoles = startElecHoles + nrElecHole - 1

@@ -56,6 +56,8 @@ contains
     integer             :: i
 
     !$OMP PARALLEL DO PRIVATE(i) SCHEDULE(AUTO)
+    !$acc parallel loop private(i, startElecHoles, endElecHoles) present(particles_cur_pos, time_step, time_step2, box_dim) &
+    !$acc copy(particles_prev_pos, particles_cur_accel, particles_prev2_accel, particles_prev_accel)
     do i = startElecHoles, endElecHoles
       ! Verlet
       particles_prev_pos(:, i) = particles_cur_pos(:, i) ! Store the previous position
@@ -72,9 +74,12 @@ contains
       particles_cur_accel(:, i)  = 0.0d0
 
       ! Mark particles that should be removed with .false. in the mask array
-      call ptr_Check_Boundary(i)
+      !call ptr_Check_Boundary(i)
+      call Check_Boundary_ElecHole_Planar(i)
     end do
     !$OMP END PARALLEL DO
+
+    !!!$acc update device(particles_cur_pos(:, 1:nrPart)) async
   end subroutine Update_ElecHole_Position
 
   ! ----------------------------------------------------------------------------
@@ -84,6 +89,7 @@ contains
   subroutine Check_Boundary_ElecHole_Planar(i)
     integer, intent(in) :: i
     double precision    :: z
+    !$acc routine seq
 
     z = particles_cur_pos(3, i)
 
@@ -105,6 +111,7 @@ contains
     double precision    :: q
 
     !$OMP PARALLEL DO PRIVATE(i, q, k) SCHEDULE(AUTO)
+    !!!$acc parallel loop private(startElecHoles, endElecHoles)
     do i = startElecHoles, endElecHoles
       ! Verlet
       particles_cur_vel(:, i) = particles_cur_vel(:, i) &
@@ -311,7 +318,7 @@ contains
     integer                                      :: n
     double precision, dimension(1:3)             :: pos_ic, diff
     double precision                             :: r
-    !$acc routine seq
+    !!!$acc routine seq
     ! Check if we are doing image charge or not
     if (image_charge .eqv. .false.) then
       ! Return 0 if we are not using image charge

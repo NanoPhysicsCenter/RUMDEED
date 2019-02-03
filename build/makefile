@@ -54,7 +54,7 @@ FFLAGS=-fast
 #FFLAGS=-g -gopt -Mbounds -Mchkfpstk -Mchkfpstk -Mchkfpstk -Melf -traceback
 ifdef OPENMP
 #FFLAGS+=-mp
-FFLAGS+=-acc -ta=host,tesla:cc60,managed -Minfo=accel
+FFLAGS+=-acc -ta=tesla:cc60 -Minfo=accel -Minline
 #FFLAGS+=-acc -ta=tesla -Minfo=accel
 endif
 endif
