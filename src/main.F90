@@ -289,6 +289,12 @@ contains
       stop
     end if
 
+    ! If the mean collisions per time step is less than or equal to zero just disable collisions
+    if ((collisions_mean <= 0.0d0) .and. (collisions .eqv. .true.)) then
+      print '(a)', 'Vacuum: Warning - Disabling ion collisions because mean is less than or equal to zero'
+      collisions = .false.
+    end if
+
     open(newunit=ud_debug, iostat=IFAIL, file='debug.dt', status='replace', action='write')
     if (IFAIL /= 0) then
       print '(a)', 'Vacuum: ERROR UNABLE TO OPEN file debug.dt'

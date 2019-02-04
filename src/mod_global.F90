@@ -244,7 +244,7 @@ module mod_global
   namelist /input/ V_s, box_dim, time_step, steps, &
                    nrEmit, emitters_pos, emitters_dim, &
                    emitters_type, emitters_delay, EMISSION_MODE, &
-                   image_charge, N_ic_max, collisions
+                   image_charge, N_ic_max, collisions, collisions_mean
 
   ! ----------------------------------------------------------------------------
   ! Prodecure interfaces and pointers

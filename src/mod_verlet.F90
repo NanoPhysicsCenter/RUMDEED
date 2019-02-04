@@ -351,7 +351,7 @@ contains
   ! ----------------------------------------------------------------------------
   ! Ion collisions
   subroutine Do_Collisions()
-    double precision, parameter      :: N_mean_col  = 100 ! Average number of collisions per time step
+    !double precision, parameter      :: N_mean_col  = 100 ! Average number of collisions per time step
     integer, parameter               :: N_max_tries = 1000 ! Maximum number of tries before we give up looking for particles
     double precision, parameter      :: v2_min      = (2.0d0*q_0*1.0d0/m_0) ! Minimum velocity squared
     double precision, parameter      :: v2_max      = (2.0d0*q_0*100.0d0/m_0) ! Maximum velocity squared
@@ -364,7 +364,7 @@ contains
 
   
     ! Number of collisions per time step is poisson distributed
-    N_col = Rand_Poission(N_mean_col)
+    N_col = Rand_Poission(collisions_mean)
 
     ! Keep track of what particles have had collisions
     particles_collision = .false.
