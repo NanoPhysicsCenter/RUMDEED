@@ -127,7 +127,9 @@ program VacuumMD
     call Remove_Particles(i)
 
     ! Do Collisions
-    call Do_Collisions()
+    if (collisions .eqv. .true.) then
+      call Do_Collisions()
+    end if
 
     ! Flush data
     !call Flush_Data()
@@ -321,6 +323,7 @@ contains
     allocate(particles_mask(1:MAX_PARTICLES))
     allocate(particles_emitter(1:MAX_PARTICLES))
     allocate(particles_section(1:MAX_PARTICLES))
+    allocate(particles_collision(1:MAX_PARTICLES))
 
     allocate(life_time(1:MAX_LIFE_TIME, 1:2))
     allocate(ramo_current(1:nrSpecies))

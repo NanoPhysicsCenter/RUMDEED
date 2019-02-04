@@ -50,7 +50,7 @@ module mod_global
   ! These can be increased if needed.
   integer, parameter :: MAX_PARTICLES = 500000 ! Maximum number of particles allowed in the system
   integer, parameter :: MAX_EMITTERS  = 10     ! Maximum number of emitters in the system
-  integer, parameter :: MAX_SECTIONS  = 121    ! Maximum number of sections an emitter can have
+  integer, parameter :: MAX_SECTIONS  = 144    ! Maximum number of sections an emitter can have
 
 
   !! ----------------------------------------------------------------------------
@@ -89,6 +89,7 @@ module mod_global
   integer         , dimension(:)   , allocatable :: particles_step       ! Time step when particle was created
   integer         , dimension(:)   , allocatable :: particles_emitter    ! The emitter the particle came from
   integer         , dimension(:)   , allocatable :: particles_section    ! The section of the emitter the particles came from
+  logical         , dimension(:)   , allocatable :: particles_collision  ! True if the particle has had a collision with an ion in the current time step
   logical         , dimension(:)   , allocatable :: particles_mask       ! Mask array used to indicate which particles should be removed
                                                                          ! .true. means that the particle is active,
                                                                          ! .false. means it is inactive and should be removed
@@ -123,6 +124,9 @@ module mod_global
   double precision :: time_step2 ! time_step squared
 
   integer          :: steps      ! Number of time steps in the simulation
+
+  logical          :: collisions = .false. ! Do ion colissions or not
+  double precision :: collisions_mean = 0     ! Mean number of collisions per time step
 
 
   ! ----------------------------------------------------------------------------
@@ -240,7 +244,7 @@ module mod_global
   namelist /input/ V_s, box_dim, time_step, steps, &
                    nrEmit, emitters_pos, emitters_dim, &
                    emitters_type, emitters_delay, EMISSION_MODE, &
-                   image_charge, N_ic_max
+                   image_charge, N_ic_max, collisions
 
   ! ----------------------------------------------------------------------------
   ! Prodecure interfaces and pointers
@@ -331,6 +335,54 @@ function box_muller(mean, std)
   y = x*sqrt( (-2.0d0 * log( w ) ) / w )
   box_muller = y*std + mean
 end function box_muller
+
+! Random poission variable with mean lambda.
+! See
+! https://en.wikipedia.org/wiki/Poisson_distribution#Generating_Poisson-distributed_random_variables
+integer function Rand_Poission(lambda)
+double precision, intent(in) :: lambda
+double precision             :: lambda_left, p, u
+integer                      :: k
+double precision, parameter  :: Poisson_Step = 500.0d0
+
+lambda_left = lambda
+k = 0
+p = 1
+
+do while (p >= 1)
+  k = k + 1
+  call random_number(u)
+  p = p*u
+  do while ((p < 1) .and. (lambda_left > 0))
+   if (lambda_left > Poisson_Step) then
+     p = p * exp(Poisson_Step)
+     lambda_left = lambda_left - Poisson_Step
+   else
+      p = p * exp(lambda_left)
+      lambda_left = 0.0d0
+    end if
+  end do
+end do
+
+Rand_Poission = k - 1
+
+! From Wikipedia
+! algorithm poisson random number (Junhao, based on Knuth):
+!   init:
+!        Let λLeft ← λ, k ← 0 and p ← 1.
+!   do:
+!        k ← k + 1.
+!        Generate uniform random number u in (0,1) and let p ← p × u.
+!        while p < 1 and λLeft > 0:
+!             if λLeft > STEP:
+!                  p ← p × exp(STEP)
+!                  λLeft ← λLeft - STEP
+!             else:
+!                  p ← p × exp(λLeft)
+!                  λLeft ← 0
+!   while p > 1.
+!   return k − 1.
+end function Rand_Poission
 
 !***********************************************************************************************************************************
 !  M55INV  -  Compute the inverse of a 5x5 matrix.

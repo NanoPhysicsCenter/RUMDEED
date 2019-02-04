@@ -351,7 +351,7 @@ contains
   ! ----------------------------------------------------------------------------
   ! Ion collisions
   subroutine Do_Collisions()
-    integer, parameter               :: N_mean_col  = 100 ! Average number of collisions per time step
+    double precision, parameter      :: N_mean_col  = 100 ! Average number of collisions per time step
     integer, parameter               :: N_max_tries = 1000 ! Maximum number of tries before we give up looking for particles
     double precision, parameter      :: v2_min      = (2.0d0*q_0*1.0d0/m_0) ! Minimum velocity squared
     double precision, parameter      :: v2_max      = (2.0d0*q_0*100.0d0/m_0) ! Maximum velocity squared
@@ -362,9 +362,12 @@ contains
     integer                          :: i
     double precision, dimension(1:3) :: par_vec
 
-    N_col = N_mean_col ! Todo: Poisson distribution
+  
+    ! Number of collisions per time step is poisson distributed
+    N_col = Rand_Poission(N_mean_col)
 
-    ! Todo: Keep track of what particles have had collisions
+    ! Keep track of what particles have had collisions
+    particles_collision = .false.
     
     N_try = 0
     do while ((N_try < N_max_tries) .and. (N_col > 0))
@@ -375,16 +378,20 @@ contains
       ! Calulate the squared velocity of the particle picked
       vel2 = particles_cur_vel(1, i)**2 + particles_cur_vel(2, i)**2 + particles_cur_vel(3, i)**2
 
-      ! Check if it above and below the minimum and maximum
-      if ((vel2 > v2_min) .and. (vel2 < v2_max)) then
+      ! Check if it is above and below the minimum and maximum
+      if ((vel2 > v2_min) .and. (vel2 < v2_max) .and. (particles_collision(i) .eqv. .false.)) then
         N_col = N_col - 1 ! One less collision to do
-        N_try = 0
+        N_try = 0 ! Reset number of failed attempts
+        particles_collision(i) = .true. ! Keep track of what particles have had collisions
 
         ! Pick a new random direction for the particle
+        ! Todo: This should not be uniform
         call random_number(par_vec)
         par_vec = par_vec / sqrt(par_vec(1)**2 + par_vec(2)**2 + par_vec(3)**2)
 
         ! Reduce the energy by a random amount between 0 and 10%
+        ! Todo: This should probably not be uniform
+        ! Todo: Check upper and lower limit
         call random_number(rnd)
         rnd = rnd*10.0d0/100.0d0
         vel2 = vel2*rnd
