@@ -7,6 +7,20 @@ import f90nml
 import shutil
 import subprocess
 
+def Half_fill(w_base, w_add, N):
+    A = np.ones((N, N))*w_base
+    for i in range(N):
+        
+        if (i % 2 == 0):
+            j_start = 1
+        else:
+            j_start = 0
+            
+        for j in range(j_start, N, 2):
+            A[i, j] = w_base + w_add
+    
+    return A
+
 def Fill_One_Spot(W):
     # Check if we have filled all spots
     if (np.abs(W-2.0) < 1.0E-6).all():
