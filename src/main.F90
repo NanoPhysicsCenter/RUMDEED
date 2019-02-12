@@ -128,7 +128,7 @@ program VacuumMD
 
     ! Do Collisions
     if (collisions .eqv. .true.) then
-      call Do_Collisions()
+      call Do_Collisions_3(i)
     end if
 
     ! Flush data
@@ -290,10 +290,10 @@ contains
     end if
 
     ! If the mean collisions per time step is less than or equal to zero just disable collisions
-    if ((collisions_mean <= 0.0d0) .and. (collisions .eqv. .true.)) then
-      print '(a)', 'Vacuum: Warning - Disabling ion collisions because mean is less than or equal to zero'
-      collisions = .false.
-    end if
+    !if ((collisions_mean <= 0.0d0) .and. (collisions .eqv. .true.)) then
+    !  print '(a)', 'Vacuum: Warning - Disabling ion collisions because mean is less than or equal to zero'
+    !  collisions = .false.
+    !end if
 
     open(newunit=ud_debug, iostat=IFAIL, file='debug.dt', status='replace', action='write')
     if (IFAIL /= 0) then
@@ -468,6 +468,12 @@ contains
     open(newunit=ud_field, iostat=IFAIL, file='out/field.dt', status='replace', action='write')
     if (IFAIL /= 0) then
       print '(a)', 'Vacuum: ERROR UNABLE TO OPEN file field.dt'
+      stop
+    end if
+
+    open(newunit=ud_coll, iostat=IFAIL, file='out/collisions.dt', status='replace', action='write')
+    if (IFAIL /= 0) then
+      print '(a)', 'Vacuum: ERROR UNABLE TO OPEN file collisions.dt'
       stop
     end if
     
@@ -672,6 +678,7 @@ contains
     close(unit=ud_ramo_sec, status='keep')
     close(unit=ud_volt, status='keep')
     close(unit=ud_field,status='keep')
+    close(unit=ud_coll,status='keep')
     close(unit=ud_debug, status='keep')
 
     close(unit=ud_density_emit, status='keep')

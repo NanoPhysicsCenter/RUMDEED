@@ -66,6 +66,7 @@ contains
       particles_species(nrPart+1) = par_species
       particles_emitter(nrPart+1) = emit
       particles_section(nrPart+1) = sec
+      particles_collision(nrPart+1) = .true.
 
       if (par_species == species_elec) then ! Electron
         particles_charge(nrPart+1) = -1.0d0*q_0

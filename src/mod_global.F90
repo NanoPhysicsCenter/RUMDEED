@@ -50,7 +50,7 @@ module mod_global
   ! These can be increased if needed.
   integer, parameter :: MAX_PARTICLES = 500000 ! Maximum number of particles allowed in the system
   integer, parameter :: MAX_EMITTERS  = 10     ! Maximum number of emitters in the system
-  integer, parameter :: MAX_SECTIONS  = 144    ! Maximum number of sections an emitter can have
+  integer, parameter :: MAX_SECTIONS  = 10    ! Maximum number of sections an emitter can have
 
 
   !! ----------------------------------------------------------------------------
@@ -126,7 +126,7 @@ module mod_global
   integer          :: steps      ! Number of time steps in the simulation
 
   logical          :: collisions = .false. ! Do ion colissions or not
-  double precision :: collisions_mean = 0     ! Mean number of collisions per time step
+  double precision :: collisions_mean = 0  ! Mean number of collisions per time step
 
 
   ! ----------------------------------------------------------------------------
@@ -223,6 +223,7 @@ module mod_global
   integer :: ud_volt ! Voltage in the system
   integer :: ud_debug ! File for debuging and testing
   integer :: ud_field ! File for surface field
+  integer :: ud_coll ! Collisions
 
   ! unit descriptors for data files (binary files)
   integer :: ud_ramo_sec ! File for the ramo current broken down into emitters and sections
