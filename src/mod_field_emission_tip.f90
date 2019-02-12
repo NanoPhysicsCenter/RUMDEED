@@ -242,50 +242,28 @@ end subroutine Do_Field_Emission_Tip_2
 
       !!!$OMP FLUSH (particles, nrElec)
       ndim = 25
-      par_pos = Metro_algo_tip(ndim, xi_1, phi_1)
-      !par_pos = Metro_algo_rec(ndim)
-      field = Calc_Field_at(par_pos)
-      F = Field_normal(par_pos, field)
+      call Metro_algo_tip_v2(ndim, xi_1, phi_1, F, D_f, par_pos)
 
       if (F >= 0.0d0) then
-        !Try again
-        !par_pos = Metro_algo_rec(ndim)
-        par_pos = Metro_algo_tip(ndim, xi_1, phi_1)
-        field = Calc_Field_at(par_pos)
-        F = Field_normal(par_pos, field)
-
-        if (F >= 0.0d0) then
-          D_f = 0.0d0
-          print *, 'Warning: F > 0.0d0'
-        end if
-      else
-        D_f = Escape_Prob(F, par_pos)
+        D_f = 0.0d0
       end if
 
       CALL RANDOM_NUMBER(rnd)
-      print *, 'rnd ', rnd
-      print *, 'D_f ', D_f
-      print *, ''
+      !print *, 'rnd ', rnd
+      !print *, 'D_f ', D_f
+      !print *, ''
       if (rnd <= D_f) then
-        !par_pos(3) = par_pos(3) + 1.0d0*length
         surf_norm = surface_normal(par_pos)
         par_pos = par_pos + surf_norm*length_scale
         !$OMP CRITICAL
-          !call Add_kdens_Graph_emit(par_pos, step)
-          !call Add_Plane_Graph_emit(par_pos, step)
-          !call Add_J_tip(xi_1, eta_1, phi_1, step)
-          !call Add_Plane_Graph_xi(xi_1, eta_1, phi_1, step)
-          !call Add_Plane_Graph_arc(xi_1, eta_1, phi_1, step)
-          !write (ud_debug2, "(E16.8, tr2, E16.8, tr2, E16.8)", iostat=IFAIL) par_pos(1), par_pos(2), par_pos(3)
-          !particles(nrElec+1)%cur_pos = par_pos
 
-          ! Add a particle to the system
-          par_vel = 0.0d0
-          call Add_Particle(par_pos, par_vel, species_elec, step, emit)
+        ! Add a particle to the system
+        par_vel = 0.0d0
+        call Add_Particle(par_pos, par_vel, species_elec, step, emit)
 
-          !nrElec = nrElec + 1
-          nrElecEmit = nrElecEmit + 1
-          print *, 'Particle emitted'
+        !nrElec = nrElec + 1
+        nrElecEmit = nrElecEmit + 1
+        !print *, 'Particle emitted'
         !$OMP END CRITICAL
       end if
     end do
@@ -302,6 +280,144 @@ end subroutine Do_Field_Emission_Tip_2
 
     !!!$OMP END PARALLEL
   end subroutine Do_Field_Emission_Tip_1
+
+  subroutine Metro_algo_tip_v2(ndim, xi, phi, eta_f, df_cur, par_pos)
+    integer, intent(in)              :: ndim
+    double precision, intent(out)    :: xi, phi, eta_f, df_cur
+    double precision                 :: new_xi, new_phi, new_eta_f, df_new, rnd, alpha
+    double precision, dimension(1:3) :: std, new_pos, cur_pos, par_pos, field
+    integer                          :: i, count
+
+    std(1) = max_xi*0.075d0/100.d0 ! Standard deviation for the normal distribution is 0.075% of the emitter length.
+    std(2) = 2.0d0*pi*0.075d0/100.d0
+    ! This means that 68% of jumps are less than this value.
+    ! The expected value of the absolute value of the normal distribution is std*sqrt(2/pi).
+
+    ! Get a random initial position on the surface of the tip.
+    ! We pick this location from a uniform distribution.
+    count = 0
+    do ! Infinite loop, we try to find a favourable position to start from
+      CALL RANDOM_NUMBER(cur_pos(1:2))
+
+      xi = (max_xi - 1.0d0)*cur_pos(1) + 1.0d0
+      phi = 2.0d0*pi*cur_pos(2)
+
+      cur_pos(1) = x_coor(xi, eta_1, phi)
+      cur_pos(2) = y_coor(xi, eta_1, phi)
+      cur_pos(3) = z_coor(xi, eta_1, phi)
+
+      ! Calculate the electric field at this position
+      field = Calc_Field_at(cur_pos)
+      eta_f = Field_normal(cur_pos, field) ! Component normal to the surface
+      if (eta_f < 0.0d0) then
+        exit ! We found a nice spot so we exit the loop
+      else
+        count = count + 1
+        if (count > 10000) exit ! The loop is infnite, must stop it at some point.
+        ! In field emission it is rare the we reach the CL limit.
+      end if
+    end do
+
+    ! Calculate the escape probability at this location
+    if (eta_f < 0.0d0) then
+      df_cur = Escape_Prob_tip(field(3), cur_pos)
+    else
+      df_cur = 0.0d0 ! Zero escape probabilty if field is not favourable
+    end if
+
+    !---------------------------------------------------------------------------
+    ! We now pick a random distance and direction to jump to from our
+    ! current location. We do this ndim times.
+    do i = 1, ndim
+      ! Find a new position using a normal distribution.
+      new_pos(1:2) = box_muller((/0.0d0, 0.0d0/), std)
+      new_xi = new_pos(1) + xi
+      new_phi = new_pos(2) + phi
+
+      ! Make sure that the new position is within the limits of the emitter area.
+      call check_limits_metro_rec_tip(new_xi, new_phi)
+
+      new_pos(1) = x_coor(new_xi, eta_1, new_phi)
+      new_pos(2) = y_coor(new_xi, eta_1, new_phi)
+      new_pos(3) = z_coor(new_xi, eta_1, new_phi)
+
+      ! Calculate the field at the new position
+      field = Calc_Field_at(new_pos)
+      new_eta_f = Field_normal(new_pos, field)
+
+      ! Check if the field is favourable for emission at the new position.
+      ! If it is not then cycle, i.e. we reject this location and
+      ! pick another one.
+      if (new_eta_f > 0.0d0) cycle ! Do the next loop iteration, i.e. find a new position.
+
+      ! Calculate the escape probability at the new position, to compair with
+      ! the current position.
+      df_new = Escape_Prob_Tip(new_eta_f, new_pos)
+
+      ! If the escape probability is higher in the new location,
+      ! then we jump to that location. If it is not then we jump to that
+      ! location with the probabilty df_new / df_cur.
+      if (df_new > df_cur) then
+        cur_pos = new_pos ! New position becomes the current position
+        df_cur = df_new
+        eta_f = new_eta_f
+        xi = new_xi
+        phi = new_phi
+      else
+        alpha = df_new / df_cur
+
+        CALL RANDOM_NUMBER(rnd)
+        ! Jump to this position with probability alpha, i.e. if rnd is less than alpha
+        if (rnd < alpha) then
+          cur_pos = new_pos ! New position becomes the current position
+          df_cur = df_new
+          eta_f = new_eta_f
+          xi = new_xi
+          phi = new_phi
+        end if
+      end if
+    end do
+
+    par_pos = cur_pos
+  end subroutine Metro_algo_tip_v2
+
+  subroutine check_limits_metro_rec_tip(xi, phi)
+    double precision, intent(inout) :: xi, phi
+    double precision                :: d_xi, max_d
+
+    ! Keep \phi between 0 and 2\pi
+    if (phi > 2.0d0*pi) then
+      phi = phi - 2.0d0*pi
+    end if
+    if (phi < 0.0d0) then
+      phi = phi + 2.0d0*pi
+    end if
+
+    max_d = max_xi - 1.0d0
+
+    if (xi > max_xi) then
+      d_xi = xi - max_xi
+      if (d_xi > max_d) then
+        xi = max_xi
+        !print *, 'max_d'
+      else
+        xi = max_xi - d_xi
+      end if
+    end if
+
+    if (xi < 0.0d0) then
+      xi = 1.0d0
+    end if
+
+    if (xi < 1.0d0) then
+      d_xi = 1.0 - xi
+      if (d_xi > max_d) then
+        xi = 1.0d0
+      else
+        xi = 1.0d0 + d_xi
+      end if
+    end if
+  end subroutine check_limits_metro_rec_tip
 
   function Metro_algo_tip(ndim, xi, phi)
     integer, intent(in)                          :: ndim
@@ -529,7 +645,7 @@ end subroutine Do_Field_Emission_Tip_2
     double precision                             :: l
 
     if (image_charge .eqv. .true.) then
-      l = l_const * (-1.0d0*F) / w_theta_xy(pos)**2 ! l = y^2, y = 3.79E-4 * sqrt(F_old) / w_theta
+      l = l_const * (-1.0d0*F) / w_theta_pos_tip(pos)**2 ! l = y^2, y = 3.79E-4 * sqrt(F_old) / w_theta
       if (l > 1.0d0) then
         l = 1.0d0
       end if
@@ -545,7 +661,7 @@ end subroutine Do_Field_Emission_Tip_2
     double precision                             :: l
 
     if (image_charge .eqv. .true.) then
-      l = l_const * (-1.0d0*F) / w_theta_xy(pos)**2 ! l = y^2, y = 3.79E-4 * sqrt(F_old) / w_theta
+      l = l_const * (-1.0d0*F) / w_theta_pos_tip(pos)**2 ! l = y^2, y = 3.79E-4 * sqrt(F_old) / w_theta
       if (l > 1.0d0) then
         print *, 'Error: l > 1.0'
         print *, 'l = ', l, ', F = ', F, ', t_y = ', t_y
@@ -581,47 +697,44 @@ end subroutine Do_Field_Emission_Tip_2
     double precision, dimension(1:3), intent(in) :: pos
     double precision                             :: n
 
-    n = A * a_FN * F**2 * time_step / (q_0 * w_theta_xy(pos) * (t_y(F, pos))**2)
+    n = A * a_FN * F**2 * time_step / (q_0 * w_theta_pos_tip(pos) * (t_y(F, pos))**2)
 
     Elec_supply = n
   end function Elec_supply
 
   ! This function returns the escape probability of the Electrons.
   ! Escape_prob = exp(-b_FN*w_theta^(3/2)*v_y/F) .
-  double precision function Escape_Prob(F, pos)
+  double precision function Escape_Prob_Tip(F, pos)
     double precision, intent(in)                 :: F
     double precision, dimension(1:3), intent(in) :: pos
 
-    Escape_Prob = exp(b_FN * (sqrt(w_theta_xy(pos)))**3 * v_y(F, pos) / (-1.0d0*F))
+    Escape_Prob_Tip = exp(b_FN * (sqrt(w_theta_pos_tip(pos)))**3 * v_y(F, pos) / (-1.0d0*F))
 
-    if (Escape_Prob > 1.0d0) then
+    if (Escape_Prob_Tip > 1.0d0) then
       print *, 'Escape_prob is larger than 1.0'
-      print *, 'Escape_prob = ', Escape_prob
+      print *, 'Escape_prob = ', Escape_prob_Tip
       print *, ''
     end if
-    if (isnan(Escape_Prob)) then
+    if (ieee_is_nan(Escape_Prob_tip) .eqv. .True.) then
+    print *, 'Escape_Prob++ ', Escape_Prob_Tip
       print *, 'b_FN ', b_FN
-      print *, 'w_theta_xy ', w_theta_xy(pos)
+      print *, 'w_theta_pos_tip ', w_theta_pos_tip(pos)
       print *, 'pos ', pos
       print *, 'v_y ', v_y(F, pos)
       print *, 'F ', F
+      print *, 'WTF'
+      pause
     end if
-    print *, 'Escape_Prob ', Escape_Prob
-    print *, isnan(Escape_Prob)
-    print *, ieee_is_nan(Escape_Prob)
-    print *, '-'
-  end function Escape_Prob
+    !print *, 'Escape_Prob-- ', Escape_Prob_Tip
+    !print *, isnan(Escape_Prob_Tip)
+    !print *, ieee_is_nan(Escape_Prob_Tip)
+    !print *, '--'
+  end function Escape_Prob_Tip
 
-  double precision function w_theta_xy(pos)
+  double precision function w_theta_pos_tip(pos)
     double precision, dimension(1:3), intent(in) :: pos
 
-    w_theta_xy = w_theta
-
-    !if (pos(1) > pos(2)) then
-    !  w_theta_xy = 2.0d0
-    !else
-    !  w_theta_xy = 2.4d0
-    !end if
-  end function w_theta_xy
+    w_theta_pos_tip = w_theta
+  end function w_theta_pos_tip
 
 end module mod_field_emission_tip
