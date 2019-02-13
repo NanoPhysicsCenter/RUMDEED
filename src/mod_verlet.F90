@@ -210,7 +210,7 @@ contains
         force_c = pre_fac_c * diff / r**3
 
         ! Do image charge
-        force_ic = pre_fac_c * Force_Image_charges_v2(pos_1, pos_2)
+        force_ic = pre_fac_c * ptr_Image_Charge_effect(pos_1, pos_2)
 
         ! The image charge force of particle i on particle j is the same in the z-direction
         ! but we reverse the x and y directions of the force due to symmetry.
@@ -239,10 +239,10 @@ contains
     double precision, dimension(1:3), intent(in) :: pos
 
     double precision, dimension(1:3) :: force_c, force_tot, force_ic
-    double precision, dimension(1:3) :: pos_1, pos_2, diff, pos_ic_a, pos_ic_b
+    double precision, dimension(1:3) :: pos_1, pos_2, diff
     double precision                 :: r
     double precision                 :: q_1, q_2
-    double precision                 :: pre_fac_c, pre_fac_ic
+    double precision                 :: pre_fac_c
     integer                          :: j
 
     ! Position of the particle we are calculating the force/acceleration on
@@ -250,8 +250,9 @@ contains
 
     ! Electric field in the system
     force_tot = ptr_field_E(pos_1)
+    !print *, force_tot
 
-    !$OMP PARALLEL DO PRIVATE(j, pos_2, pos_ic_a, pos_ic_b, diff, r, force_c, force_ic, q_2, pre_fac_c, pre_fac_ic) &
+    !$OMP PARALLEL DO PRIVATE(j, pos_2, diff, r, force_c, force_ic, q_2, pre_fac_c) &
     !$OMP& REDUCTION(+:force_tot) SCHEDULE(AUTO)
     do j = 1, nrPart
 
@@ -275,7 +276,7 @@ contains
       !force_c = diff / (r*r*r)
 
       ! Image charge effect
-      force_ic = Force_Image_charges_v2(pos_1, pos_2)
+      force_ic = ptr_Image_Charge_effect(pos_1, pos_2)
 
       ! The total force
       force_tot = force_tot + pre_fac_c * force_c + pre_fac_c * force_ic
