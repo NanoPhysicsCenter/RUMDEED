@@ -487,11 +487,16 @@ contains
         par_vec = par_vec / sqrt(par_vec(1)**2 + par_vec(2)**2 + par_vec(3)**2)
 
         ! Set the new velocity
-        call random_number(rnd)
-        rnd = rnd*e_max
+        !call random_number(rnd)
+        !rnd = rnd*e_max
         vel2 = particles_cur_vel(1, i)**2 + particles_cur_vel(2, i)**2 + particles_cur_vel(3, i)**2
-        vel2 = vel2*rnd
-        particles_cur_vel(:, i) = par_vec*sqrt(vel2)
+        !vel2 = vel2*rnd
+        particles_cur_vel(:, i) = par_vec*sqrt(vel2)*0.1d0
+        par_vec = par_vec*sqrt(vel2)*0.9d0
+        
+        !$OMP CRITICAL
+        call Add_Particle(particles_cur_pos(:, i), par_vec, species_elec, step, 1)
+        !$OMP END CRITICAL
 
         ! Update the number of collisions
         nrColl = nrColl + 1
