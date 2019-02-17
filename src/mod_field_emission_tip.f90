@@ -162,26 +162,6 @@ end subroutine Do_Field_Emission_Tip_2
     !!!$OMP SINGLE
     emit = 0
 
-    xi_c = 1.15d0
-    phi_c = 0.0d0
-
-    par_pos(1) = x_coor(xi_c, eta_1, phi_c)
-    par_pos(2) = y_coor(xi_c, eta_1, phi_c)
-    par_pos(3) = z_coor(xi_c, eta_1, phi_c)
-
-    field = Calc_Field_at(par_pos)
-    F = Field_normal(par_pos, field)
-
-    print *, field
-    print *, norm2(field)
-    print *, F
-    print *, max_xi
-    pause
-
-    nr_phi = 1000
-    nr_xi = nr_phi
-    len_phi = 2.0d0*pi / nr_phi
-    len_xi = (max_xi - 1.0d0) / nr_xi
 
     !print *, len_x, len_x / length
     !print *, len_y, len_y / length
@@ -190,64 +170,34 @@ end subroutine Do_Field_Emission_Tip_2
 
     !par_pos = 0.0d0
     n_s = 0.0d0
-    !F_avg = 0.0d0
-
-    !!!$OMP END SINGLE
-
-    !!!!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(i, j, par_pos, par_elec, xi_c, phi_c, xi_1, phi_1, xi_2, phi_2, A_f, F, n_add, s, D_f, surf_norm)
-
-    !$OMP PARALLEL DO PRIVATE(i, j, xi_c, phi_c, par_pos, field, F, n_add, xi_1, xi_2, phi_1, phi_2, A_f) &
-    !$OMP& REDUCTION(+:n_s,F_avg)
-    do i = 1, nr_xi
-      do j = 1, nr_phi
-
-        xi_c = 1.0d0 + (i - 0.5d0)*len_xi
-        phi_c = (j - 0.5d0)*len_phi
-
-        par_pos(1) = x_coor(xi_c, eta_1, phi_c)
-        par_pos(2) = y_coor(xi_c, eta_1, phi_c)
-        par_pos(3) = z_coor(xi_c, eta_1, phi_c)
-
-        field = Calc_Field_at(par_pos)
-        F = Field_normal(par_pos, field)
-
-        F_avg = F_avg + F
-
-
-        if (F >= 0.0d0) then
-          n_add = 0.0d0
-        else
-          xi_1 = 1.0d0 + (i - 1.0d0)*len_xi
-          phi_1 = (j - 1.0d0)*len_phi
-          xi_2 = 1.0d0 + (i + 0.0d0)*len_xi
-          phi_2 = (j + 0.0d0)*len_phi
-          A_f = Tip_Area(xi_1, xi_2, phi_1, phi_2)
-          n_add = Elec_supply(A_f, F, par_pos)
-          !if (isnan(n_add) == .true.) then
-          !if (n_add < 0.0d0) then
-          !  print *, 'A_f = ', A_f
-          !  print *, 'F = ', F
-          !  print *, 'n_add = ', n_add
-            !stop
-          !end if
-        end if
-
-        n_s = n_s + n_add
-        !!$OMP CRITICAL
-        !print *, n_s
-        !!$OMP END CRITICAL
-      end do
-    end do
-    !$OMP END PARALLEL DO
 
     !!$OMP SINGLE
     !print *, 'F_avg = ', F_avg
-    F_avg = F_avg / (nr_phi*nr_xi)
+    F_avg = 0.0d0
     write (ud_debug, "(i8, tr2, E16.8)", iostat=IFAIL) step, F_avg
 
     !n_s = n_s - res_s
-    n_r = nint(n_s)
+    !n_r = nint(n_s)
     !res_s = n_r - n_s
+
+    xi_c = 1.0d0
+    phi_c = 0.0d0
+
+    par_pos(1) = x_coor(xi_c, eta_1, phi_c)
+    par_pos(2) = y_coor(xi_c, eta_1, phi_c)
+    par_pos(3) = z_coor(xi_c, eta_1, phi_c)
+
+    par_vel = Calc_Field_at(par_pos)
+    print *, par_vel
+    print *, par_pos
+    print *, ''
+    F = Field_normal(par_pos, par_vel)
+    print *, F
+    print *, Elec_Supply_tip(F, par_pos)
+    print *, ''
+    pause
+
+    call Do_Cuba_Suave_FE_Tip(emit, n_r)
 
     !print *, 'n_r = ', n_r
     if (n_r < 0) then
@@ -262,7 +212,7 @@ end subroutine Do_Field_Emission_Tip_2
     print *, 'Doing emission'
     print *, n_r
 
-    !$OMP PARALLEL DO PRIVATE(s, ndim, par_pos, field, F, D_f, surf_norm, xi_1, phi_1)
+    !$OMP PARALLEL DO PRIVATE(s, ndim, par_pos, field, F, D_f, surf_norm, xi_1, phi_1, rnd, par_vel)
     do s = 1, n_r
 
       !!!$OMP FLUSH (particles, nrElec)
@@ -777,6 +727,9 @@ end subroutine Do_Field_Emission_Tip_2
 
   !n = a_FN * F**2 * time_step / (q_0 * w_theta_pos_tip(pos) * (t_y(F, pos))**2)
   Elec_supply_tip = time_step_div_q0 * a_FN/(t_y(F, pos)**2*w_theta_pos_tip(pos)) * F**2
+  !Elec_supply_tip = time_step_div_q0 * a_FN/(1.0d0*w_theta_pos_tip(pos)) * F**2
+
+  !Elec_supply_tip = a_FN/(t_y(F, pos)**2*w_theta_pos_tip(pos)) * F**2 * Escape_Prob_Tip(F, pos)
 
 end function Elec_supply_tip
 
@@ -924,6 +877,10 @@ end function Elec_supply_tip
 
      ! Round the results to the nearest integer
      N_sup = nint( integral(1) )
+
+     print *, integral(1)
+     print *, N_sup
+     pause
 
      ! Finish calculating the average field
      !F_avg = F_avg / neval

@@ -461,6 +461,8 @@ contains
     integer, intent(in)              :: step
     double precision, parameter      :: mean_path = 68.0d0*length_scale ! Mean free path
     double precision, dimension(1:3) :: cur_pos, prev_pos, par_vec
+    double precision, parameter      :: v2_min      = (2.0d0*q_0*1.0d0/m_0) ! Minimum velocity squared
+    double precision, parameter      :: v2_max      = (2.0d0*q_0*10.0d0/m_0) ! Maximum velocity squared
     double precision                 :: d ! The distance traveled
     double precision                 :: rnd, alpha
     double precision                 :: vel2             ! Squared velocity of the current particle
@@ -478,28 +480,33 @@ contains
       d = sqrt( (cur_pos(1) - prev_pos(1))**2 + (cur_pos(2) - prev_pos(2))**2 + (cur_pos(3) - prev_pos(3))**2 )
       alpha = d/mean_path
 
+      vel2 = particles_cur_vel(1, i)**2 + particles_cur_vel(2, i)**2 + particles_cur_vel(3, i)**2
+    
       ! Check if we do a collision or not
-      call random_number(rnd)
-      if (rnd < alpha) then
-            ! Pick a new random direction for the particle
-        ! Todo: This should not be uniform
-        call random_number(par_vec)
-        par_vec = par_vec / sqrt(par_vec(1)**2 + par_vec(2)**2 + par_vec(3)**2)
+      if ((vel2 > v2_min) .and. (vel2 < v2_max)) then
+        ! Check if we do a collision or not
+        call random_number(rnd)
+        if (rnd < alpha) then
+              ! Pick a new random direction for the particle
+          ! Todo: This should not be uniform
+          call random_number(par_vec)
+          par_vec = par_vec / sqrt(par_vec(1)**2 + par_vec(2)**2 + par_vec(3)**2)
 
-        ! Set the new velocity
-        !call random_number(rnd)
-        !rnd = rnd*e_max
-        vel2 = particles_cur_vel(1, i)**2 + particles_cur_vel(2, i)**2 + particles_cur_vel(3, i)**2
-        !vel2 = vel2*rnd
-        particles_cur_vel(:, i) = par_vec*sqrt(vel2)*0.1d0
-        par_vec = par_vec*sqrt(vel2)*0.9d0
-        
-        !$OMP CRITICAL
-        call Add_Particle(particles_cur_pos(:, i), par_vec, species_elec, step, 1)
-        !$OMP END CRITICAL
+          ! Set the new velocity
+          !call random_number(rnd)
+          !rnd = rnd*e_max
+          !vel2 = particles_cur_vel(1, i)**2 + particles_cur_vel(2, i)**2 + particles_cur_vel(3, i)**2
+          !vel2 = vel2*rnd
+          particles_cur_vel(:, i) = par_vec*sqrt(vel2)*0.1d0
+          par_vec = par_vec*sqrt(vel2)*0.9d0
+          
+          !$OMP CRITICAL
+          call Add_Particle(particles_cur_pos(:, i), par_vec, species_elec, step, 1)
+          !$OMP END CRITICAL
 
-        ! Update the number of collisions
-        nrColl = nrColl + 1
+          ! Update the number of collisions
+          nrColl = nrColl + 1
+        end if
       end if
     end do
     !$OMP END PARALLEL DO
