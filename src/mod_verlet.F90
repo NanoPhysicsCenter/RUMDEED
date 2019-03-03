@@ -210,7 +210,7 @@ contains
         force_c = pre_fac_c * diff / r**3
 
         ! Do image charge
-        force_ic = pre_fac_c * Force_Image_charges_v2(pos_1, pos_2)
+        force_ic = pre_fac_c * ptr_Image_Charge_effect(pos_1, pos_2)
 
         ! The image charge force of particle i on particle j is the same in the z-direction
         ! but we reverse the x and y directions of the force due to symmetry.
@@ -239,10 +239,10 @@ contains
     double precision, dimension(1:3), intent(in) :: pos
 
     double precision, dimension(1:3) :: force_c, force_tot, force_ic
-    double precision, dimension(1:3) :: pos_1, pos_2, diff, pos_ic_a, pos_ic_b
+    double precision, dimension(1:3) :: pos_1, pos_2, diff
     double precision                 :: r
     double precision                 :: q_1, q_2
-    double precision                 :: pre_fac_c, pre_fac_ic
+    double precision                 :: pre_fac_c
     integer                          :: j
 
     ! Position of the particle we are calculating the force/acceleration on
@@ -250,8 +250,9 @@ contains
 
     ! Electric field in the system
     force_tot = ptr_field_E(pos_1)
+    !print *, force_tot
 
-    !$OMP PARALLEL DO PRIVATE(j, pos_2, pos_ic_a, pos_ic_b, diff, r, force_c, force_ic, q_2, pre_fac_c, pre_fac_ic) &
+    !$OMP PARALLEL DO PRIVATE(j, pos_2, diff, r, force_c, force_ic, q_2, pre_fac_c) &
     !$OMP& REDUCTION(+:force_tot) SCHEDULE(AUTO)
     do j = 1, nrPart
 
@@ -275,7 +276,7 @@ contains
       !force_c = diff / (r*r*r)
 
       ! Image charge effect
-      force_ic = Force_Image_charges_v2(pos_1, pos_2)
+      force_ic = ptr_Image_Charge_effect(pos_1, pos_2)
 
       ! The total force
       force_tot = force_tot + pre_fac_c * force_c + pre_fac_c * force_ic
@@ -350,7 +351,7 @@ contains
 
   ! ----------------------------------------------------------------------------
   ! Ion collisions
-  subroutine Do_Collisions()
+  subroutine Do_Collisions_1()
     !double precision, parameter      :: N_mean_col  = 100 ! Average number of collisions per time step
     integer, parameter               :: N_max_tries = 1000 ! Maximum number of tries before we give up looking for particles
     double precision, parameter      :: v2_min      = (2.0d0*q_0*1.0d0/m_0) ! Minimum velocity squared
@@ -402,6 +403,116 @@ contains
         N_try = N_try + 1 ! Try again
       end if
     end do
+  end subroutine
+
+
+  ! ----------------------------------------------------------------------------
+  ! Ion collisions
+  ! Here we create an additional electron
+  subroutine Do_Collisions_2(step)
+    integer, intent(in)              :: step
+    !double precision, parameter      :: N_mean_col  = 100 ! Average number of collisions per time step
+    integer, parameter               :: N_max_tries = 1000 ! Maximum number of tries before we give up looking for particles
+    double precision, parameter      :: v2_min      = (2.0d0*q_0*1.0d0/m_0) ! Minimum velocity squared
+    double precision, parameter      :: v2_max      = (2.0d0*q_0*100.0d0/m_0) ! Maximum velocity squared
+    integer                          :: N_col           ! Number of collisions to do in this time step
+    integer                          :: N_try            ! Number of tries done so far
+    double precision                 :: rnd
+    double precision                 :: vel2             ! Squared velocity of the current particle
+    integer                          :: i
+    double precision, dimension(1:3) :: par_vec
+
+  
+    ! Number of collisions per time step is poisson distributed
+    N_col = Rand_Poission(nrPart*0.05d0)
+
+    ! Keep track of what particles have had collisions
+    particles_collision = .false.
+    
+    N_try = 0
+    do while ((N_try < N_max_tries) .and. (N_col > 0))
+      ! Randomly pick a particle
+      call random_number(rnd)
+      i = floor(rnd*nrPart) + 1
+
+      ! Calulate the squared velocity of the particle picked
+      !vel2 = particles_cur_vel(1, i)**2 + particles_cur_vel(2, i)**2 + particles_cur_vel(3, i)**2
+
+      ! Check if it is above and below the minimum and maximum
+      if ((vel2 > v2_min) .and. (vel2 < v2_max) .and. (particles_collision(i) .eqv. .false.)) then
+        N_col = N_col - 1 ! One less collision to do
+        N_try = 0 ! Reset number of failed attempts
+        particles_collision(i) = .true. ! Keep track of what particles have had collisions
+
+        par_vec = 0.90d0*particles_cur_vel(:, i)
+        particles_cur_vel(:, i) = 0.10d0*particles_cur_vel(:, i)
+
+        call Add_Particle(particles_cur_pos(:, i), par_vec, species_elec, step, 1)
+      else
+        N_try = N_try + 1 ! Try again
+      end if
+    end do
+  end subroutine
+
+  ! ----------------------------------------------------------------------------
+  ! Ion collisions
+  ! Mean free path approch
+  subroutine Do_Collisions_3(step)
+    integer, intent(in)              :: step
+    double precision, parameter      :: mean_path = 68.0d0*length_scale ! Mean free path
+    double precision, dimension(1:3) :: cur_pos, prev_pos, par_vec
+    double precision, parameter      :: v2_min      = (2.0d0*q_0*1.0d0/m_0) ! Minimum velocity squared
+    double precision, parameter      :: v2_max      = (2.0d0*q_0*10.0d0/m_0) ! Maximum velocity squared
+    double precision                 :: d ! The distance traveled
+    double precision                 :: rnd, alpha
+    double precision                 :: vel2             ! Squared velocity of the current particle
+    double precision, parameter      :: e_max = 0.10d0    ! Max value of the coefficient of restitution
+    integer                          :: i, nrColl, IFAIL
+
+    nrColl = 0
+
+    !$OMP PARALLEL DO PRIVATE(i, cur_pos, prev_pos, d, alpha, rnd, par_vec, vel2) &
+    !$OMP& REDUCTION(+:nrColl) SCHEDULE(AUTO)
+    do i = 1, nrPart
+      cur_pos(:) = particles_cur_pos(:, i)
+      prev_pos(:) = particles_prev_pos(:, i)
+
+      d = sqrt( (cur_pos(1) - prev_pos(1))**2 + (cur_pos(2) - prev_pos(2))**2 + (cur_pos(3) - prev_pos(3))**2 )
+      alpha = d/mean_path
+
+      vel2 = particles_cur_vel(1, i)**2 + particles_cur_vel(2, i)**2 + particles_cur_vel(3, i)**2
+    
+      ! Check if we do a collision or not
+      if ((vel2 > v2_min) .and. (vel2 < v2_max)) then
+        ! Check if we do a collision or not
+        call random_number(rnd)
+        if (rnd < alpha) then
+              ! Pick a new random direction for the particle
+          ! Todo: This should not be uniform
+          call random_number(par_vec)
+          par_vec = par_vec / sqrt(par_vec(1)**2 + par_vec(2)**2 + par_vec(3)**2)
+
+          ! Set the new velocity
+          !call random_number(rnd)
+          !rnd = rnd*e_max
+          !vel2 = particles_cur_vel(1, i)**2 + particles_cur_vel(2, i)**2 + particles_cur_vel(3, i)**2
+          !vel2 = vel2*rnd
+          particles_cur_vel(:, i) = par_vec*sqrt(vel2)*0.1d0
+          par_vec = par_vec*sqrt(vel2)*0.9d0
+          
+          !$OMP CRITICAL
+          call Add_Particle(particles_cur_pos(:, i), par_vec, species_elec, step, 1)
+          !$OMP END CRITICAL
+
+          ! Update the number of collisions
+          nrColl = nrColl + 1
+        end if
+      end if
+    end do
+    !$OMP END PARALLEL DO
+
+    ! Write data
+    write(ud_coll, '(i6, tr2, i6)', iostat=IFAIL) step, nrColl
   end subroutine
 
 

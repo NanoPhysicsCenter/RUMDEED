@@ -97,6 +97,9 @@ contains
     ! The function that does the emission
     ptr_Do_Emission => Do_Field_Emission
 
+    ! The function to do image charge effects
+    ptr_Image_Charge_effect => Force_Image_charges_v2
+
     call Read_work_function()
 
     ! Parameters used in the module

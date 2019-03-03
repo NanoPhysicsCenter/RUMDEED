@@ -37,6 +37,9 @@ contains
 
     ! The function that does the emission
     ptr_Do_Emission => Do_Photo_Emission
+
+    ! The function to do image charge effects
+    ptr_Image_Charge_effect => Force_Image_charges_v2
   end subroutine Init_Photo_Emission
 
   subroutine Clean_Up_Photo_Emission()

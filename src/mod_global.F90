@@ -126,7 +126,7 @@ module mod_global
   integer          :: steps      ! Number of time steps in the simulation
 
   logical          :: collisions = .false. ! Do ion colissions or not
-  double precision :: collisions_mean = 0     ! Mean number of collisions per time step
+  double precision :: collisions_mean = 0  ! Mean number of collisions per time step
 
 
   ! ----------------------------------------------------------------------------
@@ -223,6 +223,7 @@ module mod_global
   integer :: ud_volt ! Voltage in the system
   integer :: ud_debug ! File for debuging and testing
   integer :: ud_field ! File for surface field
+  integer :: ud_coll ! Collisions
 
   ! unit descriptors for data files (binary files)
   integer :: ud_ramo_sec ! File for the ramo current broken down into emitters and sections
@@ -255,7 +256,7 @@ module mod_global
       integer, intent(in) :: i
     end subroutine Check_Boundary
 
-    pure function Electric_Field(pos) result(field_E)
+    function Electric_Field(pos) result(field_E)
       double precision, dimension(1:3), intent(in) :: pos
       double precision, dimension(1:3)             :: field_E
     end function Electric_Field
@@ -263,12 +264,18 @@ module mod_global
     subroutine Do_Emission(step)
       integer, intent(in) :: step
     end subroutine Do_Emission
+
+    function Image_Charge_effect(pos_1, pos_2)
+      double precision, dimension(1:3)             :: Image_Charge_effect
+      double precision, dimension(1:3), intent(in) :: pos_1, pos_2
+   end function Image_Charge_effect
   end interface
 
   ! Pointers
-  procedure(Check_Boundary), pointer :: ptr_Check_Boundary => null()
-  procedure(Electric_Field), pointer :: ptr_field_E => null()
-  procedure(Do_Emission), pointer    :: ptr_Do_Emission => null()
+  procedure(Check_Boundary), pointer      :: ptr_Check_Boundary => null()
+  procedure(Electric_Field), pointer      :: ptr_field_E => null()
+  procedure(Do_Emission), pointer         :: ptr_Do_Emission => null()
+  procedure(Image_Charge_effect), pointer :: ptr_Image_Charge_effect => null()
 contains
 
   ! Check if a number is infinit.

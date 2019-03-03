@@ -100,7 +100,8 @@ contains
     Field_normal = dot_product(unit_vec, field_E)
   end function Field_normal
 
-  pure function field_E_Hyperboloid(pos_xyz)
+  !pure function field_E_Hyperboloid(pos_xyz)
+  function field_E_Hyperboloid(pos_xyz)
     double precision, dimension(1:3), intent(in) :: pos_xyz
     double precision, dimension(1:3)             :: pos_pro !xi, eta, phi
     double precision, dimension(1:3)             :: field_E_Hyperboloid
@@ -118,14 +119,19 @@ contains
 
     ! Electric field for the hyperboloid gemoetry
     pre_fac_E_tip_xyz = pre_fac_E_tip * 1.0d0/(pos_pro(1)**2 - pos_pro(2)**2)
-    if ((pos_pro(1)**2 - 1.0d0) < 0.0d0) then
+
+    ! if we are near the tip then the x and y components should be zero
+    if (abs(pos_pro(1) - 1.0d0) < 1.0d-6) then
       fac_E_xy = 0.0d0
     else
       fac_E_xy = pos_pro(2) * sqrt( (pos_pro(1)**2 - 1.0d0)/(1.0d0 - pos_pro(2)**2) )
     end if
+
     field_E_Hyperboloid(1) = -1.0d0*pre_fac_E_tip_xyz * fac_E_xy * cos(pos_pro(3))
     field_E_Hyperboloid(2) = -1.0d0*pre_fac_E_tip_xyz * fac_E_xy * sin(pos_pro(3))
     field_E_Hyperboloid(3) = pre_fac_E_tip_xyz * pos_pro(1)
+
+    !print *, field_E_Hyperboloid
 
 !     if ((isnan(field_E_Hyperboloid(1)) == .true.) .or. (isnan(field_E_Hyperboloid(2)) == .true.) .or. (isnan(field_E_Hyperboloid(3)) == .true.)) then
 !       print *, 'field_E_Hyperboloid is NaN'
