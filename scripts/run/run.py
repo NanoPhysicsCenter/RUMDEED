@@ -21,6 +21,25 @@ def Half_fill(w_base, w_add, N):
     
     return A
 
+def Random_swap(W, N):
+    A = W.copy()
+
+    N_i = A.shape[0]
+    N_j = A.shape[1]
+
+    i_a = np.random.randint(low=0, high=N_i, size=N)
+    j_a = np.random.randint(low=0, high=N_j, size=N)
+
+    i_b = np.random.randint(low=0, high=N_i, size=N)
+    j_b = np.random.randint(low=0, high=N_j, size=N)
+
+    for k in range(N):
+        tmp = A[i_a[k], j_a[k]]
+        A[i_a[k], j_a[k]] = A[i_b[k], j_b[k]]
+        A[i_b[k], j_b[k]] = tmp
+    
+    return A
+
 def Fill_One_Spot(W):
     # Check if we have filled all spots
     if (np.abs(W-2.0) < 1.0E-6).all():
