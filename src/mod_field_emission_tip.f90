@@ -212,7 +212,7 @@ end subroutine Do_Field_Emission_Tip_2
     print *, 'Doing emission'
     print *, n_r
 
-    !$OMP PARALLEL DO PRIVATE(s, ndim, par_pos, field, F, D_f, surf_norm, xi_1, phi_1, rnd, par_vel)
+    !$OMP PARALLEL DO PRIVATE(s, ndim, par_pos, field, F, D_f, surf_norm, xi_1, phi_1, rnd, par_vel) SCHEDULE(GUIDED, 2500)
     do s = 1, n_r
 
       !!!$OMP FLUSH (particles, nrElec)

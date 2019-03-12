@@ -55,7 +55,7 @@ contains
     integer, intent(in) :: step
     integer             :: i
 
-    !$OMP PARALLEL DO PRIVATE(i) SCHEDULE(AUTO)
+    !$OMP PARALLEL DO PRIVATE(i) SCHEDULE(GUIDED, 2500)
     do i = startElecHoles, endElecHoles
       ! Verlet
       particles_prev_pos(:, i) = particles_cur_pos(:, i) ! Store the previous position
@@ -104,7 +104,7 @@ contains
     integer             :: i, k, emit, sec
     double precision    :: q
 
-    !$OMP PARALLEL DO PRIVATE(i, q, k) SCHEDULE(AUTO)
+    !$OMP PARALLEL DO PRIVATE(i, q, k) SCHEDULE(GUIDED, 2500)
     do i = startElecHoles, endElecHoles
       ! Verlet
       particles_cur_vel(:, i) = particles_cur_vel(:, i) &
@@ -147,8 +147,7 @@ contains
     integer                          :: i, j, k_1, k_2
 
     !$OMP PARALLEL DO PRIVATE(i, j, k_1, k_2, pos_1, pos_2, diff, r), &
-    !$OMP& PRIVATE(force_E, force_c, force_ic, force_ic_N, force_ic_self, im_1, q_1, im_2, q_2, pre_fac_c)
-    !!!$OMP& REDUCTION(+:particles_cur_accel) SCHEDULE(AUTO)
+    !$OMP& PRIVATE(force_E, force_c, force_ic, force_ic_N, force_ic_self, im_1, q_1, im_2, q_2, pre_fac_c) SCHEDULE(GUIDED, 1000)
     do i = 1, nrPart
       ! Information about the particle we are calculating the force/acceleration on
       pos_1 = particles_cur_pos(:, i)
@@ -253,7 +252,7 @@ contains
     !print *, force_tot
 
     !$OMP PARALLEL DO PRIVATE(j, pos_2, diff, r, force_c, force_ic, q_2, pre_fac_c) &
-    !$OMP& REDUCTION(+:force_tot) SCHEDULE(AUTO)
+    !$OMP& REDUCTION(+:force_tot) SCHEDULE(GUIDED, 2500)
     do j = 1, nrPart
 
       ! Position of the particle that is acting on the particle at pos_1
@@ -472,7 +471,7 @@ contains
     nrColl = 0
 
     !$OMP PARALLEL DO PRIVATE(i, cur_pos, prev_pos, d, alpha, rnd, par_vec, vel2) &
-    !$OMP& REDUCTION(+:nrColl) SCHEDULE(AUTO)
+    !$OMP& REDUCTION(+:nrColl) SCHEDULE(GUIDED, 2500)
     do i = 1, nrPart
       cur_pos(:) = particles_cur_pos(:, i)
       prev_pos(:) = particles_prev_pos(:, i)

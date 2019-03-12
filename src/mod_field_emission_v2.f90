@@ -188,7 +188,7 @@ contains
     df_avg = 0.0d0
 
     ! Loop over the electrons to be emitted.
-    !$OMP PARALLEL DO PRIVATE(s, par_pos, F, D_f, rnd, par_vel) REDUCTION(+:df_avg) SCHEDULE(AUTO)
+    !$OMP PARALLEL DO PRIVATE(s, par_pos, F, D_f, rnd, par_vel) REDUCTION(+:df_avg) SCHEDULE(GUIDED, 2500)
     do s = 1, N_sup
 
       call Metropolis_Hastings_rectangle_v2(N_MH_step, emit, D_f, F, par_pos)
