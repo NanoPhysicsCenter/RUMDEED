@@ -49,8 +49,8 @@ def Fill_One_Spot(W):
     Found = False
     while (Found == False):
         # Find a spot
-        i = int(np.rint((10 - 0) * np.random.random_sample() + 0))
-        j = int(np.rint((10 - 0) * np.random.random_sample() + 0))
+        i = int(np.rint((11- 0) * np.random.random_sample() + 0))
+        j = int(np.rint((11 - 0) * np.random.random_sample() + 0))
         
         # Check if we have already change this spot
         if (np.abs(W[i, j] - 2.50) < 1.0E-6):
@@ -62,9 +62,15 @@ def Fill_One_Spot(W):
     A[i, j] = 2.0
     return A
 
+def Fill_N_Spots(N, W):
+    for i in range(N):
+        W = Fill_One_Spot(W)
+
+    return W
+
 def Write_W(W):
     filename = 'w_theta'
-    np.savetxt(filename, W, fmt='%2.3f', header='1\n11 11', comments='')
+    np.savetxt(filename, W, fmt='%2.3f', header='1\n12 12', comments='')
     return None
 
 def Write_Input():
@@ -86,7 +92,8 @@ def Write_Input():
     return None
 
 # ----------------------------------------------------------------------------------------
-N = 11*11 + 1
+#N = 12*12 + 1
+N = 10
 folders = []
 for i in range(N):
     folders.append(str(i))
@@ -107,10 +114,10 @@ for i in range(N):
     Write_Input()
 
     print('Writing work function file')
+    A = Fill_N_Spots(6, W.copy())
     Write_W(A)
 
     print('Running Vacuum-MD')
     shutil.copy2('../Vacuum-MD.out', '.')
     subprocess.run('./Vacuum-MD.out')
     os.chdir('..')
-    A = Fill_One_Spot(A)
