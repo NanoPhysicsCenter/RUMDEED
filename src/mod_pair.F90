@@ -57,6 +57,7 @@ contains
       ! Add the particle
       particles_cur_pos(:, nrPart+1) = par_pos
       particles_prev_pos(:, nrPart+1) = -1.0d0*length_scale
+      particles_last_col_pos(:, nrPart+1) = par_pos
       particles_cur_accel(:, nrPart+1) = 0.0d0
       particles_prev_accel(:, nrPart+1) = 0.0d0
       particles_prev2_accel(:, nrPart+1) = 0.0d0

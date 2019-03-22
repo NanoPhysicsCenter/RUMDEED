@@ -317,6 +317,7 @@ contains
     ! Allocate arrays
     allocate(particles_cur_pos(1:3, 1:MAX_PARTICLES))
     allocate(particles_prev_pos(1:3, 1:MAX_PARTICLES))
+    allocate(particles_last_col_pos(1:3, 1:MAX_PARTICLES))
     allocate(particles_cur_vel(1:3, 1:MAX_PARTICLES))
     !allocate(particles_prev_vel(1:3, 1:MAX_PARTICLES))
     allocate(particles_cur_accel(1:3, 1:MAX_PARTICLES))
@@ -688,6 +689,7 @@ contains
     ! Deallocate arrays
     deallocate(particles_cur_pos)
     deallocate(particles_prev_pos)
+    deallocate(particles_last_col_pos)
     deallocate(particles_cur_vel)
     !deallocate(particles_prev_vel)
     deallocate(particles_cur_accel)

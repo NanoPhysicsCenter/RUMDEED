@@ -77,6 +77,7 @@ module mod_global
   ! Position and velocity of particles. Fyrst dimension is x,y,z, second one is the number of the particle
   double precision, dimension(:, :), allocatable :: particles_cur_pos    ! Current position (1:3, 1:MAX_PARTICLES)
   double precision, dimension(:, :), allocatable :: particles_prev_pos   ! Previous position
+  double precision, dimension(:, :), allocatable :: particles_last_col_pos ! Position of last collision
   double precision, dimension(:, :), allocatable :: particles_cur_vel    ! Current velocity
   double precision, dimension(:, :), allocatable :: particles_cur_accel  ! Current acceleration
   double precision, dimension(:, :), allocatable :: particles_prev_accel ! Previous acceleration

@@ -458,7 +458,7 @@ contains
   ! Mean free path approch
   subroutine Do_Collisions_3(step)
     integer, intent(in)              :: step
-    double precision, parameter      :: mean_path = 68.0d0*length_scale ! Mean free path
+    double precision, parameter      :: mean_path = 1000.0d0*length_scale ! Mean free path
     double precision, dimension(1:3) :: cur_pos, prev_pos, par_vec
     double precision, parameter      :: v2_min      = (2.0d0*q_0*1.0d0/m_0) ! Minimum velocity squared
     double precision, parameter      :: v2_max      = (2.0d0*q_0*10.0d0/m_0) ! Maximum velocity squared
@@ -474,7 +474,7 @@ contains
     !$OMP& REDUCTION(+:nrColl) SCHEDULE(GUIDED, 2500)
     do i = 1, nrPart
       cur_pos(:) = particles_cur_pos(:, i)
-      prev_pos(:) = particles_prev_pos(:, i)
+      prev_pos(:) = particles_last_col_pos(:, i)
 
       d = sqrt( (cur_pos(1) - prev_pos(1))**2 + (cur_pos(2) - prev_pos(2))**2 + (cur_pos(3) - prev_pos(3))**2 )
       alpha = d/mean_path
@@ -486,7 +486,7 @@ contains
         ! Check if we do a collision or not
         call random_number(rnd)
         if (rnd < alpha) then
-              ! Pick a new random direction for the particle
+          ! Pick a new random direction for the particle
           ! Todo: This should not be uniform
           call random_number(par_vec)
           par_vec = par_vec / sqrt(par_vec(1)**2 + par_vec(2)**2 + par_vec(3)**2)
@@ -498,6 +498,7 @@ contains
           !vel2 = vel2*rnd
           particles_cur_vel(:, i) = par_vec*sqrt(vel2)*0.1d0
           par_vec = par_vec*sqrt(vel2)*0.9d0
+          particles_last_col_pos(:, i) = cur_pos
           
           !$OMP CRITICAL
           call Add_Particle(particles_cur_pos(:, i), par_vec, species_elec, step, 1)
