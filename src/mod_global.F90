@@ -95,6 +95,10 @@ module mod_global
                                                                          ! .true. means that the particle is active,
                                                                          ! .false. means it is inactive and should be removed
 
+  ! Cross Sections
+  double precision, allocatable, target, dimension(:, :) :: N2_ion_cross ! Ioniaztion cross section of N2
+
+
   ! ----------------------------------------------------------------------------
   ! Define storage arrays for emitters
   ! Fyrst dimension is x,y,z, second one is the number of the emitter
@@ -391,6 +395,49 @@ Rand_Poission = k - 1
 !   while p > 1.
 !   return k − 1.
 end function Rand_Poission
+
+    ! ----------------------------------------------------------------------------
+    ! A function that does a binary search of the list for the value.
+    ! It will return the index to the nearest value. The optional arguments
+    ! i1 and i2 will be the two elements that the value falls between in the list.
+integer function BinarySearch(list, value, i1, i2)
+   double precision, dimension(:), target, intent(in) :: list(:)
+   double precision, intent(in)               :: value
+   integer, intent(out), optional             :: i1, i2
+   integer                                    :: first, last, mid
+
+   ! Get the upper and lower bounds of the list
+   first = lbound(list, 1)
+   last = ubound(list, 1)
+
+   do
+   ! Check if we have narrowed down our list to two elements
+   if ((last - first) == 1) then
+      ! We found the two elements that our value is between
+      exit
+   end if
+
+   ! Search the list by cutting it in half
+   mid = (first + last) / 2
+   if (list(mid) > value) then
+      last = mid
+   else
+      first = mid
+   end if
+   end do
+
+   if (present(i1)) i1 = first
+   if (present(i2)) i2 = last
+
+   ! Return the index that is nearest to the value
+   if (abs(list(first) - value) < abs(list(last) - value)) then
+   BinarySearch = first
+   else
+   BinarySearch = last
+   end if
+
+end function BinarySearch
+
 
 !***********************************************************************************************************************************
 !  M55INV  -  Compute the inverse of a 5x5 matrix.

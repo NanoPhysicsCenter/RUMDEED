@@ -128,7 +128,7 @@ program VacuumMD
 
     ! Do Collisions
     if (collisions .eqv. .true.) then
-      call Do_Collisions_3(i)
+      call Do_Collisions_4(i)
     end if
 
     ! Flush data
@@ -294,6 +294,11 @@ contains
     !  print '(a)', 'Vacuum: Warning - Disabling ion collisions because mean is less than or equal to zero'
     !  collisions = .false.
     !end if
+
+    if (collisions .eqv. .true.) then
+      print '(a)', 'Vacuum: Doing collisions reading in data'
+      call Read_Cross_Section()
+    end if
 
     open(newunit=ud_debug, iostat=IFAIL, file='debug.dt', status='replace', action='write')
     if (IFAIL /= 0) then

@@ -8,6 +8,11 @@ module mod_verlet
   use mod_global
   use mod_pair
   implicit none
+
+  double precision, dimension(:), pointer                :: cross_energy => null()
+  double precision, dimension(:), pointer                :: cross_data => null()
+
+  double precision :: cross_sum
 contains
 
   ! ----------------------------------------------------------------------------
@@ -519,6 +524,133 @@ contains
     write(ud_coll, '(i6, tr2, i6)', iostat=IFAIL) step, nrColl
   end subroutine
 
+    ! ----------------------------------------------------------------------------
+  ! Ion collisions
+  ! Mean free path approch
+  subroutine Do_Collisions_4(step)
+    integer, intent(in)              :: step
+    double precision, parameter      :: mean_path = 1000.0d0*length_scale ! Mean free path
+    double precision, dimension(1:3) :: cur_pos, prev_pos, par_vec
+    double precision, parameter      :: v2_min      = (2.0d0*q_0*15.58d0/m_0) ! Minimum velocity squared
+    double precision, parameter      :: v2_max      = (2.0d0*q_0*5000.0d0/m_0) ! Maximum velocity squared
+    double precision                 :: d ! The distance traveled
+    double precision                 :: rnd, alpha
+    double precision                 :: vel2             ! Squared velocity of the current particle
+    double precision, parameter      :: e_max = 0.10d0    ! Max value of the coefficient of restitution
+    integer                          :: i, nrColl, IFAIL
+    double precision                 :: KE ! Kinetic energy
+
+    nrColl = 0
+
+    !$OMP PARALLEL DO PRIVATE(i, cur_pos, prev_pos, d, alpha, rnd, par_vec, vel2, KE) &
+    !$OMP& REDUCTION(+:nrColl) SCHEDULE(GUIDED, 2500)
+    do i = 1, nrPart
+      cur_pos(:) = particles_cur_pos(:, i)
+      prev_pos(:) = particles_prev_pos(:, i)
+
+      d = sqrt( (cur_pos(1) - prev_pos(1))**2 + (cur_pos(2) - prev_pos(2))**2 + (cur_pos(3) - prev_pos(3))**2 )
+      alpha = d/mean_path
+      if (alpha > 1.0d0) then
+        print *, 'WARNING: alpha > 1 in mean path'
+      end if
+
+      vel2 = particles_cur_vel(1, i)**2 + particles_cur_vel(2, i)**2 + particles_cur_vel(3, i)**2
+    
+      ! Check if we do a collision or not
+      if ((vel2 > v2_min) .and. (vel2 < v2_max)) then
+        ! Check if we do a collision or not
+        call random_number(rnd)
+        if (rnd < alpha) then
+          ! Pick a new random direction for the particle
+          ! Todo: This should not be uniform
+          call random_number(par_vec)
+          par_vec = par_vec / sqrt(par_vec(1)**2 + par_vec(2)**2 + par_vec(3)**2)
+
+          ! Set the new velocity
+          !call random_number(rnd)
+          !rnd = rnd*e_max
+          !vel2 = particles_cur_vel(1, i)**2 + particles_cur_vel(2, i)**2 + particles_cur_vel(3, i)**2
+          !vel2 = vel2*rnd
+          particles_cur_vel(:, i) = par_vec*sqrt(vel2)*0.1d0
+          par_vec = par_vec*sqrt(vel2)*0.9d0
+          particles_last_col_pos(:, i) = cur_pos(:)
+
+          KE = 0.5d0*m_0*vel2/q_0 ! Energy in eV
+          
+          !alpha = Find_Cross_data(KE)/cross_sum
+          alpha = 0.20d0
+          if (alpha > 1.0d0) then
+            print *, 'WARNING: alpha > 1 in cross section'
+          end if
+          call random_number(rnd)
+          if (rnd < alpha) then
+            !$OMP CRITICAL
+            call Add_Particle(particles_cur_pos(:, i), par_vec, species_elec, step, 1)
+            !$OMP END CRITICAL
+          end if
+
+          ! Update the number of collisions
+          nrColl = nrColl + 1
+        end if
+      end if
+    end do
+    !$OMP END PARALLEL DO
+
+    ! Write data
+    write(ud_coll, '(i6, tr2, i6)', iostat=IFAIL) step, nrColl
+  end subroutine Do_Collisions_4
+
+
+    ! --------------------------------------------------------------------------
+    ! Read the Cross Section from a file
+  subroutine Read_Cross_Section()
+    integer                      :: IFAIL, ud_abs, i, n
+    character (len=*), parameter :: filename_abs="N2-ion-cross.txt"
+
+    ! Open the file for reading
+    open(newunit=ud_abs, iostat=IFAIL, file=filename_abs, status='OLD', action='READ')
+    if (IFAIL /= 0) then
+      print '(a)', 'Vacuum: ERROR UNABLE TO OPEN file ', filename_abs
+      stop
+    end if
+
+    ! Count the number of lines in the file
+    n = 0
+    do
+      read(ud_abs, *, iostat=IFAIL)
+      if (IFAIL /= 0) exit
+      n = n + 1
+    end do
+
+    ! Allocate the array to hold the file
+    allocate(N2_ion_cross(1:n, 1:2))
+
+    ! Rewind to the start of the file
+    rewind(ud_abs)
+
+    ! Read the file into the array
+    do i = 1, n
+      read(ud_abs, *) N2_ion_cross(i, 1), N2_ion_cross(i, 2)
+    end do
+
+    ! Close the file
+    close(unit=ud_abs, iostat=IFAIL, status='keep')
+
+    cross_energy => N2_ion_cross(:, 1)
+    cross_data => N2_ion_cross(:, 2)
+    cross_sum  = sum(cross_data)
+
+    !print *, 'abs_coeff', abs_coeff
+    !pause
+  end subroutine Read_Cross_Section
+
+  double precision function Find_Cross_data(energy)
+    double precision, intent(in) :: energy
+    integer                      :: i
+
+    i = BinarySearch(cross_energy, energy)
+    Find_Cross_data = cross_data(i)
+  end function Find_Cross_data
 
   ! ----------------------------------------------------------------------------
   ! The vacuum electric field
