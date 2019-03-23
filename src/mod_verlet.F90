@@ -9,10 +9,12 @@ module mod_verlet
   use mod_pair
   implicit none
 
-  double precision, dimension(:), pointer                :: cross_energy => null()
-  double precision, dimension(:), pointer                :: cross_data => null()
+  double precision, dimension(:), pointer                :: cross_tot_energy => null()
+  double precision, dimension(:), pointer                :: cross_tot_data => null()
+  double precision, dimension(:), pointer                :: cross_ion_energy => null()
+  double precision, dimension(:), pointer                :: cross_ion_data => null()
 
-  double precision :: cross_sum
+  !double precision :: cross_sum
 contains
 
   ! ----------------------------------------------------------------------------
@@ -529,10 +531,15 @@ contains
   ! Mean free path approch
   subroutine Do_Collisions_4(step)
     integer, intent(in)              :: step
-    double precision, parameter      :: mean_path = 1000.0d0*length_scale ! Mean free path
+    !double precision, parameter      :: mean_path = 1000.0d0*length_scale ! Mean free path
     double precision, dimension(1:3) :: cur_pos, prev_pos, par_vec
-    double precision, parameter      :: v2_min      = (2.0d0*q_0*15.58d0/m_0) ! Minimum velocity squared
-    double precision, parameter      :: v2_max      = (2.0d0*q_0*5000.0d0/m_0) ! Maximum velocity squared
+    double precision, parameter      :: v2_min      = (2.0d0*q_0*0.1d0/m_0) ! Minimum velocity squared
+    double precision, parameter      :: v2_max      = (2.0d0*q_0*1000.0d0/m_0) ! Maximum velocity squared
+    double precision, parameter      :: T_temp = 293.15d0 ! Temperature in Kelvin
+    double precision, parameter      :: P_abs = 101.325d0 ! Absolute pressure in Pa
+    double precision, parameter      :: n_d = P_abs/(k_b*T_temp) ! Density
+    double precision                 :: mean_path ! Mean free path
+    double precision                 :: cross_tot, cross_ion
     double precision                 :: d ! The distance traveled
     double precision                 :: rnd, alpha
     double precision                 :: vel2             ! Squared velocity of the current particle
@@ -542,19 +549,24 @@ contains
 
     nrColl = 0
 
-    !$OMP PARALLEL DO PRIVATE(i, cur_pos, prev_pos, d, alpha, rnd, par_vec, vel2, KE) &
+    !$OMP PARALLEL DO PRIVATE(i, cur_pos, prev_pos, d, alpha, rnd, par_vec, vel2, KE, mean_path, cross_tot, cross_ion) &
     !$OMP& REDUCTION(+:nrColl) SCHEDULE(GUIDED, 2500)
     do i = 1, nrPart
       cur_pos(:) = particles_cur_pos(:, i)
       prev_pos(:) = particles_prev_pos(:, i)
 
       d = sqrt( (cur_pos(1) - prev_pos(1))**2 + (cur_pos(2) - prev_pos(2))**2 + (cur_pos(3) - prev_pos(3))**2 )
+      vel2 = particles_cur_vel(1, i)**2 + particles_cur_vel(2, i)**2 + particles_cur_vel(3, i)**2
+      KE = 0.5d0*m_0*vel2/q_0 ! Energy in eV
+
+      cross_tot = Find_Cross_tot_data(KE)
+
+      mean_path = 1.0d0/(n_d*cross_tot)
+
       alpha = d/mean_path
       if (alpha > 1.0d0) then
         print *, 'WARNING: alpha > 1 in mean path'
       end if
-
-      vel2 = particles_cur_vel(1, i)**2 + particles_cur_vel(2, i)**2 + particles_cur_vel(3, i)**2
     
       ! Check if we do a collision or not
       if ((vel2 > v2_min) .and. (vel2 < v2_max)) then
@@ -575,10 +587,10 @@ contains
           par_vec = par_vec*sqrt(vel2)*0.9d0
           particles_last_col_pos(:, i) = cur_pos(:)
 
-          KE = 0.5d0*m_0*vel2/q_0 ! Energy in eV
+          cross_ion = Find_Cross_ion_data(KE)
           
-          !alpha = Find_Cross_data(KE)/cross_sum
-          alpha = 0.20d0
+          alpha = cross_ion/cross_tot
+          !alpha = 0.20d0
           if (alpha > 1.0d0) then
             print *, 'WARNING: alpha > 1 in cross section'
           end if
@@ -604,20 +616,55 @@ contains
     ! --------------------------------------------------------------------------
     ! Read the Cross Section from a file
   subroutine Read_Cross_Section()
-    integer                      :: IFAIL, ud_abs, i, n
-    character (len=*), parameter :: filename_abs="N2-ion-cross.txt"
+    integer                      :: IFAIL, ud_cross, i, n
+    character (len=*), parameter :: filename_tot="N2-tot-cross.txt"
+    character (len=*), parameter :: filename_ion="N2-ion-cross.txt"
 
     ! Open the file for reading
-    open(newunit=ud_abs, iostat=IFAIL, file=filename_abs, status='OLD', action='READ')
+    open(newunit=ud_cross, iostat=IFAIL, file=filename_tot, status='OLD', action='READ')
     if (IFAIL /= 0) then
-      print '(a)', 'Vacuum: ERROR UNABLE TO OPEN file ', filename_abs
+      print '(a)', 'Vacuum: ERROR UNABLE TO OPEN file ', filename_tot
       stop
     end if
 
     ! Count the number of lines in the file
     n = 0
     do
-      read(ud_abs, *, iostat=IFAIL)
+      read(ud_cross, *, iostat=IFAIL)
+      if (IFAIL /= 0) exit
+      n = n + 1
+    end do
+
+    ! Allocate the array to hold the file
+    allocate(N2_tot_cross(1:n, 1:2))
+
+    ! Rewind to the start of the file
+    rewind(ud_cross)
+
+    ! Read the file into the array
+    do i = 1, n
+      read(ud_cross, *) N2_tot_cross(i, 1), N2_tot_cross(i, 2)
+    end do
+
+    ! Close the file
+    close(unit=ud_cross, iostat=IFAIL, status='keep')
+
+    cross_tot_energy => N2_tot_cross(:, 1)
+    cross_tot_data => N2_tot_cross(:, 2)
+
+    !------------------------------------------------------------------------------------------
+
+    ! Open the file for reading
+    open(newunit=ud_cross, iostat=IFAIL, file=filename_ion, status='OLD', action='READ')
+    if (IFAIL /= 0) then
+      print '(a)', 'Vacuum: ERROR UNABLE TO OPEN file ', filename_ion
+      stop
+    end if
+
+    ! Count the number of lines in the file
+    n = 0
+    do
+      read(ud_cross, *, iostat=IFAIL)
       if (IFAIL /= 0) exit
       n = n + 1
     end do
@@ -626,31 +673,39 @@ contains
     allocate(N2_ion_cross(1:n, 1:2))
 
     ! Rewind to the start of the file
-    rewind(ud_abs)
+    rewind(ud_cross)
 
     ! Read the file into the array
     do i = 1, n
-      read(ud_abs, *) N2_ion_cross(i, 1), N2_ion_cross(i, 2)
+      read(ud_cross, *) N2_ion_cross(i, 1), N2_ion_cross(i, 2)
     end do
 
     ! Close the file
-    close(unit=ud_abs, iostat=IFAIL, status='keep')
+    close(unit=ud_cross, iostat=IFAIL, status='keep')
 
-    cross_energy => N2_ion_cross(:, 1)
-    cross_data => N2_ion_cross(:, 2)
-    cross_sum  = sum(cross_data)
+    cross_ion_energy => N2_ion_cross(:, 1)
+    cross_ion_data => N2_ion_cross(:, 2)
+    !cross_sum  = sum(cross_data)
 
     !print *, 'abs_coeff', abs_coeff
     !pause
   end subroutine Read_Cross_Section
 
-  double precision function Find_Cross_data(energy)
+  double precision function Find_Cross_tot_data(energy)
     double precision, intent(in) :: energy
     integer                      :: i
 
-    i = BinarySearch(cross_energy, energy)
-    Find_Cross_data = cross_data(i)
-  end function Find_Cross_data
+    i = BinarySearch(cross_tot_energy, energy)
+    Find_Cross_tot_data = cross_tot_data(i) * 1.0E-4 ! Convert from cm^2 to m^2
+  end function Find_Cross_tot_data
+
+  double precision function Find_Cross_ion_data(energy)
+    double precision, intent(in) :: energy
+    integer                      :: i
+
+    i = BinarySearch(cross_ion_energy, energy)
+    Find_Cross_ion_data = cross_ion_data(i) * 1.0E-4 ! Convert from cm^2 to m^2
+  end function Find_Cross_ion_data
 
   ! ----------------------------------------------------------------------------
   ! The vacuum electric field

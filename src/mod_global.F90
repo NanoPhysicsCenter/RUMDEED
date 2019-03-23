@@ -96,6 +96,7 @@ module mod_global
                                                                          ! .false. means it is inactive and should be removed
 
   ! Cross Sections
+  double precision, allocatable, target, dimension(:, :) :: N2_tot_cross ! Total cross section of N2
   double precision, allocatable, target, dimension(:, :) :: N2_ion_cross ! Ioniaztion cross section of N2
 
 
