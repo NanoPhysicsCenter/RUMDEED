@@ -566,6 +566,12 @@ contains
       alpha = d/mean_path
       if (alpha > 1.0d0) then
         print *, 'WARNING: alpha > 1 in mean path'
+        print *, mean_path
+        print *, mean_path/1.0E-9
+        print *, n_d
+        print *, cross_tot
+        print *, KE
+        pause
       end if
     
       ! Check if we do a collision or not
