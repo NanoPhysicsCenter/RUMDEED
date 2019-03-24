@@ -534,11 +534,12 @@ contains
     !double precision, parameter      :: mean_path = 1000.0d0*length_scale ! Mean free path
     double precision, dimension(1:3) :: cur_pos, prev_pos, par_vec
     double precision, parameter      :: v2_min      = (2.0d0*q_0*0.1d0/m_0) ! Minimum velocity squared
-    double precision, parameter      :: v2_max      = (2.0d0*q_0*1000.0d0/m_0) ! Maximum velocity squared
+    double precision, parameter      :: v2_max      = (2.0d0*q_0*5000.0d0/m_0) ! Maximum velocity squared
     double precision, parameter      :: T_temp = 293.15d0 ! Temperature in Kelvin
-    double precision, parameter      :: P_abs = 101.325d0 ! Absolute pressure in Pa
+    double precision, parameter      :: P_abs = 101325.0d0 ! Absolute pressure in Pa
     double precision, parameter      :: n_d = P_abs/(k_b*T_temp) ! Density
-    double precision                 :: mean_path ! Mean free path
+    double precision                 :: mean_path, mean_path_avg, mean_actual_avg ! Mean free path
+    integer                          :: count
     double precision                 :: cross_tot, cross_ion
     double precision                 :: d ! The distance traveled
     double precision                 :: rnd, alpha
@@ -548,34 +549,43 @@ contains
     double precision                 :: KE ! Kinetic energy
 
     nrColl = 0
+    count = 0
+    mean_path_avg = 0.0d0
+    mean_actual_avg = 0.0d0
 
-    !$OMP PARALLEL DO PRIVATE(i, cur_pos, prev_pos, d, alpha, rnd, par_vec, vel2, KE, mean_path, cross_tot, cross_ion) &
-    !$OMP& REDUCTION(+:nrColl) SCHEDULE(GUIDED, 2500)
+    !$OMP PARALLEL DO PRIVATE(i, cur_pos, prev_pos, d, alpha, rnd, par_vec, vel2, KE, mean_path, mean_actual_avg, cross_tot, cross_ion) &
+    !$OMP& REDUCTION(+:nrColl, count, mean_path_avg) SCHEDULE(GUIDED, 2500)
     do i = 1, nrPart
       cur_pos(:) = particles_cur_pos(:, i)
       prev_pos(:) = particles_prev_pos(:, i)
+      !prev_pos(:) = particles_last_col_pos(:, i)
 
       d = sqrt( (cur_pos(1) - prev_pos(1))**2 + (cur_pos(2) - prev_pos(2))**2 + (cur_pos(3) - prev_pos(3))**2 )
       vel2 = particles_cur_vel(1, i)**2 + particles_cur_vel(2, i)**2 + particles_cur_vel(3, i)**2
-      KE = 0.5d0*m_0*vel2/q_0 ! Energy in eV
-
-      cross_tot = Find_Cross_tot_data(KE)
-
-      mean_path = 1.0d0/(n_d*cross_tot)
-
-      alpha = d/mean_path
-      if (alpha > 1.0d0) then
-        print *, 'WARNING: alpha > 1 in mean path'
-        print *, mean_path
-        print *, mean_path/1.0E-9
-        print *, n_d
-        print *, cross_tot
-        print *, KE
-        pause
-      end if
     
       ! Check if we do a collision or not
       if ((vel2 > v2_min) .and. (vel2 < v2_max)) then
+
+        KE = 0.5d0*m_0*vel2/q_0 ! Energy in eV
+
+        cross_tot = Find_Cross_tot_data(KE)
+
+        mean_path = 1.0d0/(n_d*cross_tot)
+        mean_path_avg = mean_path_avg + mean_path
+        count = count + 1
+
+        alpha = d/mean_path
+        if (alpha > 1.0d0) then
+          print *, 'WARNING: alpha > 1 in mean path'
+          print *, mean_path
+          print *, mean_path/1.0E-9
+          print *, n_d
+          print *, cross_tot
+          print *, KE
+          print *, sqrt(vel2)
+          pause
+        end if
+
         ! Check if we do a collision or not
         call random_number(rnd)
         if (rnd < alpha) then
@@ -589,9 +599,13 @@ contains
           !rnd = rnd*e_max
           !vel2 = particles_cur_vel(1, i)**2 + particles_cur_vel(2, i)**2 + particles_cur_vel(3, i)**2
           !vel2 = vel2*rnd
-          particles_cur_vel(:, i) = par_vec*sqrt(vel2)*0.1d0
-          par_vec = par_vec*sqrt(vel2)*0.9d0
+          particles_cur_vel(:, i) = par_vec*sqrt(vel2)*0.9d0
+          par_vec = par_vec*sqrt(vel2)*0.1d0
+
+          prev_pos(:) = particles_last_col_pos(:, i)
+          d = sqrt( (cur_pos(1) - prev_pos(1))**2 + (cur_pos(2) - prev_pos(2))**2 + (cur_pos(3) - prev_pos(3))**2 )
           particles_last_col_pos(:, i) = cur_pos(:)
+          mean_actual_avg = mean_actual_avg + d
 
           cross_ion = Find_Cross_ion_data(KE)
           
@@ -610,12 +624,22 @@ contains
           ! Update the number of collisions
           nrColl = nrColl + 1
         end if
+      else
+        KE = 0.5d0*m_0*vel2/q_0 ! Energy in eV
+        if (KE > 0.1d0) then
+          print *, 'Outside range'
+          print *, KE
+          print *, ''
+        end if
       end if
     end do
     !$OMP END PARALLEL DO
 
+    mean_path_avg = mean_path_avg / count
+    mean_actual_avg = mean_actual_avg / nrColl
     ! Write data
-    write(ud_coll, '(i6, tr2, i6)', iostat=IFAIL) step, nrColl
+    write(ud_coll, '(i6, tr2, i6, tr2, i6, tr2, ES12.4, tr2, ES12.4)', iostat=IFAIL) step, nrColl, count, &
+             (mean_path_avg/length_scale), (mean_actual_avg/length_scale)
   end subroutine Do_Collisions_4
 
 
@@ -702,7 +726,7 @@ contains
     integer                      :: i
 
     i = BinarySearch(cross_tot_energy, energy)
-    Find_Cross_tot_data = cross_tot_data(i) * 1.0E-4 ! Convert from cm^2 to m^2
+    Find_Cross_tot_data = cross_tot_data(i) * 1.0E-20 ! Data is in 10^-16 cm^2 to m^2
   end function Find_Cross_tot_data
 
   double precision function Find_Cross_ion_data(energy)
@@ -710,7 +734,7 @@ contains
     integer                      :: i
 
     i = BinarySearch(cross_ion_energy, energy)
-    Find_Cross_ion_data = cross_ion_data(i) * 1.0E-4 ! Convert from cm^2 to m^2
+    Find_Cross_ion_data = cross_ion_data(i) * 1.0E-20 ! Data is in 10^-16 cm^2 to m^2
   end function Find_Cross_ion_data
 
   ! ----------------------------------------------------------------------------
