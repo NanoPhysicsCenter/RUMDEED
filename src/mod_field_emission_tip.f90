@@ -9,6 +9,7 @@ Module mod_field_emission_tip
   use mod_hyperboloid_tip
   use mod_verlet
   use mod_pair
+  use mod_ic
   use ieee_arithmetic
   implicit none
 
@@ -56,10 +57,13 @@ contains
     ptr_field_E => field_E_Hyperboloid
 
     ! The function that does the emission
-    ptr_Do_Emission => Do_Field_Emission_Tip
+    !ptr_Do_Emission => Do_Field_Emission_Tip
+    !ptr_Do_Emission => Do_Simple_Field_Emission_tip
+    ptr_Do_Emission => Do_Field_Emission_Tip_Test
 
     ! The function to do image charge effects
-    ptr_Image_Charge_effect => Sphere_IC_field
+    !ptr_Image_Charge_effect => Sphere_IC_field
+    ptr_Image_Charge_effect => NULL()
 
     ! Parameters used in the module
     time_step_div_q0 = time_step / q_0
@@ -143,6 +147,15 @@ subroutine Do_Field_Emission_Tip_2(step)
   posInit = posInit + nrElecEmit
   nrEmitted = nrEmitted + nrElecEmit
 end subroutine Do_Field_Emission_Tip_2
+
+subroutine Do_Field_Emission_Tip_Test(step)
+  integer, intent(in)               :: step
+  integer                           :: N_sup
+
+  call Do_Cuba_Suave_FE_Tip_Test(1, N_sup)
+
+  stop
+end subroutine Do_Field_Emission_Tip_Test
 
 !----------------------------------------------------------------------------------------
 
@@ -255,6 +268,108 @@ end subroutine Do_Field_Emission_Tip_2
 
     !!!$OMP END PARALLEL
   end subroutine Do_Field_Emission_Tip_1
+
+  subroutine Do_Simple_Field_Emission_tip(step)
+    integer, intent(in) :: step
+    integer             :: i, j, s
+    integer             :: nrElecEmit, ndim, n_addi, IFAIL
+    integer             :: nr_phi, nr_xi
+    double precision    :: len_phi, len_xi
+    double precision    :: n_s, F_avg, A_f, F, n_add, A_tot
+    double precision    :: xi_start, xi_end, xi_c
+    double precision    :: phi_start, phi_end, phi_c
+    integer, parameter  :: MAX_EMISSION_TRY = 10000
+    double precision, parameter :: pre_fac_a = m_0 / (-1.0d0*q_0) ! Acceleration prefactor
+    double precision, dimension(1:3) :: par_pos, surf_norm, par_accel, par_vel
+    !type(electron)                   :: par_elec
+
+    nr_phi = 50
+    nr_xi = 50
+    !len_phi = 2.0d0*pi / nr_phi
+    !len_xi = (max_xi - 1.0d0) / nr_xi
+    len_phi = 2.0d0*pi
+    len_xi = max_xi - 1.0d0
+
+    !print *, len_x, len_x / length
+    !print *, len_y, len_y / length
+
+    nrElecEmit = 0
+
+    par_pos = 0.0d0
+    n_s = 0.0d0
+    F_avg = 0.0d0
+    n_add = 0.0d0
+    A_tot = 0.0d0
+
+    !print *, 'len_xi = '
+
+    !!$OMP PARALLEL DEFAULT(SHARED)
+
+    !!$OMP DO PRIVATE(i, j, xi_1, phi_1, xi_2, phi_2)&
+    !!$OMP& PRIVATE(xi_c, phi_c, par_pos, par_elec, F, A_f) REDUCTION(+:n_add)
+    do i = 0, (nr_xi-1)
+      xi_start = 1.0 + i*len_xi/nr_xi
+      xi_end = 1.0 + (i+1)*len_xi/nr_xi
+      xi_c = (xi_end + xi_start) * 0.5
+
+      do j = 0, (nr_phi-1)
+
+        phi_start = j*len_phi/nr_phi
+        phi_end = (j+1)*len_phi/nr_phi
+        phi_c = (phi_end + phi_start) * 0.5
+
+        par_pos = xyz_corr(xi_c, eta_1, phi_c)
+
+
+        par_accel = Calc_Field_at(par_pos)
+        F = Field_normal(par_pos, par_accel)
+
+
+        if (F < 0.0d0) then
+          A_f = Tip_Area(xi_start, xi_end, phi_start, phi_end)
+          A_tot = A_tot + A_f
+          n_add = n_add + Elec_Supply(A_f, F, par_pos) * Escape_Prob_Tip(F, par_pos)
+        end if
+
+      end do
+    end do
+    !!$OMP END DO
+
+    !!OMP SINGLE
+    n_addi = nint(n_add)
+    !print *, 'Number of electrons = ', n_addi, n_add
+    !print *, 'Area = ', A_tot
+    !pause
+    !!$OMP END SINGLE
+
+    !!$OMP DO PRIVATE(i, s, ndim, par_pos, xi_c, phi_c, surf_norm)
+    do i = 1, n_addi
+      do s = 1, MAX_EMISSION_TRY
+        ndim = 30
+        par_pos = Metro_algo_tip(ndim, xi_c, phi_c)
+
+        if (ndim > 0) then
+          !!$OMP CRITICAL
+
+          surf_norm = surface_normal(par_pos)
+          par_pos = par_pos + surf_norm*length_scale
+
+          !call Add_particle(par_pos, step)
+          par_vel = 0.0d0
+          call Add_Particle(par_pos, par_vel, species_elec, step, 1)
+          nrElecEmit = nrElecEmit + 1
+
+          !!$OMP END CRITICAL
+          exit
+        end if
+      end do
+    end do
+    !!$OMP END DO
+    !!$OMP END PARALLEL
+
+    posInit = posInit + nrElecEmit
+    nrEmitted = nrEmitted + nrElecEmit
+  end subroutine Do_Simple_Field_Emission_tip
 
   subroutine Metro_algo_tip_v2(ndim, xi, phi, eta_f, df_cur, par_pos)
     integer, intent(in)              :: ndim
@@ -824,6 +939,69 @@ end function Elec_supply_tip
     integrand_cuba_fe_tip = 0 ! Return value to Cuba, 0 = success
   end function integrand_cuba_fe_tip
 
+  ! ----------------------------------------------------------------------------
+  ! The integration function for the Cuba library
+  !
+  integer function integrand_cuba_fe_tip_test(ndim, xx, ncomp, ff, userdata)
+    ! Input / output variables
+    integer, intent(in) :: ndim ! Number of dimensions (Should be 2)
+    integer, intent(in) :: ncomp ! Number of vector-components in the integrand (Always 1 here)
+    integer, intent(in) :: userdata ! Additional data passed to the integral function (In our case the number of the emitter)
+    double precision, intent(in), dimension(1:ndim)   :: xx ! Integration points, between 0 and 1
+    double precision, intent(out), dimension(1:ncomp) :: ff ! Results of the integrand function
+
+    ! Variables used for calculations
+    double precision, dimension(1:3) :: par_pos, field
+    double precision                 :: A ! Emitter area
+    double precision                 :: eta_f ! Component normal to the surface
+    double precision                 :: xi, phi ! Prolate coordinates
+    double precision                 :: h_xi, h_phi ! Scale factors
+
+    !! Emitter area
+    !A = Tip_Area(1.0d0, max_xi, 0.0d0, 2.0d0*pi)
+
+    ! Surface position
+    ! Cuba does the intergration over the hybercube.
+    ! It gives us coordinates between 0 and 1.
+    xi = (max_xi - 1.0d0)*xx(1) + 1.0d0
+    phi = 2.0d0*pi*xx(2)
+
+    !par_pos(1) = x_coor(xi, eta_1, phi)
+    !par_pos(2) = y_coor(xi, eta_1, phi)
+    !par_pos(3) = z_coor(xi, eta_1, phi)
+    par_pos = xyz_corr(xi, eta_1, phi)
+
+    ! Calculate the electric field on the surface
+    field = Calc_Field_at(par_pos)
+    eta_f = Field_normal(par_pos, field)
+
+    ! Add to the average field
+    !F_avg = F_avg + field
+
+    ! Check if the field is favourable for emission
+    if (eta_f < 0.0d0) then
+      ! The field is favourable for emission
+
+      ! Calculate the scale factors
+      h_xi = a_foci*sqrt((xi**2 - eta_1**2)/(xi**2 - 1.0d0))
+      h_phi = a_foci*sqrt((xi**2 - 1.0d0)*(1 - eta_1**2))
+
+      ! Calculate the current density at this point
+      ff(1) = h_xi*h_phi*Elec_Supply_tip(eta_f, par_pos)*Escape_Prob_Tip(eta_f, par_pos)
+      !ff(1) = h_xi*h_phi
+    else
+      ! The field is NOT favourable for emission
+      ! This point does not contribute
+      ff(1) = 0.0d0
+    end if
+
+    ! We mutiply with the area because Cuba does the 
+    ! integration over the hybercube, i.e. from 0 to 1.
+    ff(1) = 2.0d0*pi*(max_xi - 1.0d0)*ff(1)
+    
+    integrand_cuba_fe_tip_test = 0 ! Return value to Cuba, 0 = success
+  end function integrand_cuba_fe_tip_test
+
   subroutine Do_Cuba_Suave_FE_Tip(emit, N_sup)
     ! Input / output variables
     integer, intent(in)  :: emit
@@ -886,4 +1064,68 @@ end function Elec_supply_tip
      !F_avg = F_avg / neval
   end subroutine Do_Cuba_Suave_FE_Tip
 
+  subroutine Do_Cuba_Suave_FE_Tip_Test(emit, N_sup)
+    ! Input / output variables
+    integer, intent(in)  :: emit
+    integer, intent(out) :: N_sup
+
+    ! Cuba integration variables
+    integer, parameter :: ndim = 2 ! Number of dimensions
+    integer, parameter :: ncomp = 1 ! Number of components in the integrand
+    integer            :: userdata = 0 ! User data passed to the integrand
+    integer, parameter :: nvec = 1 ! Number of points given to the integrand function
+    double precision   :: epsrel = 1.0d-2 ! Requested relative error
+    double precision   :: epsabs = 1.0d-4 ! Requested absolute error
+    integer            :: flags = 0+4 ! Flags
+    integer            :: seed = 0 ! Seed for the rng. Zero will use Sobol.
+    integer            :: mineval = 10000 ! Minimum number of integrand evaluations
+    integer            :: maxeval = 5000000 ! Maximum number of integrand evaluations
+    integer            :: nnew = 2500 ! Number of integrand evaluations in each subdivision
+    integer            :: nmin = 1000 ! Minimum number of samples a former pass must contribute to a subregion to be considered in the region's compound integral value.
+    double precision   :: flatness = 5.0d0 ! Determine how prominently out-liers, i.e. samples with a large fluctuation, 
+                                           ! figure in the total fluctuation, which in turn determines how a region is split up.
+                                           ! As suggested by its name, flatness should be chosen large for 'flat" integrand and small for 'volatile' integrands
+                                           ! with high peaks.
+    character          :: statefile = "" ! File to save the state in. Empty string means don't do it.
+    integer            :: spin = -1 ! Spinning cores
+    integer            :: nregions ! <out> The actual number of subregions nedded
+    integer            :: neval ! <out> The actual number of integrand evaluations needed
+    integer            :: fail ! <out> Error flag (0 = Success, -1 = Dimension out of range, >0 = Accuracy goal was not met)
+    double precision, dimension(1:ncomp) :: integral ! <out> The integral of the integrand over the unit hybercube
+    double precision, dimension(1:ncomp) :: error ! <out> The presumed absolute error
+    double precision, dimension(1:ncomp) :: prob ! <out> The chi-square probability
+
+
+    ! Initialize the average field to zero
+    !F_avg = 0.0d0
+
+    ! Pass the number of the emitter being integraded over to the integrand as userdata
+    userdata = emit
+
+    call suave(ndim, ncomp, integrand_cuba_fe_tip_test, userdata, nvec, &
+     & epsrel, epsabs, flags, seed, &
+     & mineval, maxeval, nnew, nmin, flatness, &
+     & statefile, spin, &
+     & nregions, neval, fail, integral, error, prob)
+
+     if (fail /= 0) then
+      print '(a)', 'Vacuum: WARNING Cuba did not return 0'
+      print *, fail
+      print *, error
+      print *, prob
+     end if
+
+     ! Round the results to the nearest integer
+     N_sup = nint( integral(1) )
+
+     print *, integral(1)
+     print *, N_sup
+     print *, Tip_Area(1.0d0, max_xi, 0.0d0, 2.0d0*pi)
+     print *, ''
+     print *, a_foci
+     pause
+
+     ! Finish calculating the average field
+     !F_avg = F_avg / neval
+  end subroutine Do_Cuba_Suave_FE_Tip_Test
 end module mod_field_emission_tip

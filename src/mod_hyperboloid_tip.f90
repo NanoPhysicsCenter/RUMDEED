@@ -22,6 +22,17 @@ Module mod_hyperboloid_tip
   !double precision            :: xi_0 = 1.0124d0 ! 99.9% Emission area
 
 contains
+  pure function xyz_corr(xi, eta, phi)
+    double precision, intent(in)     :: xi, eta, phi
+    double precision, dimension(1:3) :: xyz_corr
+    double precision                 :: xy
+
+    xy = a_foci * sqrt( (xi**2 - 1.0d0)*(1.0d0 - eta**2) )
+    xyz_corr(1) = xy * cos(phi)
+    xyz_corr(2) = xy * sin(phi)
+    xyz_corr(3) = a_foci * xi * eta + shift_z
+  end function xyz_corr
+
   double precision elemental function x_coor(xi, eta, phi)
     double precision, intent(in) :: xi, eta, phi
 
@@ -146,6 +157,6 @@ contains
 
     fac_1 = xi_1*sqrt(xi_1**2 - eta_1**2) - eta_1**2*log(xi_1 + sqrt(xi_1**2 - eta_1**2))
     fac_2 = xi_2*sqrt(xi_2**2 - eta_1**2) - eta_1**2*log(xi_2 + sqrt(xi_2**2 - eta_1**2))
-    Tip_Area = 0.5d0*a_foci * sqrt(1.0d0-eta_1**2) * (phi_2 - phi_1) * (fac_2 - fac_1)
+    Tip_Area = 0.5d0*a_foci**2 * sqrt(1.0d0-eta_1**2) * (phi_2 - phi_1) * (fac_2 - fac_1)
   end function Tip_Area
 end Module mod_hyperboloid_tip

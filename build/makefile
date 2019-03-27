@@ -95,6 +95,9 @@ $(PROJECT_NAME).out: ../src/main.F90 ../cuba/lib/libcuba.a \
 mod_global.mod mod_global.o: ../src/mod_global.F90
 		$(FCOMPILER) -c $(FFLAGS) ../src/mod_global.F90
 
+mod_ic.mod mod_ic.o: ../src/mod_ic.f90 mod_global.o mod_hyperboloid_tip.o mod_verlet.o
+		$(FCOMPILER) -c $(FFLAGS) ../src/mod_ic.f90
+
 mod_verlet.mod mod_verlet.o: ../src/mod_verlet.F90 mod_global.mod mod_pair.mod
 		$(FCOMPILER) -c $(FFLAGS) ../src/mod_verlet.F90
 
