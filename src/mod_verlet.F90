@@ -553,7 +553,8 @@ contains
     mean_path_avg = 0.0d0
     mean_actual_avg = 0.0d0
 
-    !$OMP PARALLEL DO PRIVATE(i, cur_pos, prev_pos, d, alpha, rnd, par_vec, vel2, KE, mean_path, mean_actual_avg, cross_tot, cross_ion) &
+    !$OMP PARALLEL DO PRIVATE(i, cur_pos, prev_pos, d, alpha, rnd, par_vec, vel2) &
+    !$OMP& PRIVATE(KE, mean_path, mean_actual_avg, cross_tot, cross_ion) &
     !$OMP& REDUCTION(+:nrColl, count, mean_path_avg) SCHEDULE(GUIDED, 2500)
     do i = 1, nrPart
       cur_pos(:) = particles_cur_pos(:, i)

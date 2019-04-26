@@ -14,7 +14,7 @@ GIT_VERSION := $(shell git describe --dirty --always --tags)
 CUBA_LIB=../cuba/lib/libcuba.a
 
 #UNIT_TEST = 1
-#OPENMP = 1
+OPENMP = 1
 
 # Compile flags
 # UNKNOWN COMPILERS
@@ -119,7 +119,7 @@ mod_field_emission_v2.mod mod_field_emission_v2.o: ../src/mod_field_emission_v2.
 mod_field_emission_2D.mod mod_field_emission_2D.o: ../src/mod_field_emission_2D.f90 mod_global.mod mod_verlet.mod mod_pair.mod
 			$(FCOMPILER) -c $(FFLAGS) ../src/mod_field_emission_2D.f90
 
-mod_field_emission_tip.mod mod_field_emission_tip.o: ../src/mod_field_emission_tip.f90 mod_global.mod mod_verlet.mod mod_pair.mod mod_hyperboloid_tip.mod
+mod_field_emission_tip.mod mod_field_emission_tip.o: ../src/mod_field_emission_tip.f90 mod_global.mod mod_verlet.mod mod_pair.mod mod_hyperboloid_tip.mod mod_ic.mod
 		$(FCOMPILER) -c $(FFLAGS) ../src/mod_field_emission_tip.f90
 
 mod_hyperboloid_tip.mod mod_hyperboloid_tip.o: ../src/mod_hyperboloid_tip.f90 mod_global.mod
