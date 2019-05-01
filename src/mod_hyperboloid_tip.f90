@@ -112,7 +112,7 @@ contains
   end function Field_normal
 
   !pure function field_E_Hyperboloid(pos_xyz)
-  function field_E_Hyperboloid(pos_xyz)
+  pure function field_E_Hyperboloid(pos_xyz)
     double precision, dimension(1:3), intent(in) :: pos_xyz
     double precision, dimension(1:3)             :: pos_pro !xi, eta, phi
     double precision, dimension(1:3)             :: field_E_Hyperboloid

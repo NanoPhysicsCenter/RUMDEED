@@ -262,7 +262,7 @@ module mod_global
       integer, intent(in) :: i
     end subroutine Check_Boundary
 
-    function Electric_Field(pos) result(field_E)
+    pure function Electric_Field(pos) result(field_E)
       double precision, dimension(1:3), intent(in) :: pos
       double precision, dimension(1:3)             :: field_E
     end function Electric_Field
@@ -310,7 +310,7 @@ contains
 ! So far the PGI compiler (v. 18.4) has not implemented the NORM2 function
 ! from the Fortran 2008 Standard
 #if defined(__PGI)
-  double precision function norm2(a)
+  pure double precision function norm2(a)
     double precision, dimension(:), intent(in) :: a
     ! integer                                    :: i
 
