@@ -358,7 +358,9 @@ contains
     double precision    :: ramo_cur = 0.0d0
 
     ! Write out the current for each emitter and section
-    write(unit=ud_ramo_sec, asynchronous='YES') ramo_current_emit
+    if (write_ramo_sec .eqv. .true.) then
+      write(unit=ud_ramo_sec, asynchronous='YES') ramo_current_emit
+    end if
 
     ! Write the total current along with other data
     ramo_cur = sum(ramo_current) / cur_scale

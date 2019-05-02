@@ -50,7 +50,7 @@ module mod_global
   ! These can be increased if needed.
   integer, parameter :: MAX_PARTICLES = 500000 ! Maximum number of particles allowed in the system
   integer, parameter :: MAX_EMITTERS  = 10     ! Maximum number of emitters in the system
-  integer, parameter :: MAX_SECTIONS  = 48*48    ! Maximum number of sections an emitter can have
+  integer, parameter :: MAX_SECTIONS  = 48*48  ! Maximum number of sections an emitter can have
 
 
   !! ----------------------------------------------------------------------------
@@ -216,6 +216,10 @@ module mod_global
   ! Parameters for random number generators
   !integer                                            :: SEED = 2815
   integer, allocatable :: my_seed(:)
+
+  ! ----------------------------------------------------------------------------
+  ! Other stuff
+  logical, parameter :: write_ramo_sec = .false. ! Write out the ramo current for each section.
 
 
   ! ----------------------------------------------------------------------------
