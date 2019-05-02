@@ -127,9 +127,7 @@ program VacuumMD
     call Remove_Particles(i)
 
     ! Do Collisions
-    if (collisions .eqv. .true.) then
-      call Do_Collisions_4(i)
-    end if
+    call Do_Collisions(i)
 
     ! Flush data
     !call Flush_Data()
@@ -295,10 +293,7 @@ contains
     !  collisions = .false.
     !end if
 
-    if (collisions .eqv. .true.) then
-      print '(a)', 'Vacuum: Doing collisions reading in data'
-      call Read_Cross_Section()
-    end if
+    call Read_Cross_Section_Data()
 
     open(newunit=ud_debug, iostat=IFAIL, file='debug.dt', status='replace', action='write')
     if (IFAIL /= 0) then

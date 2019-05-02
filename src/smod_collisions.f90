@@ -191,7 +191,7 @@ subroutine Do_Collisions_1()
   ! ----------------------------------------------------------------------------
   ! Ion collisions
   ! Mean free path approch
-  subroutine Do_Collisions_4(step)
+  module subroutine Do_Collisions_4(step)
     integer, intent(in)              :: step
     !double precision, parameter      :: mean_path = 1000.0d0*length_scale ! Mean free path
     double precision, dimension(1:3) :: cur_pos, prev_pos, par_vec
@@ -327,7 +327,7 @@ subroutine Do_Collisions_1()
 
     ! --------------------------------------------------------------------------
     ! Read the Cross Section from a file
-  subroutine Read_Cross_Section()
+  module subroutine Read_Cross_Section()
     integer                      :: IFAIL, ud_cross, i, n
     character (len=*), parameter :: filename_tot="N2-tot-cross.txt"
     character (len=*), parameter :: filename_ion="N2-ion-cross.txt"

@@ -58,6 +58,21 @@ contains
 
   end subroutine Velocity_Verlet
 
+  subroutine Do_Collisions(step)
+    integer, intent(in) :: step
+
+    if (collisions .eqv. .true.) then
+      call Do_Collisions_4(step)
+    end if
+  end subroutine Do_Collisions
+
+  subroutine Read_Cross_Section_Data()
+    if (collisions .eqv. .true.) then
+      print '(a)', 'Vacuum: Doing collisions reading in data'
+      call Read_Cross_Section()
+    end if
+   end subroutine Read_Cross_Section_Data
+
   ! ----------------------------------------------------------------------------
   ! Update the position of particles in the verlet integration
   subroutine Update_ElecHole_Position(step)
