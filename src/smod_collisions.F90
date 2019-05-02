@@ -286,14 +286,16 @@ subroutine Do_Collisions_1()
           end if
           call random_number(rnd)
           if (rnd < alpha) then
-            !$OMP CRITICAL
-            !!call Add_Particle(particles_cur_pos(:, i), par_vec, species_elec, step, 1)
+            
             call random_number(prev_pos)
             prev_pos = prev_pos - 0.5d0
             cur_pos = cur_pos + prev_pos*length_scale
+
+            !$OMP CRITICAL
             !call Add_Particle(cur_pos, step, par_vec)
             call Add_Particle(cur_pos, par_vec, species_elec, step, 1)
             !$OMP END CRITICAL
+
             nrIon = nrIon + 1
           end if
 

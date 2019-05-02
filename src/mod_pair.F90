@@ -368,8 +368,8 @@ contains
     ! Write the total current along with other data
     ramo_cur = sum(ramo_current) / cur_scale
     write(unit=ud_ramo, &
-    fmt="(ES12.4, tr2, i8, tr2, E12.4, tr2, E12.4, tr2, i6, tr2, i6, tr2, i6, tr2, E12.4, tr2, E12.4)", &
-    iostat=IFAIL) &
+    & fmt="(ES12.4, tr2, i8, tr2, E12.4, tr2, E12.4, tr2, i6, tr2, i6, tr2, i6, tr2, E12.4, tr2, E12.4)", &
+    & iostat=IFAIL) &
     & cur_time, step, ramo_cur, V_d, nrPart, nrElec, nrHole, avg_mob, avg_speed
 
   end subroutine Write_Ramo_current
