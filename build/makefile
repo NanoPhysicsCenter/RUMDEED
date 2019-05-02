@@ -61,6 +61,8 @@ ifdef UNIT_TEST
 FFLAGS+=-D_UNIT_TEST_
 endif
 
+FFLAGS+=-DCHUNK_SIZE=1000
+
 # Name of the output file
 PROJECT_NAME=Vacuum-MD
 
@@ -115,8 +117,8 @@ mod_photo_emission.mod mod_photo_emission.o: ../src/mod_photo_emission.f90 mod_g
 mod_field_emission.mod mod_field_emission.o: ../src/mod_field_emission.f90 mod_global.mod mod_verlet.mod mod_pair.mod
 		$(FCOMPILER) -c $(FFLAGS) ../src/mod_field_emission.f90
 
-mod_field_emission_v2.mod mod_field_emission_v2.o: ../src/mod_field_emission_v2.f90 mod_global.mod mod_verlet.mod mod_pair.mod ziggurat.mod
-		$(FCOMPILER) -c $(FFLAGS) ../src/mod_field_emission_v2.f90
+mod_field_emission_v2.mod mod_field_emission_v2.o: ../src/mod_field_emission_v2.F90 mod_global.mod mod_verlet.mod mod_pair.mod ziggurat.mod
+		$(FCOMPILER) -c $(FFLAGS) ../src/mod_field_emission_v2.F90
 
 mod_field_emission_2D.mod mod_field_emission_2D.o: ../src/mod_field_emission_2D.f90 mod_global.mod mod_verlet.mod mod_pair.mod
 			$(FCOMPILER) -c $(FFLAGS) ../src/mod_field_emission_2D.f90
@@ -142,8 +144,8 @@ mod_thermionic_emission@smod_mc_integration_te.smod smod_mc_integration_te.o: ..
 mod_field_emission_v2@smod_metro_algo.smod smod_metro_algo.o: ../src/smod_metro_algo.F90 mod_field_emission_v2.mod
 		$(FCOMPILER) -c $(FFLAGS) ../src/smod_metro_algo.F90
 
-mod_verlet@smod_collisions.smod smod_collisions.o: ../src/smod_collisions.f90 mod_verlet.mod mod_global.mod
-		$(FCOMPILER) -c $(FFLAGS) ../src/smod_collisions.f90
+mod_verlet@smod_collisions.smod smod_collisions.o: ../src/smod_collisions.F90 mod_verlet.mod mod_global.mod
+		$(FCOMPILER) -c $(FFLAGS) ../src/smod_collisions.F90
 
 ziggurat.o ziggurat.mod: ../src/mod_ziggurat.f90
 		$(FCOMPILER) -c $(FFLAGS) ../src/mod_ziggurat.f90

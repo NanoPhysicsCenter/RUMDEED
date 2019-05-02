@@ -7,6 +7,8 @@
 module mod_global
   implicit none
 
+  !integer, parameter :: CHUNK_SIZE = 1000
+
   ! ----------------------------------------------------------------------------
   ! Define material parameters
   !

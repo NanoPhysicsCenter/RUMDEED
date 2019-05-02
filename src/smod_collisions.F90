@@ -140,7 +140,7 @@ subroutine Do_Collisions_1()
     nrColl = 0
 
     !$OMP PARALLEL DO PRIVATE(i, cur_pos, prev_pos, d, alpha, rnd, par_vec, vel2) &
-    !$OMP& REDUCTION(+:nrColl) SCHEDULE(GUIDED, 2500)
+    !$OMP& REDUCTION(+:nrColl) SCHEDULE(GUIDED, CHUNK_SIZE)
     do i = 1, nrPart
       cur_pos(:) = particles_cur_pos(:, i)
       prev_pos(:) = particles_prev_pos(:, i)
@@ -220,7 +220,7 @@ subroutine Do_Collisions_1()
     if (nrElec > 0) then
 
     !$OMP PARALLEL DO PRIVATE(i, cur_pos, prev_pos, d, alpha, rnd, par_vec, vel2, KE, mean_path, cross_tot, cross_ion) &
-    !$OMP& REDUCTION(+:nrColl, count_n, mean_path_avg, nrIon) SCHEDULE(GUIDED, 2500)
+    !$OMP& REDUCTION(+:nrColl, count_n, mean_path_avg, nrIon) SCHEDULE(GUIDED, CHUNK_SIZE)
     do i = 1, nrElec
       cur_pos(:) = particles_cur_pos(:, i)
       prev_pos(:) = particles_prev_pos(:, i)
