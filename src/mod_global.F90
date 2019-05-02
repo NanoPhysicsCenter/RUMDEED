@@ -176,6 +176,9 @@ module mod_global
   double precision :: ramo_cur_prev
   double precision :: ramo_integral
 
+  double precision                 :: avg_mob ! Average mobility
+  double precision, dimension(1:3) :: avg_vel ! Average speed
+
   double precision :: cur_time ! This is updated in the main loop, given in ps
   integer, parameter :: MAX_LIFE_TIME = 1000
   integer, dimension(:, :), allocatable :: life_time

@@ -61,6 +61,7 @@ ifdef UNIT_TEST
 FFLAGS+=-D_UNIT_TEST_
 endif
 
+# Chunk size for OpenMP
 FFLAGS+=-DCHUNK_SIZE=1000
 
 # Name of the output file

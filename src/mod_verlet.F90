@@ -124,11 +124,13 @@ contains
   ! ----------------------------------------------------------------------------
   ! Update the velocity in the verlet integration
   subroutine Update_Velocity(step)
-    integer, intent(in) :: step
-    integer             :: i, k, emit, sec
-    double precision    :: q
+    integer, intent(in)              :: step
+    integer                          :: i, k, emit, sec
+    double precision                 :: q
 
-    !$OMP PARALLEL DO PRIVATE(i, q, k) SCHEDULE(GUIDED, CHUNK_SIZE)
+    avg_vel(:) = 0.0d0
+
+    !$OMP PARALLEL DO PRIVATE(i, q, k) REDUCTION(+:avg_vel) SCHEDULE(GUIDED, CHUNK_SIZE)
     do i = startElecHoles, endElecHoles
       ! Verlet
       particles_cur_vel(:, i) = particles_cur_vel(:, i) &
@@ -153,8 +155,12 @@ contains
       ! We use OMP ATOMIC here because the indexes sec and emit are not loop indexes
       !$OMP ATOMIC UPDATE
       ramo_current_emit(sec, emit) = ramo_current_emit(sec, emit) + q * E_zunit * particles_cur_vel(3, i)
+
+      avg_vel(:) = avg_vel(:) + particles_cur_vel(:, i)
     end do
     !$OMP END PARALLEL DO
+
+    avg_mob = sqrt(avg_vel(1)**2 + avg_vel(2)**2 + avg_vel(3)**2) / E_z
   end subroutine Update_Velocity
 
 
@@ -170,8 +176,9 @@ contains
     double precision                 :: pre_fac_c
     integer                          :: i, j, k_1, k_2
 
+    ! We do not use GUIDED scheduling in OpenMP here because the inner loop changes size.
     !$OMP PARALLEL DO PRIVATE(i, j, k_1, k_2, pos_1, pos_2, diff, r), &
-    !$OMP& PRIVATE(force_E, force_c, force_ic, force_ic_N, force_ic_self, im_1, q_1, im_2, q_2, pre_fac_c) SCHEDULE(GUIDED, CHUNK_SIZE)
+    !$OMP& PRIVATE(force_E, force_c, force_ic, force_ic_N, force_ic_self, im_1, q_1, im_2, q_2, pre_fac_c) SCHEDULE(DYNAMIC, 4)
     do i = 1, nrPart
       ! Information about the particle we are calculating the force/acceleration on
       pos_1 = particles_cur_pos(:, i)

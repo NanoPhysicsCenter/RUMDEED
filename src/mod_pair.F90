@@ -356,6 +356,9 @@ contains
     integer, intent(in) :: step
     integer             :: IFAIL
     double precision    :: ramo_cur = 0.0d0
+    double precision    :: avg_speed
+
+    avg_speed = sqrt(avg_vel(1)**2 + avg_vel(2)**2 + avg_vel(3)**2)
 
     ! Write out the current for each emitter and section
     if (write_ramo_sec .eqv. .true.) then
@@ -364,8 +367,10 @@ contains
 
     ! Write the total current along with other data
     ramo_cur = sum(ramo_current) / cur_scale
-    write(unit=ud_ramo, fmt="(ES12.4, tr2, i8, tr2, E12.4, tr2, E12.4, tr2, i6, tr2, i6, tr2, i6)", iostat=IFAIL) &
-    & cur_time, step, ramo_cur, V_d, nrPart, nrElec, nrHole
+    write(unit=ud_ramo, &
+    fmt="(ES12.4, tr2, i8, tr2, E12.4, tr2, E12.4, tr2, i6, tr2, i6, tr2, i6, tr2, E12.4, tr2, E12.4)", &
+    iostat=IFAIL) &
+    & cur_time, step, ramo_cur, V_d, nrPart, nrElec, nrHole, avg_mob, avg_speed
 
   end subroutine Write_Ramo_current
 
