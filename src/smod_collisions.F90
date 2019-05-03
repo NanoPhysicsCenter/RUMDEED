@@ -221,7 +221,9 @@ subroutine Do_Collisions_1()
 
     !$OMP PARALLEL DO PRIVATE(i, cur_pos, prev_pos, d, alpha, rnd, par_vec, vel2, KE, mean_path, cross_tot, cross_ion) &
     !$OMP& REDUCTION(+:nrColl, count_n, mean_path_avg, nrIon) SCHEDULE(GUIDED, CHUNK_SIZE)
-    do i = 1, nrElec
+    do i = 1, nrPart
+      if (particles_species(i) /= species_elec) cycle ! Skip particles that are not electrons
+
       cur_pos(:) = particles_cur_pos(:, i)
       prev_pos(:) = particles_prev_pos(:, i)
       !prev_pos(:) = particles_last_col_pos(:, i)
@@ -284,9 +286,11 @@ subroutine Do_Collisions_1()
           if (alpha > 1.0d0) then
             print *, 'WARNING: alpha > 1 in cross section'
           end if
+          
+          ! Check if the collision ionizes the N2 or not  
           call random_number(rnd)
           if (rnd < alpha) then
-            
+
             call random_number(prev_pos)
             prev_pos = prev_pos - 0.5d0
             cur_pos = cur_pos + prev_pos*length_scale
@@ -294,6 +298,9 @@ subroutine Do_Collisions_1()
             !$OMP CRITICAL
             !call Add_Particle(cur_pos, step, par_vec)
             call Add_Particle(cur_pos, par_vec, species_elec, step, 1)
+
+            par_vec = 0.0d0
+            call Add_Particle(cur_pos, par_vec, species_hole, step, 1)
             !$OMP END CRITICAL
 
             nrIon = nrIon + 1

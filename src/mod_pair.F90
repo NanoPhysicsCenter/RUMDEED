@@ -73,9 +73,9 @@ contains
         particles_charge(nrPart+1) = -1.0d0*q_0
         particles_mass(nrPart+1) = m_eeff*m_0
         nrElec = nrElec + 1
-      else ! Hole
+      else ! N_2^+ Ion
         particles_charge(nrPart+1) = +1.0d0*q_0
-        particles_mass(nrPart+1) = m_heff*m_0
+        particles_mass(nrPart+1) = m_N2p
         nrHole = nrHole + 1
       end if
 
@@ -368,7 +368,7 @@ contains
     ! Write the total current along with other data
     ramo_cur = sum(ramo_current) / cur_scale
     write(unit=ud_ramo, &
-    & fmt="(ES12.4, tr2, i8, tr2, E12.4, tr2, E12.4, tr2, i6, tr2, i6, tr2, i6, tr2, E12.4, tr2, E12.4)", &
+    & fmt="(ES12.4, tr2, i8, tr2, ES12.4, tr2, ES12.4, tr2, i6, tr2, i6, tr2, i6, tr2, ES12.4, tr2, ES12.4)", &
     & iostat=IFAIL) &
     & cur_time, step, ramo_cur, V_d, nrPart, nrElec, nrHole, avg_mob, avg_speed
 

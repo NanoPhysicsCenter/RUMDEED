@@ -36,6 +36,8 @@ module mod_global
   !double precision, parameter :: m_e = m_eeff * m_0 ! m_e* Effective electron mass (kg)
   !double precision, parameter :: m_h = m_heff * m_0! m_h* Effective hole mass (kg)
 
+  double precision, parameter :: m_N2p = 14.0067d0*m_u - m_0 ! Mass of N_2^+
+
   double precision, parameter :: q_0 = 1.6021766208d-19 ! Elementary charge (C)
   double precision, parameter :: q_02 = q_0**2 ! Elementary charge squared (C)
 
