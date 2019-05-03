@@ -22,6 +22,7 @@ Module mod_field_emission_v2
   !integer                            :: nrEmitted
   double precision, dimension(1:3)   :: F_avg = 0.0d0
   integer, parameter                 :: N_MH_step = 20 ! Number of steps to do in the MH algorithm
+  double precision                   :: residual = 0.0d0
 
   ! ----------------------------------------------------------------------------
   ! Constants for field emission
@@ -61,8 +62,8 @@ Module mod_field_emission_v2
 
       ! Interface for the MC integration submodule
       module subroutine Do_Surface_Integration_FE(emit, N_sup)
-        integer, intent(in)  :: emit ! The emitter to do the integration on
-        integer, intent(out) :: N_sup ! Number of electrons
+        integer, intent(in)           :: emit ! The emitter to do the integration on
+        double precision, intent(out) :: N_sup ! Number of electrons
       end subroutine Do_Surface_Integration_FE
 
       ! Interface for the Metropolis-Hastings submodule
@@ -159,7 +160,8 @@ contains
     integer, intent(in)              :: step, emit
 
     ! Integration
-    integer                          :: N_sup
+    double precision                 :: N_sup
+    integer                          :: N_round
 
     ! Emission variables
     double precision                 :: D_f, Df_avg, F, rnd
@@ -168,6 +170,9 @@ contains
     double precision, dimension(1:3) :: par_pos, par_vel
 
     call Do_Surface_Integration_FE(emit, N_sup)
+    N_round = nint(N_sup + residual)
+    residual = N_sup - N_round
+
     !call Calc_Field_old_method(step, emit)
 
     !print *, 'V_2'
@@ -189,7 +194,7 @@ contains
 
     ! Loop over the electrons to be emitted.
     !$OMP PARALLEL DO PRIVATE(s, par_pos, F, D_f, rnd, par_vel) REDUCTION(+:df_avg) SCHEDULE(GUIDED, CHUNK_SIZE)
-    do s = 1, N_sup
+    do s = 1, N_round
 
       call Metropolis_Hastings_rectangle_v2(N_MH_step, emit, D_f, F, par_pos)
       !call Metropolis_Hastings_rectangle_v2_field(N_MH_step, emit, D_f, F, par_pos)

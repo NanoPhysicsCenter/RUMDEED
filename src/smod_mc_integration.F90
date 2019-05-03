@@ -15,8 +15,8 @@ contains
   ! Here we select the method to do it.
   !
   module subroutine Do_Surface_Integration_FE(emit, N_sup)
-    integer, intent(in)  :: emit ! The emitter to do the integration on
-    integer, intent(out) :: N_sup ! Number of electrons
+    integer, intent(in)           :: emit ! The emitter to do the integration on
+    double precision, intent(out) :: N_sup ! Number of electrons
 
     !call Do_2D_MC_plain(emit, N_sup)
     call Do_Cuba_Suave_FE(emit, N_sup)
@@ -76,8 +76,8 @@ contains
   !
   subroutine Do_Cuba_Suave_FE(emit, N_sup)
     ! Input / output variables
-    integer, intent(in)  :: emit
-    integer, intent(out) :: N_sup
+    integer, intent(in)           :: emit
+    double precision, intent(out) :: N_sup
 
     ! Cuba integration variables
     integer, parameter :: ndim = 2 ! Number of dimensions
@@ -125,8 +125,9 @@ contains
       print *, prob
      end if
 
-     ! Round the results to the nearest integer
-     N_sup = nint( integral(1) )
+     !! Round the results to the nearest integer
+     !N_sup = nint( integral(1) )
+     N_sup = integral(1)
 
      ! Finish calculating the average field
      F_avg = F_avg / neval

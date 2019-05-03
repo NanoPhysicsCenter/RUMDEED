@@ -62,7 +62,7 @@ FFLAGS+=-D_UNIT_TEST_
 endif
 
 # Chunk size for OpenMP
-FFLAGS+=-DCHUNK_SIZE=1000
+FFLAGS+=-DCHUNK_SIZE=500
 
 # Name of the output file
 PROJECT_NAME=Vacuum-MD
