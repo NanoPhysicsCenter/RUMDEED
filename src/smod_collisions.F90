@@ -272,7 +272,9 @@ subroutine Do_Collisions_1()
 
           call random_number(rnd)
           !par_vec = par_vec*sqrt(vel2)*(1.0d0 - rnd)
-          par_vec = par_vec*sqrt(2.0d0*q_0*rnd*40.0d0/m_0) ! Give the electron an initial energy between 0 and 40 eV
+
+          rnd = rnd*0.8d0 + 0.2d0
+          par_vec = par_vec*sqrt(2.0d0*q_0*rnd*40.0d0/m_0) ! Give the electron an initial energy between 8 and 40 eV
 
           !prev_pos(:) = particles_last_col_pos(:, i)
           !d = sqrt( (cur_pos(1) - prev_pos(1))**2 + (cur_pos(2) - prev_pos(2))**2 + (cur_pos(3) - prev_pos(3))**2 )
@@ -300,6 +302,7 @@ subroutine Do_Collisions_1()
             call Add_Particle(cur_pos, par_vec, species_elec, step, 1)
 
             par_vec = 0.0d0
+            cur_pos = cur_pos + 1.0d0*length_scale
             call Add_Particle(cur_pos, par_vec, species_hole, step, 1)
             !$OMP END CRITICAL
 
