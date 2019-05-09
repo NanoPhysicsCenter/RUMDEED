@@ -150,7 +150,7 @@ contains
         ! Speed needed to reach over the gap spacing. Includes image charge partners behind the cathode and annode but not the electric field.
         !par_vel(3) = q_0/(4.0d0*sqrt(pi*epsilon_0*epsilon_r*m_0))*(d-2.0d0*par_pos(3))/sqrt(d*par_pos(3)*(d-par_pos(3)))
         
-        call Add_Particle(par_pos, par_vel, species_elec, step, emit)
+        call Add_Particle(par_pos, par_vel, species_elec, step, emit, -1)
 
         nrElecEmit = nrElecEmit + 1
         nrEmitted_emitters(emit) = nrEmitted_emitters(emit) + 1
@@ -203,7 +203,7 @@ contains
 
           par_pos(3) = 1.0d0 * length_scale ! Place above plane
           par_vel = 0.0d0
-          call Add_Particle(par_pos, par_vel, species_elec, step, emit)
+          call Add_Particle(par_pos, par_vel, species_elec, step, emit, -1)
 
           !print *, 'field = ', field
           !pause

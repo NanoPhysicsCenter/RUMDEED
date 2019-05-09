@@ -3,6 +3,96 @@ import pandas as pd
 from scipy.constants import pi, m_e, hbar, e, epsilon_0
 
 # ----------------------------------------------------------------
+# Calculate the Entropy of a Matrix
+# See:
+# Wang, C. and Zhao, H., 2018. Spatial Heterogeneity Analysis: Introducing a New Form of Spatial Entropy. Entropy, 20(6), p.398.
+#
+# Mat: The matrix
+# x_len: Length of squares in x-direction
+# y_len: Length of squares in y-direction
+# w_1: Value of work function for type 1 of squares
+# w_2: Value of work function for type 2 of squares
+def Calc_Entropy(Mat, x_len, y_len, w_1, w_2, r_mean):
+    edge_length = 0
+    
+    y_num = Mat.shape[0]
+    x_num = Mat.shape[1]
+
+    n_1 = 0
+    x_1 = 0.0
+    y_1 = 0.0
+
+    n_2 = 0
+    x_2 = 0.0
+    y_2 = 0.0
+
+    for i in range(x_num):
+        for j in range(y_num):
+            # Count all edges and calculate the edge length
+            w = Mat[j, i]
+            j_i = y_num - j - 1
+
+            x_pos = i*x_len + 0.5
+            y_pos = j_i*y_len + 0.5
+
+            if (np.abs(w - w_1) < 1.0E-6):
+                n_1 = n_1 + 1
+                x_1 = x_1 + x_pos
+                y_1 = y_1 + y_pos
+            if (np.abs(w - w_2) < 1.0E-6):
+                n_2 = n_2 + 1
+                x_2 = x_2 + x_pos
+                y_2 = y_2 + y_pos
+
+
+            # Above
+            j_n = j - 1
+            i_n = i
+            if (j_n >= 0):
+                w_n = Mat[j_n, i_n]
+                if (np.abs(w_n - w) > 1.0E-6):
+                    edge_length = edge_length + 1.0*y_len
+            # Below
+            j_n = j + 1
+            i_n = i
+            if (j_n <= (y_num-1)):
+                w_n = Mat[j_n, i_n]
+                if (np.abs(w_n - w) > 1.0E-6):
+                    edge_length = edge_length + 1.0*y_len
+            # Left
+            j_n = j
+            i_n = i - 1
+            if (i_n >= 0):
+                w_n = Mat[j_n, i_n]
+                if (np.abs(w_n - w) > 1.0E-6):
+                    edge_length = edge_length + 1.0*x_len
+
+            # Right
+            j_n = j 
+            i_n = i + 1
+            if (i_n <= (x_num-1)):
+                w_n = Mat[j_n, i_n]
+                if (np.abs(w_n - w) > 1.0E-6):
+                    edge_length = edge_length + 1.0*x_len
+
+    x_1 = x_1 / n_1
+    y_1 = y_1 / n_1
+
+    x_2 = x_2 / n_2
+    y_2 = y_2 / n_2
+
+    # Calculate distance between 
+    d = np.sqrt((x_1 - x_2)**2 + (y_1 - y_2)**2)
+    d = r_mean
+    p_1 = n_1 / (n_1 + n_2)
+    p_2 = n_2 / (n_1 + n_2)
+
+    edge_length = edge_length / 2.0 # Divide with two because we double count 
+
+    H_s = -edge_length/d*p_1*np.log(p_1)/np.log(2) - edge_length/d*p_2*np.log(p_2)/np.log(2)
+    return H_s
+
+# ----------------------------------------------------------------
 # Calculates the emittance
 # Input is a pandas dataframe that has columns called x and x'.
 # It returns the Emittance, sigma_w, sigma_wp and theta

@@ -141,7 +141,7 @@ subroutine Do_Field_Emission_Tip_2(step)
   end if
 
   par_vel = 0.0d0
-  call Add_Particle(par_pos, par_vel, species_elec, step, emit)
+  call Add_Particle(par_pos, par_vel, species_elec, step, emit, -1)
   nrElecEmit = nrElecEmit + 1
 
   posInit = posInit + nrElecEmit
@@ -247,7 +247,7 @@ end subroutine Do_Field_Emission_Tip_Test
 
         ! Add a particle to the system
         par_vel = 0.0d0
-        call Add_Particle(par_pos, par_vel, species_elec, step, emit)
+        call Add_Particle(par_pos, par_vel, species_elec, step, emit, -1)
 
         !nrElec = nrElec + 1
         nrElecEmit = nrElecEmit + 1
@@ -356,7 +356,7 @@ end subroutine Do_Field_Emission_Tip_Test
 
           !call Add_particle(par_pos, step)
           par_vel = 0.0d0
-          call Add_Particle(par_pos, par_vel, species_elec, step, 1)
+          call Add_Particle(par_pos, par_vel, species_elec, step, 1, -1)
           nrElecEmit = nrElecEmit + 1
 
           !!$OMP END CRITICAL

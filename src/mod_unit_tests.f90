@@ -199,9 +199,9 @@ contains
 
     ! Add particles
     par_vel = 0.0d0
-    call Add_Particle(R_1, par_vel, species_elec, 1, 0)
-    call Add_Particle(R_2, par_vel, species_elec, 1, 0)
-    call Add_Particle(R_3, par_vel, species_hole, 1, 0)
+    call Add_Particle(R_1, par_vel, species_elec, 1, 0, -1)
+    call Add_Particle(R_2, par_vel, species_elec, 1, 0, -1)
+    call Add_Particle(R_3, par_vel, species_hole, 1, 0, -1)
 
     call Calculate_Acceleration_Particles()
 
@@ -675,9 +675,9 @@ contains
 
     ! Add particles
     par_vel = 0.0d0
-    call Add_Particle(R_1, par_vel, species_elec, 1, 0)
-    call Add_Particle(R_2, par_vel, species_elec, 1, 0)
-    call Add_Particle(R_3, par_vel, species_hole, 1, 0)
+    call Add_Particle(R_1, par_vel, species_elec, 1, 0, -1)
+    call Add_Particle(R_2, par_vel, species_elec, 1, 0, -1)
+    call Add_Particle(R_3, par_vel, species_hole, 1, 0, -1)
 
     call Calculate_Acceleration_Particles()
 
@@ -772,7 +772,7 @@ contains
 
     ! Add particle
     par_vel = 0.0d0
-    call Add_Particle(R_1, par_vel, species_elec, 1, 1)
+    call Add_Particle(R_1, par_vel, species_elec, 1, 1, -1)
 
     do i = 1, steps
 
@@ -850,7 +850,7 @@ contains
       par_vel = 0.0d0
 
       ! Add the particle to the system
-      call Add_Particle(par_pos, par_vel, species_elec, 1, 0)
+      call Add_Particle(par_pos, par_vel, species_elec, 1, 0, -1)
     end do
 
     ! Start the simulation

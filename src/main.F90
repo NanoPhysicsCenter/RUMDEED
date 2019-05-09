@@ -287,12 +287,6 @@ contains
       stop
     end if
 
-    ! If the mean collisions per time step is less than or equal to zero just disable collisions
-    !if ((collisions_mean <= 0.0d0) .and. (collisions .eqv. .true.)) then
-    !  print '(a)', 'Vacuum: Warning - Disabling ion collisions because mean is less than or equal to zero'
-    !  collisions = .false.
-    !end if
-
     call Read_Cross_Section_Data()
 
     open(newunit=ud_debug, iostat=IFAIL, file='debug.dt', status='replace', action='write')
@@ -330,6 +324,7 @@ contains
     allocate(particles_mask(1:MAX_PARTICLES))
     allocate(particles_emitter(1:MAX_PARTICLES))
     allocate(particles_section(1:MAX_PARTICLES))
+    allocate(particles_life(1:MAX_PARTICLES))
     allocate(particles_collision(1:MAX_PARTICLES))
 
     allocate(life_time(1:MAX_LIFE_TIME, 1:2))
@@ -701,6 +696,8 @@ contains
     deallocate(particles_mask)
     deallocate(particles_emitter)
     deallocate(particles_section)
+    deallocate(particles_life)
+    deallocate(particles_collision)
 
     deallocate(emitters_pos)
     deallocate(emitters_dim)

@@ -94,6 +94,7 @@ module mod_global
   integer         , dimension(:)   , allocatable :: particles_step       ! Time step when particle was created
   integer         , dimension(:)   , allocatable :: particles_emitter    ! The emitter the particle came from
   integer         , dimension(:)   , allocatable :: particles_section    ! The section of the emitter the particles came from
+  integer         , dimension(:)   , allocatable :: particles_life       ! The time step when the particle should be removed from the system
   logical         , dimension(:)   , allocatable :: particles_collision  ! True if the particle has had a collision with an ion in the current time step
   logical         , dimension(:)   , allocatable :: particles_mask       ! Mask array used to indicate which particles should be removed
                                                                          ! .true. means that the particle is active,
@@ -136,7 +137,6 @@ module mod_global
   integer          :: steps      ! Number of time steps in the simulation
 
   logical          :: collisions = .false. ! Do ion colissions or not
-  double precision :: collisions_mean = 0  ! Mean number of collisions per time step
 
 
   ! ----------------------------------------------------------------------------
@@ -262,7 +262,7 @@ module mod_global
   namelist /input/ V_s, box_dim, time_step, steps, &
                    nrEmit, emitters_pos, emitters_dim, &
                    emitters_type, emitters_delay, EMISSION_MODE, &
-                   image_charge, N_ic_max, collisions, collisions_mean
+                   image_charge, N_ic_max, collisions
 
   ! ----------------------------------------------------------------------------
   ! Prodecure interfaces and pointers

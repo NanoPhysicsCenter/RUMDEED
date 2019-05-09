@@ -30,9 +30,9 @@ contains
   ! par_species: The type of particle, search for species_elec in mod_global to see a list
   ! step: The current time step, i.e. when the particle is emitted
   ! emit: The number of the emitter that the particle came from
-  subroutine Add_Particle(par_pos, par_vel, par_species, step, emit, opt_sec)
+  subroutine Add_Particle(par_pos, par_vel, par_species, step, emit, life, opt_sec)
     double precision, dimension(1:3), intent(in) :: par_pos, par_vel
-    integer, intent(in)                          :: par_species, step, emit
+    integer, intent(in)                          :: par_species, step, emit, life
     integer, intent(in), optional                :: opt_sec
     integer                                      :: sec
 
@@ -68,6 +68,7 @@ contains
       particles_emitter(nrPart+1) = emit
       particles_section(nrPart+1) = sec
       particles_collision(nrPart+1) = .true.
+      particles_life(nrPart+1) = life
 
       if (par_species == species_elec) then ! Electron
         particles_charge(nrPart+1) = -1.0d0*q_0

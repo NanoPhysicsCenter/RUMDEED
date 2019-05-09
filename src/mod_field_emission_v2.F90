@@ -193,7 +193,7 @@ contains
     df_avg = 0.0d0
 
     ! Loop over the electrons to be emitted.
-    !$OMP PARALLEL DO PRIVATE(s, par_pos, F, D_f, rnd, par_vel) REDUCTION(+:df_avg) SCHEDULE(GUIDED, CHUNK_SIZE)
+    !!$OMP PARALLEL DO PRIVATE(s, par_pos, F, D_f, rnd, par_vel) REDUCTION(+:df_avg) SCHEDULE(GUIDED, CHUNK_SIZE)
     do s = 1, N_round
 
       call Metropolis_Hastings_rectangle_v2(N_MH_step, emit, D_f, F, par_pos)
@@ -230,19 +230,17 @@ contains
         par_pos(3) = 1.0d0*length_scale
         par_vel = 0.0d0
         rnd = w_theta_xy(par_pos, sec) ! Get the section
-        !$OMP CRITICAL(EMIT_PAR)
+        !!$OMP CRITICAL(EMIT_PAR)
 
           ! Add a particle to the system
-          call Add_Particle(par_pos, par_vel, species_elec, step, emit, sec)
+          call Add_Particle(par_pos, par_vel, species_elec, step, emit, -1, sec)
 
           nrElecEmit = nrElecEmit + 1
           nrEmitted_emitters(emit) = nrEmitted_emitters(emit) + 1
-          !call Add_Plane_Graph_emit(par_pos, step)
-          !call Add_Plane_Graph_emitt_xy(par_pos)
-        !$OMP END CRITICAL(EMIT_PAR)
+        !!$OMP END CRITICAL(EMIT_PAR)
       end if
     end do
-    !$OMP END PARALLEL DO
+    !!$OMP END PARALLEL DO
 
     df_avg = df_avg / N_sup
 
