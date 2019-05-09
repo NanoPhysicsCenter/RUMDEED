@@ -92,11 +92,12 @@ contains
           call random_number(rnd)
           if (rnd < alpha) then
             ! Pick a new random direction for the particle
-            call random_number(par_vec)
-            par_vec(1:2) = par_vec(1:2) - 0.5d0
-            par_vec(3) = par_vec(3) - 0.25d0
-            !par_vec = par_vec - 0.5d0
-            par_vec = par_vec / sqrt(par_vec(1)**2 + par_vec(2)**2 + par_vec(3)**2)
+            par_vec = Get_Angle_Vec(20.0d0, KE, particles_cur_vel(:, i))
+            !call random_number(par_vec)
+            !par_vec(1:2) = par_vec(1:2) - 0.5d0
+            !par_vec(3) = par_vec(3) - 0.25d0
+            !!par_vec = par_vec - 0.5d0
+            !par_vec = par_vec / sqrt(par_vec(1)**2 + par_vec(2)**2 + par_vec(3)**2)
 
             ! Set the new velocity
             call random_number(rnd)
@@ -172,6 +173,54 @@ contains
              step, cur_time, nrColl, nrIon, count_n, &
              (mean_path_avg/length_scale), (mean_actual_avg/length_scale)
   end subroutine Do_Collisions_4
+
+  ! This function returns a normalized direction vector for the ejected electron
+  ! The angle between this vector and the velocity vector of the incident electron
+  ! is approximatly distrubted according the experimental values.
+  ! See:
+  ! Dobly Differential Cross Section for Electron Scattered by Nitrogen
+  ! J. C. Nogueira, M. A. Eschiapati Ferreira and Ronaldo S. Barbieri
+  module function Get_Angle_Vec(W, T, par_vel)
+    double precision, dimension(1:3)             :: Get_Angle_Vec
+    double precision, intent(in)                 :: T, W
+    double precision, dimension(1:3), intent(in) :: par_vel
+    logical                                      :: found = .false.
+    double precision, parameter                  :: a = -430.5d0, b = -0.5445d0, c = 89.32d0
+    double precision, parameter                  :: sigma = 48.0d0
+    double precision                             :: angle_max, angle
+    double precision                             :: m_factor, rnd, alpha
+    double precision                             :: dot_p, len_vec, len_vel
+    double precision, dimension(1:3)             :: par_vec
+
+    angle_max = a*T**b + c
+
+    m_factor = 1.0d0/(sqrt(2.0d0*pi)*sigma)
+
+    do while (found .eqv. .false.)
+      call random_number(par_vec)
+      dot_p = par_vel(1)*par_vec(1) + par_vel(2)*par_vec(2) + par_vel(3)*par_vec(3)
+      len_vec = sqrt(par_vec(1)**2 + par_vec(2)**2 + par_vec(3)**2)
+      len_vel = sqrt(par_vel(1)**2 + par_vel(2)**2 + par_vel(3)**2)
+
+      angle = acos(dot_p/(len_vec*len_vel)) * pi/180.0d0
+
+      alpha = normal_dist(angle_max, sigma, angle) / m_factor
+
+      call random_number(rnd)
+      if (rnd < alpha) then
+        found = .true.
+      end if
+    end do
+
+    Get_Angle_Vec = par_vec / len_vec
+  end function Get_Angle_Vec
+
+  ! Normal distribtuion
+  double precision function normal_dist(mu, sigma, x)
+    double precision, intent(in) :: mu, sigma, x
+
+    normal_dist = 1.0d0/(sqrt(2.0d0*pi)*sigma)*exp(-(x-mu)**2/(2.0d0*sigma**2))
+  end function
 
 
     ! --------------------------------------------------------------------------
