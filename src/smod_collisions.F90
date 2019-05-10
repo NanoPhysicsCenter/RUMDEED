@@ -22,8 +22,7 @@ contains
   ! Mean free path approch
   module subroutine Do_Collisions_4(step)
     integer, intent(in)              :: step
-    !double precision, parameter      :: mean_path = 1000.0d0*length_scale ! Mean free path
-    double precision, dimension(1:3) :: cur_pos, prev_pos, par_vec
+    double precision, dimension(1:3) :: cur_pos, prev_pos, par_vec, old_vel
     double precision, parameter      :: v2_min      = (2.0d0*q_0*0.1d0/m_0) ! Minimum velocity squared
     double precision, parameter      :: v2_max      = (2.0d0*q_0*5000.0d0/m_0) ! Maximum velocity squared
     double precision, parameter      :: T_temp = 293.15d0 ! Temperature in Kelvin
@@ -46,28 +45,35 @@ contains
     mean_path_avg = 0.0d0
     mean_actual_avg = 0.0d0
 
-    if (nrElec > 0) then
+    if (nrPart > 0) then
 
-    !$OMP PARALLEL DO PRIVATE(i, cur_pos, prev_pos, d, alpha, rnd, par_vec, vel2, KE, mean_path, cross_tot, cross_ion) &
+    !$OMP PARALLEL DO DEFAULT(SHARED) &
+    !$OMP& PRIVATE(i, cur_pos, prev_pos, d, alpha, rnd, par_vec, vel2, KE, mean_path, cross_tot, cross_ion) &
     !$OMP& REDUCTION(+:nrColl, count_n, mean_path_avg, nrIon) SCHEDULE(GUIDED, CHUNK_SIZE)
     do i = 1, nrPart
       if (particles_species(i) /= species_elec) then
-        if (particles_life(i) >= step) then
-          particles_mask(i) = .false. ! Mark the ion to be removed, it has reached the end of its life.
+        if (step >= particles_life(i)) then
+          call Mark_Particles_Remove(i, remove_top) ! Mark the ion to be removed, it has reached the end of its life.
         end if
       else
 
         cur_pos(:) = particles_cur_pos(:, i)
         prev_pos(:) = particles_prev_pos(:, i)
         !prev_pos(:) = particles_last_col_pos(:, i)
+        old_vel = particles_cur_vel(:, i)
 
         d = sqrt( (cur_pos(1) - prev_pos(1))**2 + (cur_pos(2) - prev_pos(2))**2 + (cur_pos(3) - prev_pos(3))**2 )
-        vel2 = particles_cur_vel(1, i)**2 + particles_cur_vel(2, i)**2 + particles_cur_vel(3, i)**2
+        vel2 = old_vel(1)**2 + old_vel(2)**2 + old_vel(3)**2
       
         ! Check if we do a collision or not
-        if ((vel2 > v2_min) .and. (vel2 < v2_max)) then
+        !if ((vel2 > v2_min) .and. (vel2 < v2_max)) then
+        if (vel2 > v2_min) then
 
-          KE = 0.5d0*m_0*vel2/q_0 ! Energy in eV
+          if (vel2 > v2_max) then
+            KE = 0.5d0*m_0*v2_max/q_0
+          else
+            KE = 0.5d0*m_0*vel2/q_0 ! Energy in eV
+          end if
 
           cross_tot = Find_Cross_tot_data(KE)
 
@@ -76,28 +82,27 @@ contains
           count_n = count_n + 1
 
           alpha = d/mean_path
-          if (alpha > 1.0d0) then
-            print *, 'WARNING: alpha > 1 in mean path'
-            print *, mean_path
-            print *, mean_path/1.0E-9
-            print *, n_d
-            print *, cross_tot
-            print *, KE
-            print *, sqrt(vel2)
-            print *, d
-            !pause
-          end if
+          ! if (alpha > 1.0d0) then
+          !   print *, 'WARNING: alpha > 1 in mean path'
+          !   print *, mean_path
+          !   print *, mean_path/1.0E-9
+          !   print *, n_d
+          !   print *, cross_tot
+          !   print *, KE
+          !   print *, sqrt(vel2)
+          !   print *, d
+          !   !pause
+          ! end if
 
           ! Check if we do a collision or not
           call random_number(rnd)
           if (rnd < alpha) then
             ! Pick a new random direction for the particle
-            par_vec = Get_Angle_Vec(20.0d0, KE, particles_cur_vel(:, i))
-            !call random_number(par_vec)
-            !par_vec(1:2) = par_vec(1:2) - 0.5d0
-            !par_vec(3) = par_vec(3) - 0.25d0
-            !!par_vec = par_vec - 0.5d0
-            !par_vec = par_vec / sqrt(par_vec(1)**2 + par_vec(2)**2 + par_vec(3)**2)
+            call random_number(par_vec)
+            par_vec(1:2) = par_vec(1:2) - 0.5d0
+            par_vec(3) = par_vec(3) - 0.25d0
+            !par_vec = par_vec - 0.5d0
+            par_vec = par_vec / sqrt(par_vec(1)**2 + par_vec(2)**2 + par_vec(3)**2)
 
             ! Set the new velocity
             call random_number(rnd)
@@ -107,8 +112,8 @@ contains
             call random_number(rnd)
             !par_vec = par_vec*sqrt(vel2)*(1.0d0 - rnd)
 
-            rnd = rnd*0.85d0 + (1.0d0-0.85d0)
-            par_vec = par_vec*sqrt(2.0d0*q_0*rnd*40.0d0/m_0) ! Give the electron an initial energy between 6 and 40 eV
+            rnd = rnd*0.80d0 + (1.0d0-0.80d0)
+            par_vec = par_vec*sqrt(2.0d0*q_0*rnd*40.0d0/m_0) ! Give the electron an initial energy between 8 and 40 eV
 
             !prev_pos(:) = particles_last_col_pos(:, i)
             !d = sqrt( (cur_pos(1) - prev_pos(1))**2 + (cur_pos(2) - prev_pos(2))**2 + (cur_pos(3) - prev_pos(3))**2 )
@@ -119,27 +124,36 @@ contains
             
             alpha = cross_ion/cross_tot
             !alpha = 0.20d0
-            if (alpha > 1.0d0) then
-              print *, 'WARNING: alpha > 1 in cross section'
-            end if
+            ! if (alpha > 1.0d0) then
+            !   print *, 'WARNING: alpha > 1 in cross section'
+            ! end if
             
             ! Check if the collision ionizes the N2 or not  
             call random_number(rnd)
             if (rnd < alpha) then
 
+              ! Pick a position for the new electron to appear at some where close to where the collision occurred
+              call random_number(prev_pos)
+              prev_pos = prev_pos - 0.5d0
+              cur_pos = cur_pos + prev_pos*length_scale
+
+              ! Pick a direction for the new electron to go in
+              par_vec = Get_Angle_Vec(KE, KE, old_vel)
+
+              !$OMP CRITICAL
+              ! Add the new electron to the system
+              call Add_Particle(cur_pos, par_vec, species_elec, step, 1, -1) ! Electron
+              !$OMP END CRITICAL
+
+              par_vec = 0.0d0
+
+              ! Pick a position for the ion to appear at some where close to where the collision occurred
               call random_number(prev_pos)
               prev_pos = prev_pos - 0.5d0
               cur_pos = cur_pos + prev_pos*length_scale
 
               !$OMP CRITICAL
-              !call Add_Particle(cur_pos, step, par_vec)
-              call Add_Particle(cur_pos, par_vec, species_elec, step, 1, -1) ! Electron
-
-              par_vec = 0.0d0
-              call random_number(prev_pos)
-              prev_pos = prev_pos - 0.5d0
-              cur_pos = cur_pos + prev_pos*length_scale
-              !cur_pos(3) = cur_pos(3) - 1.0d0*length_scale
+              ! Add the new positively charged ion to the system
               call Add_Particle(cur_pos, par_vec, species_hole, step, 1, step+1384) ! Ion
               !$OMP END CRITICAL
 
@@ -151,11 +165,11 @@ contains
           end if
         else
           KE = 0.5d0*m_0*vel2/q_0 ! Energy in eV
-          if (KE > 0.1d0) then
-            print *, 'Outside range'
-            print *, KE
-            print *, ''
-          end if
+          ! if (KE > 0.1d0) then
+          !   print *, 'Outside range'
+          !   print *, KE
+          !   print *, ''
+          ! end if
         end if
       end if
     end do
@@ -184,35 +198,49 @@ contains
     double precision, dimension(1:3)             :: Get_Angle_Vec
     double precision, intent(in)                 :: T, W
     double precision, dimension(1:3), intent(in) :: par_vel
-    logical                                      :: found = .false.
     double precision, parameter                  :: a = -430.5d0, b = -0.5445d0, c = 89.32d0
     double precision, parameter                  :: sigma = 48.0d0
     double precision                             :: angle_max, angle
     double precision                             :: m_factor, rnd, alpha
     double precision                             :: dot_p, len_vec, len_vel
     double precision, dimension(1:3)             :: par_vec
+    integer                                      :: n_tries = 0
 
-    angle_max = a*T**b + c
+    if (T < 100.d0) then
+      angle_max = a*100.0d0**b + c
+    else
+      angle_max = a*T**b + c
+    end if
 
     m_factor = 1.0d0/(sqrt(2.0d0*pi)*sigma)
 
-    do while (found .eqv. .false.)
+    do
       call random_number(par_vec)
       dot_p = par_vel(1)*par_vec(1) + par_vel(2)*par_vec(2) + par_vel(3)*par_vec(3)
       len_vec = sqrt(par_vec(1)**2 + par_vec(2)**2 + par_vec(3)**2)
       len_vel = sqrt(par_vel(1)**2 + par_vel(2)**2 + par_vel(3)**2)
 
-      angle = acos(dot_p/(len_vec*len_vel)) * pi/180.0d0
+      angle = acos(dot_p/(len_vec*len_vel)) * 180.0d0/pi
 
       alpha = normal_dist(angle_max, sigma, angle) / m_factor
 
       call random_number(rnd)
       if (rnd < alpha) then
-        found = .true.
+        exit ! Exit the loop
+      else
+        n_tries = n_tries + 1
+        if (n_tries >= 10000) then
+          print *, 'n_tries > 10000'
+          print *, angle
+          print *, angle_max
+          print *, alpha
+          print *, T
+          pause
+        end if
       end if
     end do
 
-    Get_Angle_Vec = par_vec / len_vec
+    Get_Angle_Vec = (par_vec / len_vec)
   end function Get_Angle_Vec
 
   ! Normal distribtuion
@@ -334,7 +362,7 @@ contains
     if ((energy > 180.0d0) .and. (energy <= 3000.0d0)) then
       Find_Cross_ion_data = (a*exp(b*energy) + c*exp(d*energy)) * 1.0d-20
     else
-      i = BinarySearch(cross_ion_energy, energy)
+      i = BinarySearch(cross_ion_energy, energy, i1, i2)
       y1 = cross_ion_data(i1)
       y2 = cross_ion_data(i2)
       x1 = cross_ion_energy(i1)

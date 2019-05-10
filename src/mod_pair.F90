@@ -67,7 +67,6 @@ contains
       particles_species(nrPart+1) = par_species
       particles_emitter(nrPart+1) = emit
       particles_section(nrPart+1) = sec
-      particles_collision(nrPart+1) = .true.
       particles_life(nrPart+1) = life
 
       if (par_species == species_elec) then ! Electron
@@ -83,7 +82,7 @@ contains
       ! Update the number of particles in the system
       nrElecHole = nrElec + nrHole
       nrPart = nrElecHole
-      endElecHoles = nrPart
+      !endElecHoles = nrPart
 
       ! Write out the x and y position of the emitted particle
       ! along with which emitter and section it came from.
@@ -207,8 +206,8 @@ contains
         !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(m, k)
         !$OMP SINGLE
 
-        k = startElecHoles
-        m = endElecHoles
+        k = 1
+        m = nrPart
 
         !$OMP TASK FIRSTPRIVATE(k, m) SHARED(particles_cur_pos, particles_mask)
         !call compact_array_2D_double_verbal(particles_cur_pos, particles_mask, k, m)
@@ -217,6 +216,10 @@ contains
 
         !$OMP TASK FIRSTPRIVATE(k, m) SHARED(particles_prev_pos, particles_mask)
         call compact_array(particles_prev_pos, particles_mask, k, m)
+        !$OMP END TASK
+
+        !$OMP TASK FIRSTPRIVATE(k, m) SHARED(particles_last_col_pos, particles_mask)
+        call compact_array(particles_last_col_pos, particles_mask, k, m)
         !$OMP END TASK
 
         !$OMP TASK FIRSTPRIVATE(k, m) SHARED(particles_cur_vel, particles_mask)
@@ -254,6 +257,10 @@ contains
 
         !$OMP TASK FIRSTPRIVATE(k, m) SHARED(particles_section, particles_mask)
         call compact_array(particles_section, particles_mask, k, m)
+        !$OMP END TASK
+
+        !$OMP TASK FIRSTPRIVATE(k, m) SHARED(particles_life, particles_mask)
+        call compact_array(particles_life, particles_mask, k, m)
         !$OMP END TASK
 
         ! Wait for all tasks to finish
@@ -294,8 +301,8 @@ contains
       nrElecHole = nrElec + nrHole
       nrPart = nrElecHole
 
-      startElecHoles = 1
-      endElecHoles = startElecHoles + nrElecHole - 1
+      !startElecHoles = 1
+      !endElecHoles = startElecHoles + nrElecHole - 1
 
       particles_mask = .true. ! Reset the mask. .true. means all particles are active.
 

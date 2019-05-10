@@ -80,7 +80,7 @@ contains
     integer             :: i
 
     !$OMP PARALLEL DO PRIVATE(i) SCHEDULE(GUIDED, CHUNK_SIZE)
-    do i = startElecHoles, endElecHoles
+    do i = 1, nrPart
       ! Verlet
       particles_prev_pos(:, i) = particles_cur_pos(:, i) ! Store the previous position
       particles_cur_pos(:, i)  = particles_cur_pos(:, i) + particles_cur_vel(:, i)*time_step &
@@ -130,8 +130,8 @@ contains
 
     avg_vel(:) = 0.0d0
 
-    !$OMP PARALLEL DO PRIVATE(i, q, k) REDUCTION(+:avg_vel) SCHEDULE(GUIDED, CHUNK_SIZE)
-    do i = startElecHoles, endElecHoles
+    !$OMP PARALLEL DO PRIVATE(i, q, k, emit, sec) REDUCTION(+:avg_vel) SCHEDULE(GUIDED, CHUNK_SIZE)
+    do i = 1, nrPart
       ! Verlet
       particles_cur_vel(:, i) = particles_cur_vel(:, i) &
                             & + 0.5d0*( particles_prev_accel(:, i) &
@@ -147,6 +147,17 @@ contains
       k = particles_species(i)
       emit = particles_emitter(i)
       sec  = particles_section(i)
+
+      if ((emit <= 0) .or. (k <= 0)) then
+        print *, 'Emit <= 0 .or. k <= 0'
+        print *, i
+        print *, q
+        print *, k
+        print *, sec
+        print *, emit
+        print *, nrPart
+        pause
+      end if
 
       ! We use OMP ATOMIC here because the index k is not a loop index
       !$OMP ATOMIC UPDATE

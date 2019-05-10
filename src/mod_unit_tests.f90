@@ -58,8 +58,8 @@ contains
     nrHole      = 0
     nrElecHole  = 0
 
-    startElecHoles = 1
-    endElecHoles   = 0
+    !startElecHoles = 1
+    !endElecHoles   = 0
 
 
     nrPart_remove = 0

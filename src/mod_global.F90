@@ -95,7 +95,6 @@ module mod_global
   integer         , dimension(:)   , allocatable :: particles_emitter    ! The emitter the particle came from
   integer         , dimension(:)   , allocatable :: particles_section    ! The section of the emitter the particles came from
   integer         , dimension(:)   , allocatable :: particles_life       ! The time step when the particle should be removed from the system
-  logical         , dimension(:)   , allocatable :: particles_collision  ! True if the particle has had a collision with an ion in the current time step
   logical         , dimension(:)   , allocatable :: particles_mask       ! Mask array used to indicate which particles should be removed
                                                                          ! .true. means that the particle is active,
                                                                          ! .false. means it is inactive and should be removed
@@ -160,8 +159,8 @@ module mod_global
   integer :: nrElec_remove ! Number of electrons to be removed
   integer :: nrHole_remove ! Number of holes to be removed
 
-  integer :: startElecHoles
-  integer :: endElecHoles
+  !integer :: startElecHoles
+  !integer :: endElecHoles
 
   integer, dimension(:), allocatable :: nrElec_remove_top_emit
 

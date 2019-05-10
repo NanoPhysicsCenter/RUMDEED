@@ -325,7 +325,6 @@ contains
     allocate(particles_emitter(1:MAX_PARTICLES))
     allocate(particles_section(1:MAX_PARTICLES))
     allocate(particles_life(1:MAX_PARTICLES))
-    allocate(particles_collision(1:MAX_PARTICLES))
 
     allocate(life_time(1:MAX_LIFE_TIME, 1:2))
     allocate(ramo_current(1:nrSpecies))
@@ -363,8 +362,8 @@ contains
     nrHole      = 0
     nrElecHole  = 0
 
-    startElecHoles = 1
-    endElecHoles   = 0
+    !startElecHoles = 1
+    !endElecHoles   = 0
 
 
     nrPart_remove = 0
@@ -697,7 +696,6 @@ contains
     deallocate(particles_emitter)
     deallocate(particles_section)
     deallocate(particles_life)
-    deallocate(particles_collision)
 
     deallocate(emitters_pos)
     deallocate(emitters_dim)
