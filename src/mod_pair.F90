@@ -269,10 +269,11 @@ contains
         call compact_array(particles_life, particles_mask, k, m)
         !$OMP END TASK
 
+        !$OMP END SINGLE NOWAIT
+
         ! Wait for all tasks to finish
         !$OMP TASKWAIT
 
-        !$OMP END SINGLE
         !$OMP END PARALLEL
       end if
 
