@@ -203,7 +203,11 @@ contains
     if ((nrPart_remove > 0) .and. (nrPart > 0)) then ! Check if we have some thing to do
 
       if ((nrPart - nrPart_remove) > 0) then ! Check if we can skip this
-        !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(m, k)
+        !$OMP PARALLEL DEFAULT(NONE) PRIVATE(m, k) &
+        !$OMP& SHARED(particles_mask, particles_cur_pos, particles_prev_pos, particles_last_col_pos) &
+        !$OMP& SHARED(particles_cur_vel, particles_cur_accel, particles_prev_accel, particles_prev2_accel) &
+        !$OMP& SHARED(particles_step, particles_species, step, particles_mass, particles_charge) &
+        !$OMP& SHARED(particles_emitter, particles_section, particles_life, nrPart, life_time)
         !$OMP SINGLE
 
         k = 1

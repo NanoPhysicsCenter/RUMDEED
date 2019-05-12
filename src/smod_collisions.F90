@@ -47,8 +47,10 @@ contains
 
     if (nrPart > 0) then
 
-    !$OMP PARALLEL DO DEFAULT(SHARED) &
-    !$OMP& PRIVATE(i, cur_pos, prev_pos, d, alpha, rnd, par_vec, vel2, KE, mean_path, cross_tot, cross_ion) &
+    !$OMP PARALLEL DO DEFAULT(NONE) &
+    !$OMP& PRIVATE(i, cur_pos, prev_pos, d, alpha, rnd, par_vec, vel2, KE, mean_path, cross_tot, cross_ion, old_vel) &
+    !$OMP& SHARED(nrPart, particles_species, particles_life, step, particles_cur_pos) &
+    !$OMP& SHARED(particles_prev_pos, particles_cur_vel) &
     !$OMP& REDUCTION(+:nrColl, count_n, mean_path_avg, nrIon) SCHEDULE(GUIDED, CHUNK_SIZE)
     do i = 1, nrPart
       if (particles_species(i) /= species_elec) then

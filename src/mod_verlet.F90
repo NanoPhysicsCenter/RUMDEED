@@ -79,7 +79,10 @@ contains
     integer, intent(in) :: step
     integer             :: i
 
-    !$OMP PARALLEL DO PRIVATE(i) SCHEDULE(GUIDED, CHUNK_SIZE)
+    !$OMP PARALLEL DO DEFAULT(NONE) PRIVATE(i) &
+    !$OMP& SHARED(particles_prev_pos, particles_cur_pos, particles_cur_vel, particles_cur_accel) &
+    !$OMP& SHARED(time_step, time_step2, particles_prev2_accel, particles_prev_accel, ptr_Check_Boundary)
+    !$OMP& SCHEDULE(GUIDED, CHUNK_SIZE)
     do i = 1, nrPart
       ! Verlet
       particles_prev_pos(:, i) = particles_cur_pos(:, i) ! Store the previous position
@@ -130,7 +133,11 @@ contains
 
     avg_vel(:) = 0.0d0
 
-    !$OMP PARALLEL DO PRIVATE(i, q, k, emit, sec) REDUCTION(+:avg_vel) SCHEDULE(GUIDED, CHUNK_SIZE)
+    !$OMP PARALLEL DO DEFAULT(NONE) PRIVATE(i, q, k, emit, sec) &
+    !$OMP& SHARED(nrPart, particles_cur_vel, particles_prev_accel, particles_cur_accel, time_step) &
+    !$OMP& SHARED(ramo_current, ramo_current_emit, avg_vel, E_zunit, particles_section, particles_charge) &
+    !$OMP& SHARED(particles_species, particles_emitter)
+    !$OMP& REDUCTION(+:avg_vel) SCHEDULE(GUIDED, CHUNK_SIZE)
     do i = 1, nrPart
       ! Verlet
       particles_cur_vel(:, i) = particles_cur_vel(:, i) &
@@ -147,17 +154,6 @@ contains
       k = particles_species(i)
       emit = particles_emitter(i)
       sec  = particles_section(i)
-
-      if ((emit <= 0) .or. (k <= 0)) then
-        print *, 'Emit <= 0 .or. k <= 0'
-        print *, i
-        print *, q
-        print *, k
-        print *, sec
-        print *, emit
-        print *, nrPart
-        pause
-      end if
 
       ! We use OMP ATOMIC here because the index k is not a loop index
       !$OMP ATOMIC UPDATE
@@ -188,8 +184,11 @@ contains
     integer                          :: i, j, k_1, k_2
 
     ! We do not use GUIDED scheduling in OpenMP here because the inner loop changes size.
-    !$OMP PARALLEL DO PRIVATE(i, j, k_1, k_2, pos_1, pos_2, diff, r), &
-    !$OMP& PRIVATE(force_E, force_c, force_ic, force_ic_N, force_ic_self, im_1, q_1, im_2, q_2, pre_fac_c) SCHEDULE(DYNAMIC, 4)
+    !$OMP PARALLEL DO DEFAULT(NONE) PRIVATE(i, j, k_1, k_2, pos_1, pos_2, diff, r) &
+    !$OMP& PRIVATE(force_E, force_c, force_ic, force_ic_N, force_ic_self, im_1, q_1, im_2, q_2, pre_fac_c) &
+    !$OMP SHARED(nrPart, particles_cur_pos, particles_mass, particles_species, ptr_field_E) &
+    !$OMP SHARED(ptr_Image_Charge_effect, particles_cur_accel, particles_charge)
+    !$OMP& SCHEDULE(DYNAMIC, 4)
     do i = 1, nrPart
       ! Information about the particle we are calculating the force/acceleration on
       pos_1 = particles_cur_pos(:, i)
@@ -293,7 +292,8 @@ contains
     force_tot = ptr_field_E(pos_1)
     !print *, force_tot
 
-    !$OMP PARALLEL DO PRIVATE(j, pos_2, diff, r, force_c, force_ic, q_2, pre_fac_c) &
+    !$OMP PARALLEL DO DEFAULT(NONE) PRIVATE(j, pos_2, diff, r, force_c, force_ic, q_2, pre_fac_c) &
+    !$OMP& SHARED(nrPart, particles_cur_pos, particles_charge, ptr_Image_Charge_effect, pos_1) &
     !$OMP& REDUCTION(+:force_tot) SCHEDULE(GUIDED, CHUNK_SIZE)
     do j = 1, nrPart
 
