@@ -18,8 +18,12 @@ submodule (mod_verlet) smod_collisions
 
 contains
   ! ----------------------------------------------------------------------------
-  ! Ion collisions
-  ! Mean free path approch
+  ! Ion collisions, Mean free path approach.
+  ! Simulate collisions with N2 molecules. We read the collision cross section and use it
+  ! to calculate the mean free path of the electrons. The distance the electrons travel
+  ! in one time step divided with the mean free path is used as a probability to
+  ! determine if a collision occurs. The density of N2 molecules is calulated from
+  ! the temperature and pressure.
   module subroutine Do_Ion_Collisions(step)
     integer, intent(in)              :: step
     double precision, dimension(1:3) :: cur_pos, prev_pos, par_vec, old_vel
