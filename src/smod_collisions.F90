@@ -206,7 +206,8 @@ contains
     double precision, dimension(1:3)             :: par_vec
     integer                                      :: n_tries
 
-    m_factor = 1.0d0/(sqrt(2.0d0*pi)*sigma)
+    !m_factor = 1.0d0/(sqrt(2.0d0*pi)*sigma)
+    m_factor = folded_normal_dist(mu, sigma, mu)
     n_tries = 0
 
     do
@@ -217,7 +218,7 @@ contains
 
       angle = acos(dot_p/(len_vec*len_vel)) * 180.0d0/pi
 
-      alpha = normal_dist(mu, sigma, angle) / m_factor
+      alpha = folded_normal_dist(mu, sigma, angle) / m_factor
 
       call random_number(rnd)
       if (rnd < alpha) then
@@ -262,7 +263,8 @@ contains
       angle_max = a*T**b + c
     end if
 
-    m_factor = 1.0d0/(sqrt(2.0d0*pi)*sigma)
+    !m_factor = 1.0d0/(sqrt(2.0d0*pi)*sigma)
+    m_factor = folded_normal_dist(angle_max, sigma, angle_max)
     n_tries = 0
 
     do
@@ -273,7 +275,7 @@ contains
 
       angle = acos(dot_p/(len_vec*len_vel)) * 180.0d0/pi
 
-      alpha = normal_dist(angle_max, sigma, angle) / m_factor
+      alpha = folded_normal_dist(angle_max, sigma, angle) / m_factor
 
       call random_number(rnd)
       if (rnd < alpha) then
@@ -295,7 +297,15 @@ contains
     double precision, intent(in) :: mu, sigma, x
 
     normal_dist = 1.0d0/(sqrt(2.0d0*pi)*sigma)*exp(-(x-mu)**2/(2.0d0*sigma**2))
-  end function
+  end function normal_dist
+
+  double precision function folded_normal_dist(mu, sigma, x)
+    double precision, intent(in) :: mu, sigma, x
+    double precision             :: sigma2
+
+    sigma2 = sigma**2
+    folded_normal_dist = sqrt(2.0d0/(pi*sigma2)) * exp(-1.0d0*(mu**2 + x**2)/(2.0d0*sigma2))*cosh(mu*x/sigma2)
+  end function folded_normal_dist
 
 
     ! --------------------------------------------------------------------------
