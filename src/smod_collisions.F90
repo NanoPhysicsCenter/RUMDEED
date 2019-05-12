@@ -42,6 +42,7 @@ contains
     integer                          :: i, nrColl, IFAIL, nrIon
     double precision                 :: KE ! Kinetic energy
     double precision                 :: cur_time
+    integer                          :: ion_life_time
 
     nrColl = 0
     nrIon = 0
@@ -52,9 +53,10 @@ contains
     if (nrPart > 0) then
 
     !$OMP PARALLEL DO DEFAULT(NONE) &
-    !$OMP& PRIVATE(i, cur_pos, prev_pos, d, alpha, rnd, par_vec, vel2, KE, mean_path, cross_tot, cross_ion, old_vel) &
+    !$OMP& PRIVATE(i, cur_pos, prev_pos, d, alpha, rnd, par_vec, vel2, KE, mean_path, cross_tot, cross_ion) &
+    !$OMP& PRIVATE(old_vel, ion_life_time) &
     !$OMP& SHARED(nrPart, particles_species, particles_life, step, particles_cur_pos) &
-    !$OMP& SHARED(particles_prev_pos, particles_cur_vel) &
+    !$OMP& SHARED(particles_prev_pos, particles_cur_vel, time_step) &
     !$OMP& REDUCTION(+:nrColl, count_n, mean_path_avg, nrIon) SCHEDULE(GUIDED, CHUNK_SIZE)
     do i = 1, nrPart
       if (particles_species(i) /= species_elec) then
@@ -159,9 +161,16 @@ contains
               prev_pos = prev_pos - 0.5d0
               cur_pos = cur_pos + prev_pos*length_scale
 
+              ! Calculate the life time of the Ion
+              ! This number is drawn from an exponential distribution
+              ! The half life is 0.13843690559395497 ps
+              alpha = -0.13843690559395497E-12 / time_step
+              call random_number(rnd)
+              ion_life_time = NINT(alpha*log(1.0d0 - rnd))
+
               !$OMP CRITICAL
               ! Add the new positively charged ion to the system
-              call Add_Particle(cur_pos, par_vec, species_hole, step, 1, step+1384) ! Ion
+              call Add_Particle(cur_pos, par_vec, species_hole, step, 1, step+ion_life_time) ! Ion
               !$OMP END CRITICAL
 
               nrIon = nrIon + 1
@@ -292,13 +301,15 @@ contains
     Get_Ejected_Vec = (par_vec / len_vec)
   end function Get_Ejected_Vec
 
-  ! Normal distribtuion
+  ! Normal distribution
   double precision function normal_dist(mu, sigma, x)
     double precision, intent(in) :: mu, sigma, x
 
     normal_dist = 1.0d0/(sqrt(2.0d0*pi)*sigma)*exp(-(x-mu)**2/(2.0d0*sigma**2))
   end function normal_dist
 
+  ! Folded normal distribution
+  ! https://en.wikipedia.org/wiki/Folded_normal_distribution
   double precision function folded_normal_dist(mu, sigma, x)
     double precision, intent(in) :: mu, sigma, x
     double precision             :: sigma2
