@@ -195,8 +195,8 @@ contains
     double precision, dimension(1:3)             :: Get_Injected_Vec
     double precision, dimension(1:3), intent(in) :: par_vel
     double precision, intent(in)                 :: T ! Energy in eV
-    double precision, parameter                  :: mu = 5.0d0, sigma = 25.0d0
-    double precision                             :: angle_max, angle
+    double precision, parameter                  :: mu = 5.0d0, sigma = 45.0d0
+    double precision                             :: angle
     double precision                             :: m_factor, rnd, alpha
     double precision                             :: dot_p, len_vec, len_vel
     double precision, dimension(1:3)             :: par_vec
@@ -220,7 +220,7 @@ contains
       else
         n_tries = n_tries + 1
         if (n_tries >= 10000) then ! This should never take this long
-          print *, 'n_tries > 10000'
+          print *, 'n_tries > 10000 (Injected)'
           exit
         end if
       end if
@@ -271,7 +271,7 @@ contains
       else
         n_tries = n_tries + 1
         if (n_tries >= 10000) then ! This should never take this long
-          print *, 'n_tries > 10000'
+          print *, 'n_tries > 10000 (Ejected)'
           exit
         end if
       end if
