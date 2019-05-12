@@ -246,6 +246,7 @@ module mod_global
 
   ! Emission density (binary files)
   integer :: ud_density_emit
+  integer :: ud_density_ion
 
   ! Absorption density (binary files)
   integer :: ud_density_absorb_top

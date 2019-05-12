@@ -489,7 +489,14 @@ contains
     open(newunit=ud_density_emit, iostat=IFAIL, file='out/density_emit.bin', &
     status='REPLACE', action='WRITE', access='STREAM')
     if (IFAIL /= 0) then
-      print *, 'Vacuum: Failed to open file density_emit.dt. ABORTING'
+      print *, 'Vacuum: Failed to open file density_emit.bin. ABORTING'
+      stop
+    end if
+
+    open(newunit=ud_density_ion, iostat=IFAIL, file='out/density_ion.bin', &
+    status='REPLACE', action='WRITE', access='STREAM')
+    if (IFAIL /= 0) then
+      print *, 'Vacuum: Failed to open file density_ion.bin. ABORTING'
       stop
     end if
 
@@ -498,14 +505,14 @@ contains
     open(newunit=ud_density_absorb_top, iostat=IFAIL, file='out/density_absorb_top.bin', &
          status='REPLACE', action='WRITE', access='STREAM')
     if (IFAIL /= 0) then
-      print *, 'Vacuum: Failed to open file density_absorb_top.dt. ABORTING'
+      print *, 'Vacuum: Failed to open file density_absorb_top.bin. ABORTING'
       stop
     end if
 
     open(newunit=ud_density_absorb_bot, iostat=IFAIL, file='out/density_absorb_bot.bin', &
          status='REPLACE', action='WRITE', access='STREAM')
     if (IFAIL /= 0) then
-      print *, 'Vacuum: Failed to open file density_absorb_bot.dt. ABORTING'
+      print *, 'Vacuum: Failed to open file density_absorb_bin.dt. ABORTING'
       stop
     end if
 
@@ -574,6 +581,7 @@ contains
     flush(ud_debug)
 
     flush(ud_density_emit)
+    flush(ud_density_ion)
 
     flush(ud_density_absorb_top)
     flush(ud_density_absorb_bot)
@@ -689,6 +697,7 @@ contains
     close(unit=ud_debug, status='keep')
 
     close(unit=ud_density_emit, status='keep')
+    close(unit=ud_density_ion, status='keep')
     close(unit=ud_density_absorb_top, status='keep')
     close(unit=ud_density_absorb_bot, status='keep')
 

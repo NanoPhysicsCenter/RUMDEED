@@ -20,7 +20,7 @@ contains
   ! ----------------------------------------------------------------------------
   ! Ion collisions
   ! Mean free path approch
-  module subroutine Do_Collisions_4(step)
+  module subroutine Do_Ion_Collisions(step)
     integer, intent(in)              :: step
     double precision, dimension(1:3) :: cur_pos, prev_pos, par_vec, old_vel
     double precision, parameter      :: v2_min      = (2.0d0*q_0*0.1d0/m_0) ! Minimum velocity squared
@@ -100,9 +100,10 @@ contains
           call random_number(rnd)
           if (rnd < alpha) then
             ! Pick a new random direction for the particle
-            call random_number(par_vec)
-            par_vec(1:2) = par_vec(1:2) - 0.5d0
-            par_vec(3) = par_vec(3) - 0.25d0
+            par_vec = Get_Injected_Vec(KE, old_vel)
+            !call random_number(par_vec)
+            !par_vec(1:2) = par_vec(1:2) - 0.5d0
+            !par_vec(3) = par_vec(3) - 0.25d0
             !par_vec = par_vec - 0.5d0
             par_vec = par_vec / sqrt(par_vec(1)**2 + par_vec(2)**2 + par_vec(3)**2)
 
@@ -140,7 +141,7 @@ contains
               cur_pos = cur_pos + prev_pos*length_scale
 
               ! Pick a direction for the new electron to go in
-              par_vec = Get_Angle_Vec(KE, KE, old_vel)
+              par_vec = Get_Ejected_Vec(KE, KE, old_vel)
 
               !$OMP CRITICAL
               ! Add the new electron to the system
@@ -188,7 +189,45 @@ contains
     write(ud_coll, '(i6, tr2, ES12.4, tr2, i6, tr2, i6, tr2, i6, tr2, ES12.4, tr2, ES12.4)', iostat=IFAIL) &
              step, cur_time, nrColl, nrIon, count_n, &
              (mean_path_avg/length_scale), (mean_actual_avg/length_scale)
-  end subroutine Do_Collisions_4
+  end subroutine Do_Ion_Collisions
+
+  module function Get_Injected_Vec(T, par_vel)
+    double precision, dimension(1:3)             :: Get_Injected_Vec
+    double precision, dimension(1:3), intent(in) :: par_vel
+    double precision, intent(in)                 :: T ! Energy in eV
+    double precision, parameter                  :: mu = 5.0d0, sigma = 25.0d0
+    double precision                             :: angle_max, angle
+    double precision                             :: m_factor, rnd, alpha
+    double precision                             :: dot_p, len_vec, len_vel
+    double precision, dimension(1:3)             :: par_vec
+    integer                                      :: n_tries = 0
+
+    m_factor = 1.0d0/(sqrt(2.0d0*pi)*sigma)
+
+    do
+      call random_number(par_vec)
+      dot_p = par_vel(1)*par_vec(1) + par_vel(2)*par_vec(2) + par_vel(3)*par_vec(3)
+      len_vec = sqrt(par_vec(1)**2 + par_vec(2)**2 + par_vec(3)**2)
+      len_vel = sqrt(par_vel(1)**2 + par_vel(2)**2 + par_vel(3)**2)
+
+      angle = acos(dot_p/(len_vec*len_vel)) * 180.0d0/pi
+
+      alpha = normal_dist(mu, sigma, angle) / m_factor
+
+      call random_number(rnd)
+      if (rnd < alpha) then
+        exit ! Exit the loop
+      else
+        n_tries = n_tries + 1
+        if (n_tries >= 10000) then ! This should never take this long
+          print *, 'n_tries > 10000'
+          exit
+        end if
+      end if
+    end do
+
+    Get_Injected_Vec = (par_vec / len_vec)
+  end function Get_Injected_Vec
 
   ! This function returns a normalized direction vector for the ejected electron
   ! The angle between this vector and the velocity vector of the incident electron
@@ -196,8 +235,8 @@ contains
   ! See:
   ! Dobly Differential Cross Section for Electron Scattered by Nitrogen
   ! J. C. Nogueira, M. A. Eschiapati Ferreira and Ronaldo S. Barbieri
-  module function Get_Angle_Vec(W, T, par_vel)
-    double precision, dimension(1:3)             :: Get_Angle_Vec
+  module function Get_Ejected_Vec(W, T, par_vel)
+    double precision, dimension(1:3)             :: Get_Ejected_Vec
     double precision, intent(in)                 :: T, W
     double precision, dimension(1:3), intent(in) :: par_vel
     double precision, parameter                  :: a = -430.5d0, b = -0.5445d0, c = 89.32d0
@@ -238,8 +277,8 @@ contains
       end if
     end do
 
-    Get_Angle_Vec = (par_vec / len_vec)
-  end function Get_Angle_Vec
+    Get_Ejected_Vec = (par_vec / len_vec)
+  end function Get_Ejected_Vec
 
   ! Normal distribtuion
   double precision function normal_dist(mu, sigma, x)

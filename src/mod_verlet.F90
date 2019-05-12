@@ -10,7 +10,7 @@ Module mod_verlet
   implicit none
 
   interface
-    module subroutine Do_Collisions_4(step)
+    module subroutine Do_Ion_Collisions(step)
       integer, intent(in) :: step
     end subroutine
 
@@ -62,7 +62,7 @@ contains
     integer, intent(in) :: step
 
     if (collisions .eqv. .true.) then
-      call Do_Collisions_4(step)
+      call Do_Ion_Collisions(step)
     end if
   end subroutine Do_Collisions
 
