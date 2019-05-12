@@ -147,6 +147,11 @@ program VacuumMD
       call Flush_Data()
     end if
 
+    if (cought_stop_signal .eqv. .true.) then
+      print '(a)', 'Vacuum: Got signal 99 stopping main loop.'
+      exit ! We cought the signal to stop. Exit the main loop.
+    end if
+
     ! if (i == progress(1)) then
     !   call PrintProgress(1)
     ! else if (i == progress(2)) then
@@ -212,6 +217,10 @@ contains
     print '(tr2, i0, a, i0, a)', nrElec, ' electrons and ', nrHole, ' holes'
     print *, ''
   end subroutine PrintProgress
+
+  subroutine Signal_Handler()
+    cought_stop_signal = .true.
+  end subroutine Signal_Handler
 
   ! ----------------------------------------------------------------------------
   ! A subroutine to read the input variable from the file 'input'
@@ -395,6 +404,9 @@ contains
     !deallocate(my_seed)
 
     call init_random_seed()
+
+    ! Register a subroutine to catch the 99 signal
+    IFAIL = SIGNAL(99, Signal_Handler)
 
     ! Create folder for output files
 #if defined(__PGI)

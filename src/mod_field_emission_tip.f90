@@ -225,7 +225,7 @@ end subroutine Do_Field_Emission_Tip_Test
     print *, 'Doing emission'
     print *, n_r
 
-    !$OMP PARALLEL DO PRIVATE(s, ndim, par_pos, field, F, D_f, surf_norm, xi_1, phi_1, rnd, par_vel) SCHEDULE(GUIDED, 2500)
+    !!$OMP PARALLEL DO DEFAULT(NONE) PRIVATE(s, ndim, par_pos, field, F, D_f, surf_norm, xi_1, phi_1, rnd, par_vel) SCHEDULE(GUIDED, 2500)
     do s = 1, n_r
 
       !!!$OMP FLUSH (particles, nrElec)
@@ -255,7 +255,7 @@ end subroutine Do_Field_Emission_Tip_Test
         !$OMP END CRITICAL
       end if
     end do
-    !$OMP END PARALLEL DO
+    !!$OMP END PARALLEL DO
 
     !!!$OMP MASTER
 
