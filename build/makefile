@@ -5,7 +5,7 @@
 # Compiler to use
 ifndef FCOMPILER
 #FCOMPILER=ifort
-FCOMPILER=gfortran-9.1
+FCOMPILER=gfortran-8
 #FCOMPILER=pgfortran
 endif
 

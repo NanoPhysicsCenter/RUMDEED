@@ -255,6 +255,11 @@ module mod_global
   ! Nodal Analysis
   double precision, dimension(1:5) :: V_cur, V_prev ! Voltage and branch currents for the nodal analysis
 
+  !-----------------------------------------------------------------------------
+  ! Other
+  logical :: cought_stop_signal = .false. ! If true we stop the main loop
+
+
   ! ----------------------------------------------------------------------------
   ! Define namelist for the input file
   ! These variables are read for the input file.
