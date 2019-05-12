@@ -204,9 +204,10 @@ contains
     double precision                             :: m_factor, rnd, alpha
     double precision                             :: dot_p, len_vec, len_vel
     double precision, dimension(1:3)             :: par_vec
-    integer                                      :: n_tries = 0
+    integer                                      :: n_tries
 
     m_factor = 1.0d0/(sqrt(2.0d0*pi)*sigma)
+    n_tries = 0
 
     do
       call random_number(par_vec)
@@ -225,6 +226,10 @@ contains
         n_tries = n_tries + 1
         if (n_tries >= 10000) then ! This should never take this long
           print *, 'n_tries > 10000 (Injected)'
+          print *, 'angle = ', angle
+          print *, 'alpha = ', alpha
+          print *, 'n_tries = ', n_tries
+          print *, ''
           exit
         end if
       end if
@@ -249,7 +254,7 @@ contains
     double precision                             :: m_factor, rnd, alpha
     double precision                             :: dot_p, len_vec, len_vel
     double precision, dimension(1:3)             :: par_vec
-    integer                                      :: n_tries = 0
+    integer                                      :: n_tries 
 
     if (T < 100.d0) then
       angle_max = a*100.0d0**b + c
@@ -258,6 +263,7 @@ contains
     end if
 
     m_factor = 1.0d0/(sqrt(2.0d0*pi)*sigma)
+    n_tries = 0
 
     do
       call random_number(par_vec)
