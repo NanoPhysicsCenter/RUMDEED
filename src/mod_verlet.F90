@@ -357,7 +357,7 @@ contains
       pos_ic(3) = -1.0d0*pos_2(3) ! Change z
 
       diff = pos_1 - pos_ic
-      r = sqrt( sum(diff**2) ) + length_scale**3
+      r = sqrt( sum(diff**2) ) + length_scale**2
       Force_Image_charges_v2 = (-1.0d0)*diff/r**3 ! -1.0d0 because of the opposite charge
 
       do n = 1, N_ic_max
@@ -365,26 +365,26 @@ contains
         ! Plus n
         pos_ic(3) = 2.0d0*n*d - pos_2(3) ! Change z
         diff = pos_1 - pos_ic
-        r = sqrt( sum(diff**2) ) + length_scale**3
+        r = sqrt( sum(diff**2) ) + length_scale**2
         Force_Image_charges_v2 = Force_Image_charges_v2 + (-1.0d0)*diff/r**3 ! -1.0d0 because of the opposite charge
 
         ! Negative n
         pos_ic(3) = -2.0d0*n*d - pos_2(3) ! Change z
         diff = pos_1 - pos_ic
-        r = sqrt( sum(diff**2) ) + length_scale**3
+        r = sqrt( sum(diff**2) ) + length_scale**2
         Force_Image_charges_v2 = Force_Image_charges_v2 + (-1.0d0)*diff/r**3 ! -1.0d0 because of the opposite charge
 
         ! Now do the charges with the same charge
         ! Plus n
         pos_ic(3) = 2.0d0*n*d + pos_2(3) ! Change z
         diff = pos_1 - pos_ic
-        r = sqrt( sum(diff**2) ) + length_scale**3
+        r = sqrt( sum(diff**2) ) + length_scale**2
         Force_Image_charges_v2 = Force_Image_charges_v2 + (+1.0d0)*diff/r**3 ! +1.0d0 because of the same charge
 
         ! Negative n
         pos_ic(3) = -2.0d0*n*d + pos_2(3) ! Change z
         diff = pos_1 - pos_ic
-        r = sqrt( sum(diff**2) ) + length_scale**3
+        r = sqrt( sum(diff**2) ) + length_scale**2
         Force_Image_charges_v2 = Force_Image_charges_v2 + (+1.0d0)*diff/r**3 ! +1.0d0 because of the same charge
       end do
     end if
