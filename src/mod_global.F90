@@ -257,7 +257,8 @@ module mod_global
 
   !-----------------------------------------------------------------------------
   ! Other
-  logical :: cought_stop_signal = .false. ! If true we stop the main loop
+  logical            :: cought_stop_signal = .false. ! If true we stop the main loop
+  integer, parameter :: SIGINT = 2 ! Interrupt signal (Ctrl+C)
 
 
   ! ----------------------------------------------------------------------------

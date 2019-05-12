@@ -148,7 +148,7 @@ program VacuumMD
     end if
 
     if (cought_stop_signal .eqv. .true.) then
-      print '(a)', 'Vacuum: Got signal 99 stopping main loop.'
+      print '(a)', 'Vacuum: Got signal SIGINT stopping main loop.'
       exit ! We cought the signal to stop. Exit the main loop.
     end if
 
@@ -405,8 +405,8 @@ contains
 
     call init_random_seed()
 
-    ! Register a subroutine to catch the 99 signal
-    IFAIL = SIGNAL(99, Signal_Handler)
+    ! Register a subroutine to catch the SIGINT signal
+    IFAIL = SIGNAL(SIGINT, Signal_Handler)
 
     ! Create folder for output files
 #if defined(__PGI)
