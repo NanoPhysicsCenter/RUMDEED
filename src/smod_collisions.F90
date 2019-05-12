@@ -231,13 +231,9 @@ contains
         exit ! Exit the loop
       else
         n_tries = n_tries + 1
-        if (n_tries >= 10000) then
+        if (n_tries >= 10000) then ! This should never take this long
           print *, 'n_tries > 10000'
-          print *, angle
-          print *, angle_max
-          print *, alpha
-          print *, T
-          pause
+          exit
         end if
       end if
     end do
