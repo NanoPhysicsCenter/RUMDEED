@@ -81,7 +81,7 @@ contains
 
     !$OMP PARALLEL DO DEFAULT(NONE) PRIVATE(i) &
     !$OMP& SHARED(particles_prev_pos, particles_cur_pos, particles_cur_vel, particles_cur_accel) &
-    !$OMP& SHARED(time_step, time_step2, particles_prev2_accel, particles_prev_accel, ptr_Check_Boundary)
+    !$OMP& SHARED(time_step, time_step2, particles_prev2_accel, particles_prev_accel, ptr_Check_Boundary) &
     !$OMP& SCHEDULE(GUIDED, CHUNK_SIZE)
     do i = 1, nrPart
       ! Verlet
@@ -135,8 +135,8 @@ contains
 
     !$OMP PARALLEL DO DEFAULT(NONE) PRIVATE(i, q, k, emit, sec) &
     !$OMP& SHARED(nrPart, particles_cur_vel, particles_prev_accel, particles_cur_accel, time_step) &
-    !$OMP& SHARED(ramo_current, ramo_current_emit, avg_vel, E_zunit, particles_section, particles_charge) &
-    !$OMP& SHARED(particles_species, particles_emitter)
+    !$OMP& SHARED(ramo_current, ramo_current_emit, E_zunit, particles_section, particles_charge) &
+    !$OMP& SHARED(particles_species, particles_emitter) &
     !$OMP& REDUCTION(+:avg_vel) SCHEDULE(GUIDED, CHUNK_SIZE)
     do i = 1, nrPart
       ! Verlet
@@ -187,7 +187,7 @@ contains
     !$OMP PARALLEL DO DEFAULT(NONE) PRIVATE(i, j, k_1, k_2, pos_1, pos_2, diff, r) &
     !$OMP& PRIVATE(force_E, force_c, force_ic, force_ic_N, force_ic_self, im_1, q_1, im_2, q_2, pre_fac_c) &
     !$OMP SHARED(nrPart, particles_cur_pos, particles_mass, particles_species, ptr_field_E) &
-    !$OMP SHARED(ptr_Image_Charge_effect, particles_cur_accel, particles_charge)
+    !$OMP SHARED(ptr_Image_Charge_effect, particles_cur_accel, particles_charge) &
     !$OMP& SCHEDULE(DYNAMIC, 4)
     do i = 1, nrPart
       ! Information about the particle we are calculating the force/acceleration on
