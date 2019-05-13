@@ -229,6 +229,7 @@ contains
       len_vel = sqrt(par_vel(1)**2 + par_vel(2)**2 + par_vel(3)**2)
 
       ! Calculate the angle between the two vector using the dot product.
+      ! We want the angle in degrees.
       angle = acos(dot_p/(len_vec*len_vel)) * 180.0d0/pi
 
       alpha = folded_normal_dist(mu, sigma, angle) / m_factor
@@ -238,8 +239,8 @@ contains
         exit ! Exit the loop
       else
         n_tries = n_tries + 1
-        if (n_tries >= 10000) then ! This should never take this long
-          print *, 'n_tries > 10000 (Injected)'
+        if (n_tries >= 1000000) then ! This should never take this long
+          print *, 'n_tries > 100000 (Injected)'
           print *, 'angle = ', angle
           print *, 'alpha = ', alpha
           print *, 'n_tries = ', n_tries
@@ -296,8 +297,8 @@ contains
         exit ! Exit the loop
       else
         n_tries = n_tries + 1
-        if (n_tries >= 10000) then ! This should never take this long
-          print *, 'n_tries > 10000 (Ejected)'
+        if (n_tries >= 1000000) then ! This should never take this long
+          print *, 'n_tries > 100000 (Ejected)'
           exit
         end if
       end if
