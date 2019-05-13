@@ -98,6 +98,8 @@ contains
   ! i -- The particle to be removed
   ! m -- Why the particle is being removed
   ! See mod_global for list of removal flags
+  ! if particles_mask(i) is .true. then the particle is active
+  ! if particles_mask(i) is .false. then the particle is inactive and should be removed
   subroutine Mark_Particles_Remove(i, m)
     integer, intent(in) :: i, m
     integer             :: emit
@@ -107,6 +109,7 @@ contains
     if (particles_mask(i) .eqv. .false.) return
 
     ! Mark the particle for removal
+    ! The particle is actually removed later when Remove_Particles is called.
     particles_mask(i) = .false.
 
     ! Set the charge to zero. That way it no longer has any effects on calculations.
@@ -135,11 +138,11 @@ contains
           nrElec_remove_top_emit(emit) = nrElec_remove_top_emit(emit) + 1
 
           ! Write out the transverse position of the particle, its velocity and which emitter/section it came from.
-          !$OMP CRITICAL(DENSITY_ABSORB)
-          write(unit=ud_density_absorb_top) particles_cur_pos(1, i), particles_cur_pos(2, i), &
+          !$OMP CRITICAL(DENSITY_ABSORB_TOP)
+          write(unit=ud_density_absorb_top) particles_cur_pos(1, i)/length_scale, particles_cur_pos(2, i)/length_scale, &
                                           & particles_cur_vel(1, i), particles_cur_vel(2, i), particles_cur_vel(3, i), &
                                           & particles_emitter(i), particles_section(i)
-          !$OMP END CRITICAL(DENSITY_ABSORB)
+          !$OMP END CRITICAL(DENSITY_ABSORB_TOP)
         CASE (remove_bot)
           !$OMP ATOMIC UPDATE
           nrPart_remove_bot = nrPart_remove_bot + 1
@@ -148,10 +151,10 @@ contains
           nrElec_remove_bot = nrElec_remove_bot + 1
 
           ! Write out the x and y position of the particle along with which emitter it came from.
-          !$OMP CRITICAL(DENSITY_ABSORB)
-          write(unit=ud_density_absorb_bot) particles_cur_pos(1, i), particles_cur_pos(2, i), &
+          !$OMP CRITICAL(DENSITY_ABSORB_BOT)
+          write(unit=ud_density_absorb_bot) particles_cur_pos(1, i)/length_scale, particles_cur_pos(2, i)/length_scale, &
                                           & particles_emitter(i), particles_section(i)
-          !$OMP END CRITICAL(DENSITY_ABSORB)
+          !$OMP END CRITICAL(DENSITY_ABSORB_BOT)
         CASE DEFAULT
           print *, 'Error unkown remove case ', m
       END SELECT
@@ -302,6 +305,7 @@ contains
       !print *, 'nrPart_remove = ', nrPart_remove
       !print *, 'nrPart - nrPart_remove = ', nrPart - nrPart_remove
 
+      ! This should not happen, but just in case.
       if (nrElec < 0) nrElec = 0
       if (nrHole < 0) nrHole = 0
 

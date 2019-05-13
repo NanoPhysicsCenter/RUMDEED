@@ -208,7 +208,7 @@ contains
     double precision, dimension(1:3)             :: Get_Injected_Vec
     double precision, dimension(1:3), intent(in) :: par_vel
     double precision, intent(in)                 :: T ! Energy in eV
-    double precision, parameter                  :: mu = 5.0d0, sigma = 45.0d0
+    double precision, parameter                  :: mu = 5.0d0, sigma = 25.0d0
     double precision                             :: angle
     double precision                             :: m_factor, rnd, alpha
     double precision                             :: dot_p, len_vec, len_vel
@@ -221,10 +221,14 @@ contains
 
     do
       call random_number(par_vec)
+      ! Dot product
       dot_p = par_vel(1)*par_vec(1) + par_vel(2)*par_vec(2) + par_vel(3)*par_vec(3)
+
+      ! Length of the vectors
       len_vec = sqrt(par_vec(1)**2 + par_vec(2)**2 + par_vec(3)**2)
       len_vel = sqrt(par_vel(1)**2 + par_vel(2)**2 + par_vel(3)**2)
 
+      ! Calculate the angle between the two vector using the dot product.
       angle = acos(dot_p/(len_vec*len_vel)) * 180.0d0/pi
 
       alpha = folded_normal_dist(mu, sigma, angle) / m_factor
@@ -245,6 +249,7 @@ contains
       end if
     end do
 
+    ! Return the normalized vector
     Get_Injected_Vec = (par_vec / len_vec)
   end function Get_Injected_Vec
 

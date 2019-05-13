@@ -554,11 +554,11 @@ contains
           t = transfer(tms, t)
        end if
        s = ieor(t(1), t(2))
-       pid = getpid() + 1099279 ! Add a prime
+       pid = getpid() + 1099313 ! Add a prime
        s = ieor(s, pid)
        if (n >= 3) then
-          my_seed(1) = t(1) + 36269
-          my_seed(2) = t(2) + 72551
+          my_seed(1) = t(1) + 36343
+          my_seed(2) = t(2) + 72679
           my_seed(3) = pid
           if (n > 3) then
              my_seed(4:) = s + 37 * (/ (i, i = 0, n - 4) /)
