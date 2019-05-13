@@ -136,19 +136,19 @@ contains
     !$OMP PARALLEL DO DEFAULT(NONE) PRIVATE(i, q, k, emit, sec) &
     !$OMP& SHARED(nrPart, particles_cur_vel, particles_prev_accel, particles_cur_accel, time_step) &
     !$OMP& SHARED(ramo_current, ramo_current_emit, E_zunit, particles_section, particles_charge) &
-    !$OMP& SHARED(particles_species, particles_emitter) &
+    !$OMP& SHARED(particles_species, particles_emitter, particles_prev2_accel) &
     !$OMP& REDUCTION(+:avg_vel) SCHEDULE(GUIDED, CHUNK_SIZE)
     do i = 1, nrPart
       ! Verlet
-      particles_cur_vel(:, i) = particles_cur_vel(:, i) &
-                            & + 0.5d0*( particles_prev_accel(:, i) &
-                            & + particles_cur_accel(:, i) )*time_step
+      !particles_cur_vel(:, i) = particles_cur_vel(:, i) &
+      !                      & + 0.5d0*( particles_prev_accel(:, i) &
+      !                      & + particles_cur_accel(:, i) )*time_step
 
       ! Beeman
-      !particles_cur_vel(:, i) = particles_cur_vel(:, i) &
-      !                      & + 1.0d0/6.0d0*( 2.0d0*particles_cur_accel(:, i) &
-      !                      & + 5.0d0*particles_prev_accel(:, i) & 
-      !                      & - particles_prev2_accel(:, i) )*time_step
+      particles_cur_vel(:, i) = particles_cur_vel(:, i) &
+                            & + 1.0d0/6.0d0*( 2.0d0*particles_cur_accel(:, i) &
+                            & + 5.0d0*particles_prev_accel(:, i) & 
+                            & - particles_prev2_accel(:, i) )*time_step
 
       q = particles_charge(i)
       k = particles_species(i)
