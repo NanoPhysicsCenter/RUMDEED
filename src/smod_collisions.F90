@@ -220,7 +220,10 @@ contains
     n_tries = 0
 
     do
+      ! Get random numbers between 0 and 1
       call random_number(par_vec)
+      ! Convert this to random numbers between -0.5 and 0.5
+      par_vec = par_vec - 0.5d0
       ! Dot product
       dot_p = par_vel(1)*par_vec(1) + par_vel(2)*par_vec(2) + par_vel(3)*par_vec(3)
 
@@ -284,6 +287,7 @@ contains
 
     do
       call random_number(par_vec)
+      par_vec = par_vec - 0.5d0
       dot_p = par_vel(1)*par_vec(1) + par_vel(2)*par_vec(2) + par_vel(3)*par_vec(3)
       len_vec = sqrt(par_vec(1)**2 + par_vec(2)**2 + par_vec(3)**2)
       len_vel = sqrt(par_vel(1)**2 + par_vel(2)**2 + par_vel(3)**2)
