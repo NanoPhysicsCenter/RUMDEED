@@ -39,7 +39,7 @@ endif
 # ifeq ($(FCOMPILER),gfortran)
 ifneq (,$(findstring gfortran,$(FCOMPILER)))
 $(info Using GNU Fortran)
-FFLAGS=-O2 -flto -march=native -no-pie -ffast-math
+FFLAGS=-O2 -ffast-math -flto -march=native -no-pie
 #FFLAGS=-g -fcheck=all -Wall -fbacktrace #-ffpe-trap=zero,overflow,underflow,denormal,invalid
 ifdef OPENMP
 FFLAGS+=-fopenmp

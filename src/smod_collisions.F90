@@ -235,6 +235,8 @@ contains
       ! We want the angle in degrees.
       angle = acos(dot_p/(len_vec*len_vel)) * 180.0d0/pi
 
+      ! Get the acceptance/rejection criteria. We use a folded normal distribution
+      ! because the angle between two vector is always positive. [0, pi]/[0, 180]. 
       alpha = folded_normal_dist(mu, sigma, angle) / m_factor
 
       call random_number(rnd)
