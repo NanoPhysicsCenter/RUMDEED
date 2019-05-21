@@ -3452,7 +3452,7 @@ if test "$GCC" = yes; then :
   *) :
     opt=-O3 ;;
 esac
-   CFLAGS=${USER_CFLAGS:-$opt -fomit-frame-pointer -ffast-math -Wall -march=native -flto}
+   CFLAGS=${USER_CFLAGS:-$opt -fomit-frame-pointer -ffast-math -Wall -march=native}
 else
   CFLAGS=${USER_CFLAGS:--O}
 fi
