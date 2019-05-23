@@ -151,6 +151,29 @@ end subroutine Do_Field_Emission_Tip_2
 subroutine Do_Field_Emission_Tip_Test(step)
   integer, intent(in)               :: step
   integer                           :: N_sup
+  double precision, dimension(1:3)  :: par_pos , Field
+  double precision                  :: F
+
+  print *, 'Hi Test'
+  print *, ''
+  print *, 'Field at top'
+  par_pos(1) = x_coor(1.0d0, eta_1, 0.0d0)
+  par_pos(2) = y_coor(1.0d0, eta_1, 0.0d0)
+  par_pos(3) = z_coor(1.0d0, eta_1, 0.0d0)
+  Field = field_E_Hyperboloid(par_pos)
+  F = Field_normal(par_pos, Field)
+  print *, Field
+  print *, F
+  print *, ''
+  print *, 'Field at bottom'
+  par_pos(1) = x_coor(max_xi, eta_1, 0.0d0)
+  par_pos(2) = y_coor(max_xi, eta_1, 0.0d0)
+  par_pos(3) = z_coor(max_xi, eta_1, 0.0d0)
+  Field = field_E_Hyperboloid(par_pos)
+  F = Field_normal(par_pos, Field)
+  print *, Field
+  print *, F
+  pause
 
   call Do_Cuba_Suave_FE_Tip_Test(1, N_sup)
 
@@ -854,7 +877,7 @@ end function Elec_supply_tip
     double precision, intent(in)                 :: F
     double precision, dimension(1:3), intent(in) :: pos
 
-    Escape_Prob_Tip = exp(b_FN * (sqrt(w_theta_pos_tip(pos)))**3 * v_y(F, pos) / (-1.0d0*F))
+    Escape_Prob_Tip = exp(b_FN * (sqrt(w_theta_pos_tip(pos)))**3 * v_y(F, pos) / abs(F))
 
     if (Escape_Prob_Tip > 1.0d0) then
       print *, 'Escape_prob is larger than 1.0'
@@ -987,15 +1010,14 @@ end function Elec_supply_tip
       h_phi = a_foci*sqrt((xi**2 - 1.0d0)*(1 - eta_1**2))
 
       ! Calculate the current density at this point
-      ff(1) = h_xi*h_phi*Elec_Supply_tip(eta_f, par_pos)*Escape_Prob_Tip(eta_f, par_pos)
-      !ff(1) = h_xi*h_phi
+      ff(1) = Elec_Supply_tip(eta_f, par_pos)*Escape_Prob_Tip(eta_f, par_pos) * h_xi * h_phi
     else
       ! The field is NOT favourable for emission
       ! This point does not contribute
       ff(1) = 0.0d0
     end if
 
-    ! We mutiply with the area because Cuba does the 
+    ! We mutiply with 2.0*pi (max_xi - 1.0) because Cuba does the 
     ! integration over the hybercube, i.e. from 0 to 1.
     ff(1) = 2.0d0*pi*(max_xi - 1.0d0)*ff(1)
     
@@ -1020,7 +1042,7 @@ end function Elec_supply_tip
     integer            :: maxeval = 5000000 ! Maximum number of integrand evaluations
     integer            :: nnew = 2500 ! Number of integrand evaluations in each subdivision
     integer            :: nmin = 1000 ! Minimum number of samples a former pass must contribute to a subregion to be considered in the region's compound integral value.
-    double precision   :: flatness = 5.0d0 ! Determine how prominently out-liers, i.e. samples with a large fluctuation, 
+    double precision   :: flatness = 50.0d0 ! Determine how prominently out-liers, i.e. samples with a large fluctuation, 
                                            ! figure in the total fluctuation, which in turn determines how a region is split up.
                                            ! As suggested by its name, flatness should be chosen large for 'flat" integrand and small for 'volatile' integrands
                                            ! with high peaks.
@@ -1056,6 +1078,7 @@ end function Elec_supply_tip
      ! Round the results to the nearest integer
      N_sup = nint( integral(1) )
 
+     print *, 'Integral results'
      print *, integral(1)
      print *, N_sup
      pause
@@ -1118,6 +1141,7 @@ end function Elec_supply_tip
      ! Round the results to the nearest integer
      N_sup = nint( integral(1) )
 
+     print *, 'Integral results'
      print *, integral(1)
      print *, N_sup
      print *, Tip_Area(1.0d0, max_xi, 0.0d0, 2.0d0*pi)
