@@ -57,16 +57,17 @@ contains
     ptr_field_E => field_E_Hyperboloid
 
     ! The function that does the emission
-    !ptr_Do_Emission => Do_Field_Emission_Tip
+    ptr_Do_Emission => Do_Field_Emission_Tip
     !ptr_Do_Emission => Do_Simple_Field_Emission_tip
-    ptr_Do_Emission => Do_Field_Emission_Tip_Test
+    !ptr_Do_Emission => Do_Field_Emission_Tip_Test
 
     ! The function to do image charge effects
-    !ptr_Image_Charge_effect => Sphere_IC_field
-    ptr_Image_Charge_effect => NULL()
+    ptr_Image_Charge_effect => Sphere_IC_field
+    !ptr_Image_Charge_effect => NULL()
 
     ! Parameters used in the module
     time_step_div_q0 = time_step / q_0
+    res_s = 0.0d0
 
 
     ! Tip Parameters
@@ -150,34 +151,86 @@ end subroutine Do_Field_Emission_Tip_2
 
 subroutine Do_Field_Emission_Tip_Test(step)
   integer, intent(in)               :: step
-  integer                           :: N_sup
-  double precision, dimension(1:3)  :: par_pos , Field
-  double precision                  :: F
+  integer                           :: ndim, N_round, nrElecEmit
+  integer                           :: i, s
+  double precision, dimension(1:3)  :: par_pos, Field, par_vel, surf_norm
+  double precision                  :: F, N_sup, xi, phi, D_f
+  integer, parameter                :: MAX_EMISSION_TRY = 10000
 
-  print *, 'Hi Test'
-  print *, ''
-  print *, 'Field at top'
-  par_pos(1) = x_coor(1.0d0, eta_1, 0.0d0)
-  par_pos(2) = y_coor(1.0d0, eta_1, 0.0d0)
-  par_pos(3) = z_coor(1.0d0, eta_1, 0.0d0)
-  Field = field_E_Hyperboloid(par_pos)
-  F = Field_normal(par_pos, Field)
-  print *, Field
-  print *, F
-  print *, ''
-  print *, 'Field at bottom'
-  par_pos(1) = x_coor(max_xi, eta_1, 0.0d0)
-  par_pos(2) = y_coor(max_xi, eta_1, 0.0d0)
-  par_pos(3) = z_coor(max_xi, eta_1, 0.0d0)
-  Field = field_E_Hyperboloid(par_pos)
-  F = Field_normal(par_pos, Field)
-  print *, Field
-  print *, F
-  pause
+  ! print *, 'Hi Test'
+  ! print *, ''
+  ! print *, 'Field at top'
+  ! par_pos(1) = x_coor(1.0d0, eta_1, 0.0d0)
+  ! par_pos(2) = y_coor(1.0d0, eta_1, 0.0d0)
+  ! par_pos(3) = z_coor(1.0d0, eta_1, 0.0d0)
+  ! Field = field_E_Hyperboloid(par_pos)
+  ! F = Field_normal(par_pos, Field)
+  ! print *, Field
+  ! print *, F
+  ! print *, 'Supply'
+  ! print *, Elec_Supply_tip(F, par_pos)
+  ! print *, 'Escape Prob'
+  ! print *, Escape_Prob_Tip(F, par_pos)
+  ! print *, ''
+  ! print *, 'Field at bottom'
+  ! par_pos(1) = x_coor(max_xi, eta_1, 0.0d0)
+  ! par_pos(2) = y_coor(max_xi, eta_1, 0.0d0)
+  ! par_pos(3) = z_coor(max_xi, eta_1, 0.0d0)
+  ! Field = field_E_Hyperboloid(par_pos)
+  ! F = Field_normal(par_pos, Field)
+  ! print *, Field
+  ! print *, F
+  ! print *, 'Supply'
+  ! print *, Elec_Supply_tip(F, par_pos)
+  ! print *, 'Escape Prob'
+  ! print *, Escape_Prob_Tip(F, par_pos)
+  ! pause
+
+  nrElecEmit = 0
 
   call Do_Cuba_Suave_FE_Tip_Test(1, N_sup)
 
-  stop
+  N_round = nint(N_sup + res_s)
+  res_s = N_sup - N_round
+
+  !print *, 'Number of electrons = ', N_round, N_sup
+  !pause
+  !!$OMP END SINGLE
+
+  !!$OMP DO PRIVATE(i, s, ndim, par_pos, xi, phi, surf_norm) REDUCTION(nrElecEmit)
+  do i = 1, N_round
+    !print *, 'i = ', i
+    do s = 1, MAX_EMISSION_TRY
+      ndim = 30
+      call Metro_algo_tip_v2(ndim, xi, phi, F, D_f, par_pos)
+
+      if (F >= 0.0d0) then
+        D_f = 0.0d0
+      end if
+
+      if (F < 0.0d0) then
+
+        surf_norm = surface_normal(par_pos)
+        par_pos = par_pos + surf_norm*length_scale
+
+        !call Add_particle(par_pos, step)
+        par_vel = 0.0d0
+        !!$OMP CRITICAL
+        call Add_Particle(par_pos, par_vel, species_elec, step, 1, -1)
+        nrElecEmit = nrElecEmit + 1
+
+        !!$OMP END CRITICAL
+        exit
+      end if
+    end do
+  end do
+  !!$OMP END DO
+  !!$OMP END PARALLEL
+
+  !print *, 'Loop done'
+
+  posInit = posInit + nrElecEmit
+  nrEmitted = nrEmitted + nrElecEmit
 end subroutine Do_Field_Emission_Tip_Test
 
 !----------------------------------------------------------------------------------------
@@ -187,7 +240,7 @@ end subroutine Do_Field_Emission_Tip_Test
     double precision                 :: F
     double precision, dimension(1:3) :: par_pos, surf_norm, par_vel
     !double precision, dimension(1)   :: rnd
-    double precision                 :: rnd
+    double precision                 :: rnd, N_sup
     integer                          :: i, j, s, IFAIL, nrElecEmit, n_r
     double precision                 :: A_f, D_f, n_s, F_avg, n_add
     double precision                 :: len_phi, len_xi
@@ -196,7 +249,7 @@ end subroutine Do_Field_Emission_Tip_Test
     double precision, dimension(1:3) :: field
 
     !!!$OMP SINGLE
-    emit = 0
+    emit = 1
 
 
     !print *, len_x, len_x / length
@@ -204,36 +257,16 @@ end subroutine Do_Field_Emission_Tip_Test
 
     nrElecEmit = 0
 
-    !par_pos = 0.0d0
-    n_s = 0.0d0
 
     !!$OMP SINGLE
     !print *, 'F_avg = ', F_avg
-    F_avg = 0.0d0
-    write (ud_debug, "(i8, tr2, E16.8)", iostat=IFAIL) step, F_avg
+    !F_avg = 0.0d0
+    !write (ud_debug, "(i8, tr2, E16.8)", iostat=IFAIL) step, F_avg
 
-    !n_s = n_s - res_s
-    !n_r = nint(n_s)
-    !res_s = n_r - n_s
+    call Do_Cuba_Suave_FE_Tip(emit, N_sup)
 
-    xi_c = 1.0d0
-    phi_c = 0.0d0
-
-    par_pos(1) = x_coor(xi_c, eta_1, phi_c)
-    par_pos(2) = y_coor(xi_c, eta_1, phi_c)
-    par_pos(3) = z_coor(xi_c, eta_1, phi_c)
-
-    par_vel = Calc_Field_at(par_pos)
-    print *, par_vel
-    print *, par_pos
-    print *, ''
-    F = Field_normal(par_pos, par_vel)
-    print *, F
-    print *, Elec_Supply_tip(F, par_pos)
-    print *, ''
-    pause
-
-    call Do_Cuba_Suave_FE_Tip(emit, n_r)
+    n_r = nint(N_sup + res_s)
+    res_s = N_sup - N_r
 
     !print *, 'n_r = ', n_r
     if (n_r < 0) then
@@ -245,8 +278,8 @@ end subroutine Do_Field_Emission_Tip_Test
 
     !!!$OMP END SINGLE
 
-    print *, 'Doing emission'
-    print *, n_r
+    !print *, 'Doing emission'
+    !print *, n_r
 
     !!$OMP PARALLEL DO DEFAULT(NONE) PRIVATE(s, ndim, par_pos, field, F, D_f, surf_norm, xi_1, phi_1, rnd, par_vel) SCHEDULE(GUIDED, 2500)
     do s = 1, n_r
@@ -270,7 +303,7 @@ end subroutine Do_Field_Emission_Tip_Test
 
         ! Add a particle to the system
         par_vel = 0.0d0
-        call Add_Particle(par_pos, par_vel, species_elec, step, emit, -1)
+        call Add_Particle(par_pos, par_vel, species_elec, step, emit, -1, 1)
 
         !nrElec = nrElec + 1
         nrElecEmit = nrElecEmit + 1
@@ -284,9 +317,9 @@ end subroutine Do_Field_Emission_Tip_Test
 
     posInit = posInit + nrElecEmit
     nrEmitted = nrEmitted + nrElecEmit
-    print *, 'Emission done'
-    print *, posInit
-    print *, ''
+    !print *, 'Emission done'
+    !print *, posInit
+    !print *, ''
     !!!$OMP END MASTER
 
     !!!$OMP END PARALLEL
@@ -422,6 +455,7 @@ end subroutine Do_Field_Emission_Tip_Test
       ! Calculate the electric field at this position
       field = Calc_Field_at(cur_pos)
       eta_f = Field_normal(cur_pos, field) ! Component normal to the surface
+
       if (eta_f < 0.0d0) then
         exit ! We found a nice spot so we exit the loop
       else
@@ -912,54 +946,61 @@ end function Elec_supply_tip
   !
   integer function integrand_cuba_fe_tip(ndim, xx, ncomp, ff, userdata)
     ! Input / output variables
-    integer, intent(in) :: ndim ! Number of dimensions (Should be 2)
-    integer, intent(in) :: ncomp ! Number of vector-components in the integrand (Always 1 here)
-    integer, intent(in) :: userdata ! Additional data passed to the integral function (In our case the number of the emitter)
-    double precision, intent(in), dimension(1:ndim)   :: xx ! Integration points, between 0 and 1
-    double precision, intent(out), dimension(1:ncomp) :: ff ! Results of the integrand function
+  integer, intent(in) :: ndim ! Number of dimensions (Should be 2)
+  integer, intent(in) :: ncomp ! Number of vector-components in the integrand (Always 1 here)
+  integer, intent(in) :: userdata ! Additional data passed to the integral function (In our case the number of the emitter)
+  double precision, intent(in), dimension(1:ndim)   :: xx ! Integration points, between 0 and 1
+  double precision, intent(out), dimension(1:ncomp) :: ff ! Results of the integrand function
 
-    ! Variables used for calculations
-    double precision, dimension(1:3) :: par_pos, field
-    double precision                 :: A ! Emitter area
-    double precision                 :: eta_f ! Component normal to the surface
-    double precision                 :: xi, phi ! Prolate coordinates
+  ! Variables used for calculations
+  double precision, dimension(1:3) :: par_pos, field
+  double precision                 :: A ! Emitter area
+  double precision                 :: eta_f ! Component normal to the surface
+  double precision                 :: xi, phi ! Prolate coordinates
+  double precision                 :: h_xi, h_phi ! Scale factors
 
-    ! Emitter area
-    A = Tip_Area(1.0d0, max_xi, 0.0d0, 2.0d0*pi)
+  !! Emitter area
+  !A = Tip_Area(1.0d0, max_xi, 0.0d0, 2.0d0*pi)
 
-    ! Surface position
-    ! Cuba does the intergration over the hybercube.
-    ! It gives us coordinates between 0 and 1.
-    xi = (max_xi - 1.0d0)*xx(1) + 1.0d0
-    phi = 2.0d0*pi*xx(2)
+  ! Surface position
+  ! Cuba does the intergration over the hybercube.
+  ! It gives us coordinates between 0 and 1.
+  xi = (max_xi - 1.0d0)*xx(1) + 1.0d0
+  phi = 2.0d0*pi*xx(2)
 
-    par_pos(1) = x_coor(xi, eta_1, phi)
-    par_pos(2) = y_coor(xi, eta_1, phi)
-    par_pos(3) = z_coor(xi, eta_1, phi)
+  !par_pos(1) = x_coor(xi, eta_1, phi)
+  !par_pos(2) = y_coor(xi, eta_1, phi)
+  !par_pos(3) = z_coor(xi, eta_1, phi)
+  par_pos = xyz_corr(xi, eta_1, phi)
 
-    ! Calculate the electric field on the surface
-    field = Calc_Field_at(par_pos)
-    eta_f = Field_normal(par_pos, field)
+  ! Calculate the electric field on the surface
+  field = Calc_Field_at(par_pos)
+  eta_f = Field_normal(par_pos, field)
 
-    ! Add to the average field
-    !F_avg = F_avg + field
+  ! Add to the average field
+  !F_avg = F_avg + field
 
-    ! Check if the field is favourable for emission
-    if (eta_f < 0.0d0) then
-      ! The field is favourable for emission
-      ! Calculate the electron supply at this point
-      ff(1) = Elec_Supply_tip(eta_f, par_pos)
-    else
-      ! The field is NOT favourable for emission
-      ! This point does not contribute
-      ff(1) = 0.0d0
-    end if
+  ! Check if the field is favourable for emission
+  if (eta_f < 0.0d0) then
+    ! The field is favourable for emission
 
-    ! We mutiply with the area of the emitter because Cuba does the 
-    ! integration over the hybercube, i.e. from 0 to 1.
-    ff(1) = A*ff(1)
-    
-    integrand_cuba_fe_tip = 0 ! Return value to Cuba, 0 = success
+    ! Calculate the scale factors
+    h_xi = a_foci*sqrt((xi**2 - eta_1**2)/(xi**2 - 1.0d0))
+    h_phi = a_foci*sqrt((xi**2 - 1.0d0)*(1 - eta_1**2))
+
+    ! Calculate the current density at this point
+    ff(1) = Elec_Supply_tip(eta_f, par_pos) * h_xi * h_phi
+  else
+    ! The field is NOT favourable for emission
+    ! This point does not contribute
+    ff(1) = 0.0d0
+  end if
+
+  ! We mutiply with 2.0*pi (max_xi - 1.0) because Cuba does the 
+  ! integration over the hybercube, i.e. from 0 to 1.
+  ff(1) = 2.0d0*pi*(max_xi - 1.0d0)*ff(1)
+  
+  integrand_cuba_fe_tip = 0 ! Return value to Cuba, 0 = success
   end function integrand_cuba_fe_tip
 
   ! ----------------------------------------------------------------------------
@@ -1026,8 +1067,8 @@ end function Elec_supply_tip
 
   subroutine Do_Cuba_Suave_FE_Tip(emit, N_sup)
     ! Input / output variables
-    integer, intent(in)  :: emit
-    integer, intent(out) :: N_sup
+    integer, intent(in)           :: emit
+    double precision, intent(out) :: N_sup
 
     ! Cuba integration variables
     integer, parameter :: ndim = 2 ! Number of dimensions
@@ -1042,7 +1083,7 @@ end function Elec_supply_tip
     integer            :: maxeval = 5000000 ! Maximum number of integrand evaluations
     integer            :: nnew = 2500 ! Number of integrand evaluations in each subdivision
     integer            :: nmin = 1000 ! Minimum number of samples a former pass must contribute to a subregion to be considered in the region's compound integral value.
-    double precision   :: flatness = 50.0d0 ! Determine how prominently out-liers, i.e. samples with a large fluctuation, 
+    double precision   :: flatness = 5.0d0 ! Determine how prominently out-liers, i.e. samples with a large fluctuation, 
                                            ! figure in the total fluctuation, which in turn determines how a region is split up.
                                            ! As suggested by its name, flatness should be chosen large for 'flat" integrand and small for 'volatile' integrands
                                            ! with high peaks.
@@ -1073,15 +1114,20 @@ end function Elec_supply_tip
       print *, fail
       print *, error
       print *, prob
+      print *, integral(1)
      end if
 
      ! Round the results to the nearest integer
-     N_sup = nint( integral(1) )
+     !N_sup = nint( integral(1) )
+     N_sup = integral(1)
 
-     print *, 'Integral results'
-     print *, integral(1)
-     print *, N_sup
-     pause
+    !  print *, 'Integral results'
+    !  print *, integral(1)
+    !  print *, N_sup
+    !  print *, Tip_Area(1.0d0, max_xi, 0.0d0, 2.0d0*pi)
+    !  print *, ''
+    !  print *, a_foci
+    !  pause
 
      ! Finish calculating the average field
      !F_avg = F_avg / neval
@@ -1089,8 +1135,8 @@ end function Elec_supply_tip
 
   subroutine Do_Cuba_Suave_FE_Tip_Test(emit, N_sup)
     ! Input / output variables
-    integer, intent(in)  :: emit
-    integer, intent(out) :: N_sup
+    integer, intent(in)           :: emit
+    double precision, intent(out) :: N_sup
 
     ! Cuba integration variables
     integer, parameter :: ndim = 2 ! Number of dimensions
@@ -1136,18 +1182,20 @@ end function Elec_supply_tip
       print *, fail
       print *, error
       print *, prob
+      print *, integral(1)
      end if
 
      ! Round the results to the nearest integer
-     N_sup = nint( integral(1) )
+     !N_sup = nint( integral(1) )
+     N_sup = integral(1)
 
-     print *, 'Integral results'
-     print *, integral(1)
-     print *, N_sup
-     print *, Tip_Area(1.0d0, max_xi, 0.0d0, 2.0d0*pi)
-     print *, ''
-     print *, a_foci
-     pause
+    !  print *, 'Integral results'
+    !  print *, integral(1)
+    !  print *, N_sup
+    !  print *, Tip_Area(1.0d0, max_xi, 0.0d0, 2.0d0*pi)
+    !  print *, ''
+    !  print *, a_foci
+    !  pause
 
      ! Finish calculating the average field
      !F_avg = F_avg / neval
