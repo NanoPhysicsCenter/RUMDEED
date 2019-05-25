@@ -1,6 +1,6 @@
 &INPUT
-  V_S = 20.0d3,
-  BOX_DIM = 0.0d0, 0.0d0, 2500.0d0,
+  V_S = 2.0d3,
+  BOX_DIM = 0.0d0, 0.0d0, 1000.0d0,
   TIME_STEP = 1.00d-4,
   STEPS = 6000,
   EMISSION_MODE = 99,
