@@ -290,8 +290,9 @@ contains
     time_step = time_step * time_scale
     time_step2 = time_step**2 ! Time_step squared
 
-    ! Temperature and pressure
+    ! Temperature, pressure and density
     P_abs = P_abs * P_std 
+    n_d = P_abs/(k_b*T_temp)
 
     ! steps: Number of time steps that the program will simulate
     if (steps <= 0) then

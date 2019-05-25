@@ -29,7 +29,6 @@ contains
     double precision, dimension(1:3) :: cur_pos, prev_pos, par_vec, old_vel
     double precision, parameter      :: v2_min      = (2.0d0*q_0*0.1d0/m_0) ! Minimum velocity squared
     double precision, parameter      :: v2_max      = (2.0d0*q_0*5000.0d0/m_0) ! Maximum velocity squared
-    double precision, parameter      :: n_d = P_abs/(k_b*T_temp) ! Density
     double precision                 :: mean_path, mean_path_avg, mean_actual_avg ! Mean free path
     integer                          :: count_n
     double precision                 :: cross_tot, cross_ion
@@ -54,7 +53,7 @@ contains
     !$OMP& PRIVATE(i, cur_pos, prev_pos, d, alpha, rnd, par_vec, vel2, KE, mean_path, cross_tot, cross_ion) &
     !$OMP& PRIVATE(old_vel, ion_life_time) &
     !$OMP& SHARED(nrPart, particles_species, particles_life, step, particles_cur_pos) &
-    !$OMP& SHARED(particles_prev_pos, particles_cur_vel, time_step) &
+    !$OMP& SHARED(particles_prev_pos, particles_cur_vel, time_step, n_d) &
     !$OMP& REDUCTION(+:nrColl, count_n, mean_path_avg, nrIon) SCHEDULE(GUIDED, CHUNK_SIZE)
     do i = 1, nrPart
       if (particles_species(i) /= species_elec) then

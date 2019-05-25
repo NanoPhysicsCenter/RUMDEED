@@ -142,6 +142,7 @@ module mod_global
 
   double precision :: T_temp = T_std ! Temperature in Kelvin
   double precision :: P_abs = P_std  ! Pressure as fraction of P_std
+  double precision :: n_d = P_std/(k_b*T_std) ! Density of N2
 
 
   ! ----------------------------------------------------------------------------
