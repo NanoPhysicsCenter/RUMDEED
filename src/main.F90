@@ -290,6 +290,9 @@ contains
     time_step = time_step * time_scale
     time_step2 = time_step**2 ! Time_step squared
 
+    ! Temperature and pressure
+    P_abs = P_abs * P_std 
+
     ! steps: Number of time steps that the program will simulate
     if (steps <= 0) then
       print '(a)', 'ERROR: steps <= 0'

@@ -41,6 +41,9 @@ module mod_global
   double precision, parameter :: q_0 = 1.6021766208d-19 ! Elementary charge (C)
   double precision, parameter :: q_02 = q_0**2 ! Elementary charge squared (C)
 
+  double precision, parameter      :: T_std = 293.15d0 ! Standard temperature in Kelvin
+  double precision, parameter      :: P_std = 101325.0d0 ! Standard pressure in Pa
+
   ! ----------------------------------------------------------------------------
   ! Define scales used when reading and writing data
   double precision, parameter :: length_scale = 1.0d-9 ! Length scale (1 nanometer)
@@ -136,6 +139,9 @@ module mod_global
   integer          :: steps      ! Number of time steps in the simulation
 
   logical          :: collisions = .false. ! Do ion colissions or not
+
+  double precision :: T_temp = T_std ! Temperature in Kelvin
+  double precision :: P_abs = P_std  ! Pressure as fraction of P_std
 
 
   ! ----------------------------------------------------------------------------
@@ -268,7 +274,7 @@ module mod_global
   namelist /input/ V_s, box_dim, time_step, steps, &
                    nrEmit, emitters_pos, emitters_dim, &
                    emitters_type, emitters_delay, EMISSION_MODE, &
-                   image_charge, N_ic_max, collisions
+                   image_charge, N_ic_max, collisions, T_temp, P_abs
 
   ! ----------------------------------------------------------------------------
   ! Prodecure interfaces and pointers
