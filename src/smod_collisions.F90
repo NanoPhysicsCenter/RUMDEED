@@ -30,7 +30,7 @@ contains
     double precision, parameter      :: v2_min      = (2.0d0*q_0*0.1d0/m_0) ! Minimum velocity squared
     double precision, parameter      :: v2_max      = (2.0d0*q_0*5000.0d0/m_0) ! Maximum velocity squared
     double precision, parameter      :: T_temp = 293.15d0 ! Temperature in Kelvin
-    double precision, parameter      :: P_abs = 101325.0d0*1.25d0 ! Absolute pressure in Pa
+    double precision, parameter      :: P_abs = 101325.0d0 ! Absolute pressure in Pa
     double precision, parameter      :: n_d = P_abs/(k_b*T_temp) ! Density
     double precision                 :: mean_path, mean_path_avg, mean_actual_avg ! Mean free path
     integer                          :: count_n
