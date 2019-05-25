@@ -106,7 +106,8 @@ contains
     nrEmitted = 0
 
     if (emitters_Type(1) == 1) then
-      call Do_Field_Emission_Tip_1(step)
+      !call Do_Field_Emission_Tip_1(step)
+      call Do_Field_Emission_Tip_Test(step)
     else
       ! Reverse the voltage
       call Do_Field_Emission_Tip_2(step)
