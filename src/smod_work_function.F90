@@ -23,10 +23,18 @@ submodule (mod_field_emission_v2) smod_work_function
   double precision, allocatable, dimension(:) :: w_gaussians_std_x ! standard deviation / spread in x
   double precision, allocatable, dimension(:) :: w_gaussians_std_y ! standard deviation / spread in y
 
+  ! Voronoi
+  integer                                     :: num_vor_sites ! Number of sites/cells in the Voronoi pattern
+  double precision, allocatable, dimension(:) :: vor_sites_x   ! x-position of a site
+  double precision, allocatable, dimension(:) :: vor_sites_y   ! y-position of a site
+  double precision, allocatable, dimension(:) :: vor_w_theta   ! Work function in cell
+  integer,          allocatable, dimension(:) :: vor_sec       ! The number for the section of the cell
+
   ! Type of work function models
   integer, parameter :: WORK_CHECKBOARD = 1
   integer, parameter :: WORK_GAUSS      = 2
   integer, parameter :: WORK_CIRCLE     = 3
+  integer, parameter :: WORK_VORONOI    = 4
 
   interface
     double precision function Work_fun(pos, sec)
@@ -107,6 +115,23 @@ contains
     case (WORK_CIRCLE)
       print '(a)', 'Vacuum: Using circle work function model'
       ptr_Work_fun => w_theta_circle
+    case (WORK_VORONOI)
+      print '(a)', 'Vacuum: Using Voronoi work function model'
+      ptr_Work_fun => w_theta_voronoi
+
+      ! Read the number of sites
+      read(unit=ud_work, FMT=*) num_vor_sites
+
+      ! Allocate variables
+      allocate(vor_sites_x(1:num_vor_sites))
+      allocate(vor_sites_y(1:num_vor_sites))
+      allocate(vor_w_theta(1:num_vor_sites))
+      allocate(vor_sec(1:num_vor_sites))
+
+      ! Loop over number of sites and read in each one
+      do i = 1, num_vor_sites
+        read(unit=ud_work, FMT=*) vor_sites_x, vor_sites_y, vor_w_theta, vor_sec
+      end do
     case DEFAULT
       print '(a)', 'Vacuum: ERROR UNKNOWN WORK FUNCTION TYPE'
       print *, WORK_TYPE
@@ -128,6 +153,14 @@ contains
       deallocate(w_gaussians_y)
       deallocate(w_gaussians_std_x)
       deallocate(w_gaussians_std_y)
+    end if
+
+
+    if (WORK_TYPE == WORK_VORONOI) then
+      deallocate(vor_sites_x)
+      deallocate(vor_sites_y)
+      deallocate(vor_w_theta)
+      deallocate(vor_sec)
     end if
   end subroutine Work_fun_cleanup
 
@@ -392,5 +425,89 @@ contains
       sec = 1
     end if
   end function w_theta_checkerboard_2x2
+
+  ! The function that handles the Voronoi patterns
+  double precision function w_theta_voronoi(pos, sec)
+    double precision, intent(in), dimension(1:3) :: pos
+    integer, intent(out), optional               :: sec
+
+    integer                                      :: k, i
+    double precision                             :: d, d_p
+
+    k = -1 ! The closest point, set to invalid value at start
+    d = 9.9E10 ! Distance squared to the closest point we have found so far, set it to a large number to begin with
+
+    ! Find the site that is closest to the point and pos
+    ! When the loop has finished the integer k will hold the index to the closest site.
+    do i = 1, num_vor_sites
+
+      ! Calculate the distance between pos and vor_site
+      ! Note we skip taking the square root, if x**2 < y**2 then sqrt(x**2) < sqrt(y**2) also or the other way around
+      d_p = (pos(1) - vor_sites_x(i))**2 + (pos(2) - vor_sites_y(i))**2
+
+      ! Check if we have found a site that is closer to our point at pos
+      if (d_p < d) then
+        k = i
+        d = d_p
+      end if
+    end do
+
+    ! Set the work function to the value of the closest site to pos
+    w_theta_voronoi = vor_w_theta(k)
+
+    ! Set the section
+    if (present(sec) .eqv. .true.) then
+      sec = vor_sec(k)
+    end if
+  end function w_theta_voronoi
+
+  logical function unit_test_voronoi()
+    double precision, dimension(1:3) :: pos ! Test point
+    integer                          :: sec
+    double precision                 :: res
+    
+    ! Set to true and then fail it later if necessary 
+    unit_test_voronoi = .true.
+
+    ! Set number of sites
+    num_vor_sites = 9
+    
+    ! Allocate variables
+    allocate(vor_sites_x(1:num_vor_sites))
+    allocate(vor_sites_y(1:num_vor_sites))
+    allocate(vor_w_theta(1:num_vor_sites))
+    allocate(vor_sec(1:num_vor_sites))
+
+    ! Set values for unit test
+    vor_sites_x = (/ 0.5d0, 0.0d0, 0.0d0, 1.1d0, 0.8d0, 1.4d0, 2.33d0, 2.0d0, 2.1d0/)
+    vor_sites_y = (/ 0.0d0, 1.0d0, 2.3d0, 0.0d0, 1.0d0, 2.0d0, 0.0d0, 1.25d0, 2.7d0 /)
+
+    vor_w_theta = (/ 1.0d0, 2.0d0, 3.0d0, 4.0d0, 5.0d0, 6.0d0, 7.0d00, 8.0d0, 9.0d0 /)
+    vor_sec = (/ 1, 2, 3, 4, 5, 6, 7, 8, 9 /)
+
+    ! Set the test point
+    pos = (/ 1.5d0, 1.0d0, 0.0d0/)
+
+    res = w_theta_voronoi(pos, sec) ! Should return 8.0d0 for the work function and also 8 for the section.
+
+    ! Check the values
+    if (abs(res - 8.0d0) > 1.0d-3) unit_test_voronoi = .false.
+    if (sec /= 8) unit_test_voronoi = .false.
+
+    ! Try another point
+    pos = (/ 1.0d0/3.0d0, 5.0d0/3.0d0, 0.0d0 /)
+
+    res = w_theta_voronoi(pos, sec) ! Should return 3.0d0 for the work function and also 3 for the section.
+
+    ! Check the values
+    if (abs(res - 3.0d0) > 1.0d-3) unit_test_voronoi = .false.
+    if (sec /= 3) unit_test_voronoi = .false.
+
+    ! Clean up
+    deallocate(vor_sites_x)
+    deallocate(vor_sites_y)
+    deallocate(vor_w_theta)
+    deallocate(vor_sec)
+  end function unit_test_voronoi
 
 end submodule smod_work_function
