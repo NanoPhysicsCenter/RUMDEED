@@ -130,7 +130,11 @@ contains
 
       ! Loop over number of sites and read in each one
       do i = 1, num_vor_sites
-        read(unit=ud_work, FMT=*) vor_sites_x, vor_sites_y, vor_w_theta, vor_sec
+        read(unit=ud_work, FMT=*) vor_sites_x(i), vor_sites_y(i), vor_w_theta(i), vor_sec(i)
+
+        ! Coordinates in the file should be given on scale from [0, 1]
+        vor_sites_x(i) = emitters_pos(1, 1) + vor_sites_x(i)*emitters_dim(1, 1)
+        vor_sites_y(i) = emitters_pos(2, 1) + vor_sites_y(i)*emitters_dim(2, 1)
       end do
     case DEFAULT
       print '(a)', 'Vacuum: ERROR UNKNOWN WORK FUNCTION TYPE'
