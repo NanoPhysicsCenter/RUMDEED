@@ -19,7 +19,7 @@ AS_IF([test "$GCC" = yes],
     [*LLVM*], [opt=-O3],
     [*gcc*4.2* | *gcc*4.4.3*], [opt=-O0],
     [opt=-O3])
-   CFLAGS=${USER_CFLAGS:-$opt -fomit-frame-pointer -ffast-math -Wall -march=native -flto}],
+   CFLAGS=${USER_CFLAGS:-$opt -fomit-frame-pointer -ffast-math -Wall -march=native}],
   [CFLAGS=${USER_CFLAGS:--O}])
 
 AC_C_CONST

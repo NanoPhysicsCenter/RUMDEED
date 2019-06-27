@@ -21,7 +21,7 @@ Module mod_field_emission_v2
   integer                            :: nrElecEmitAll
   !integer                            :: nrEmitted
   double precision, dimension(1:3)   :: F_avg = 0.0d0
-  integer, parameter                 :: N_MH_step = 20 ! Number of steps to do in the MH algorithm
+  integer, parameter                 :: N_MH_step = 5 ! Number of steps to do in the MH algorithm
   double precision                   :: residual = 0.0d0
 
   ! ----------------------------------------------------------------------------
@@ -244,7 +244,7 @@ contains
 
     df_avg = df_avg / N_sup
 
-    write (ud_field, "(i8, tr2, E16.8, tr2, E16.8, tr2, E16.8, tr2, i8, tr2, E16.8)", iostat=IFAIL) &
+    write (ud_field, "(i8, tr2, E16.8, tr2, E16.8, tr2, E16.8, tr2, E16.8, tr2, E16.8)", iostat=IFAIL) &
                                       step, F_avg(1), F_avg(2), F_avg(3), N_sup, df_avg
 
     nrElecEmitAll = nrElecEmitAll + nrElecEmit
