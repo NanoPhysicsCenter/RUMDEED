@@ -244,7 +244,7 @@ contains
 
     df_avg = df_avg / N_sup
 
-    write (ud_field, "(i8, tr2, E16.8, tr2, E16.8, tr2, E16.8, tr2, i8, tr2, E16.8)", iostat=IFAIL) &
+    write (ud_field, "(i8, tr2, E16.8, tr2, E16.8, tr2, E16.8, tr2, E16.8, tr2, E16.8)", iostat=IFAIL) &
                                       step, F_avg(1), F_avg(2), F_avg(3), N_sup, df_avg
 
     nrElecEmitAll = nrElecEmitAll + nrElecEmit
