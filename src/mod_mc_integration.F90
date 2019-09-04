@@ -1,20 +1,22 @@
 !-------------------------------------------!
-! Submodule for Monte Carlo Integration     !
+! module for Monte Carlo Integration     !
 ! routines for field emission               !
 ! Kristinn Torfason                         !
 ! 21.10.18                                  !
 !-------------------------------------------!
-submodule (mod_field_emission_v2) smod_mc_integration
+module mod_mc_integration
   use mod_global
   use mod_verlet
 
   implicit none
+
+  double precision, dimension(1:3)   :: F_avg = 0.0d0
 contains
   ! ----------------------------------------------------------------------------
   ! This function is called to do the surface integration.
   ! Here we select the method to do it.
   !
-  module subroutine Do_Surface_Integration_FE(emit, N_sup)
+  subroutine Do_Surface_Integration_FE(emit, N_sup)
     integer, intent(in)           :: emit ! The emitter to do the integration on
     double precision, intent(out) :: N_sup ! Number of electrons
 
@@ -229,4 +231,4 @@ contains
     N_sup = nint(N_sup_db) ! Round the number to integer
   end subroutine Do_2D_MC_plain_FE
 
-end submodule smod_mc_integration
+end module mod_mc_integration

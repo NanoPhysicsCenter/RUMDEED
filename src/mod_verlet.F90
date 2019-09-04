@@ -7,16 +7,9 @@
 Module mod_verlet
   use mod_global
   use mod_pair
+  use mod_collisions
   implicit none
 
-  interface
-    module subroutine Do_Ion_Collisions(step)
-      integer, intent(in) :: step
-    end subroutine
-
-    module subroutine Read_Cross_Section()
-    end subroutine
-  end interface
 contains
 
   ! ----------------------------------------------------------------------------
@@ -79,9 +72,9 @@ contains
     integer, intent(in) :: step
     integer             :: i
 
-    !$OMP PARALLEL DO DEFAULT(NONE) PRIVATE(i) &
+    !$OMP PARALLEL DO PRIVATE(i) &
     !$OMP& SHARED(particles_prev_pos, particles_cur_pos, particles_cur_vel, particles_cur_accel) &
-    !$OMP& SHARED(time_step, time_step2, particles_prev2_accel, particles_prev_accel, ptr_Check_Boundary) &
+    !$OMP& SHARED(time_step, time_step2, particles_prev2_accel, particles_prev_accel) &
     !$OMP& SCHEDULE(GUIDED, CHUNK_SIZE)
     do i = 1, nrPart
       ! Verlet

@@ -10,7 +10,7 @@ Module mod_field_emission_tip
   use mod_verlet
   use mod_pair
   use mod_ic
-  use ieee_arithmetic
+  !use ieee_arithmetic
   implicit none
 
   ! ----------------------------------------------------------------------------
@@ -861,7 +861,7 @@ end function Elec_supply_tip
       print *, 'Escape_prob = ', Escape_prob_Tip
       print *, ''
     end if
-    if (ieee_is_nan(Escape_Prob_tip) .eqv. .True.) then
+    if (isnan(Escape_Prob_tip) .eqv. .True.) then
     print *, 'Escape_Prob++ ', Escape_Prob_Tip
       print *, 'b_FN ', b_FN
       print *, 'w_theta_pos_tip ', w_theta_pos_tip(pos)

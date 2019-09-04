@@ -4,8 +4,9 @@
 ! Kristinn Torfason                         !
 ! 21.10.18                                  !
 !-------------------------------------------!
-submodule (mod_verlet) smod_collisions
+module mod_collisions
     use mod_global
+    use mod_pair
 
     implicit none
 
@@ -24,7 +25,7 @@ contains
   ! in one time step divided with the mean free path is used as a probability to
   ! determine if a collision occurs. The density of N2 molecules is calulated from
   ! the temperature and pressure.
-  module subroutine Do_Ion_Collisions(step)
+  subroutine Do_Ion_Collisions(step)
     integer, intent(in)              :: step
     double precision, dimension(1:3) :: cur_pos, prev_pos, par_vec, old_vel
     double precision, parameter      :: v2_min      = (2.0d0*q_0*0.1d0/m_0) ! Minimum velocity squared
@@ -204,7 +205,7 @@ contains
              (mean_path_avg/length_scale), (mean_actual_avg/length_scale)
   end subroutine Do_Ion_Collisions
 
-  module function Get_Injected_Vec(T, par_vel)
+  function Get_Injected_Vec(T, par_vel)
     double precision, dimension(1:3)             :: Get_Injected_Vec
     double precision, dimension(1:3), intent(in) :: par_vel
     double precision, intent(in)                 :: T ! Energy in eV
@@ -265,7 +266,7 @@ contains
   ! See:
   ! Dobly Differential Cross Section for Electron Scattered by Nitrogen
   ! J. C. Nogueira, M. A. Eschiapati Ferreira and Ronaldo S. Barbieri
-  module function Get_Ejected_Vec(W, T, par_vel)
+  function Get_Ejected_Vec(W, T, par_vel)
     double precision, dimension(1:3)             :: Get_Ejected_Vec
     double precision, intent(in)                 :: T, W
     double precision, dimension(1:3), intent(in) :: par_vel
@@ -333,7 +334,7 @@ contains
 
     ! --------------------------------------------------------------------------
     ! Read the Cross Section from a file
-  module subroutine Read_Cross_Section()
+  subroutine Read_Cross_Section()
     integer                      :: IFAIL, ud_cross, i, n
     character (len=*), parameter :: filename_tot="N2-tot-cross.txt"
     character (len=*), parameter :: filename_ion="N2-ion-cross.txt"
@@ -456,4 +457,4 @@ contains
       !Find_Cross_ion_data = cross_ion_data(i) * 1.0d-20 ! Data is in 10^-16 cm^2 to m^2
     end if
   end function Find_Cross_ion_data
-end submodule smod_collisions
+end module mod_collisions
