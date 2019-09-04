@@ -39,7 +39,7 @@ endif
 # ifeq ($(FCOMPILER),gfortran)
 ifneq (,$(findstring gfortran,$(FCOMPILER)))
 $(info Using GNU Fortran)
-FFLAGS=-O2 -ffast-math -flto -march=native -no-pie
+FFLAGS=-O2 -ffast-math -march=native
 #FFLAGS=-g -fcheck=all -Wall -fbacktrace #-ffpe-trap=zero,overflow,underflow,denormal,invalid
 ifdef OPENMP
 FFLAGS+=-fopenmp
@@ -91,7 +91,7 @@ $(PROJECT_NAME).out: ../src/main.F90 ../cuba/lib/libcuba.a \
 			$(CUBA_LIB) -lpthread -lm -ldl -o $(PROJECT_NAME).out
 
 ../cuba/lib/libcuba.a:
-		cd ../cuba/; ./install-cuba.sh
+		cd ../cuba/; chmod +x ./install-cuba.sh; ./install-cuba.sh
 
 mod_global.mod mod_global.o: ../src/mod_global.F90
 		$(FCOMPILER) -c $(FFLAGS) ../src/mod_global.F90
