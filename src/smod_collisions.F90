@@ -20,10 +20,11 @@ contains
   ! ----------------------------------------------------------------------------
   ! Ion collisions, Mean free path approach.
   ! Simulate collisions with N2 molecules. We read the collision cross section and use it
-  ! to calculate the mean free path of the electrons. The distance the electrons travel
-  ! in one time step divided with the mean free path is used as a probability to
-  ! determine if a collision occurs. The density of N2 molecules is calulated from
-  ! the temperature and pressure.
+  ! to calculate the mean free path of the electrons.
+  !
+  ! The distance the electrons travel in one time step divided with the mean free
+  ! path is used as a probability to determine if a collision occurs.
+  ! The density of N2 molecules is calulated from the temperature and pressure.
   module subroutine Do_Ion_Collisions(step)
     integer, intent(in)              :: step
     double precision, dimension(1:3) :: cur_pos, prev_pos, par_vec, old_vel
@@ -70,7 +71,7 @@ contains
         d = sqrt( (cur_pos(1) - prev_pos(1))**2 + (cur_pos(2) - prev_pos(2))**2 + (cur_pos(3) - prev_pos(3))**2 )
         vel2 = old_vel(1)**2 + old_vel(2)**2 + old_vel(3)**2
       
-        ! Check if we do a collision or not
+        ! The velocity should be above the minimum velocity we set.
         !if ((vel2 > v2_min) .and. (vel2 < v2_max)) then
         if (vel2 > v2_min) then
 
@@ -86,6 +87,7 @@ contains
           mean_path_avg = mean_path_avg + mean_path
           count_n = count_n + 1
 
+          ! Calculate the ratio between the distance travled and the mean free path
           alpha = d/mean_path
           ! if (alpha > 1.0d0) then
           !   print *, 'WARNING: alpha > 1 in mean path'
@@ -126,6 +128,8 @@ contains
             !particles_last_col_pos(:, i) = cur_pos(:)
             !mean_actual_avg = mean_actual_avg + d
 
+            !---------------------------------------------
+            ! Check if the collision ionizes the N2 or not  
             cross_ion = Find_Cross_ion_data(KE)
             
             alpha = cross_ion/cross_tot
@@ -134,10 +138,10 @@ contains
             !   print *, 'WARNING: alpha > 1 in cross section'
             ! end if
             
-            ! Check if the collision ionizes the N2 or not  
             call random_number(rnd)
-            if (rnd < alpha) then
+            if (rnd < alpha) then ! Check if we ionize or not
 
+              ! We ionize
               ! Pick a position for the new electron to appear at some where close to where the collision occurred
               call random_number(prev_pos)
               prev_pos = prev_pos - 0.5d0
