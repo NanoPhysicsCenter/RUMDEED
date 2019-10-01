@@ -430,7 +430,6 @@ contains
     end if
   end function w_theta_checkerboard_2x2
 
-<<<<<<< HEAD:src/smod_work_function.F90
   ! The function that handles the Voronoi patterns
   double precision function w_theta_voronoi(pos, sec)
     double precision, intent(in), dimension(1:3) :: pos
@@ -515,7 +514,4 @@ contains
     deallocate(vor_sec)
   end function unit_test_voronoi
 
-end submodule smod_work_function
-=======
 end module mod_work_function
->>>>>>> dfc169e83b68ae2b6ede2ab626941d244ae0479e:src/mod_work_function.F90
