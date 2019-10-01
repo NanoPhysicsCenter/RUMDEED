@@ -1,10 +1,10 @@
 !-------------------------------------------!
-! Submodule for position dependent          !
+! module for position dependent          !
 ! work function                             !
 ! Kristinn Torfason                         !
 ! 21.10.18                                  !
 !-------------------------------------------!
-submodule (mod_field_emission_v2) smod_work_function
+module mod_work_function
   use mod_global
 
   implicit none
@@ -45,7 +45,7 @@ submodule (mod_field_emission_v2) smod_work_function
   procedure(Work_fun), pointer :: ptr_Work_fun => null()
 contains
 
-  module subroutine Read_work_function()
+  subroutine Read_work_function()
     integer :: ud_work, IFAIL, i, j
     character(256) :: iomsg
 
@@ -146,7 +146,7 @@ contains
   end subroutine Read_work_function
 
   ! Clean up stuff
-  module subroutine Work_fun_cleanup()
+  subroutine Work_fun_cleanup()
     if (WORK_TYPE == WORK_CHECKBOARD) then
       deallocate(w_theta_arr)
     end if
@@ -171,7 +171,7 @@ contains
   ! ----------------------------------------------------------------------------
   ! Function that returns the position dependant work function.
   ! This function simply calls the function that was set in Read_work_function.
-  module double precision function w_theta_xy(pos, sec)
+  double precision function w_theta_xy(pos, sec)
     double precision, dimension(1:3), intent(in) :: pos
     integer, intent(out), optional               :: sec
 
@@ -430,6 +430,7 @@ contains
     end if
   end function w_theta_checkerboard_2x2
 
+<<<<<<< HEAD:src/smod_work_function.F90
   ! The function that handles the Voronoi patterns
   double precision function w_theta_voronoi(pos, sec)
     double precision, intent(in), dimension(1:3) :: pos
@@ -515,3 +516,6 @@ contains
   end function unit_test_voronoi
 
 end submodule smod_work_function
+=======
+end module mod_work_function
+>>>>>>> dfc169e83b68ae2b6ede2ab626941d244ae0479e:src/mod_work_function.F90
