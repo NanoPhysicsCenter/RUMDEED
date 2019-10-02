@@ -5,7 +5,7 @@
 # Compiler to use
 ifndef FCOMPILER
 #FCOMPILER=ifort
-FCOMPILER=gfortran
+FCOMPILER=gfortran-6
 #FCOMPILER=pgfortran
 endif
 
@@ -39,8 +39,8 @@ endif
 # ifeq ($(FCOMPILER),gfortran)
 ifneq (,$(findstring gfortran,$(FCOMPILER)))
 $(info Using GNU Fortran)
-FFLAGS=-O2 -ffast-math -march=native
-#FFLAGS=-g -fcheck=all -Wall -fbacktrace #-ffpe-trap=zero,overflow,underflow,denormal,invalid
+FFLAGS=-O3 -ffast-math -march=native -fomit-frame-pointer
+#FFLAGS=-g -fcheck=all -Wall -fbacktrace -ffpe-trap=invalid,zero,overflow,underflow
 ifdef OPENMP
 FFLAGS+=-fopenmp
 endif

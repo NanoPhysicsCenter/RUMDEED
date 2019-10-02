@@ -194,7 +194,9 @@ contains
 
     end if
 
-    mean_path_avg = mean_path_avg / count_n
+    if (count_n > 1) then
+      mean_path_avg = mean_path_avg / count_n
+    end if
     mean_actual_avg = 0.0d0
 
     cur_time = time_step * step / time_scale ! Scaled in units of time_scale

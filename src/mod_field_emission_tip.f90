@@ -1149,10 +1149,10 @@ end function Elec_supply_tip
     integer            :: flags = 0+4 ! Flags
     integer            :: seed = 0 ! Seed for the rng. Zero will use Sobol.
     integer            :: mineval = 1000 ! Minimum number of integrand evaluations
-    integer            :: maxeval = 5000000 ! Maximum number of integrand evaluations
+    integer            :: maxeval = 50000000 ! Maximum number of integrand evaluations
     integer            :: nnew = 250 ! Number of integrand evaluations in each subdivision
     integer            :: nmin = 100 ! Minimum number of samples a former pass must contribute to a subregion to be considered in the region's compound integral value.
-    double precision   :: flatness = 10.0d0 ! Determine how prominently out-liers, i.e. samples with a large fluctuation, 
+    double precision   :: flatness = 5.0d0 ! Determine how prominently out-liers, i.e. samples with a large fluctuation, 
                                            ! figure in the total fluctuation, which in turn determines how a region is split up.
                                            ! As suggested by its name, flatness should be chosen large for 'flat" integrand and small for 'volatile' integrands
                                            ! with high peaks.
@@ -1165,6 +1165,10 @@ end function Elec_supply_tip
     double precision, dimension(1:ncomp) :: error ! <out> The presumed absolute error
     double precision, dimension(1:ncomp) :: prob ! <out> The chi-square probability
 
+    !integer            :: verbose = 0
+    !integer, parameter :: last = 4
+    integer, parameter :: key = 0
+
 
     ! Initialize the average field to zero
     !F_avg = 0.0d0
@@ -1172,11 +1176,18 @@ end function Elec_supply_tip
     ! Pass the number of the emitter being integraded over to the integrand as userdata
     userdata = emit
 
-    call suave(ndim, ncomp, integrand_cuba_fe_tip_test, userdata, nvec, &
-     & epsrel, epsabs, flags, seed, &
-     & mineval, maxeval, nnew, nmin, flatness, &
+    !call suave(ndim, ncomp, integrand_cuba_fe_tip_test, userdata, nvec, &
+    ! & epsrel, epsabs, flags, seed, &
+    ! & mineval, maxeval, nnew, nmin, flatness, &
+    ! & statefile, spin, &
+    ! & nregions, neval, fail, integral, error, prob)
+
+     call cuhre(ndim, ncomp, integrand_cuba_fe_tip_test, userdata, nvec, &
+     & epsrel, epsabs, flags, &
+     & mineval, maxeval, key, &
      & statefile, spin, &
      & nregions, neval, fail, integral, error, prob)
+
 
      if (fail /= 0) then
       print '(a)', 'Vacuum: WARNING Cuba did not return 0'
