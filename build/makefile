@@ -5,7 +5,7 @@
 # Compiler to use
 ifndef FCOMPILER
 #FCOMPILER=ifort
-FCOMPILER=gfortran-6
+FCOMPILER=gfortran
 #FCOMPILER=pgfortran
 endif
 
@@ -152,6 +152,7 @@ clean:
 		rm -f *.mod
 		rm -f *.smod
 		rm -f $(PROJECT_NAME).out
+		rm -f $(CUBA_LIB)
 
 install:
 		cp $(PROJECT_NAME).out ../data/
