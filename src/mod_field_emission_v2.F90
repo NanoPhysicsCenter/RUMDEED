@@ -169,8 +169,9 @@ contains
 
     ! Do integration
     call Do_Cuba_Suave_Simple(emit, N_sup)
-    N_round = nint(N_sup + residual)
-    residual = N_sup - N_round
+    N_round = Rand_Poission(N_sup)
+    !N_round = nint(N_sup + residual)
+    !residual = N_sup - N_round
 
     ! Loop over all electrons and place them
 
