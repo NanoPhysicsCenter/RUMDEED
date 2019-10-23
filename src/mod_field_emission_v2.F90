@@ -24,7 +24,7 @@ Module mod_field_emission_v2
   !integer                            :: nrEmitted
   double precision, dimension(1:3)   :: F_avg = 0.0d0
   integer, parameter                 :: N_MH_step = 5 ! Number of steps to do in the MH algorithm
-  double precision                   :: residual = 0.0d0
+  double precision                   :: residual = 0.0d0 ! Should be a array the size of the number of emitters
 
   ! ----------------------------------------------------------------------------
   ! Constants for field emission
@@ -169,9 +169,9 @@ contains
 
     ! Do integration
     call Do_Cuba_Suave_Simple(emit, N_sup)
-    N_round = Rand_Poission(N_sup)
-    !N_round = nint(N_sup + residual)
-    !residual = N_sup - N_round
+
+    N_round = nint(N_sup + residual)
+    residual = N_sup - N_round
 
     ! Loop over all electrons and place them
 
