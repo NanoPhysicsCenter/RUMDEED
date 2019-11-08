@@ -38,8 +38,11 @@ double precision function Get_Kevin_Jgtf(F, T, w_theta)
   double precision             :: F_evnm
 
   F_evnm = F * 1.0d-9 ! Kevin wants the field in eV/nm see note above (Basically we convert to GV/m).
-
+  print *, 'Enter Kevin'
   Get_Kevin_Jgtf = RJgtf(w_theta, Chem, F, T) * (1.0d0/1.0d-2)**2 ! Kevin returns in A/cm² convert to A/m²
+  print *, Get_Kevin_Jgtf
+  print *, 'Exit Kevin'
+  print *, ''
 end function Get_Kevin_Jgtf
 
 !==============================================================
@@ -138,7 +141,7 @@ double precision function RJgtf(Phi,Chem,Fld,Tmp)
   Bfmphi = pi*sqrt(y*rmo*Phi) /( rhbar*Fld)
   Tmin = (rhbar*Fld/(4*ty*rkb))*sqrt(2.0d0/(rmo*Phi))
   Tmax = (rhbar*Fld/(pi*rkb)) *sqrt(1.0d0/(y*rmo*Phi))
-  
+
   ! Three regimes:
   if(Tmp.le.Tmin) then !Field Emission Regime
     s = Qmu
