@@ -121,7 +121,9 @@ subroutine Init_Field_Thermo_Emission()
     call Do_Cuba_Suave_Simple(emit, N_sup)
 
     ! Use the number electrons as an average for a Poission distribution to get the number of electrons to emitt 
+    print *, N_sup
     N_round = Rand_Poission(N_sup)
+    print *, N_round
 
     ! Loop over all electrons and place them
     do i = 1, N_round
