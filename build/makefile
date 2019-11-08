@@ -79,12 +79,15 @@ $(PROJECT_NAME).out: ../src/main.F90 ../cuba/lib/libcuba.a \
 			mod_field_emission.mod mod_field_emission.o \
 			mod_field_emission_tip.mod mod_field_emission_tip.o \
 			mod_field_emission_v2.mod mod_field_emission_v2.o \
+			mod_field_thermo_emission.mod mod_field_thermo_emission.o \
 			mod_field_emission_2D.mod mod_field_emission_2D.o \
 			mod_work_function.mod mod_work_function.o \
-			mod_collisions.mod mod_collisions.o mod_ziggurat.o
+			mod_collisions.mod mod_collisions.o mod_ziggurat.o \
+			mod_kevin_rjgtf.mod mod_kevin_rjgtf.o
 		$(FCOMPILER) $(FFLAGS) -D_GIT_VERSION_=\"${GIT_VERSION}\" \
 		    ../src/main.F90 mod_global.o mod_verlet.o mod_pair.o \
 			mod_unit_tests.o mod_photo_emission.o mod_field_emission.o mod_field_emission_v2.o \
+			mod_field_thermo_emission.o mod_kevin_rjgtf.o \
 			mod_field_emission_tip.o mod_hyperboloid_tip.o mod_field_emission_2D.o \
 			mod_work_function.o mod_collisions.o \
 			mod_ziggurat.o \
@@ -116,6 +119,12 @@ mod_field_emission.mod mod_field_emission.o: ../src/mod_field_emission.f90 mod_g
 
 mod_field_emission_v2.mod mod_field_emission_v2.o: ../src/mod_field_emission_v2.F90 mod_global.mod mod_verlet.mod mod_pair.mod ziggurat.mod mod_work_function.mod
 		$(FCOMPILER) -c $(FFLAGS) ../src/mod_field_emission_v2.F90
+
+mod_field_thermo_emission.mod mod_field_thermo_emission.o: ../src/mod_field_thermo_emission.F90 mod_global.mod mod_verlet.mod mod_pair.mod ziggurat.mod mod_work_function.mod mod_kevin_rjgtf.mod
+		$(FCOMPILER) -c $(FFLAGS) ../src/mod_field_thermo_emission.F90
+
+mod_kevin_rjgtf.mod mod_kevin_rjgtf.o: ../src/mod_kevin_rjgtf.F90
+		$(FCOMPILER) -c $(FFLAGS) ../src/mod_kevin_rjgtf.F90
 
 mod_field_emission_2D.mod mod_field_emission_2D.o: ../src/mod_field_emission_2D.f90 mod_global.mod mod_verlet.mod mod_pair.mod
 			$(FCOMPILER) -c $(FFLAGS) ../src/mod_field_emission_2D.f90

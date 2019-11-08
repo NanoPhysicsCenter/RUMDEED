@@ -23,7 +23,7 @@ Module mod_field_emission_v2
   integer                            :: nrElecEmitAll
   !integer                            :: nrEmitted
   double precision, dimension(1:3)   :: F_avg = 0.0d0
-  integer, parameter                 :: N_MH_step = 5 ! Number of steps to do in the MH algorithm
+  integer, parameter                 :: N_MH_step = 10 ! Number of steps to do in the MH algorithm
   double precision                   :: residual = 0.0d0 ! Should be a array the size of the number of emitters
 
   ! ----------------------------------------------------------------------------
@@ -170,11 +170,10 @@ contains
     ! Do integration
     call Do_Cuba_Suave_Simple(emit, N_sup)
 
-    N_round = nint(N_sup + residual)
+    N_round = nint(N_sup + residual) ! Round to whole number
     residual = N_sup - N_round
 
     ! Loop over all electrons and place them
-
     do i = 1, N_round
       call Metropolis_Hastings_rectangle_v2(N_MH_step, emit, D_f, F, par_pos)
     
@@ -182,7 +181,6 @@ contains
       par_pos(3) = 1.0d0*length_scale
       par_vel = 0.0d0
       rnd = w_theta_xy(par_pos, sec) ! Get the section
-      !!$OMP CRITICAL(EMIT_PAR)
 
       ! Add a particle to the system
       call Add_Particle(par_pos, par_vel, species_elec, step, emit, -1, sec)
