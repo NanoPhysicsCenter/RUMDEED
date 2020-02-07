@@ -215,7 +215,7 @@ contains
     integer                          :: nrElecEmit
     double precision, dimension(1:3) :: par_pos, par_vel
 
-    call Do_Cuba_Suave_Simple(emit, N_sup)
+    call Do_Surface_Integration_FE(emit, N_sup)
     N_round = nint(N_sup + residual)
     residual = N_sup - N_round
 
