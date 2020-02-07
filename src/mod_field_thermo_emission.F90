@@ -140,6 +140,7 @@ subroutine Init_Field_Thermo_Emission()
     !print *, N_sup
     N_round = Rand_Poission(N_sup)
     !print *, N_round
+    nrElecEmit = 0
 
     ! Loop over all electrons and place them
     do i = 1, N_round
