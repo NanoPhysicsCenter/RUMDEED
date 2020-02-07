@@ -29,6 +29,22 @@ Module mod_field_thermo_emission
   ! Constant used in MC integration (function Elec_Supply_V2)
   double precision :: time_step_div_q0
 
+  ! ----------------------------------------------------------------------------
+  ! Constants for field emission
+  ! Fyrst Fowler-Nordheim constant in units [ A eV V^{-2} ]
+  double precision, parameter :: a_FN = q_02/(16.0d0*pi**2*h_bar)
+
+  ! Second Fowler-Nodheim constant in units [ eV^{-3/2} V m^{-1} ]
+  double precision, parameter :: b_FN = -4.0d0/(3.0d0*h_bar) * sqrt(2.0d0*m_0*q_0)
+
+  ! Constant used for calculation of the l in v_y and t_y.
+  ! The units are [ eV^{2} V^{-1} m ]
+  ! See Forbes, R. G., & Deane, J. H. (2007, November).
+  ! "Reformulation of the standard theory of Fowler–Nordheim tunnelling and cold field electron emission."
+  ! In Proceedings of the Royal Society of London A: Mathematical,
+  ! Physical and Engineering Sciences (Vol. 463, No. 2087, pp. 2907-2927). The Royal Society.
+  double precision, parameter :: l_const = q_0 / (4.0d0*pi*epsilon_0)
+
 contains
 
   !-----------------------------------------------------------------------------
@@ -121,18 +137,18 @@ subroutine Init_Field_Thermo_Emission()
     call Do_Cuba_Suave_Simple(emit, N_sup)
 
     ! Use the number electrons as an average for a Poission distribution to get the number of electrons to emitt 
-    print *, N_sup
+    !print *, N_sup
     N_round = Rand_Poission(N_sup)
-    print *, N_round
+    !print *, N_round
 
     ! Loop over all electrons and place them
     do i = 1, N_round
-      call Metropolis_Hastings_rectangle_v2_field(N_MH_step, emit, D_f, F, par_pos)
-    
+      !call Metropolis_Hastings_rectangle_v2_field(N_MH_step, emit, D_f, F, par_pos)
+      call Metropolis_Hastings_rectangle_v2(N_MH_step, emit, D_f, F, par_pos)
 
       par_pos(3) = 1.0d0*length_scale
       par_vel = 0.0d0
-      rnd = w_theta_xy(par_pos, sec) ! Get the section
+      rnd = w_theta_xy(par_pos, emit, sec) ! Get the section
 
       ! Add a particle to the system
       call Add_Particle(par_pos, par_vel, species_elec, step, emit, -1, sec)
@@ -148,6 +164,102 @@ subroutine Init_Field_Thermo_Emission()
 
     nrElecEmitAll = nrElecEmitAll + nrElecEmit
   end subroutine Do_Field_Thermo_Emission_Planar_simple
+
+  !-----------------------------------------------------------------------------
+  ! Metropolis-Hastings algorithm
+  ! Includes that the work function can vary with position
+  subroutine Metropolis_Hastings_rectangle_v2(ndim, emit, df_out, F_out, pos_out)
+    ! The interface is declared in the parent module
+    integer, intent(in)                           :: ndim, emit
+    double precision, intent(out)                 :: df_out, F_out
+    double precision, intent(out), dimension(1:3) :: pos_out
+    integer                                       :: count, i
+    double precision                              :: rnd, alpha
+    double precision, dimension(1:2)              :: std
+    double precision, dimension(1:3)              :: cur_pos, new_pos, field
+    double precision                              :: df_cur, df_new
+
+    std(1:2) = emitters_dim(1:2, emit)*0.075d0/100.d0 ! Standard deviation for the normal distribution is 0.075% of the emitter length.
+    ! This means that 68% of jumps are less than this value.
+    ! The expected value of the absolute value of the normal distribution is std*sqrt(2/pi).
+
+    ! Get a random initial position on the surface.
+    ! We pick this location from a uniform distribution.
+    count = 0
+    do ! Infinite loop, we try to find a favourable position to start from
+      CALL RANDOM_NUMBER(cur_pos(1:2))
+      cur_pos(1:2) = cur_pos(1:2)*emitters_dim(1:2, emit) + emitters_pos(1:2, emit)
+      cur_pos(3) = 0.0d0 ! On the surface
+
+      ! Calculate the electric field at this position
+      field = Calc_Field_at(cur_pos)
+      if (field(3) < 0.0d0) then
+        exit ! We found a nice spot so we exit the loop
+      else
+        count = count + 1
+        if (count > 10000) exit ! The loop is infnite, must stop it at some point.
+        ! In field emission it is rare the we reach the CL limit.
+      end if
+    end do
+
+    F_out = field(3)
+
+    ! Calculate the escape probability at this location
+    if (field(3) < 0.0d0) then
+      df_cur = Escape_Prob(field(3), cur_pos, emit)
+    else
+      df_cur = 0.0d0 ! Zero escape probabilty if field is not favourable
+    end if
+
+    !---------------------------------------------------------------------------
+    ! We now pick a random distance and direction to jump to from our
+    ! current location. We do this ndim times.
+    do i = 1, ndim
+      ! Find a new position using a normal distribution.
+      !new_pos(1:2) = ziggurat_normal(cur_pos(1:2), std)
+      new_pos(1:2) = box_muller(cur_pos(1:2), std)
+      new_pos(3) = 0.0d0 ! At the surface
+
+      ! Make sure that the new position is within the limits of the emitter area.
+      call check_limits_metro_rec(new_pos, emit)
+
+      ! Calculate the field at the new position
+      field = Calc_Field_at(new_pos)
+
+      ! Check if the field is favourable for emission at the new position.
+      ! If it is not then cycle, i.e. we reject this location and
+      ! pick another one.
+      if (field(3) > 0.0d0) cycle ! Do the next loop iteration, i.e. find a new position.
+
+      ! Calculate the escape probability at the new position, to compair with
+      ! the current position.
+      df_new = Escape_Prob(field(3), new_pos, emit)
+
+      ! If the escape probability is higher in the new location,
+      ! then we jump to that location. If it is not then we jump to that
+      ! location with the probabilty df_new / df_cur.
+      if (df_new > df_cur) then
+        cur_pos = new_pos ! New position becomes the current position
+        df_cur = df_new
+        F_out = field(3)
+      else
+        alpha = df_new / df_cur
+
+        CALL RANDOM_NUMBER(rnd)
+        ! Jump to this position with probability alpha, i.e. if rnd is less than alpha
+        if (rnd < alpha) then
+          cur_pos = new_pos ! New position becomes the current position
+          df_cur = df_new
+          F_out = field(3)
+        end if
+      end if
+    end do
+
+    ! Return the current position
+
+    pos_out = cur_pos
+    df_out = df_cur
+  end subroutine Metropolis_Hastings_rectangle_v2
 
   subroutine Metropolis_Hastings_rectangle_v2_field(ndim, emit, df_out, F_out, pos_out)
     ! The interface is declared in the parent module
@@ -314,8 +426,9 @@ subroutine Init_Field_Thermo_Emission()
     if (field(3) < 0.0d0) then
       ! The field is favourable for emission
       ! Calculate the current density at this point
-      w_theta = w_theta_xy(par_pos)
+      w_theta = w_theta_xy(par_pos, userdata)
       ff(1) = Get_Kevin_Jgtf(field(3), T_temp, w_theta)
+      !ff(1) = Elec_Supply_V2(field(3), par_pos, userdata)*Escape_Prob(field(3), par_pos, userdata)
     else
       ! The field is NOT favourable for emission
       ! This point does not contribute
@@ -382,10 +495,90 @@ subroutine Init_Field_Thermo_Emission()
 
      !! Round the results to the nearest integer
      !N_sup = nint( integral(1) )
-     N_sup = integral(1)
+     N_sup = integral(1) * time_step_div_q0
 
      ! Finish calculating the average field
      F_avg = F_avg / neval
   end subroutine Do_Cuba_Suave_Simple
+
+
+
+!----------------------------------------------------------------------------------------
+! The functions v_y and t_y are because of the image charge effect in the FN equation.
+! The approximation for v_y and t_y are taken from
+! Forbes, R. G., & Deane, J. H. (2007, November).
+! "Reformulation of the standard theory of Fowler–Nordheim tunnelling and cold field electron emission."
+! In Proceedings of the Royal Society of London A: Mathematical,
+! Physical and Engineering Sciences (Vol. 463, No. 2087, pp. 2907-2927). The Royal Society.
+!
+  double precision function v_y(F, pos, emit)
+    double precision, intent(in)                 :: F
+    double precision, dimension(1:3), intent(in) :: pos
+    integer, intent(in)                          :: emit
+    double precision                             :: l
+
+    if (image_charge .eqv. .true.) then
+      l = l_const * (-1.0d0*F) / w_theta_xy(pos, emit)**2 ! l = y^2, y = 3.79E-4 * sqrt(F_old) / w_theta
+      if (l > 1.0d0) then
+        l = 1.0d0
+      end if
+      v_y = 1.0d0 - l + 1.0d0/6.0d0 * l * log(l)
+    else
+      v_y = 1.0d0
+    end if
+  end function v_y
+
+  double precision function t_y(F, pos, emit)
+    double precision, intent(in)                 :: F
+    double precision, dimension(1:3), intent(in) :: pos
+    integer, intent(in)                          :: emit
+    double precision                             :: l
+
+    if (image_charge .eqv. .true.) then
+      l = l_const * (-1.0d0*F) / w_theta_xy(pos, emit)**2 ! l = y^2, y = 3.79E-4 * sqrt(F_old) / w_theta
+      if (l > 1.0d0) then
+        print *, 'Error: l > 1.0'
+        print *, 'l = ', l, ', F = ', F, ', t_y = ', t_y
+        print *, 'x = ', pos(1)/length_scale, 'y = ', pos(2)/length_scale, ' z = ,', pos(3)/length_scale
+        l = 1.0d0
+        !call Write_Current_Position()
+        !stop
+      end if
+
+      t_y = 1.0d0 + l*(1.0d0/9.0d0 - 1.0d0/18.0d0*log(l))
+    else
+      t_y = 1.0d0
+    end if
+  end function t_y
+
+  !-----------------------------------------------------------------------------
+  ! This function returns the escape probability of the Electrons.
+  ! Escape_prob = exp(-b_FN*w_theta^(3/2)*v_y/F) .
+  double precision function Escape_Prob(F, pos, emit)
+    double precision, intent(in)                 :: F
+    double precision, dimension(1:3), intent(in) :: pos
+    integer, intent(in)                          :: emit
+
+    Escape_Prob = exp(b_FN * (sqrt(w_theta_xy(pos, emit)))**3 * v_y(F, pos, emit) / (-1.0d0*F))
+
+    if (Escape_Prob > 1.0d0) then
+      print *, 'Escape_prob is larger than 1.0'
+      print *, 'Escape_prob = ', Escape_prob
+      print *, ''
+    end if
+  end function Escape_Prob
+
+  !-----------------------------------------------------------------------------
+  ! A simple function that calculates
+  ! A_FN/(t**2(l)*w_theta(x,y)) F**2(x,y)
+  ! pos: Position to calculate the function
+  ! F: The z-component of the field at par_pos, it should be F < 0.0d0.
+  double precision function Elec_Supply_V2(F, pos, emit)
+    double precision, dimension(1:3), intent(in) :: pos
+    double precision,                 intent(in) :: F
+    integer, intent(in)                          :: emit
+
+    Elec_Supply_V2 = time_step_div_q0 * a_FN/(t_y(F, pos, emit)**2*w_theta_xy(pos, emit)) * F**2
+  end function Elec_Supply_V2
 
 end module mod_field_thermo_emission

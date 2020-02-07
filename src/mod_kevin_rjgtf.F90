@@ -2,6 +2,7 @@
 ! RJgtf subroutine pulled out
 
 module mod_kevin_rjgtf
+!use mod_global
 
 implicit none
 PRIVATE
@@ -15,7 +16,7 @@ PUBLIC :: Get_Kevin_Jgtf
 ! terms with different units are combinations of Units
 ! eg: [rmo] = [eV]/c ̂ 2, [c] = nm/fs
 !––––––––––––––––––––––––––––––––––––––––––––––––-
-    double precision, parameter :: pi = 3.14159265359d0, &
+    double precision, parameter :: pi = 3.14159265359, &
     & rmo = 5.685629853d0, rkb = 1.0d0/11604.5192d0, &
     & rhbar = 0.658211899d0, &
     & alpha = 7.29735257d-3, c = 299.7924580d0, &
@@ -30,19 +31,17 @@ contains
 ! Field: V/m -> eV/nm
 ! Current density: A/cm² -> A/m²
 ! Note that in Kevins units the electron charge is e = 1.
-! This means the 1 V = 1 eV and that 1 GV/m = 1 eV/nm.
+! This means that 1 V = 1 eV and that 1 GV/m = 1 eV/nm.
 ! See Chapter 2 page 10 in Kevins book Introduction to the Physics of Electrom Emission.
 double precision function Get_Kevin_Jgtf(F, T, w_theta)
   double precision, intent(in) :: F, T, w_theta
-  double precision             :: Chem = 7.0d0 ! Chemical potential
+  double precision             :: Chem = 7.0d0 ! Chemical potential, it dosen't seem to matter what this number is!
   double precision             :: F_evnm
 
-  F_evnm = F * 1.0d-9 ! Kevin wants the field in eV/nm see note above (Basically we convert to GV/m).
-  print *, 'Enter Kevin'
-  Get_Kevin_Jgtf = RJgtf(w_theta, Chem, F, T) * (1.0d0/1.0d-2)**2 ! Kevin returns in A/cm² convert to A/m²
-  print *, Get_Kevin_Jgtf
-  print *, 'Exit Kevin'
-  print *, ''
+  !F_evnm = abs(F)*1.0E-6
+
+  F_evnm = abs(F) * 1.0d-9 ! Kevin wants the field in eV/nm see note above (Basically we convert to GV/m).
+  Get_Kevin_Jgtf = RJgtf(w_theta, Chem, F_evnm, T) * 1.0d4 ! Kevin returns in A/cm² convert to A/m²
 end function Get_Kevin_Jgtf
 
 !==============================================================

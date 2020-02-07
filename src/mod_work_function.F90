@@ -37,8 +37,9 @@ module mod_work_function
   integer, parameter :: WORK_VORONOI    = 4
 
   interface
-    double precision function Work_fun(pos, sec)
+    double precision function Work_fun(pos, emit, sec)
       double precision, dimension(1:3), intent(in) :: pos
+      integer, intent(in)                          :: emit
       integer, intent(out), optional               :: sec
     end function Work_fun
   end interface
@@ -171,12 +172,13 @@ contains
   ! ----------------------------------------------------------------------------
   ! Function that returns the position dependant work function.
   ! This function simply calls the function that was set in Read_work_function.
-  double precision function w_theta_xy(pos, sec)
+  double precision function w_theta_xy(pos, emit, sec)
     double precision, dimension(1:3), intent(in) :: pos
+    integer, intent(in)                          :: emit ! Number of the emitter
     integer, intent(out), optional               :: sec
 
     ! Call the function set in Read_work_function
-    w_theta_xy = ptr_Work_fun(pos, sec)
+    w_theta_xy = ptr_Work_fun(pos, emit, sec)
    
     !w_theta_xy = w_theta_triangle(pos, sec)
     !w_theta_xy = w_theta_checkerboard(pos, sec)
@@ -189,8 +191,9 @@ contains
   ! ----------------------------------------------------------------------------
   ! Constant work function
   !
-  double precision function w_theta_constant(pos, sec)
+  double precision function w_theta_constant(pos, emit, sec)
     double precision, dimension(1:3), intent(in) :: pos
+    integer, intent(in)                          :: emit
     integer, intent(out), optional               :: sec
 
     w_theta_constant = 2.0d0
@@ -203,8 +206,9 @@ contains
   ! ----------------------------------------------------------------------------
   ! A Gaussian work function that dips
   !
-  double precision function w_theta_gaussian(pos, sec)
+  double precision function w_theta_gaussian(pos, emit, sec)
     double precision, intent(in), dimension(1:3) :: pos
+    integer, intent(in)                          :: emit
     integer, intent(out), optional               :: sec
     double precision                             :: A
     double precision                             :: std_x, std_y
@@ -244,8 +248,9 @@ contains
     end if
   end function w_theta_gaussian
 
-  double precision function w_theta_circle(pos, sec)
+  double precision function w_theta_circle(pos, emit, sec)
   double precision, intent(in), dimension(1:3) :: pos
+  integer, intent(in)                          :: emit
   integer, intent(out), optional               :: sec
 
   integer                                      :: sec_
@@ -265,7 +270,7 @@ contains
     w_theta_circle = 2.20d0
     sec_ = 3
   else
-    w_theta_circle = 2.20d0
+    w_theta_circle = 2.50d0
     sec_ = 4
   end if
 
@@ -283,8 +288,9 @@ contains
   ! |/4.5|
   ! |----|
   !
-  double precision function w_theta_triangle(pos, sec)
+  double precision function w_theta_triangle(pos, emit, sec)
     double precision, intent(in), dimension(1:3) :: pos
+    integer, intent(in)                          :: emit
     integer, intent(out), optional               :: sec
     double precision                             :: x, y
 
@@ -315,74 +321,88 @@ contains
   ! |----|----|----|
   ! would map exactly like this to the emitter area
   !
-  double precision function w_theta_checkerboard(pos, sec)
+  double precision function w_theta_checkerboard(pos, emit, sec)
     double precision, intent(in), dimension(1:3)  :: pos
+    integer, intent(in)                           :: emit
     integer, intent(out), optional                :: sec
     double precision, dimension(1:3)              :: pos_scaled
     double precision                              :: x, y
     integer                                       :: x_i, y_i
-    integer, parameter                            :: emit = 1 ! Assume emitter nr. 1 for now
+    !integer, parameter                            :: emit = 1 ! Assume emitter nr. 1 for now
 
-    ! To do: Read this from a file
-    !w_theta_arr(1, 1:4) = (/ 4.70d0, 4.70d0, 4.70d0, 4.70d0 /)
-    !w_theta_arr(2, 1:4) = (/ 4.70d0, 4.60d0, 4.60d0, 4.70d0 /)
-    !w_theta_arr(3, 1:4) = (/ 4.70d0, 4.60d0, 4.60d0, 4.70d0 /)
-    !w_theta_arr(4, 1:4) = (/ 4.70d0, 4.70d0, 4.70d0, 4.70d0 /)
+    if (nrEmit > 1) then
+      if (mod(emit, 2) == 0) then
+        w_theta_checkerboard = 2.5
+      else
+        w_theta_checkerboard = 2.0
+      endif
 
-    !w_theta_arr(1, 1:4) = (/ 4.65d0, 4.65d0, 4.65d0, 4.65d0 /)
-    !w_theta_arr(2, 1:4) = (/ 4.65d0, 4.70d0, 4.70d0, 4.65d0 /)
-    !w_theta_arr(3, 1:4) = (/ 4.65d0, 4.70d0, 4.70d0, 4.65d0 /)
-    !w_theta_arr(4, 1:4) = (/ 4.65d0, 4.65d0, 4.65d0, 4.65d0 /)
+      if (present(sec) .eqv. .true.) then
+        sec = 1
+      end if
+    else
 
-    !w_theta_arr(1, 1:4) = (/ 4.65d0, 4.65d0, 4.65d0, 4.65d0 /)
-    !w_theta_arr(2, 1:4) = (/ 4.65d0, 4.65d0, 4.65d0, 4.65d0 /)
-    !w_theta_arr(3, 1:4) = (/ 4.65d0, 4.65d0, 4.65d0, 4.65d0 /)
-    !w_theta_arr(4, 1:4) = (/ 4.65d0, 4.65d0, 4.65d0, 4.65d0 /)
+      ! To do: Read this from a file
+      !w_theta_arr(1, 1:4) = (/ 4.70d0, 4.70d0, 4.70d0, 4.70d0 /)
+      !w_theta_arr(2, 1:4) = (/ 4.70d0, 4.60d0, 4.60d0, 4.70d0 /)
+      !w_theta_arr(3, 1:4) = (/ 4.70d0, 4.60d0, 4.60d0, 4.70d0 /)
+      !w_theta_arr(4, 1:4) = (/ 4.70d0, 4.70d0, 4.70d0, 4.70d0 /)
 
-    !w_theta_arr(1, 1:4) = (/ 4.70d0, 4.70d0, 4.70d0, 4.70d0 /)
-    !w_theta_arr(2, 1:4) = (/ 4.70d0, 4.70d0, 4.70d0, 4.70d0 /)
-    !w_theta_arr(3, 1:4) = (/ 4.70d0, 4.70d0, 4.70d0, 4.70d0 /)
-    !w_theta_arr(4, 1:4) = (/ 4.70d0, 4.70d0, 4.70d0, 4.70d0 /)
+      !w_theta_arr(1, 1:4) = (/ 4.65d0, 4.65d0, 4.65d0, 4.65d0 /)
+      !w_theta_arr(2, 1:4) = (/ 4.65d0, 4.70d0, 4.70d0, 4.65d0 /)
+      !w_theta_arr(3, 1:4) = (/ 4.65d0, 4.70d0, 4.70d0, 4.65d0 /)
+      !w_theta_arr(4, 1:4) = (/ 4.65d0, 4.65d0, 4.65d0, 4.65d0 /)
 
-    ! Scale x, y to unit square
-    pos_scaled(1:2) = (pos(1:2) - emitters_pos(1:2, emit)) / emitters_dim(1:2, emit)
+      !w_theta_arr(1, 1:4) = (/ 4.65d0, 4.65d0, 4.65d0, 4.65d0 /)
+      !w_theta_arr(2, 1:4) = (/ 4.65d0, 4.65d0, 4.65d0, 4.65d0 /)
+      !w_theta_arr(3, 1:4) = (/ 4.65d0, 4.65d0, 4.65d0, 4.65d0 /)
+      !w_theta_arr(4, 1:4) = (/ 4.65d0, 4.65d0, 4.65d0, 4.65d0 /)
 
-    x = pos_scaled(1)
-    y = pos_scaled(2)
+      !w_theta_arr(1, 1:4) = (/ 4.70d0, 4.70d0, 4.70d0, 4.70d0 /)
+      !w_theta_arr(2, 1:4) = (/ 4.70d0, 4.70d0, 4.70d0, 4.70d0 /)
+      !w_theta_arr(3, 1:4) = (/ 4.70d0, 4.70d0, 4.70d0, 4.70d0 /)
+      !w_theta_arr(4, 1:4) = (/ 4.70d0, 4.70d0, 4.70d0, 4.70d0 /)
 
-    ! Calculate the position in the matrix
-    x_i = floor(x/x_len) + 1
-    y_i = floor(y/y_len) + 1
+      ! Scale x, y to unit square
+      pos_scaled(1:2) = (pos(1:2) - emitters_pos(1:2, emit)) / emitters_dim(1:2, emit)
 
-    ! Check the numbers
-    if (x_i > x_num) then
-      x_i = x_num
-    else if (x_i < 1) then
-      x_i = 1
+      x = pos_scaled(1)
+      y = pos_scaled(2)
+
+      ! Calculate the position in the matrix
+      x_i = floor(x/x_len) + 1
+      y_i = floor(y/y_len) + 1
+
+      ! Check the numbers
+      if (x_i > x_num) then
+        x_i = x_num
+      else if (x_i < 1) then
+        x_i = 1
+      end if
+      if (y_i > y_num) then
+        y_i = y_num
+      else if (y_i < 1) then
+        y_i = 1
+      end if
+
+      ! Return the section on the emitter
+      ! The numbering scheme is,
+      ! |----|----|----|
+      ! | 1  | 2  | 3  |
+      ! |----|----|----|
+      ! | 4  | 5  | 6  |
+      ! |----|----|----|
+      ! and so forth.
+      if (present(sec) .eqv. .true.) then
+        sec = x_num*(y_i - 1) + x_i
+      end if
+
+      ! Reverse the y-direction in the array
+      y_i = y_num - y_i + 1
+
+      ! Return the results
+      w_theta_checkerboard = w_theta_arr(y_i, x_i)
     end if
-    if (y_i > y_num) then
-      y_i = y_num
-    else if (y_i < 1) then
-      y_i = 1
-    end if
-
-    ! Return the section on the emitter
-    ! The numbering scheme is,
-    ! |----|----|----|
-    ! | 1  | 2  | 3  |
-    ! |----|----|----|
-    ! | 4  | 5  | 6  |
-    ! |----|----|----|
-    ! and so forth.
-    if (present(sec) .eqv. .true.) then
-      sec = x_num*(y_i - 1) + x_i
-    end if
-
-    ! Reverse the y-direction in the array
-    y_i = y_num - y_i + 1
-
-    ! Return the results
-    w_theta_checkerboard = w_theta_arr(y_i, x_i)
 
   end function w_theta_checkerboard
 
@@ -431,8 +451,9 @@ contains
   end function w_theta_checkerboard_2x2
 
   ! The function that handles the Voronoi patterns
-  double precision function w_theta_voronoi(pos, sec)
+  double precision function w_theta_voronoi(pos, emit, sec)
     double precision, intent(in), dimension(1:3) :: pos
+    integer, intent(in)                          :: emit
     integer, intent(out), optional               :: sec
 
     integer                                      :: k, i

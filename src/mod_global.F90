@@ -41,8 +41,8 @@ module mod_global
   double precision, parameter :: q_0 = 1.6021766208d-19 ! Elementary charge (C)
   double precision, parameter :: q_02 = q_0**2 ! Elementary charge squared (C)
 
-  double precision, parameter      :: T_std = 293.15d0 ! Standard temperature in Kelvin
-  double precision, parameter      :: P_std = 101325.0d0 ! Standard pressure in Pa
+  double precision, parameter :: T_std = 293.15d0 ! Standard temperature in Kelvin
+  double precision, parameter :: P_std = 101325.0d0 ! Standard pressure in Pa
 
   ! ----------------------------------------------------------------------------
   ! Define scales used when reading and writing data
@@ -56,8 +56,8 @@ module mod_global
   ! Define maximum size constants.
   ! These can be increased if needed.
   integer, parameter :: MAX_PARTICLES = 500000 ! Maximum number of particles allowed in the system
-  integer, parameter :: MAX_EMITTERS  = 10     ! Maximum number of emitters in the system
-  integer, parameter :: MAX_SECTIONS  = 48*48  ! Maximum number of sections an emitter can have
+  integer, parameter :: MAX_EMITTERS  = 36     ! Maximum number of emitters in the system
+  integer, parameter :: MAX_SECTIONS  = 10     ! Maximum number of sections an emitter can have
 
 
   !! ----------------------------------------------------------------------------

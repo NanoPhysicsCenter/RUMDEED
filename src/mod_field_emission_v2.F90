@@ -23,7 +23,7 @@ Module mod_field_emission_v2
   integer                            :: nrElecEmitAll
   !integer                            :: nrEmitted
   double precision, dimension(1:3)   :: F_avg = 0.0d0
-  integer, parameter                 :: N_MH_step = 10 ! Number of steps to do in the MH algorithm
+  integer, parameter                 :: N_MH_step = 100 ! Number of steps to do in the MH algorithm
   double precision                   :: residual = 0.0d0 ! Should be a array the size of the number of emitters
 
   ! ----------------------------------------------------------------------------
@@ -140,8 +140,8 @@ contains
         !  call Do_Photo_Emission_Circle(step, i)
         !case (EMIT_RECTANGLE)
           !print *, 'Doing Rectangle'
-          !!!!!!!call Do_Field_Emission_Planar_rectangle(step, i)
-          call Do_Field_Emission_Planar_simple(step, i)
+          call Do_Field_Emission_Planar_rectangle(step, i)
+          !call Do_Field_Emission_Planar_simple(step, i)
         !case default
         !  print *, 'Vacuum: WARNING unknown emitter type!!'
         !  print *, emitters_type(i)
@@ -180,7 +180,7 @@ contains
 
       par_pos(3) = 1.0d0*length_scale
       par_vel = 0.0d0
-      rnd = w_theta_xy(par_pos, sec) ! Get the section
+      rnd = w_theta_xy(par_pos, emit, sec) ! Get the section
 
       ! Add a particle to the system
       call Add_Particle(par_pos, par_vel, species_elec, step, emit, -1, sec)
@@ -275,7 +275,7 @@ contains
         !end if
         par_pos(3) = 1.0d0*length_scale
         par_vel = 0.0d0
-        rnd = w_theta_xy(par_pos, sec) ! Get the section
+        rnd = w_theta_xy(par_pos, emit, sec) ! Get the section
         !!$OMP CRITICAL(EMIT_PAR)
 
           ! Add a particle to the system
@@ -305,13 +305,14 @@ contains
 ! In Proceedings of the Royal Society of London A: Mathematical,
 ! Physical and Engineering Sciences (Vol. 463, No. 2087, pp. 2907-2927). The Royal Society.
 !
-  double precision function v_y(F, pos)
+  double precision function v_y(F, pos, emit)
     double precision, intent(in)                 :: F
     double precision, dimension(1:3), intent(in) :: pos
+    integer, intent(in)                          :: emit
     double precision                             :: l
 
     if (image_charge .eqv. .true.) then
-      l = l_const * (-1.0d0*F) / w_theta_xy(pos)**2 ! l = y^2, y = 3.79E-4 * sqrt(F_old) / w_theta
+      l = l_const * (-1.0d0*F) / w_theta_xy(pos, emit)**2 ! l = y^2, y = 3.79E-4 * sqrt(F_old) / w_theta
       if (l > 1.0d0) then
         l = 1.0d0
       end if
@@ -321,13 +322,14 @@ contains
     end if
   end function v_y
 
-  double precision function t_y(F, pos)
+  double precision function t_y(F, pos, emit)
     double precision, intent(in)                 :: F
     double precision, dimension(1:3), intent(in) :: pos
+    integer, intent(in)                          :: emit
     double precision                             :: l
 
     if (image_charge .eqv. .true.) then
-      l = l_const * (-1.0d0*F) / w_theta_xy(pos)**2 ! l = y^2, y = 3.79E-4 * sqrt(F_old) / w_theta
+      l = l_const * (-1.0d0*F) / w_theta_xy(pos, emit)**2 ! l = y^2, y = 3.79E-4 * sqrt(F_old) / w_theta
       if (l > 1.0d0) then
         print *, 'Error: l > 1.0'
         print *, 'l = ', l, ', F = ', F, ', t_y = ', t_y
@@ -346,11 +348,12 @@ contains
   !-----------------------------------------------------------------------------
   ! This function returns the escape probability of the Electrons.
   ! Escape_prob = exp(-b_FN*w_theta^(3/2)*v_y/F) .
-  double precision function Escape_Prob(F, pos)
+  double precision function Escape_Prob(F, pos, emit)
     double precision, intent(in)                 :: F
     double precision, dimension(1:3), intent(in) :: pos
+    integer, intent(in)                          :: emit
 
-    Escape_Prob = exp(b_FN * (sqrt(w_theta_xy(pos)))**3 * v_y(F, pos) / (-1.0d0*F))
+    Escape_Prob = exp(b_FN * (sqrt(w_theta_xy(pos, emit)))**3 * v_y(F, pos, emit) / (-1.0d0*F))
 
     if (Escape_Prob > 1.0d0) then
       print *, 'Escape_prob is larger than 1.0'
@@ -364,11 +367,12 @@ contains
   ! A_FN/(t**2(l)*w_theta(x,y)) F**2(x,y)
   ! pos: Position to calculate the function
   ! F: The z-component of the field at par_pos, it should be F < 0.0d0.
-  double precision function Elec_Supply_V2(F, pos)
+  double precision function Elec_Supply_V2(F, pos, emit)
     double precision, dimension(1:3), intent(in) :: pos
     double precision,                 intent(in) :: F
+    integer, intent(in)                          :: emit
 
-    Elec_Supply_V2 = time_step_div_q0 * a_FN/(t_y(F, pos)**2*w_theta_xy(pos)) * F**2
+    Elec_Supply_V2 = time_step_div_q0 * a_FN/(t_y(F, pos, emit)**2*w_theta_xy(pos, emit)) * F**2
   end function Elec_Supply_V2
 
 
@@ -418,7 +422,7 @@ contains
     if (field(3) < 0.0d0) then
       ! The field is favourable for emission
       ! Calculate the electron supply at this point
-      ff(1) = Elec_Supply_V2(field(3), par_pos)
+      ff(1) = Elec_Supply_V2(field(3), par_pos, userdata)
     else
       ! The field is NOT favourable for emission
       ! This point does not contribute
@@ -529,7 +533,7 @@ contains
     if (field(3) < 0.0d0) then
       ! The field is favourable for emission
       ! Calculate the current density at this point
-      ff(1) = Elec_Supply_V2(field(3), par_pos) * Escape_Prob(field(3), par_pos)
+      ff(1) = Elec_Supply_V2(field(3), par_pos, userdata) * Escape_Prob(field(3), par_pos, userdata)
     else
       ! The field is NOT favourable for emission
       ! This point does not contribute
@@ -653,7 +657,7 @@ contains
         N_mc = N_mc + 1
 
         !Calculate <f> and <f^2>
-        e_sup_res = Elec_Supply_V2(field(3), par_pos)
+        e_sup_res = Elec_Supply_V2(field(3), par_pos, emit)
         e_sup = e_sup + e_sup_res
         e_sup2 = e_sup2 + e_sup_res**2
 
@@ -740,7 +744,7 @@ contains
 
     ! Calculate the escape probability at this location
     if (field(3) < 0.0d0) then
-      df_cur = Escape_Prob(field(3), cur_pos)
+      df_cur = Escape_Prob(field(3), cur_pos, emit)
     else
       df_cur = 0.0d0 ! Zero escape probabilty if field is not favourable
     end if
@@ -767,7 +771,7 @@ contains
 
       ! Calculate the escape probability at the new position, to compair with
       ! the current position.
-      df_new = Escape_Prob(field(3), new_pos)
+      df_new = Escape_Prob(field(3), new_pos, emit)
 
       ! If the escape probability is higher in the new location,
       ! then we jump to that location. If it is not then we jump to that
@@ -867,7 +871,7 @@ contains
     end do
 
     F_out = cur_field(3)
-    df_out = Escape_Prob(F_out, cur_pos)
+    df_out = Escape_Prob(F_out, cur_pos, emit)
     pos_out = cur_pos
   end subroutine Metropolis_Hastings_rectangle_v2_field
 

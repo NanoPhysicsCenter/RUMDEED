@@ -10,7 +10,7 @@
  Nx        Number of plot points
 &JFTPARAM
  CHEM=  7.00000000    ,
- PHI=  4.50000000    ,
+ PHI=  2.50000000    ,
  FMAX=  8.00000000    ,
  FMIN=  1.00000000    ,
  FIELD=  2.00000000    ,

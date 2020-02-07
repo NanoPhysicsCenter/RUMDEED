@@ -46,6 +46,7 @@ contains
         if (opt_sec > MAX_SECTIONS) then
           sec = MAX_SECTIONS
           print '(a)', 'Vacuum: WARNING MAX_SECTIONS REACHED. INCREASE MAX_SECTIONS'
+          print *, opt_sec
         else
           sec = opt_sec
         end if
@@ -75,9 +76,9 @@ contains
         nrElec = nrElec + 1
         ! Write out the x and y position of the emitted particle
         ! along with which emitter and section it came from.
-        if (abs(par_pos(3) - 1.0d0*length_scale) < 1.0E-3) then
+        !if (abs(par_pos(3) - 1.0d0*length_scale) < 1.0E-3) then
           write(unit=ud_density_emit) (par_pos(1) / length_scale), (par_pos(2) / length_scale), emit, sec
-        end if
+        !end if
       else ! N_2^+ Ion
         particles_charge(nrPart+1) = +1.0d0*q_0
         particles_mass(nrPart+1) = m_N2p
@@ -381,7 +382,8 @@ contains
 
     ! Write out the current for each emitter and section
     if (write_ramo_sec .eqv. .true.) then
-      write(unit=ud_ramo_sec, asynchronous='YES') ramo_current_emit
+      !write(unit=ud_ramo_sec, asynchronous='YES') ramo_current_emit
+      write(unit=ud_ramo_sec) ramo_current_emit
     end if
 
     ! Write the total current along with other data
