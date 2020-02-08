@@ -25,6 +25,7 @@ Module mod_field_thermo_emission
   !integer                            :: nrEmitted
   double precision, dimension(1:3)   :: F_avg = 0.0d0
   integer, parameter                 :: N_MH_step = 10 ! Number of steps to do in the MH algorithm
+  double precision                   :: residual = 0.0d0 ! Should be a array the size of the number of emitters
 
   ! Constant used in MC integration (function Elec_Supply_V2)
   double precision :: time_step_div_q0
@@ -137,11 +138,12 @@ subroutine Init_Field_Thermo_Emission()
     call Do_Cuba_Suave_Simple(emit, N_sup)
 
     ! Use the number electrons as an average for a Poission distribution to get the number of electrons to emitt 
-    !print *, N_sup
-    N_round = Rand_Poission(N_sup)
-    !print *, N_round
-    nrElecEmit = 0
+    !N_round = Rand_Poission(N_sup)
+    N_round = nint(N_sup + residual) ! Round to whole number
+    residual = N_sup - N_round
 
+
+    nrElecEmit = 0
     ! Loop over all electrons and place them
     do i = 1, N_round
       !call Metropolis_Hastings_rectangle_v2_field(N_MH_step, emit, D_f, F, par_pos)
