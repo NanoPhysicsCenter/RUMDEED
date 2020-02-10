@@ -1,8 +1,8 @@
 !-------------------------------------------!
-! Test Module for field+thermo emission     !
+! Module for field+thermo emission          !
 !                                           !
 ! Kristinn Torfason                         !
-! 08.11.19                                  !
+! 03.01.20                                  !
 !-------------------------------------------!
 
 Module mod_field_thermo_emission
