@@ -138,9 +138,9 @@ subroutine Init_Field_Thermo_Emission()
     call Do_Cuba_Suave_Simple(emit, N_sup)
 
     ! Use the number electrons as an average for a Poission distribution to get the number of electrons to emitt 
-    !N_round = Rand_Poission(N_sup)
-    N_round = nint(N_sup + residual) ! Round to whole number
-    residual = N_sup - N_round
+    N_round = Rand_Poission(N_sup)
+    !N_round = nint(N_sup + residual) ! Round to whole number
+    !residual = N_sup - N_round
 
 
     nrElecEmit = 0
@@ -150,7 +150,7 @@ subroutine Init_Field_Thermo_Emission()
       call Metropolis_Hastings_rectangle_v2(N_MH_step, emit, D_f, F, par_pos)
 
       par_pos(3) = 1.0d0*length_scale
-      par_vel = 0.0d0
+      par_vel = 0.0d0 ! Get velocity from MB dist!!!!
       rnd = w_theta_xy(par_pos, emit, sec) ! Get the section
 
       ! Add a particle to the system
