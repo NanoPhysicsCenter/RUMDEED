@@ -398,6 +398,7 @@ subroutine Init_Field_Thermo_Emission()
 
   ! ----------------------------------------------------------------------------
   ! Generate velocity from a Maxwell-Boltzmann distribution.
+  ! https://en.wikipedia.org/wiki/Maxwell%E2%80%93Boltzmann_distribution#Distribution_for_the_velocity_vector
   function Get_MB_Velocity()
     double precision, dimension(1:3) :: Get_MB_Velocity
     double precision, dimension(1:2) :: std
