@@ -355,11 +355,6 @@ contains
 
     Escape_Prob = exp(b_FN * (sqrt(w_theta_xy(pos, emit)))**3 * v_y(F, pos, emit) / (-1.0d0*F))
 
-    if (Escape_Prob > 1.0d0) then
-      print *, 'Escape_prob is larger than 1.0'
-      print *, 'Escape_prob = ', Escape_prob
-      print *, ''
-    end if
   end function Escape_Prob
 
   !-----------------------------------------------------------------------------

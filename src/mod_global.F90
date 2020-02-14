@@ -300,13 +300,18 @@ module mod_global
       double precision, dimension(1:3)             :: Image_Charge_effect
       double precision, dimension(1:3), intent(in) :: pos_1, pos_2
    end function Image_Charge_effect
+
+   function Get_Emission_Velocity()
+      double precision, dimension(1:3) :: Get_Emission_Velocity
+   end function Get_Emission_Velocity
   end interface
 
   ! Pointers
-  procedure(Check_Boundary), pointer      :: ptr_Check_Boundary => null()
-  procedure(Electric_Field), pointer      :: ptr_field_E => null()
-  procedure(Do_Emission), pointer         :: ptr_Do_Emission => null()
-  procedure(Image_Charge_effect), pointer :: ptr_Image_Charge_effect => null()
+  procedure(Check_Boundary), pointer        :: ptr_Check_Boundary => null()
+  procedure(Electric_Field), pointer        :: ptr_field_E => null()
+  procedure(Do_Emission), pointer           :: ptr_Do_Emission => null()
+  procedure(Image_Charge_effect), pointer   :: ptr_Image_Charge_effect => null()
+  procedure(Get_Emission_Velocity), pointer :: ptr_Get_Emission_Velocity => null()
 contains
 
   ! Check if a number is infinit.
