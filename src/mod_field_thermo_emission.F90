@@ -8,6 +8,7 @@
 Module mod_field_thermo_emission
   use mod_global
   use mod_verlet
+  use mod_velocity
   use mod_pair
   use ziggurat
   use mod_work_function
@@ -68,6 +69,8 @@ subroutine Init_Field_Thermo_Emission()
 
     ! The function to do image charge effects
     ptr_Image_Charge_effect => Force_Image_charges_v2
+
+    call Init_Emission_Velocity(VELOCITY_MB)
 
     call Read_work_function()
 
@@ -150,8 +153,7 @@ subroutine Init_Field_Thermo_Emission()
       call Metropolis_Hastings_rectangle_v2(N_MH_step, emit, D_f, F, par_pos)
 
       par_pos(3) = 1.0d0*length_scale
-      !par_vel = 0.0d0
-      par_vel = Get_MB_Velocity()
+      par_vel = ptr_Get_Emission_Velocity()
       rnd = w_theta_xy(par_pos, emit, sec) ! Get the section
 
       ! Add a particle to the system
@@ -397,30 +399,6 @@ subroutine Init_Field_Thermo_Emission()
   end subroutine check_limits_metro_rec
 
   ! ----------------------------------------------------------------------------
-  ! Generate velocity from a Maxwell-Boltzmann distribution.
-  ! https://en.wikipedia.org/wiki/Maxwell%E2%80%93Boltzmann_distribution#Distribution_for_the_velocity_vector
-  function Get_MB_Velocity()
-    double precision, dimension(1:3) :: Get_MB_Velocity
-    double precision, dimension(1:2) :: std
-    double precision, dimension(1:2) :: mean
-
-    ! Get Gaussian distributed numbers.
-    ! The Box Muller method gives two numbers.
-    ! We overwrite the second element in the array.
-    mean = 0.0d0
-    std = sqrt(k_b * T_temp / m_0)
-    Get_MB_Velocity(1:2) = box_muller(mean, std)
-    Get_MB_Velocity(2:3) = box_muller(mean, std)
-
-    ! Scale the Gaussian distribution to the Maxwell-Boltzmann distribution.
-    Get_MB_Velocity = Get_MB_Velocity / (std(1)**2 * 2.0d0*pi) ! f(v) = N(v) * 1/(a**2 * 2*pi)
-
-    !Get_MB_Velocity(:, 1) = 0.0d0
-    !Get_MB_Velocity(:, 2) = 0.0d0
-    Get_MB_Velocity(3) = abs(Get_MB_Velocity(3)) ! Positive velocity in the z-direction
-  end function Get_MB_Velocity
-
-  ! ----------------------------------------------------------------------------
   ! The integration function for the Cuba library
   !
   integer function integrand_cuba_simple(ndim, xx, ncomp, ff, userdata)
@@ -530,7 +508,6 @@ subroutine Init_Field_Thermo_Emission()
   end subroutine Do_Cuba_Suave_Simple
 
 
-
 !----------------------------------------------------------------------------------------
 ! The functions v_y and t_y are because of the image charge effect in the FN equation.
 ! The approximation for v_y and t_y are taken from
@@ -589,24 +566,6 @@ subroutine Init_Field_Thermo_Emission()
 
     Escape_Prob = exp(b_FN * (sqrt(w_theta_xy(pos, emit)))**3 * v_y(F, pos, emit) / (-1.0d0*F))
 
-    if (Escape_Prob > 1.0d0) then
-      print *, 'Escape_prob is larger than 1.0'
-      print *, 'Escape_prob = ', Escape_prob
-      print *, ''
-    end if
   end function Escape_Prob
-
-  !-----------------------------------------------------------------------------
-  ! A simple function that calculates
-  ! A_FN/(t**2(l)*w_theta(x,y)) F**2(x,y)
-  ! pos: Position to calculate the function
-  ! F: The z-component of the field at par_pos, it should be F < 0.0d0.
-  double precision function Elec_Supply_V2(F, pos, emit)
-    double precision, dimension(1:3), intent(in) :: pos
-    double precision,                 intent(in) :: F
-    integer, intent(in)                          :: emit
-
-    Elec_Supply_V2 = time_step_div_q0 * a_FN/(t_y(F, pos, emit)**2*w_theta_xy(pos, emit)) * F**2
-  end function Elec_Supply_V2
 
 end module mod_field_thermo_emission
