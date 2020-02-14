@@ -43,26 +43,26 @@ end function Get_Zero_Velocity
 ! ----------------------------------------------------------------------------
 ! Generate velocity from a Maxwell-Boltzmann distribution.
 ! https://en.wikipedia.org/wiki/Maxwell%E2%80%93Boltzmann_distribution#Distribution_for_the_velocity_vector
+! 
+! Maxwell-Boltzmann velocity distribution is basically a normal distribution for each velocity component with
+! zero mean and standard deviation \sqrt{k_b T / m}.
 function Get_MB_Velocity()
     double precision, dimension(1:3) :: Get_MB_Velocity
     double precision, dimension(1:2) :: std
     double precision, dimension(1:2) :: mean
 
-    ! Get Gaussian distributed numbers.
+    mean = 0.0d0
+    std = sqrt(k_b * T_temp / m_0) ! Standard deviation of the Maxwell-Boltzmann distribution
+
+    ! Get normal distributed numbers.
     ! The Box Muller method gives two numbers.
     ! We overwrite the second element in the array.
-    mean = 0.0d0
-    std = sqrt(k_b * T_temp / m_0)
     Get_MB_Velocity(1:2) = box_muller(mean, std)
     Get_MB_Velocity(2:3) = box_muller(mean, std)
-
-    ! Scale the Gaussian distribution to the Maxwell-Boltzmann distribution.
-    Get_MB_Velocity = Get_MB_Velocity / (std(1)**2 * 2.0d0*pi) ! f(v) = N(v) * 1/(a**2 * 2*pi)
 
     !Get_MB_Velocity(:, 1) = 0.0d0
     !Get_MB_Velocity(:, 2) = 0.0d0
     Get_MB_Velocity(3) = abs(Get_MB_Velocity(3)) ! Positive velocity in the z-direction
   end function Get_MB_Velocity
-
 
 end module mod_velocity
