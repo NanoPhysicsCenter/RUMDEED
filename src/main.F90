@@ -297,7 +297,7 @@ contains
     time_step2 = time_step**2 ! Time_step squared
 
     ! Temperature, pressure and density
-    P_abs = P_abs * P_std 
+    P_abs = P_abs * P_ntp 
     n_d = P_abs/(k_b*T_temp)
 
     ! steps: Number of time steps that the program will simulate

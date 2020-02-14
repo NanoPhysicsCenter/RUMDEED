@@ -41,8 +41,8 @@ module mod_global
   double precision, parameter :: q_0 = 1.6021766208d-19 ! Elementary charge (C)
   double precision, parameter :: q_02 = q_0**2 ! Elementary charge squared (C)
 
-  double precision, parameter :: T_std = 293.15d0 ! Standard temperature in Kelvin
-  double precision, parameter :: P_std = 101325.0d0 ! Standard pressure in Pa
+  double precision, parameter :: T_ntp = 293.15d0 ! Normal temperature in Kelvin (NIST)
+  double precision, parameter :: P_ntp = 101325.0d0 ! Normal pressure in Pa (NIST)
 
   ! ----------------------------------------------------------------------------
   ! Define scales used when reading and writing data
@@ -140,9 +140,9 @@ module mod_global
 
   logical          :: collisions = .false. ! Do ion colissions or not
 
-  double precision :: T_temp = T_std ! Temperature in Kelvin
-  double precision :: P_abs = P_std  ! Pressure as fraction of P_std
-  double precision :: n_d = P_std/(k_b*T_std) ! Density of N2
+  double precision :: T_temp = T_ntp ! Temperature in Kelvin
+  double precision :: P_abs = P_ntp  ! Pressure as fraction of P_std
+  double precision :: n_d = P_ntp/(k_b*T_ntp) ! Density of N2
 
 
   ! ----------------------------------------------------------------------------
