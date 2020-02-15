@@ -133,7 +133,8 @@ subroutine Init_Field_Thermo_Emission()
 
     ! Emission variables
     integer                          :: i, sec, nrElecEmit, IFAIL
-    double precision                 :: rnd, D_f, F, Df_avg
+    double precision                 :: rnd, df_avg
+    !double precision                 :: D_f, F
     double precision, dimension(1:3) :: par_pos, par_vel
 
 
@@ -150,7 +151,7 @@ subroutine Init_Field_Thermo_Emission()
     ! Loop over all electrons and place them
     do i = 1, N_round
       !call Metropolis_Hastings_rectangle_v2_field(N_MH_step, emit, D_f, F, par_pos)
-      call Metropolis_Hastings_rectangle_v2(N_MH_step, emit, D_f, F, par_pos)
+      call Metropolis_Hastings_rectangle_n(N_MH_step, emit, par_pos)
 
       par_pos(3) = 1.0d0*length_scale
       par_vel = ptr_Get_Emission_Velocity()
@@ -163,7 +164,7 @@ subroutine Init_Field_Thermo_Emission()
       nrEmitted_emitters(emit) = nrEmitted_emitters(emit) + 1
     end do
 
-    Df_avg = 0.0d0
+    Df_avg = 0.0d0 ! Not used here
 
     write (ud_field, "(i8, tr2, E16.8, tr2, E16.8, tr2, E16.8, tr2, E16.8, tr2, E16.8)", iostat=IFAIL) &
                                       step, F_avg(1), F_avg(2), F_avg(3), N_sup, df_avg
@@ -174,16 +175,15 @@ subroutine Init_Field_Thermo_Emission()
   !-----------------------------------------------------------------------------
   ! Metropolis-Hastings algorithm
   ! Includes that the work function can vary with position
-  subroutine Metropolis_Hastings_rectangle_v2(ndim, emit, df_out, F_out, pos_out)
+  subroutine Metropolis_Hastings_rectangle_n(ndim, emit, pos_out)
     ! The interface is declared in the parent module
     integer, intent(in)                           :: ndim, emit
-    double precision, intent(out)                 :: df_out, F_out
     double precision, intent(out), dimension(1:3) :: pos_out
     integer                                       :: count, i
     double precision                              :: rnd, alpha
     double precision, dimension(1:2)              :: std
     double precision, dimension(1:3)              :: cur_pos, new_pos, field
-    double precision                              :: df_cur, df_new
+    double precision                              :: df_cur, df_new, F_out
 
     std(1:2) = emitters_dim(1:2, emit)*0.075d0/100.d0 ! Standard deviation for the normal distribution is 0.075% of the emitter length.
     ! This means that 68% of jumps are less than this value.
@@ -212,7 +212,7 @@ subroutine Init_Field_Thermo_Emission()
 
     ! Calculate the escape probability at this location
     if (field(3) < 0.0d0) then
-      df_cur = Escape_Prob(field(3), cur_pos, emit)
+      df_cur = n_calc(field(3), cur_pos, emit)
     else
       df_cur = 0.0d0 ! Zero escape probabilty if field is not favourable
     end if
@@ -239,7 +239,7 @@ subroutine Init_Field_Thermo_Emission()
 
       ! Calculate the escape probability at the new position, to compair with
       ! the current position.
-      df_new = Escape_Prob(field(3), new_pos, emit)
+      df_new = n_calc(field(3), new_pos, emit)
 
       ! If the escape probability is higher in the new location,
       ! then we jump to that location. If it is not then we jump to that
@@ -264,8 +264,7 @@ subroutine Init_Field_Thermo_Emission()
     ! Return the current position
 
     pos_out = cur_pos
-    df_out = df_cur
-  end subroutine Metropolis_Hastings_rectangle_v2
+  end subroutine Metropolis_Hastings_rectangle_n
 
   subroutine Metropolis_Hastings_rectangle_v2_field(ndim, emit, df_out, F_out, pos_out)
     ! The interface is declared in the parent module
@@ -507,6 +506,18 @@ subroutine Init_Field_Thermo_Emission()
      F_avg = F_avg / neval
   end subroutine Do_Cuba_Suave_Simple
 
+  !----------------------------------------------------------------------------------------
+  ! A function that calculates
+  ! n = \beta_T / \beta_F
+  ! See equation 17.18 in Kevin Jensen - Introduction to the Physics of Electron Emission.
+  double precision function n_calc(F, pos, emit)
+    double precision                , intent(in) :: F
+    double precision, dimension(1:3), intent(in) :: pos
+    integer                         , intent(in) :: emit
+
+    n_calc = h_bar*(-1.0d0*F)/(2*k_b*T_temp*sqrt(2*m_0*w_theta_xy(pos, emit))*t_y(F, pos, emit))
+  end function n_calc
+
 
 !----------------------------------------------------------------------------------------
 ! The functions v_y and t_y are because of the image charge effect in the FN equation.
@@ -516,22 +527,22 @@ subroutine Init_Field_Thermo_Emission()
 ! In Proceedings of the Royal Society of London A: Mathematical,
 ! Physical and Engineering Sciences (Vol. 463, No. 2087, pp. 2907-2927). The Royal Society.
 !
-  double precision function v_y(F, pos, emit)
-    double precision, intent(in)                 :: F
-    double precision, dimension(1:3), intent(in) :: pos
-    integer, intent(in)                          :: emit
-    double precision                             :: l
+  ! double precision function v_y(F, pos, emit)
+  !   double precision, intent(in)                 :: F
+  !   double precision, dimension(1:3), intent(in) :: pos
+  !   integer, intent(in)                          :: emit
+  !   double precision                             :: l
 
-    if (image_charge .eqv. .true.) then
-      l = l_const * (-1.0d0*F) / w_theta_xy(pos, emit)**2 ! l = y^2, y = 3.79E-4 * sqrt(F_old) / w_theta
-      if (l > 1.0d0) then
-        l = 1.0d0
-      end if
-      v_y = 1.0d0 - l + 1.0d0/6.0d0 * l * log(l)
-    else
-      v_y = 1.0d0
-    end if
-  end function v_y
+  !   if (image_charge .eqv. .true.) then
+  !     l = l_const * (-1.0d0*F) / w_theta_xy(pos, emit)**2 ! l = y^2, y = 3.79E-4 * sqrt(F_old) / w_theta
+  !     if (l > 1.0d0) then
+  !       l = 1.0d0
+  !     end if
+  !     v_y = 1.0d0 - l + 1.0d0/6.0d0 * l * log(l)
+  !   else
+  !     v_y = 1.0d0
+  !   end if
+  ! end function v_y
 
   double precision function t_y(F, pos, emit)
     double precision, intent(in)                 :: F
@@ -556,16 +567,16 @@ subroutine Init_Field_Thermo_Emission()
     end if
   end function t_y
 
-  !-----------------------------------------------------------------------------
-  ! This function returns the escape probability of the Electrons.
-  ! Escape_prob = exp(-b_FN*w_theta^(3/2)*v_y/F) .
-  double precision function Escape_Prob(F, pos, emit)
-    double precision, intent(in)                 :: F
-    double precision, dimension(1:3), intent(in) :: pos
-    integer, intent(in)                          :: emit
+  ! !-----------------------------------------------------------------------------
+  ! ! This function returns the escape probability of the Electrons.
+  ! ! Escape_prob = exp(-b_FN*w_theta^(3/2)*v_y/F) .
+  ! double precision function Escape_Prob(F, pos, emit)
+  !   double precision, intent(in)                 :: F
+  !   double precision, dimension(1:3), intent(in) :: pos
+  !   integer, intent(in)                          :: emit
 
-    Escape_Prob = exp(b_FN * (sqrt(w_theta_xy(pos, emit)))**3 * v_y(F, pos, emit) / (-1.0d0*F))
+  !   Escape_Prob = exp(b_FN * (sqrt(w_theta_xy(pos, emit)))**3 * v_y(F, pos, emit) / (-1.0d0*F))
 
-  end function Escape_Prob
+  ! end function Escape_Prob
 
 end module mod_field_thermo_emission

@@ -359,7 +359,8 @@ contains
 ! standard, normally distributed (zero expectation, unit variance) random numbers,
 ! given a source of uniformly distributed random numbers."
 ! See https://en.wikipedia.org/wiki/Box%E2%80%93Muller_transform
-! and https://en.wikipedia.org/wiki/Marsaglia_polar_method
+! We use the polar form version here see:
+! https://en.wikipedia.org/wiki/Marsaglia_polar_method
 function box_muller(mean, std)
   double precision, dimension(1:2)             :: box_muller
   double precision, dimension(1:2), intent(in) :: mean, std
