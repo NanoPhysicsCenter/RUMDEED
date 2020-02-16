@@ -118,10 +118,10 @@ mod_photo_emission.mod mod_photo_emission.o: ../src/mod_photo_emission.f90 mod_g
 mod_field_emission.mod mod_field_emission.o: ../src/mod_field_emission.f90 mod_global.mod mod_verlet.mod mod_pair.mod mod_velocity.mod
 		$(FCOMPILER) -c $(FFLAGS) ../src/mod_field_emission.f90
 
-mod_field_emission_v2.mod mod_field_emission_v2.o: ../src/mod_field_emission_v2.F90 mod_global.mod mod_verlet.mod mod_pair.mod ziggurat.mod mod_work_function.mod mod_velocity.mod
+mod_field_emission_v2.mod mod_field_emission_v2.o: ../src/mod_field_emission_v2.F90 mod_global.mod mod_verlet.mod mod_pair.mod mod_work_function.mod mod_velocity.mod
 		$(FCOMPILER) -c $(FFLAGS) ../src/mod_field_emission_v2.F90
 
-mod_field_thermo_emission.mod mod_field_thermo_emission.o: ../src/mod_field_thermo_emission.F90 mod_global.mod mod_verlet.mod mod_pair.mod ziggurat.mod mod_work_function.mod mod_kevin_rjgtf.mod mod_velocity.mod
+mod_field_thermo_emission.mod mod_field_thermo_emission.o: ../src/mod_field_thermo_emission.F90 mod_global.mod mod_verlet.mod mod_pair.mod mod_work_function.mod mod_kevin_rjgtf.mod mod_velocity.mod
 		$(FCOMPILER) -c $(FFLAGS) ../src/mod_field_thermo_emission.F90
 
 mod_kevin_rjgtf.mod mod_kevin_rjgtf.o: ../src/mod_kevin_rjgtf.F90
@@ -136,7 +136,7 @@ mod_field_emission_tip.mod mod_field_emission_tip.o: ../src/mod_field_emission_t
 mod_hyperboloid_tip.mod mod_hyperboloid_tip.o: ../src/mod_hyperboloid_tip.f90 mod_global.mod
 		$(FCOMPILER) -c $(FFLAGS) ../src/mod_hyperboloid_tip.f90
 
-#mod_thermionic_emission.mod mod_thermionic_emission.o: ../src/mod_thermionic_emission.f90 mod_global.mod mod_verlet.mod mod_pair.mod ziggurat.mod
+#mod_thermionic_emission.mod mod_thermionic_emission.o: ../src/mod_thermionic_emission.f90 mod_global.mod mod_verlet.mod mod_pair.mod
 #		$(FCOMPILER) -c $(FFLAGS) ../src/mod_thermionic_emission.f90
 
 mod_work_function.mod mod_work_function.o: ../src/mod_work_function.F90
