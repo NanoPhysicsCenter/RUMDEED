@@ -38,8 +38,6 @@ double precision function Get_Kevin_Jgtf(F, T, w_theta)
   double precision             :: Chem = 7.0d0 ! Chemical potential, it dosen't seem to matter what this number is!
   double precision             :: F_evnm
 
-  !F_evnm = abs(F)*1.0E-6
-
   F_evnm = abs(F) * 1.0d-9 ! Kevin wants the field in eV/nm see note above (Basically we convert to GV/m).
   Get_Kevin_Jgtf = RJgtf(w_theta, Chem, F_evnm, T) * 1.0d4 ! Kevin returns in A/cm² convert to A/m²
 end function Get_Kevin_Jgtf
