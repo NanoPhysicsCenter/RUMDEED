@@ -10,10 +10,8 @@ Module mod_field_thermo_emission
   use mod_verlet
   use mod_velocity
   use mod_pair
-  !use ziggurat
   use mod_work_function
   use mod_kevin_rjgtf
-  !use mod_mc_integration
   implicit none
 
   PRIVATE
