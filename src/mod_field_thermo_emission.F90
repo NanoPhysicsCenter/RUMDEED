@@ -26,9 +26,9 @@ Module mod_field_thermo_emission
   !integer                            :: nrEmitted
   double precision, dimension(1:3)   :: F_avg = 0.0d0
   integer, parameter                 :: N_MH_step = 10 ! Number of steps to do in the MH algorithm
-  double precision                   :: residual = 0.0d0 ! Should be a array the size of the number of emitters
+  !double precision                   :: residual = 0.0d0 ! Should be a array the size of the number of emitters
 
-  ! Constant used in MC integration (function Elec_Supply_V2)
+  ! Constant used in MC integration
   double precision :: time_step_div_q0
 
   ! ----------------------------------------------------------------------------
@@ -38,14 +38,6 @@ Module mod_field_thermo_emission
 
   ! Second Fowler-Nodheim constant in units [ eV^{-3/2} V m^{-1} ]
   double precision, parameter :: b_FN = -4.0d0/(3.0d0*h_bar) * sqrt(2.0d0*m_0*q_0)
-
-  ! Constant used for calculation of the l in v_y and t_y.
-  ! The units are [ eV^{2} V^{-1} m ]
-  ! See Forbes, R. G., & Deane, J. H. (2007, November).
-  ! "Reformulation of the standard theory of Fowler–Nordheim tunnelling and cold field electron emission."
-  ! In Proceedings of the Royal Society of London A: Mathematical,
-  ! Physical and Engineering Sciences (Vol. 463, No. 2087, pp. 2907-2927). The Royal Society.
-  double precision, parameter :: l_const = q_0 / (4.0d0*pi*epsilon_0)
 
 contains
 
@@ -78,7 +70,7 @@ subroutine Init_Field_Thermo_Emission()
     time_step_div_q0 = time_step / q_0
 
     ! Initialize the Ziggurat algorithm
-    call zigset(my_seed(1))
+    !call zigset(my_seed(1))
 
   end subroutine Init_Field_Thermo_Emission
 

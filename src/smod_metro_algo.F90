@@ -237,25 +237,25 @@ contains
     end if
   end subroutine check_limits_metro_rec
 
-  ! ----------------------------------------------------------------------------
-  ! Generate random numbers using the Ziggurat method.
-  ! Normal distributed random numbers.
-  ! This is faster than the Box-Muller.
-  function ziggurat_normal(mean, std)
-    double precision, intent(in), dimension(1:2) :: mean
-    double precision, intent(in), dimension(1:2) :: std
-    double precision, dimension(1:2)             :: ziggurat_normal
+  ! ! ----------------------------------------------------------------------------
+  ! ! Generate random numbers using the Ziggurat method.
+  ! ! Normal distributed random numbers.
+  ! ! This is faster than the Box-Muller.
+  ! function ziggurat_normal(mean, std)
+  !   double precision, intent(in), dimension(1:2) :: mean
+  !   double precision, intent(in), dimension(1:2) :: std
+  !   double precision, dimension(1:2)             :: ziggurat_normal
 
-    ! This stuff is not thread safe.
-    ! The Intel compiler barfs at this while using OpenMP.
-    ! It has to do with the fact that the save attribute is used in the module.
-    ! Variables with the save attribute are shared.
-    !$OMP CRITICAL(ZIGGURAT)
-    ziggurat_normal(1) = rnor()
-    ziggurat_normal(2) = rnor()
-    !$OMP END CRITICAL(ZIGGURAT)
+  !   ! This stuff is not thread safe.
+  !   ! The Intel compiler barfs at this while using OpenMP.
+  !   ! It has to do with the fact that the save attribute is used in the module.
+  !   ! Variables with the save attribute are shared.
+  !   !$OMP CRITICAL(ZIGGURAT)
+  !   ziggurat_normal(1) = rnor()
+  !   ziggurat_normal(2) = rnor()
+  !   !$OMP END CRITICAL(ZIGGURAT)
 
-    ziggurat_normal(:) = mean(:) + std(:)*ziggurat_normal(:)
-  end function ziggurat_normal
+  !   ziggurat_normal(:) = mean(:) + std(:)*ziggurat_normal(:)
+  ! end function ziggurat_normal
 
 end submodule smod_metro_algo

@@ -109,7 +109,7 @@ contains
     time_step_div_q0 = time_step / q_0
 
     ! Initialize the Ziggurat algorithm
-    call zigset(my_seed(1))
+    !call zigset(my_seed(1))
 
   end subroutine Init_Field_Emission_v2
 
