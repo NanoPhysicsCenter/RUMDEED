@@ -180,14 +180,15 @@ subroutine Init_Field_Thermo_Emission()
     double precision                              :: df_cur, df_new, F_out
     double precision                              :: cur_w, new_w
     integer                                       :: jump_a, jump_r ! Number of jumps accepted and rejected
+    double precision                              :: ratio_change
 
     jump_a = 0
     jump_r = 0
     ndim = ndim_in
 
-
-    ! Try to keep the acceptance ration around 50% by
+    ! Try to keep the acceptance ratio around 50% by
     ! changing the standard deviation.
+    ratio_change = 0.5d0*100.0d0/maxval(emitters_dim(:, emit))
     CALL RANDOM_NUMBER(rnd) ! Change be a random number
     if (a_rate < 0.50d0) then
       MH_std = MH_std * (1.0d0 - rnd*0.005d0)
@@ -325,82 +326,6 @@ subroutine Init_Field_Thermo_Emission()
     pos_out = cur_pos
   end subroutine Metropolis_Hastings_rectangle_J
 
-  ! subroutine Metropolis_Hastings_rectangle_v2_field(ndim, emit, df_out, F_out, pos_out)
-  !   ! The interface is declared in the parent module
-  !   integer, intent(in)                           :: ndim, emit
-  !   double precision, intent(out)                 :: df_out, F_out
-  !   double precision, intent(out), dimension(1:3) :: pos_out
-
-  !   double precision, dimension(1:3)              :: cur_field, new_field
-  !   double precision, dimension(1:3)              :: cur_pos, new_pos
-  !   double precision, dimension(1:2)              :: std
-  !   double precision                              :: rnd, alpha
-  !   integer                                       :: i, count
-
-  !   std(1:2) = emitters_dim(1:2, emit)*0.075d0/100.d0 ! Standard deviation for the normal distribution is 0.075% of the emitter length.
-  !   ! This means that 68% of jumps are less than this value.
-  !   ! The expected value of the absolute value of the normal distribution is std*sqrt(2/pi).
-
-  !   ! Get a random initial position on the surface.
-  !   ! We pick this location from a uniform distribution.
-  !   count = 0
-  !   do ! Infinite loop, we try to find a favourable position to start from
-  !     CALL RANDOM_NUMBER(cur_pos(1:2))
-  !     cur_pos(1:2) = cur_pos(1:2)*emitters_dim(1:2, emit) + emitters_pos(1:2, emit)
-  !     cur_pos(3) = 0.0d0 ! On the surface
-
-  !     ! Calculate the electric field at this position
-  !     cur_field = Calc_Field_at(cur_pos)
-  !     if (cur_field(3) < 0.0d0) then
-  !       exit ! We found a nice spot so we exit the loop
-  !     else
-  !       count = count + 1
-  !       if (count > 10000) exit ! The loop is infnite, must stop it at some point.
-  !       ! In field emission it is rare the we reach the CL limit.
-  !     end if
-  !   end do
-
-  !   do i = 1, ndim
-  !     ! Find a new position using a normal distribution.
-  !     !new_pos(1:2) = ziggurat_normal(cur_pos(1:2), std)
-  !     new_pos(1:2) = box_muller(cur_pos(1:2), std)
-  !     new_pos(3) = 0.0d0 ! At the surface
-
-  !     ! Make sure that the new position is within the limits of the emitter area.
-  !     call check_limits_metro_rec(new_pos, emit)
-
-  !     ! Calculate the field at the new position
-  !     new_field = Calc_Field_at(new_pos)
-
-  !     ! Check if the field is favourable for emission at the new position.
-  !     ! If it is not then cycle, i.e. we reject this location and
-  !     ! pick another one.
-  !     if (new_field(3) > 0.0d0) cycle ! Do the next loop iteration, i.e. find a new position.
-
-  !     ! Keep in mind that the field is negative
-  !     ! -2 < -1 = True (More negative field is more favourable for emission)
-  !     if (new_field(3) < cur_field(3)) then
-  !       cur_pos = new_pos ! New position becomes the current position
-  !       cur_field = new_field
-  !     else
-  !       ! Here we have some thing like -2 < -3
-  !       ! so alpha = -2/-3 = 2/3 = 0.67
-  !       alpha = new_field(3) / cur_field(3)
-  !       CALL RANDOM_NUMBER(rnd)
-  !       ! Jump to this position with probability alpha, i.e. if rnd is less than alpha
-  !       if (rnd < alpha) then
-  !         cur_pos = new_pos
-  !         cur_field = new_field
-  !       end if
-  !     end if
-
-  !   end do
-
-  !   F_out = cur_field(3)
-  !   !df_out = Escape_Prob(F_out, cur_pos)
-  !   df_out = 0.0d0
-  !   pos_out = cur_pos
-  ! end subroutine Metropolis_Hastings_rectangle_v2_field
 
   ! ----------------------------------------------------------------------------
   ! Checks the limits of the rectangular region of the emitter
@@ -408,72 +333,22 @@ subroutine Init_Field_Thermo_Emission()
     double precision, dimension(1:3), intent(inout) :: par_pos
     double precision, dimension(1:3)                :: scaled_pos
     integer, intent(in)                             :: emit
-    double precision                                :: x_max, x_min, y_max, y_min
-    double precision                                :: d_x, d_y
 
-    ! Scale and shift to coordinates between 0 and 1
+    ! Scale and shift to coordinates to be between 0 and 1
     scaled_pos(1:2) = (par_pos(1:2) - emitters_pos(1:2, emit))/emitters_dim(1:2, emit)
 
+    ! Check x
     if ((scaled_pos(1) > 1.0d0) .or. (scaled_pos(1) < 0.0d0)) then
       scaled_pos(1) = 1.0d0 - (scaled_pos(1) - floor(scaled_pos(1)))
     end if
 
+    ! Check y
     if ((scaled_pos(2) > 1.0d0) .or. (scaled_pos(2) < 0.0d0)) then
       scaled_pos(2) = 1.0d0 - (scaled_pos(2) - floor(scaled_pos(2)))
     end if
 
-    ! Scale and shift coordinate back
+    ! Scale and shift coordinates back
     par_pos(1:2) = scaled_pos(1:2) * emitters_dim(1:2, emit) + emitters_pos(1:2, emit)
-
-    ! x_max = emitters_pos(1, emit) + emitters_dim(1, emit)
-    ! x_min = emitters_pos(1, emit)
-
-    ! y_max = emitters_pos(2, emit) + emitters_dim(2, emit)
-    ! y_min = emitters_pos(2, emit)
-
-    ! !Check x ----------------------------------------
-    ! if (par_pos(1) > x_max) then
-    !   !d_x = mod(par_pos(1), x_max)
-    !   d_x = par_pos(1) - x_max
-    !   par_pos(1) = x_max - d_x
-
-    !   !if(d_x > emitters_dim(1, emit)) then
-    !   !  print *, 'Warning: d_x to large >'
-    !   !  print *, d_x
-    !   !end if
-
-
-    ! else if (par_pos(1) < x_min) then
-    !   !d_x = x_max - mod(par_pos(1), x_max)
-    !   d_x = x_min - par_pos(1)
-    !   par_pos(1) = d_x + x_min
-
-    !   !if(d_x > emitters_dim(1, emit)) then
-    !   !  print *, 'Warning: d_x to large <'
-    !   !  print *, d_x
-    !   !end if
-    ! end if
-
-    ! !Check y ----------------------------------------
-    ! if (par_pos(2) > y_max) then
-    !   !d_y = mod(par_pos(2), y_max)
-    !   d_y = par_pos(2) - y_max
-    !   par_pos(2) = y_max - d_y
-
-    !   !if(d_y > emitters_dim(2, emit)) then
-    !   !  print *, 'Warning: d_y to large >'
-    !   !  print *, d_y
-    !   !end if
-    ! else if (par_pos(2) < y_min) then
-    !   !d_y = y_max - mod(par_pos(2), y_max)
-    !   d_y = y_min - par_pos(2)
-    !   par_pos(2) = d_y + y_min
-
-    !   !if(d_y > emitters_dim(2, emit)) then
-    !   !  print *, 'Warning: d_x to large <'
-    !   !  print *, d_y
-    !   !end if
-    ! end if
   end subroutine check_limits_metro_rec
 
   ! ----------------------------------------------------------------------------
