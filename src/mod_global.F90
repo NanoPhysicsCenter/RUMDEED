@@ -57,7 +57,7 @@ module mod_global
   ! These can be increased if needed.
   integer, parameter :: MAX_PARTICLES = 500000 ! Maximum number of particles allowed in the system
   integer, parameter :: MAX_EMITTERS  = 36     ! Maximum number of emitters in the system
-  integer, parameter :: MAX_SECTIONS  = 10     ! Maximum number of sections an emitter can have
+  integer, parameter :: MAX_SECTIONS  = 144    ! Maximum number of sections an emitter can have
 
 
   !! ----------------------------------------------------------------------------
