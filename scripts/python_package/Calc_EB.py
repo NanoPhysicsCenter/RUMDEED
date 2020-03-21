@@ -42,8 +42,8 @@ df["r'"] = (np.sqrt(df['vx']**2 + df['vy']**2) / df['vz']) / 1.0E-3
 e_x, sw, swp, th = Vacuum.Calc_Emittance(df, "x", "x'")
 e_y, _, _, _ = Vacuum.Calc_Emittance(df, "y", "y'")
 
-print('Emittance in x-direction {} nm-mrad'.format(e_x))
-print('Emittance in y-direction {} nm-mrad'.format(e_y))
+print('Emittance in x-direction {:6.2f} nm-mrad'.format(e_x))
+print('Emittance in y-direction {:6.2f} nm-mrad'.format(e_y))
 
 # Read data for current
 filename_ramo = path.join(filepath, 'ramo_current.dt') # Ramo current
@@ -53,8 +53,8 @@ df_cur = pd.read_csv(filepath_or_buffer=filename_ramo, index_col=1, delim_whites
 df_cur['cur_roll'] = df_cur['current'].rolling(5000).mean()
 cur = df_cur['cur_roll'].iloc[-1]
 
-print('Current is {} mA'.format(cur/1.0E-3))
+print('Current is {:6.2f} mA'.format(cur/1.0E-3))
 
 # Calculate brightness
 B = 2*cur/(np.pi**2*e_x*e_y * 1.0E-12)
-print('Brightness is {} A/(m-rad)^2'.format(B))
+print('Brightness is {:6.2f} A/(m-rad)^2'.format(B))
