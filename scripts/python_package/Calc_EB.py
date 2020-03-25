@@ -31,10 +31,10 @@ df = pd.DataFrame.from_records(data=data_mem, columns=data_mem.dtype.names)
 df['v'] = np.sqrt(df['vx']**2 + df['vy']**2 + df['vz']**2)
 
 df["x'"] = (df['vx']/df['vz'])/1.0E-3
-df['x'] = df['x']/1.0E-9
+df['x'] = df['x']
 
 df["y'"] = (df['vy']/df['vz'])/1.0E-3
-df['y'] = df['y']/1.0E-9
+df['y'] = df['y']
 
 df["r"] = np.sqrt(df["x"]**2 + df["y"]**2)
 df["r'"] = (np.sqrt(df['vx']**2 + df['vy']**2) / df['vz']) / 1.0E-3
@@ -50,7 +50,7 @@ filename_ramo = path.join(filepath, 'ramo_current.dt') # Ramo current
 df_cur = pd.read_csv(filepath_or_buffer=filename_ramo, index_col=1, delim_whitespace=True, \
                     header=None, names=['time', 'step', 'current', 'volt', 'nrPart', 'nrElec', 'nrHole', 'avg_mob', 'avg_speed', 'ramo_1', 'ramo_2'])
         
-df_cur['cur_roll'] = df_cur['current'].rolling(5000).mean()
+df_cur['cur_roll'] = df_cur['current'].rolling(1000).mean()
 cur = df_cur['cur_roll'].iloc[-1]
 
 print('Current is {:6.2f} mA'.format(cur/1.0E-3))
