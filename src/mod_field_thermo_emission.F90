@@ -211,8 +211,8 @@ subroutine Init_Field_Thermo_Emission()
     ! This means that 68% of jumps are less than this value.
     ! The expected value of the absolute value of the normal distribution is std*sqrt(2/pi).
 
-    !ndim = nint( 2.0d0/(MH_std*sqrt(2.0d0/pi)) )
-    ndim = 50
+    ndim = nint( 2.0d0/(MH_std*sqrt(2.0d0/pi)) )
+    !ndim = 50
 
     ! Get a random initial position on the surface.
     ! We pick this location from a uniform distribution.
