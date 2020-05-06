@@ -186,8 +186,8 @@ subroutine Init_Field_Thermo_Emission()
     !integer                                       :: jump_a, jump_r ! Number of jumps accepted and rejected
     double precision                              :: ratio_change
 
-    jump_a = 0
-    jump_r = 0
+    !jump_a = 0
+    !jump_r = 0
     !ndim = ndim_in
     ndim_in = 0
 
@@ -195,14 +195,14 @@ subroutine Init_Field_Thermo_Emission()
     ! changing the standard deviation.
     ratio_change = 0.5d0*100.0d0/maxval(emitters_dim(:, emit))
     CALL RANDOM_NUMBER(rnd) ! Change be a random number
-    if (a_rate < 0.50d0) then
-      MH_std = MH_std * (1.0d0 - rnd*0.005d0)
+    if (a_rate < 0.525d0) then
+      MH_std = MH_std * (1.0d0 - rnd*0.00025d0)
     else
-      MH_std = MH_std * (1.0d0 + rnd*0.005d0)
+      MH_std = MH_std * (1.0d0 + rnd*0.00025d0)
     end if
     ! Limits on how big or low the standard deviation can be.
-    if (MH_std > 0.50d0) then
-      MH_std = 0.50d0
+    if (MH_std > 0.1250d0) then
+      MH_std = 0.1250d0
     else if (MH_std < 0.005d0) then
       MH_std = 0.005d0
     end if
@@ -211,8 +211,8 @@ subroutine Init_Field_Thermo_Emission()
     ! This means that 68% of jumps are less than this value.
     ! The expected value of the absolute value of the normal distribution is std*sqrt(2/pi).
 
-    ndim = nint( 2.0d0/(MH_std*sqrt(2.0d0/pi)) )
-    !ndim = 50
+    !ndim = nint( 2.0d0/(MH_std*sqrt(2.0d0/pi)) )
+    ndim = 25
 
     ! Get a random initial position on the surface.
     ! We pick this location from a uniform distribution.
