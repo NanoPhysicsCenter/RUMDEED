@@ -123,7 +123,7 @@ subroutine Init_Field_Thermo_Emission()
 
     ! Integration
     double precision                 :: N_sup
-    integer                          :: N_round
+    integer                          :: N_round, ndim
 
     ! Emission variables
     integer                          :: i, sec, nrElecEmit, IFAIL
@@ -145,7 +145,8 @@ subroutine Init_Field_Thermo_Emission()
     ! Loop over all electrons and place them
     do i = 1, N_round
       !call Metropolis_Hastings_rectangle_v2_field(N_MH_step, emit, D_f, F, par_pos)
-      call Metropolis_Hastings_rectangle_J(N_MH_step, emit, par_pos)
+      call Metropolis_Hastings_rectangle_J(ndim, emit, par_pos)
+      if (ndim == -1) cycle ! We did not find a good spot to emit from.
 
       par_pos(3) = 1.0d0*length_scale
       par_vel = ptr_Get_Emission_Velocity()
@@ -170,7 +171,8 @@ subroutine Init_Field_Thermo_Emission()
   ! Metropolis-Hastings algorithm
   ! Includes that the work function can vary with position
   subroutine Metropolis_Hastings_rectangle_J(ndim_in, emit, pos_out)
-    integer, intent(in)                           :: ndim_in, emit
+    integer, intent(inout)                        :: ndim_in
+    integer, intent(in)                           :: emit
     integer                                       :: ndim
     double precision, intent(out), dimension(1:3) :: pos_out
     integer                                       :: count, i
@@ -206,6 +208,8 @@ subroutine Init_Field_Thermo_Emission()
     ! This means that 68% of jumps are less than this value.
     ! The expected value of the absolute value of the normal distribution is std*sqrt(2/pi).
 
+    ndim = nint( maxval(emitters_dim(:, emit))*0.25d0/(maxval(std(:))*sqrt(2.0d0/pi)) )
+
     ! Get a random initial position on the surface.
     ! We pick this location from a uniform distribution.
     count = 0
@@ -222,8 +226,11 @@ subroutine Init_Field_Thermo_Emission()
         exit ! We found a nice spot so we exit the loop
       else
         count = count + 1
-        if (count > 10000) exit ! The loop is infnite, must stop it at some point.
+        if (count > 10000) then ! The loop is infnite, must stop it at some point.
         ! In field emission it is rare the we reach the CL limit.
+          ndim_in = -1
+          return ! Exit the function
+        end if
       end if
     end do
 
