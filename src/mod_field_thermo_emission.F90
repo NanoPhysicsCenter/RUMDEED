@@ -148,7 +148,7 @@ subroutine Init_Field_Thermo_Emission()
     do i = 1, N_round
       !call Metropolis_Hastings_rectangle_v2_field(N_MH_step, emit, D_f, F, par_pos)
       call Metropolis_Hastings_rectangle_J(ndim, emit, par_pos)
-      if (ndim == -1) cycle ! We did not find a good spot to emit from.
+      if (ndim < 0) cycle ! We did not find a good spot to emit from.
 
       par_pos(3) = 1.0d0*length_scale
       par_vel = ptr_Get_Emission_Velocity()
@@ -186,9 +186,10 @@ subroutine Init_Field_Thermo_Emission()
     !integer                                       :: jump_a, jump_r ! Number of jumps accepted and rejected
     double precision                              :: ratio_change
 
-    !jump_a = 0
-    !jump_r = 0
+    jump_a = 0
+    jump_r = 0
     !ndim = ndim_in
+    ndim_in = 0
 
     ! Try to keep the acceptance ratio around 50% by
     ! changing the standard deviation.
