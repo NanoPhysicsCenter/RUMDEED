@@ -158,7 +158,7 @@ subroutine Init_Field_Thermo_Emission()
       ! Expected value is E = std * sqrt(2/pi). We set std = sqrt(pi/2), which gives E = 1 nm.
       ! Mean value is 0.
       par_pos_tmp(1:2) = box_muller(mean, std)
-      par_pos(3) = abs(par_pos_tmp(1)) ! We want positive values, i.e. this is a half normal-distribution.
+      par_pos(3) = abs(par_pos_tmp(1))*length_scale ! We want positive values, i.e. this is a half normal-distribution.
 
       !par_pos(3) = 1.0d0*length_scale
       par_vel = ptr_Get_Emission_Velocity()
