@@ -132,6 +132,10 @@ subroutine Init_Field_Thermo_Emission()
     double precision                 :: rnd, df_avg
     !double precision                 :: D_f, F
     double precision, dimension(1:3) :: par_pos, par_vel
+    double precision, dimension(1:2) :: par_pos_tmp, std, mean
+
+    std = sqrt(pi/2.0d0)
+    mean = 0.0d0
 
 
     ! Do integration
@@ -150,7 +154,13 @@ subroutine Init_Field_Thermo_Emission()
       call Metropolis_Hastings_rectangle_J(ndim, emit, par_pos)
       if (ndim < 0) cycle ! We did not find a good spot to emit from.
 
-      par_pos(3) = 1.0d0*length_scale
+      ! Random z-position
+      ! Expected value is E = std * sqrt(2/pi). We set std = sqrt(pi/2), which gives E = 1 nm.
+      ! Mean value is 0.
+      par_pos_tmp(1:2) = box_muller(mean, std)
+      par_pos(3) = abs(par_pos_tmp(1)) ! We want positive values, i.e. this is a half normal-distribution.
+
+      !par_pos(3) = 1.0d0*length_scale
       par_vel = ptr_Get_Emission_Velocity()
       rnd = w_theta_xy(par_pos, emit, sec) ! Get the section
 
