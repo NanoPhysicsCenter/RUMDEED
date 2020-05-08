@@ -103,7 +103,7 @@ program VacuumMD
   print *, ''
 #else
   print '(a)', 'Vacuum: Starting main loop'
-  print '(tr1, a, i0, a, ES12.4, a)', 'Doing ', steps, ' time steps of size ', time_step, ' seconds'
+  print '(tr1, a, i0, a, ES12.4, a)', 'Doing ', steps, ' time steps of size ', time_step/1.0E-12, ' ps'
 #endif
 
 #if defined(_UNIT_TEST_)
