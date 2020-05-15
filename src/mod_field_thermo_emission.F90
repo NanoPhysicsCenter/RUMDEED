@@ -201,23 +201,23 @@ subroutine Init_Field_Thermo_Emission()
     !ndim = ndim_in
     ndim_in = 0
 
-    ! ! Try to keep the acceptance ratio around 50% by
-    ! ! changing the standard deviation.
-    ! ratio_change = 0.5d0*100.0d0/maxval(emitters_dim(:, emit))
-    ! CALL RANDOM_NUMBER(rnd) ! Change be a random number
-    ! if (a_rate < 0.525d0) then
-    !   MH_std = MH_std * (1.0d0 - rnd*0.00025d0)
-    ! else
-    !   MH_std = MH_std * (1.0d0 + rnd*0.00025d0)
-    ! end if
-    ! ! Limits on how big or low the standard deviation can be.
-    ! if (MH_std > 0.1250d0) then
-    !   MH_std = 0.1250d0
-    ! else if (MH_std < 0.005d0) then
-    !   MH_std = 0.005d0
-    ! end if
+    ! Try to keep the acceptance ratio around 50% by
+    ! changing the standard deviation.
+    ratio_change = 0.5d0*100.0d0/maxval(emitters_dim(:, emit))
+    CALL RANDOM_NUMBER(rnd) ! Change be a random number
+    if (a_rate < 0.525d0) then
+      MH_std = MH_std * (1.0d0 - rnd*0.00025d0)
+    else
+      MH_std = MH_std * (1.0d0 + rnd*0.00025d0)
+    end if
+    ! Limits on how big or low the standard deviation can be.
+    if (MH_std > 0.1250d0) then
+      MH_std = 0.1250d0
+    else if (MH_std < 0.005d0) then
+      MH_std = 0.005d0
+    end if
 
-    std(1:2) = emitters_dim(1:2, emit)*MH_std/length_scale ! Standard deviation for the normal distribution is 0.075% of the emitter length.
+    std(1:2) = emitters_dim(1:2, emit)*MH_std ! Standard deviation for the normal distribution is 0.075% of the emitter length.
     ! This means that 68% of jumps are less than this value.
     ! The expected value of the absolute value of the normal distribution is std*sqrt(2/pi).
 
@@ -264,9 +264,10 @@ subroutine Init_Field_Thermo_Emission()
     do i = 1, ndim
       ! Find a new position using a normal distribution.
 
-      std = std/((1.25d0)**i)
+      !std = std/((1.15d0)**i)
 
-      new_pos(1:2) = box_muller(cur_pos(1:2)/length_scale, std)*length_scale
+      !new_pos(1:2) = box_muller(cur_pos(1:2)/length_scale, std)*length_scale
+      new_pos(1:2) = box_muller(cur_pos(1:2), std)
       new_pos(3) = 0.0d0 ! At the surface
 
       ! Make sure that the new position is within the limits of the emitter area.
