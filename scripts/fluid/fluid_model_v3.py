@@ -2,6 +2,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from scipy.constants import pi, hbar, e, m_e, epsilon_0
 from scipy.integrate import nquad, quad
+from functools import lru_cache
 
 # Fluid model code
 # Kristinn Torfason (29.11.2017) (Converted from Current_density_scaled.m)
@@ -30,31 +31,44 @@ def Checkerboard(N, L):
     for j in range(N):
 
         for i in range(N):
-            y = L/(2*N) * (j+1)
-            x = L/(2*N) * (i+1)
+            y = L/(N) * (j+1) - L/(2*N)
+            x = L/(N) * (i+1) - L/(2*N)
 
-            emitter_x[i+j] = x
-            emitter_y[i+j] = y
+            k = i + j*N
+
+            emitter_x[k] = x
+            emitter_y[k] = y
 
             if (((i+j) % 2) == 0):
-                emitter_w[i+j] = 2.5
+                emitter_w[k] = 2.5
             else:
-                emitter_w[i+j] = 2.0
+                emitter_w[k] = 2.0
 
     return emitter_x, emitter_y, emitter_Lx, emitter_Ly, emitter_w
 
 # Checkerboard with N = 6 and L = 1000.0 nm
-N = 6
+N = 1
 L = 1000.0
-emitter_x, emitter_y, emitter_Lx, emitter_Ly, emitter_w = Checkerboard(N, L)
+#emitter_x, emitter_y, emitter_Lx, emitter_Ly, emitter_w = Checkerboard(N, L)
 
+emitter_x = np.array([0.0])
+emitter_y = np.array([0.0])
+emitter_Lx = np.array([1000.0])
+emitter_Ly = np.array([1000.0])
+emitter_w = np.array([2.0])
+
+print('x')
+print(emitter_x)
+print('')
+print('y')
+print(emitter_y)
 
 plt.scatter(emitter_x, emitter_y)
 for i in range(N*N):
     plt.annotate('{:.2f}'.format(emitter_w[i]), (emitter_x[i], emitter_y[i]))
 
 plt.show()
-exit()
+#exit()
 
 #-------------------------------------------------------------------------------
 # Fluid model
@@ -71,13 +85,13 @@ x = 0.15 # Mixing weight in iteration
 MAX_ITER = 500 # Maximum number of iterations before giving upp
 
 # System parameters
-V = 1.0 # Voltage [V]
-d = 1.0 # Gap spacing [nm]
+#V = 1.0 # Voltage [V]
+#d = 1.0 # Gap spacing [nm]
 
-E_vac = V / (d*1.0E-9) # [V/m]
+#E_vac = V / (d*1.0E-9) # [V/m]
 
 # Scale the current density with the Child-Langmuir law in 1D
-J_CL1D = 4/9*epsilon_0*np.sqrt(2*e/m_e)*V**(3/2)/(d*1.0E-9)**2
+#J_CL1D = 4/9*epsilon_0*np.sqrt(2*e/m_e)*V**(3/2)/(d*1.0E-9)**2
 
 def Set_System(V_: float, d_: float):
     global V, d, E_vac, J_CL1D
@@ -153,7 +167,7 @@ def do_int(x_c: float, y_c: float, x_cp: float, y_cp: float, L_x: float, L_y: fl
 
 # Use this function to set system parameters
 # Set_System(Voltage, Gap spacing)
-Set_System(2250, 1000.0)
+Set_System(1250.0, 1000.0)
 
 
 #-------------------------------------------------------------------------------
@@ -241,3 +255,20 @@ E = np.zeros(nrEmit)
     
 # Do the fluid model calculations
 J, E = Do_Fluid_Model(emitter_x, emitter_y, emitter_Lx, emitter_Ly, emitter_w)
+
+#-------------------------------------------------------------------------------
+# Data
+
+A = L/N*L/N # Area of one emitter
+
+cur_low = 0.0
+cur_high = 0.0
+for i in range(N*N):
+    if (abs(emitter_w[i] - 2.0) < 1.0E-6):
+        cur_low = cur_low + J[i]*J_CL1D*A
+    else:
+        cur_high = cur_high + J[i]*J_CL1D*A
+
+print('')
+print('Low work function current: {:f} mA'.format(cur_low/1.0E-3))
+print('High work function current: {:f} mA'.format(cur_high/1.0E-3))
