@@ -47,15 +47,15 @@ def Checkerboard(N, L):
     return emitter_x, emitter_y, emitter_Lx, emitter_Ly, emitter_w
 
 # Checkerboard with N = 6 and L = 1000.0 nm
-N = 1
+N = 6
 L = 1000.0
-#emitter_x, emitter_y, emitter_Lx, emitter_Ly, emitter_w = Checkerboard(N, L)
+emitter_x, emitter_y, emitter_Lx, emitter_Ly, emitter_w = Checkerboard(N, L)
 
-emitter_x = np.array([0.0])
-emitter_y = np.array([0.0])
-emitter_Lx = np.array([1000.0])
-emitter_Ly = np.array([1000.0])
-emitter_w = np.array([2.0])
+#emitter_x = np.array([0.0])
+#emitter_y = np.array([0.0])
+#emitter_Lx = np.array([1000.0])
+#emitter_Ly = np.array([1000.0])
+#emitter_w = np.array([2.0])
 
 print('x')
 print(emitter_x)
@@ -63,11 +63,11 @@ print('')
 print('y')
 print(emitter_y)
 
-plt.scatter(emitter_x, emitter_y)
-for i in range(N*N):
-    plt.annotate('{:.2f}'.format(emitter_w[i]), (emitter_x[i], emitter_y[i]))
+#plt.scatter(emitter_x, emitter_y)
+#for i in range(N*N):
+#    plt.annotate('{:.2f}'.format(emitter_w[i]), (emitter_x[i], emitter_y[i]))
 
-plt.show()
+#plt.show()
 #exit()
 
 #-------------------------------------------------------------------------------
@@ -167,7 +167,7 @@ def do_int(x_c: float, y_c: float, x_cp: float, y_cp: float, L_x: float, L_y: fl
 
 # Use this function to set system parameters
 # Set_System(Voltage, Gap spacing)
-Set_System(1250.0, 1000.0)
+Set_System(2000.0, 1000.0)
 
 
 #-------------------------------------------------------------------------------
@@ -259,7 +259,7 @@ J, E = Do_Fluid_Model(emitter_x, emitter_y, emitter_Lx, emitter_Ly, emitter_w)
 #-------------------------------------------------------------------------------
 # Data
 
-A = L/N*L/N # Area of one emitter
+A = L*1.0E-9/N*L*1.0E-9/N # Area of one emitter
 
 cur_low = 0.0
 cur_high = 0.0
@@ -272,3 +272,6 @@ for i in range(N*N):
 print('')
 print('Low work function current: {:f} mA'.format(cur_low/1.0E-3))
 print('High work function current: {:f} mA'.format(cur_high/1.0E-3))
+print('')
+print('J')
+print(J)
