@@ -166,6 +166,7 @@ clean:
 		rm -f *.smod
 		rm -f $(PROJECT_NAME).out
 		rm -f $(CUBA_LIB)
+		rm -f ../cuba/4.2/libcuba.a
 
 install:
 		cp $(PROJECT_NAME).out ../data/
