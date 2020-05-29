@@ -167,6 +167,7 @@ clean:
 		rm -f $(PROJECT_NAME).out
 		rm -f $(CUBA_LIB)
 		rm -f ../cuba/4.2/libcuba.a
+		cd ../cuba/4.2/ && make clean
 
 install:
 		cp $(PROJECT_NAME).out ../data/
