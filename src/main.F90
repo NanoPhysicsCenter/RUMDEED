@@ -50,9 +50,6 @@ program VacuumMD
   nthreads = 1
 #endif
 
-#if defined(_UNIT_TEST_)
-  print '(a)', 'Vacuum: **** UNIT TESTING IS ACTIVE ****'
-#endif
 
   print '(a)', 'Vacuum: Reading input values'
   call Read_Input_Variables()
@@ -61,6 +58,9 @@ program VacuumMD
   call Init()
 
   SELECT CASE (EMISSION_MODE)
+  case(EMISSION_UNIT_TEST)
+    print '(a)', 'Vacuum: **** UNIT TESTING IS ACTIVE ****'
+    call Init_Unit_Test()
   case(EMISSION_PHOTO)
     print '(a)', 'Vacuum: Doing Photo emission'
     call Init_Photo_Emission()
@@ -98,17 +98,8 @@ program VacuumMD
   !call Init_Dipoles(0, 0, 0)
   !call Write_Dipole_data()
 
-#if defined(_UNIT_TEST_)
-  print '(a)', 'Vacuum: Starting Unit Tests'
-  print *, ''
-#else
   print '(a)', 'Vacuum: Starting main loop'
   print '(tr1, a, i0, a, ES12.4, a)', 'Doing ', steps, ' time steps of size ', time_step/1.0E-12, ' ps'
-#endif
-
-#if defined(_UNIT_TEST_)
-  call Run_Unit_Tests()
-#else
 
   print *, ''
 
@@ -181,19 +172,14 @@ program VacuumMD
   call PrintProgress(10)
   print '(a)', 'Vacuum: Main loop finished'
 
-! End of else for unit test
-#endif
 
-
-#if defined(_UNIT_TEST_)
-  print '(a)', 'Vacuum: Unit tests finished'
-#else
   print '(a)', 'Vacuum: Writing data'
   call Write_Life_Time()
-#endif
 
   print '(a)', 'Vacuum: Emission clean up'
   SELECT CASE (EMISSION_MODE)
+  case(EMISSION_UNIT_TEST)
+    call Clean_Up_Unit_Test()
   case(EMISSION_PHOTO)
     call Clean_Up_Photo_Emission()
   case(EMISSION_FIELD)

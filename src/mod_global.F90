@@ -193,6 +193,7 @@ module mod_global
 
   ! ----------------------------------------------------------------------------
   ! Emission models
+  integer, parameter :: EMISSION_UNIT_TEST         = 0 ! Units test
   integer, parameter :: EMISSION_PHOTO             = 1 ! Planar photo emission
   integer, parameter :: EMISSION_FIELD             = 2 ! Planar field emission
   integer, parameter :: EMISSION_FIELD_TIP         = 3 ! Field emission from a hyperboloid tip
