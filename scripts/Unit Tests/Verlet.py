@@ -1,5 +1,8 @@
 import numpy as np
-import pandas as pd
+#import pandas as pd
+
+from mpl_toolkits.mplot3d import Axes3D
+import matplotlib.pyplot as plt
 
 # Constants
 length_scale = 1.0E-9 # Length scale (1 nanometer)
@@ -14,10 +17,11 @@ mu_0 = 4.0*pi * 1.0E-7 # Vacuum permeability (H/m)
 epsilon_0 = 1.0/(mu_0 * c**2) # Vacuum permittivity (F/m)
 
 # Numerical parameters
-steps = 1000
+steps = 250
 maxElec = 1000
 nrElec = 0
-time_step = 1.0E-4*time_scale
+nrRemove = 0
+time_step = 0.25E-3*time_scale
 time_step2 = time_step**2
 
 # System parameters
@@ -32,10 +36,17 @@ particles_cur_vel     = np.zeros((3, maxElec*3))
 particles_cur_accel   = np.zeros((3, maxElec*3))
 particles_prev_accel  = np.zeros((3, maxElec*3))
 particles_prev2_accel = np.zeros((3, maxElec*3))
+particles_mask        = np.zeros(maxElec*3, dtype=bool)
 
 filename = 'Unit_Test_rand.bin'
 dt = np.dtype([('x', np.float64), ('y', np.float64), ('z', np.float64), ('step', np.int32), ('species', np.int32)])
 data = np.memmap(filename, dtype=dt, mode='r', order='F')
+
+plot_data = True
+
+if (plot_data == True):
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
 
 # -------------------------------------------------------------------------------------------------------------------------------------------------
 # We read from a file the particles to emit in each time step
@@ -69,6 +80,9 @@ def Do_Emission(step):
 def Update_Position(step):
     global nrElec
 
+    particles_mask[:] = False
+    nrRemove = 0
+
     for i in range(nrElec):
         particles_cur_pos[:, i] = particles_cur_pos[:, i] + particles_cur_vel[:, i]*time_step + 0.5*particles_cur_accel[:, i]*time_step2
 
@@ -77,9 +91,16 @@ def Update_Position(step):
         particles_prev_accel[:, i] = particles_cur_accel[:, i]
         particles_cur_accel[:, i] = 0.0
 
-        x = particles_cur_pos[0, i]/length_scale
-        y = particles_cur_pos[1, i]/length_scale
-        z = particles_cur_pos[2, i]/length_scale
+        if ((particles_cur_pos[2, i] < 0.0) or (particles_cur_pos[2, i] > d)):
+            particles_mask[i] = True
+            nrRemove = nrRemove + 1
+            print('Particle {:d} at z = {:.2f} marked for removal'.format(i, particles_cur_pos[2, i]/length_scale))
+        else:
+            particles_mask[i] = False
+
+        #x = particles_cur_pos[0, i]/length_scale
+        #y = particles_cur_pos[1, i]/length_scale
+        #z = particles_cur_pos[2, i]/length_scale
 
         #print('New position for {:d} x = {:.2f}, y = {:.2f}, z = {:.2f}'.format(i, x, y, z))
         #print(particles_cur_vel[:, i]*time_step)
@@ -136,18 +157,40 @@ def Update_Imagecharge_Positions(step):
 def Remove_Particles(step):
     global nrElec
 
-    for i in range(nrElec):
-        if (particles_cur_pos[2, i] < 0.0 ):
-            Remove_Particle_nr(i)
+    #for i in range(nrElec):
+    #    if (particles_cur_pos[2, i] < 0.0 ):
+    #        Remove_Particle_nr(i)
 
-        if (particles_cur_pos[2, i] > d):
-            Remove_Particle_nr(i)
+    #    if (particles_cur_pos[2, i] > d):
+    #        Remove_Particle_nr(i)
+
+    particles_cur_pos[0, :] = np.resize(particles_cur_pos[0, ~particles_mask], (maxElec*3))
+    particles_cur_pos[1, :] = np.resize(particles_cur_pos[1, ~particles_mask], (maxElec*3))
+    particles_cur_pos[2, :] = np.resize(particles_cur_pos[2, ~particles_mask], (maxElec*3))
+
+    particles_cur_vel[0, :] = np.resize(particles_cur_vel[0, ~particles_mask], (maxElec*3))
+    particles_cur_vel[1, :] = np.resize(particles_cur_vel[1, ~particles_mask], (maxElec*3))
+    particles_cur_vel[2, :] = np.resize(particles_cur_vel[2, ~particles_mask], (maxElec*3))
+
+    particles_cur_accel[0, :] = np.resize(particles_cur_accel[0, ~particles_mask], (maxElec*3))
+    particles_cur_accel[1, :] = np.resize(particles_cur_accel[1, ~particles_mask], (maxElec*3))
+    particles_cur_accel[2, :] = np.resize(particles_cur_accel[2, ~particles_mask], (maxElec*3))
+
+    particles_prev_accel[0, :] = np.resize(particles_prev_accel[0, ~particles_mask], (maxElec*3))
+    particles_prev_accel[1, :] = np.resize(particles_prev_accel[1, ~particles_mask], (maxElec*3))
+    particles_prev_accel[2, :] = np.resize(particles_prev_accel[2, ~particles_mask], (maxElec*3))
+
+    particles_prev2_accel[0, :] = np.resize(particles_prev2_accel[0, ~particles_mask], (maxElec*3))
+    particles_prev2_accel[1, :] = np.resize(particles_prev2_accel[1, ~particles_mask], (maxElec*3))
+    particles_prev2_accel[2, :] = np.resize(particles_prev2_accel[2, ~particles_mask], (maxElec*3))
+
+    nrElec = nrElec - nrRemove
     return None
 
 def Remove_Particle_nr(i):
     global nrElec
 
-    print('Particle {:d} at z = {:.2f} removed'.format(i, particles_cur_pos[2, i]))
+    print('Particle {:d} at z = {:.2f} removed'.format(i, particles_cur_pos[2, i]/length_scale))
     if (nrElec == 1):
         nrElec = 0
     else:
@@ -161,13 +204,34 @@ def Remove_Particle_nr(i):
 
     return None
 
+def Plot_Particles(step):
+    global nrElec
+
+    if (plot_data == True):
+        ax.cla()
+        ax.set_xlim3d(-50.0, 50.0)
+        ax.set_ylim3d(-50.0, 50.0)
+        ax.set_zlim3d(0.0, 1000.0)
+        ax.scatter(particles_cur_pos[0, 0:nrElec]/length_scale, particles_cur_pos[1, 0:nrElec]/length_scale, particles_cur_pos[2, 0:nrElec]/length_scale, marker='o', c='blue')
+        #plt.show()
+        fig.canvas.draw()
+        plt.pause(0.0001)
+        #fig.canvas.flush_events()
+    return None
+
 # ----------------------------------------------------------------------------------------------------------
+print('Starting')
 for step in range(1, steps+1):
     print(step)
     Do_Emission(step)
     Update_Position(step)
     Remove_Particles(step)
+    Plot_Particles(step)
     Update_Imagecharge_Positions(step)
     Calculate_Acceleration(step)
     Update_Velocity(step)
     print('')
+
+print('Finished')
+if (plot_data == True):
+    plt.show(block=True)

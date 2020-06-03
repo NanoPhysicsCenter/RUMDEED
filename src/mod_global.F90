@@ -90,11 +90,11 @@ module mod_global
   double precision, dimension(:, :), allocatable :: particles_prev_accel ! Previous acceleration
   double precision, dimension(:, :), allocatable :: particles_prev2_accel ! Previous acceleration
 
-  ! Other information about particles, the dimension if the number of particles
+  ! Other information about particles, the dimension is the number of particles
   double precision, dimension(:)   , allocatable :: particles_charge     ! Charge
   integer         , dimension(:)   , allocatable :: particles_species    ! Type of particle
   double precision, dimension(:)   , allocatable :: particles_mass       ! Mass
-  integer         , dimension(:)   , allocatable :: particles_step       ! Time step when particle was created
+  integer         , dimension(:)   , allocatable :: particles_step       ! Time step when the particle was created
   integer         , dimension(:)   , allocatable :: particles_emitter    ! The emitter the particle came from
   integer         , dimension(:)   , allocatable :: particles_section    ! The section of the emitter the particles came from
   integer         , dimension(:)   , allocatable :: particles_life       ! The time step when the particle should be removed from the system
