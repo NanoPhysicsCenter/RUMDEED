@@ -29,8 +29,8 @@ program Write_Unit_Test_Files
 
     x = -4.4d-9
     y = -1.44d-9
-    z = 1.0d-9
-    step = 10
+    z = 2.0d-9
+    step = 1
     species = species_elec
     write(unit=ud_file) x, y, z, step, species
 

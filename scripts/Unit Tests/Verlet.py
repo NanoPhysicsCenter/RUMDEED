@@ -38,11 +38,11 @@ particles_prev_accel  = np.zeros((3, maxElec*3))
 particles_prev2_accel = np.zeros((3, maxElec*3))
 particles_mask        = np.zeros(maxElec*3, dtype=bool)
 
-filename = 'Unit_Test_rand.bin'
+filename = 'Unit_Test_1.bin'
 dt = np.dtype([('x', np.float64), ('y', np.float64), ('z', np.float64), ('step', np.int32), ('species', np.int32)])
 data = np.memmap(filename, dtype=dt, mode='r', order='F')
 
-plot_data = True
+plot_data = False
 
 if (plot_data == True):
     fig = plt.figure()
@@ -54,6 +54,7 @@ def Do_Emission(step):
     global nrElec
 
     for (x, y, z, emit_step, species) in data:
+        print('emit_step = {:d}, step = {:d}'.format(emit_step, step))
         if (step == emit_step):
             print('Particle {:d} at x = {:.2f}, y = {:.2f}, z = {:.2f}, {:d} {:d} added'.format(nrElec, x/length_scale, y/length_scale, z/length_scale, emit_step, species))
 
@@ -113,6 +114,12 @@ def Calculate_Acceleration(step):
 
     pre_fac_c = (-q_0)*(-q_0) / (4 * pi * epsilon_0)
 
+    print('Calculate Acceleration nrElec = {:d}'.format(nrElec))
+    for i in range(nrElec):
+        print('i = {:d}'.format(i))
+        print(particles_cur_pos[:, i]/length_scale)
+    
+    print('')
     # Loop over all particles
     for i in range(nrElec):
         pos_1 = particles_cur_pos[:, i]
@@ -121,6 +128,9 @@ def Calculate_Acceleration(step):
 
         # Loop over all particles and also all image charge particles
         for j in range(nrElec*3):
+            if (i == j):
+                continue # Skip this
+
             pos_2 = particles_cur_pos[:, j]
 
             diff = pos_1 - pos_2
@@ -128,7 +138,14 @@ def Calculate_Acceleration(step):
             force_c = pre_fac_c * diff / r**3
 
             particles_cur_accel[:, i] = particles_cur_accel[:, i] + force_c/m_0
-
+            print('i = {:d}, j = {:d}'.format(i, j))
+            print('pos_1 [nm]')
+            print(pos_1/length_scale)
+            print('pos_2 [nm]')
+            print(pos_2/length_scale)
+            print('Accel')
+            print(particles_cur_accel[:, 0:nrElec])
+            print('')
 
     return None
 
@@ -145,12 +162,12 @@ def Update_Imagecharge_Positions(step):
 
     for i in range(nrElec):
         # Mirror about z = 0
-        particles_cur_pos[0:1, i+maxElec] = particles_cur_pos[0:1, i]
-        particles_cur_pos[2, i+maxElec] = -1.0*particles_cur_pos[2, i]
+        particles_cur_pos[0:2, i+nrElec] = particles_cur_pos[0:2, i]
+        particles_cur_pos[2, i+nrElec] = -1.0*particles_cur_pos[2, i]
 
         # Mirror about z = d
-        particles_cur_pos[0:1, i+2*maxElec] = particles_cur_pos[0:1, i]
-        particles_cur_pos[2, i+2*maxElec] = 2*d - particles_cur_pos[2, i]
+        particles_cur_pos[0:2, i+2*nrElec] = particles_cur_pos[0:2, i]
+        particles_cur_pos[2, i+2*nrElec] = 2*d - particles_cur_pos[2, i]
 
     return None
 
@@ -168,6 +185,7 @@ def Remove_Particles(step):
         print('Removing particles {:d}'.format(nrRemove))
         nrElec = nrElec - nrRemove
 
+        # np.extract works in the same way as the pack command in Fortran
         particles_cur_pos[0, 0:nrElec] = np.extract(~particles_mask, particles_cur_pos[0, :])
         particles_cur_pos[1, 0:nrElec] = np.extract(~particles_mask, particles_cur_pos[1, :])
         particles_cur_pos[2, 0:nrElec] = np.extract(~particles_mask, particles_cur_pos[2, :])
@@ -190,23 +208,6 @@ def Remove_Particles(step):
 
     return None
 
-def Remove_Particle_nr(i):
-    global nrElec
-
-    print('Particle {:d} at z = {:.2f} removed'.format(i, particles_cur_pos[2, i]/length_scale))
-    if (nrElec == 1):
-        nrElec = 0
-    else:
-        particles_cur_pos[:, i] = particles_cur_pos[:, nrElec-1]
-        particles_cur_vel[:, i] = particles_cur_vel[:, nrElec-1]
-        particles_cur_accel[:, i] = particles_cur_accel[:, nrElec-1]
-        particles_prev_accel[:, i] = particles_prev_accel[:, nrElec-1]
-        particles_prev2_accel[:, i] = particles_prev2_accel[:, nrElec-1]
-
-        nrElec = nrElec - 1
-
-    return None
-
 def Plot_Particles(step):
     global nrElec
 
@@ -215,11 +216,33 @@ def Plot_Particles(step):
         ax.set_xlim3d(-50.0, 50.0)
         ax.set_ylim3d(-50.0, 50.0)
         ax.set_zlim3d(0.0, 1000.0)
+        ax.view_init(elev=0.0, azim=0.0)
         ax.scatter(particles_cur_pos[0, 0:nrElec]/length_scale, particles_cur_pos[1, 0:nrElec]/length_scale, particles_cur_pos[2, 0:nrElec]/length_scale, marker='o', c='blue')
         #plt.show()
         fig.canvas.draw()
         plt.pause(0.0001)
         #fig.canvas.flush_events()
+    return None
+
+def Compair_Accel_With_Fortran(step):
+    filename_accel = 'accel/accel-{:d}.bin'.format(step) # The filename to read
+
+    dt_accel = np.dtype([('x', np.float64), ('y', np.float64), ('z', np.float64)])
+    data_accel = np.memmap(filename_accel, dtype=dt_accel, mode='r', order='F')
+
+    print('Accel')
+    i = 0
+    for (fortran_data) in data_accel:
+        axyz_F = np.array(fortran_data.tolist())
+        axyz_P = particles_cur_accel[:, i]
+        i = i + 1
+        print(axyz_F)
+        print(axyz_P)
+        input()
+        #print(np.abs(axyz_F - axyz_P))
+        print('')
+
+    print('')
     return None
 
 # ----------------------------------------------------------------------------------------------------------
@@ -232,6 +255,7 @@ for step in range(1, steps+1):
     Plot_Particles(step)
     Update_Imagecharge_Positions(step)
     Calculate_Acceleration(step)
+    Compair_Accel_With_Fortran(step)
     Update_Velocity(step)
     print('')
 

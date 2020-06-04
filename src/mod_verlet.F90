@@ -38,6 +38,10 @@ contains
 
       call Calculate_Acceleration_Particles()
 
+      if (EMISSION_MODE == EMISSION_UNIT_TEST) then
+        call Write_Acceleration(step)
+      end if
+
       ! Reset the ramo current. Note, this should be done after set_voltage,
       ! since the ramo current may be used there.
       wait(ud_ramo_sec) ! ud_ramo_sec is done asynchronously. We must make sure it is finished.
@@ -169,7 +173,7 @@ contains
   ! Update the acceleration for all the particles
   subroutine Calculate_Acceleration_Particles()
     double precision, dimension(1:3) :: force_E, force_c, force_ic, force_ic_N, force_ic_self
-    double precision, dimension(1:3) :: pos_1, pos_2, diff
+    double precision, dimension(1:3) :: pos_1, pos_2, diff, pos_ic
     double precision                 :: r
     double precision                 :: q_1, q_2
     double precision                 :: im_1, im_2
@@ -177,12 +181,12 @@ contains
     integer                          :: i, j, k_1, k_2
 
     ! We do not use GUIDED scheduling in OpenMP here because the inner loop changes size.
-    !$OMP PARALLEL DO DEFAULT(NONE) PRIVATE(i, j, k_1, k_2, pos_1, pos_2, diff, r) &
+    !$OMP PARALLEL DO DEFAULT(NONE) PRIVATE(i, j, k_1, k_2, pos_1, pos_2, diff, r, pos_ic) &
     !$OMP& PRIVATE(force_E, force_c, force_ic, force_ic_N, force_ic_self, im_1, q_1, im_2, q_2, pre_fac_c) &
     !$OMP SHARED(nrPart, particles_cur_pos, particles_mass, particles_species, ptr_field_E) &
-    !$OMP SHARED(ptr_Image_Charge_effect, particles_charge) &
-    !$OMP& SCHEDULE(DYNAMIC, 4) &
-    !$OMP& REDUCTION(+:particles_cur_accel)
+    !$OMP SHARED(ptr_Image_Charge_effect, particles_charge, particles_cur_accel, d) &
+    !$OMP& SCHEDULE(DYNAMIC, 4) !!&
+    !!!$OMP& REDUCTION(+:particles_cur_accel)
     do i = 1, nrPart
       ! Information about the particle we are calculating the force/acceleration on
       pos_1 = particles_cur_pos(:, i)
@@ -200,13 +204,12 @@ contains
       ! w_l = h/(m_e*v_esc) = 2.04 nm. This equal to the distance between the electron and its
       ! image charge partner.
       !force_ic_self = q_1**2 * div_fac_c * Force_Image_charges_v2(pos_1, pos_1)
-      force_ic_self = 0.0d0
+      !force_ic_self = 0.0d0
 
       ! Loop over particles from i+1 to nrElec.
       ! There is no need to loop over all particles since
       ! The forces are equal but in opposite directions
-      do j = i+1, nrPart
-
+      do j = 1, nrPart
         ! Information about the particle that is acting on the particle at pos_1
         pos_2 = particles_cur_pos(:, j)
         !if (particles_mass(j) == 0.0d0) then
@@ -220,49 +223,97 @@ contains
         pre_fac_c = q_1*q_2 * div_fac_c ! q_1*q_2 / (4*pi*epsilon)
 
         ! Calculate the distance between the two particles
-        diff = pos_1 - pos_2
-        ! There are fours ways to calculate the distance
-        ! Number 1: Use the intrinsic function NORM2(v)
-        ! Number 2: Use the equation for it sqrt( v(1)**2 + v(2)**2 + v(3)**2 )
-        ! Number 3: Or do sqrt( dot_product(v, v) )
-        ! Number 4: Or use sqrt( sum(v**2) )
-        ! It turns you number 1 is the slowest by far. Number 2, 3 and 4 are
-        ! often similar in speed. The difference is small and they fluctuate a lot,
-        ! with no clear winner.
-        !
-        ! We add a small number (length_scale**3) to the results to
-        ! prevent a singularity when calulating 1/r**3
-        !
-        r = sqrt( sum(diff**2) ) + length_scale**3
-        !r = sqrt( dot_product(diff, diff) ) + length_scale**3
-        !r = NORM2(diff) + length_scale**3
+        if (i /= j) then
+          diff = pos_1 - pos_2
+          ! There are fours ways to calculate the distance
+          ! Number 1: Use the intrinsic function NORM2(v)
+          ! Number 2: Use the equation for it sqrt( v(1)**2 + v(2)**2 + v(3)**2 )
+          ! Number 3: Or do sqrt( dot_product(v, v) )
+          ! Number 4: Or use sqrt( sum(v**2) )
+          ! It turns you number 1 is the slowest by far. Number 2, 3 and 4 are
+          ! often similar in speed. The difference is small and they fluctuate a lot,
+          ! with no clear winner.
+          !
+          ! We add a small number (length_scale**3) to the results to
+          ! prevent a singularity when calulating 1/r**3
+          !
+          r = sqrt( sum(diff**2) ) + length_scale**3
+          !r = sqrt( dot_product(diff, diff) ) + length_scale**3
+          !r = NORM2(diff) + length_scale**3
 
-        ! Calculate the Coulomb force
-        ! F = (r_1 - r_2) / |r_1 - r_2|^3
-        ! F = (diff / r) * 1/r^2
-        ! (diff / r) is a unit vector
-        force_c = pre_fac_c * diff / r**3
+          ! Calculate the Coulomb force
+          ! F = (r_1 - r_2) / |r_1 - r_2|^3
+          ! F = (diff / r) * 1/r^2
+          ! (diff / r) is a unit vector
+          force_c = pre_fac_c * diff / r**3
+        else
+          force_c = 0.0d0
+        end if
 
         ! Do image charge
-        force_ic = pre_fac_c * ptr_Image_Charge_effect(pos_1, pos_2)
+        !force_ic = pre_fac_c * ptr_Image_Charge_effect(pos_1, pos_2)
 
         ! The image charge force of particle i on particle j is the same in the z-direction
         ! but we reverse the x and y directions of the force due to symmetry.
-        force_ic_N(1:2) = -1.0d0*force_ic(1:2)
-        force_ic_N(3)   = +1.0d0*force_ic(3)
+        !force_ic_N(1:2) = -1.0d0*force_ic(1:2)
+        !force_ic_N(3)   = +1.0d0*force_ic(3)
 
-        !!!$OMP CRITICAL(ACCEL_UPDATE)
-        particles_cur_accel(:, j) = particles_cur_accel(:, j) - force_c * im_2 + force_ic_N * im_2
-        particles_cur_accel(:, i) = particles_cur_accel(:, i) + force_c * im_1 + force_ic   * im_1
-        !!!$OMP END CRITICAL(ACCEL_UPDATE)
+        ! Below plane
+        pos_ic(1:2) = pos_2(1:2)
+        pos_ic(3) = -1.0d0*pos_2(3)
+        diff = pos_1 - pos_ic
+        r = sqrt( sum(diff**2) ) + length_scale**3
+        force_ic = (-1.0d0)*pre_fac_c * diff / r**3
+
+        ! Above plane
+        pos_ic(1:2) = pos_2(1:2)
+        pos_ic(3) = 2*d - pos_2(3)
+        diff = pos_1 - pos_ic
+        r = sqrt( sum(diff**2) ) + length_scale**3
+        force_ic = force_ic + (-1.0d0)*pre_fac_c * diff / r**3
+
+
+        !$OMP CRITICAL(ACCEL_UPDATE)
+        particles_cur_accel(:, i) = particles_cur_accel(:, i) + force_c*im_1 + force_ic*im_1
+        !particles_cur_accel(:, j) = particles_cur_accel(:, j) - force_c * im_2 + force_ic_N * im_2
+        !particles_cur_accel(:, i) = particles_cur_accel(:, i) + force_c * im_1 + force_ic   * im_1
+        !$OMP END CRITICAL(ACCEL_UPDATE)
       end do
 
-      !!!$OMP CRITICAL(ACCEL_UPDATE)
-      particles_cur_accel(:, i) = particles_cur_accel(:, i) + force_E * im_1 + force_ic_self * im_1
-      !!!$OMP END CRITICAL(ACCEL_UPDATE)
+      !$OMP CRITICAL(ACCEL_UPDATE)
+      particles_cur_accel(:, i) = particles_cur_accel(:, i) + force_E * im_1 !+ force_ic_self * im_1
+      !$OMP END CRITICAL(ACCEL_UPDATE)
     end do
     !$OMP END PARALLEL DO
   end subroutine Calculate_Acceleration_Particles
+
+  subroutine Write_Acceleration(step)
+    integer, intent(in)              :: step
+    integer                          :: ud_accel, IFAIL, i
+    character(len=1024)              :: filename
+    double precision, dimension(1:3) :: par_accel
+
+    ! Prepare the name of the output file
+    ! each file is named accel-0.dt where the number
+    ! represents the current time step.
+    write(filename, '(a10, i0, a4)') 'out/accel-', step, '.bin'
+
+    open(newunit=ud_accel, iostat=IFAIL, file=filename, status='replace', action='write', access='STREAM')
+    if (IFAIL /= 0) then
+      print '(a)', 'Vacuum: ERROR UNABLE TO OPEN file for acceleration'
+      print *, filename
+      print *, step
+    end if
+
+    do i = 1, nrPart
+      par_accel(:) = particles_cur_accel(:, i) ! Position of the particle
+
+      ! Write out x, y, z and which emitter the particle came from
+      write(unit=ud_accel) par_accel(1), par_accel(2), par_accel(3)
+    end do
+
+    close(unit=ud_accel, iostat=IFAIL, status='keep')
+  end subroutine Write_Acceleration
 
 
   !-----------------------------------------------------------------------------
