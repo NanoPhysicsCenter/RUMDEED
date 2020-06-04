@@ -78,9 +78,9 @@ def Do_Emission(step):
 # -------------------------------------------------------------------------------------------------------------------------------------------------
 # Update the position
 def Update_Position(step):
-    global nrElec
+    global nrElec, nrRemove
 
-    particles_mask[:] = False
+    particles_mask[:] = True # Set all to be removed (Including image charge partners).
     nrRemove = 0
 
     for i in range(nrElec):
@@ -155,7 +155,7 @@ def Update_Imagecharge_Positions(step):
     return None
 
 def Remove_Particles(step):
-    global nrElec
+    global nrElec, nrRemove
 
     #for i in range(nrElec):
     #    if (particles_cur_pos[2, i] < 0.0 ):
@@ -164,27 +164,30 @@ def Remove_Particles(step):
     #    if (particles_cur_pos[2, i] > d):
     #        Remove_Particle_nr(i)
 
-    particles_cur_pos[0, :] = np.resize(particles_cur_pos[0, ~particles_mask], (maxElec*3))
-    particles_cur_pos[1, :] = np.resize(particles_cur_pos[1, ~particles_mask], (maxElec*3))
-    particles_cur_pos[2, :] = np.resize(particles_cur_pos[2, ~particles_mask], (maxElec*3))
+    if (nrRemove > 0):
+        print('Removing particles {:d}'.format(nrRemove))
+        nrElec = nrElec - nrRemove
 
-    particles_cur_vel[0, :] = np.resize(particles_cur_vel[0, ~particles_mask], (maxElec*3))
-    particles_cur_vel[1, :] = np.resize(particles_cur_vel[1, ~particles_mask], (maxElec*3))
-    particles_cur_vel[2, :] = np.resize(particles_cur_vel[2, ~particles_mask], (maxElec*3))
+        particles_cur_pos[0, 0:nrElec] = np.extract(~particles_mask, particles_cur_pos[0, :])
+        particles_cur_pos[1, 0:nrElec] = np.extract(~particles_mask, particles_cur_pos[1, :])
+        particles_cur_pos[2, 0:nrElec] = np.extract(~particles_mask, particles_cur_pos[2, :])
 
-    particles_cur_accel[0, :] = np.resize(particles_cur_accel[0, ~particles_mask], (maxElec*3))
-    particles_cur_accel[1, :] = np.resize(particles_cur_accel[1, ~particles_mask], (maxElec*3))
-    particles_cur_accel[2, :] = np.resize(particles_cur_accel[2, ~particles_mask], (maxElec*3))
+        particles_cur_vel[0, 0:nrElec] = np.extract(~particles_mask, particles_cur_vel[0, :])
+        particles_cur_vel[1, 0:nrElec] = np.extract(~particles_mask, particles_cur_vel[1, :])
+        particles_cur_vel[2, 0:nrElec] = np.extract(~particles_mask, particles_cur_vel[2, :])
 
-    particles_prev_accel[0, :] = np.resize(particles_prev_accel[0, ~particles_mask], (maxElec*3))
-    particles_prev_accel[1, :] = np.resize(particles_prev_accel[1, ~particles_mask], (maxElec*3))
-    particles_prev_accel[2, :] = np.resize(particles_prev_accel[2, ~particles_mask], (maxElec*3))
+        particles_cur_accel[0, 0:nrElec] = np.extract(~particles_mask, particles_cur_accel[0, :])
+        particles_cur_accel[1, 0:nrElec] = np.extract(~particles_mask, particles_cur_accel[1, :])
+        particles_cur_accel[2, 0:nrElec] = np.extract(~particles_mask, particles_cur_accel[2, :])
 
-    particles_prev2_accel[0, :] = np.resize(particles_prev2_accel[0, ~particles_mask], (maxElec*3))
-    particles_prev2_accel[1, :] = np.resize(particles_prev2_accel[1, ~particles_mask], (maxElec*3))
-    particles_prev2_accel[2, :] = np.resize(particles_prev2_accel[2, ~particles_mask], (maxElec*3))
+        particles_prev_accel[0, 0:nrElec] = np.extract(~particles_mask, particles_prev_accel[0, :])
+        particles_prev_accel[1, 0:nrElec] = np.extract(~particles_mask, particles_prev_accel[1, :])
+        particles_prev_accel[2, 0:nrElec] = np.extract(~particles_mask, particles_prev_accel[2, :])
 
-    nrElec = nrElec - nrRemove
+        particles_prev2_accel[0, 0:nrElec] = np.extract(~particles_mask, particles_prev2_accel[0, :])
+        particles_prev2_accel[1, 0:nrElec] = np.extract(~particles_mask, particles_prev2_accel[1, :])
+        particles_prev2_accel[2, 0:nrElec] = np.extract(~particles_mask, particles_prev2_accel[2, :])
+
     return None
 
 def Remove_Particle_nr(i):
