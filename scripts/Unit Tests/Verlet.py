@@ -124,18 +124,29 @@ def Calculate_Acceleration(step):
     for i in range(nrElec):
         pos_1 = particles_cur_pos[:, i]
 
+        particles_cur_accel[0:2, i] = 0.0
         particles_cur_accel[2, i] = -q_0*E/m_0
+        #print('Vacuum Accel')
+        #print(particles_cur_accel[:, i])
 
         # Loop over all particles and also all image charge particles
         for j in range(nrElec*3):
             if (i == j):
                 continue # Skip this
+            if (j == (i+nrElec)): # Skip image charge on self
+               continue
+            if (j == (i+2*nrElec)): # Skip image charge on self
+               continue
 
             pos_2 = particles_cur_pos[:, j]
 
             diff = pos_1 - pos_2
             r = np.sqrt( np.sum(diff**2) ) + length_scale**3 # + length_scale**3 to avoid division with zero
             force_c = pre_fac_c * diff / r**3
+
+
+            if (j >= nrElec): # Check if this is an image charge, they have +q
+                force_c = (-1.0)*force_c # Flip the sign if image charge
 
             particles_cur_accel[:, i] = particles_cur_accel[:, i] + force_c/m_0
             print('i = {:d}, j = {:d}'.format(i, j))
@@ -144,7 +155,7 @@ def Calculate_Acceleration(step):
             print('pos_2 [nm]')
             print(pos_2/length_scale)
             print('Accel')
-            print(particles_cur_accel[:, 0:nrElec])
+            print(force_c/m_0)
             print('')
 
     return None
@@ -230,16 +241,18 @@ def Compair_Accel_With_Fortran(step):
     dt_accel = np.dtype([('x', np.float64), ('y', np.float64), ('z', np.float64)])
     data_accel = np.memmap(filename_accel, dtype=dt_accel, mode='r', order='F')
 
-    print('Accel')
+    print('Accel diff')
     i = 0
     for (fortran_data) in data_accel:
         axyz_F = np.array(fortran_data.tolist())
         axyz_P = particles_cur_accel[:, i]
         i = i + 1
-        print(axyz_F)
-        print(axyz_P)
-        input()
-        #print(np.abs(axyz_F - axyz_P))
+        #print(axyz_F)
+        #print(axyz_P)
+        err = np.max(np.divide(np.abs(axyz_F - axyz_P), axyz_P))
+        print(err)
+        if (err > 1.0E-3):
+            input()
         print('')
 
     print('')

@@ -204,12 +204,12 @@ contains
       ! w_l = h/(m_e*v_esc) = 2.04 nm. This equal to the distance between the electron and its
       ! image charge partner.
       !force_ic_self = q_1**2 * div_fac_c * Force_Image_charges_v2(pos_1, pos_1)
-      !force_ic_self = 0.0d0
+      force_ic_self = 0.0d0
 
       ! Loop over particles from i+1 to nrElec.
       ! There is no need to loop over all particles since
       ! The forces are equal but in opposite directions
-      do j = 1, nrPart
+      do j = i+1, nrPart
         ! Information about the particle that is acting on the particle at pos_1
         pos_2 = particles_cur_pos(:, j)
         !if (particles_mass(j) == 0.0d0) then
@@ -251,37 +251,37 @@ contains
         end if
 
         ! Do image charge
-        !force_ic = pre_fac_c * ptr_Image_Charge_effect(pos_1, pos_2)
+        force_ic = pre_fac_c * ptr_Image_Charge_effect(pos_1, pos_2)
 
         ! The image charge force of particle i on particle j is the same in the z-direction
         ! but we reverse the x and y directions of the force due to symmetry.
-        !force_ic_N(1:2) = -1.0d0*force_ic(1:2)
-        !force_ic_N(3)   = +1.0d0*force_ic(3)
+        force_ic_N(1:2) = -1.0d0*force_ic(1:2)
+        force_ic_N(3)   = +1.0d0*force_ic(3)
 
-        ! Below plane
-        pos_ic(1:2) = pos_2(1:2)
-        pos_ic(3) = -1.0d0*pos_2(3)
-        diff = pos_1 - pos_ic
-        r = sqrt( sum(diff**2) ) + length_scale**3
-        force_ic = (-1.0d0)*pre_fac_c * diff / r**3
+        ! ! Below plane
+        ! pos_ic(1:2) = pos_2(1:2)
+        ! pos_ic(3) = -1.0d0*pos_2(3)
+        ! diff = pos_1 - pos_ic
+        ! r = sqrt( sum(diff**2) ) + length_scale**3
+        ! force_ic = (-1.0d0)*pre_fac_c * diff / r**3
 
-        ! Above plane
-        pos_ic(1:2) = pos_2(1:2)
-        pos_ic(3) = 2*d - pos_2(3)
-        diff = pos_1 - pos_ic
-        r = sqrt( sum(diff**2) ) + length_scale**3
-        force_ic = force_ic + (-1.0d0)*pre_fac_c * diff / r**3
+        ! ! Above plane
+        ! pos_ic(1:2) = pos_2(1:2)
+        ! pos_ic(3) = 2*d - pos_2(3)
+        ! diff = pos_1 - pos_ic
+        ! r = sqrt( sum(diff**2) ) + length_scale**3
+        ! force_ic = force_ic + (-1.0d0)*pre_fac_c * diff / r**3
 
 
         !$OMP CRITICAL(ACCEL_UPDATE)
-        particles_cur_accel(:, i) = particles_cur_accel(:, i) + force_c*im_1 + force_ic*im_1
-        !particles_cur_accel(:, j) = particles_cur_accel(:, j) - force_c * im_2 + force_ic_N * im_2
-        !particles_cur_accel(:, i) = particles_cur_accel(:, i) + force_c * im_1 + force_ic   * im_1
+        !particles_cur_accel(:, i) = particles_cur_accel(:, i) + force_c*im_1 + force_ic*im_1
+        particles_cur_accel(:, j) = particles_cur_accel(:, j) - force_c * im_2 + force_ic_N * im_2
+        particles_cur_accel(:, i) = particles_cur_accel(:, i) + force_c * im_1 + force_ic   * im_1
         !$OMP END CRITICAL(ACCEL_UPDATE)
       end do
 
       !$OMP CRITICAL(ACCEL_UPDATE)
-      particles_cur_accel(:, i) = particles_cur_accel(:, i) + force_E * im_1 !+ force_ic_self * im_1
+      particles_cur_accel(:, i) = particles_cur_accel(:, i) + force_E * im_1 + force_ic_self * im_1
       !$OMP END CRITICAL(ACCEL_UPDATE)
     end do
     !$OMP END PARALLEL DO
