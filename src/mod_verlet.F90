@@ -218,7 +218,7 @@ contains
     !$OMP& PRIVATE(force_E, force_c, force_ic, force_ic_N, force_ic_self, im_1, q_1, im_2, q_2, pre_fac_c) &
     !$OMP SHARED(nrPart, particles_cur_pos, particles_mass, particles_species, ptr_field_E) &
     !$OMP SHARED(ptr_Image_Charge_effect, particles_charge, d) &
-    !$OMP& SCHEDULE(DYNAMIC, 4) &
+    !$OMP& SCHEDULE(DYNAMIC, 1) &
     !$OMP& REDUCTION(+:particles_cur_accel)
     do i = 1, nrPart
       ! Information about the particle we are calculating the force/acceleration on
