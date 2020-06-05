@@ -453,20 +453,20 @@ contains
       ! | 4  | 5  | 6  |
       ! |----|----|----|
       ! and so forth.
-      ! if (present(sec) .eqv. .true.) then
-      !   sec = x_num*(y_i - 1) + x_i
-      ! end if
+      if (present(sec) .eqv. .true.) then
+        sec = x_num*(y_i - 1) + x_i
+      end if
 
       ! Reverse the y-direction in the array
       y_i = y_num - y_i + 1
 
-      if (present(sec) .eqv. .true.) then
-        if (abs(w_theta_arr(y_i, x_i) - 2.00d0) < 1.0E-6) then
-          sec = 1
-        else
-          sec = 2
-        end if
-      end if
+      ! if (present(sec) .eqv. .true.) then
+      !   if (abs(w_theta_arr(y_i, x_i) - 2.00d0) < 1.0E-6) then
+      !     sec = 1
+      !   else
+      !     sec = 2
+      !   end if
+      ! end if
 
       ! Return the results
       w_theta_checkerboard = w_theta_arr(y_i, x_i)
