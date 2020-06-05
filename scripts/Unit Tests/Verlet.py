@@ -261,38 +261,53 @@ def Plot_Particles(step):
         #fig.canvas.flush_events()
     return None
 
-def Compair_Accel_With_Fortran(step):
+def Compair_With_Fortran(step):
     filename_accel = 'accel/accel-{:d}.bin'.format(step) # The filename to read
+    filename_pos = 'pos/pos-{:d}.bin'.format(step)
 
     dt_accel = np.dtype([('x', np.float64), ('y', np.float64), ('z', np.float64)])
     data_accel = np.memmap(filename_accel, dtype=dt_accel, mode='r', order='F')
 
+    dt_pos = np.dtype([('x', np.float64), ('y', np.float64), ('z', np.float64)])
+    data_pos = np.memmap(filename_pos, dtype=dt_pos, mode='r', order='F')
+
     #print('Accel diff')
     i = 0
-    for (fortran_data) in data_accel:
+    for (fortran_data) in zip(data_accel, data_pos):
+        axyz_F = np.array(fortran_data[0].tolist())
+        pxyz_F = np.array(fortran_data[1].tolist())
+
         if (i >= nrElec):
             print('Error number of particles is inconsitant')
             raise RuntimeError
-        axyz_F = np.array(fortran_data.tolist())
         axyz_P = particles_cur_accel[:, i]
+        pxyz_P = particles_cur_pos[:, i]
         i = i + 1
         #print(axyz_F)
         #print(axyz_P)
-        err = np.max(np.divide(np.abs(axyz_F - axyz_P), axyz_P))
-        if (np.isinf(err) == True):
-            print('ERROR is inf')
+        err_a = np.max(np.divide(np.abs(axyz_F - axyz_P), axyz_P))
+        err_p = np.max(np.divide(np.abs(pxyz_F - pxyz_P), pxyz_P))
+        if (np.isinf(err_a) == True):
+            print('err_a is inf')
             print('nrElec = {:d}, step = {:d}, i = {:d}'.format(nrElec, step, i))
             print(particles_cur_pos[:, i]/length_scale)
             print(particles_cur_vel[:, i])
             print(particles_cur_accel[:, i])
             input()
         #print(err)
-        if (err > 1.0E-1):
-            print('Diffrance is more than 0.1')
-            print(err)
+        if (err_a > 1.0E-1):
+            print('Acceleration Diffrance is more than 0.1')
+            print(err_a)
             print(axyz_F)
             print(axyz_P)
             #input()
+            print('')
+        if (err_p > 1.0E-3):
+            print('Position Diffrance is more than 0.001')
+            print(err_p)
+            print(pxyz_F)
+            print(pxyz_P)
+            input()
             print('')
         #print('')
 
@@ -307,8 +322,8 @@ for step in range(1, steps+1):
     Update_Position(step)
     Update_Imagecharge_Positions(step)
     Calculate_Acceleration(step)
-    Compair_Accel_With_Fortran(step)
     Update_Velocity(step)
+    Compair_With_Fortran(step)
     Remove_Particles(step)
     Plot_Particles(step)
     #print('')

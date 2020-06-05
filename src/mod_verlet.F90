@@ -127,7 +127,7 @@ contains
     do i = 1, nrPart
       par_pos(:) = particles_cur_pos(:, i) ! Position of the particle
 
-      ! Write out x, y, z and which emitter the particle came from
+      ! Write out x, y, z
       write(unit=ud_pos_test) par_pos(1), par_pos(2), par_pos(3)
     end do
 
@@ -217,9 +217,9 @@ contains
     !$OMP PARALLEL DO DEFAULT(NONE) PRIVATE(i, j, k_1, k_2, pos_1, pos_2, diff, r, pos_ic) &
     !$OMP& PRIVATE(force_E, force_c, force_ic, force_ic_N, force_ic_self, im_1, q_1, im_2, q_2, pre_fac_c) &
     !$OMP SHARED(nrPart, particles_cur_pos, particles_mass, particles_species, ptr_field_E) &
-    !$OMP SHARED(ptr_Image_Charge_effect, particles_charge, particles_cur_accel, d) &
-    !$OMP& SCHEDULE(DYNAMIC, 4) !!&
-    !!!$OMP& REDUCTION(+:particles_cur_accel)
+    !$OMP SHARED(ptr_Image_Charge_effect, particles_charge, d) &
+    !$OMP& SCHEDULE(DYNAMIC, 4) &
+    !$OMP& REDUCTION(+:particles_cur_accel)
     do i = 1, nrPart
       ! Information about the particle we are calculating the force/acceleration on
       pos_1 = particles_cur_pos(:, i)
@@ -256,32 +256,28 @@ contains
         pre_fac_c = q_1*q_2 * div_fac_c ! q_1*q_2 / (4*pi*epsilon)
 
         ! Calculate the distance between the two particles
-        if (i /= j) then
-          diff = pos_1 - pos_2
-          ! There are fours ways to calculate the distance
-          ! Number 1: Use the intrinsic function NORM2(v)
-          ! Number 2: Use the equation for it sqrt( v(1)**2 + v(2)**2 + v(3)**2 )
-          ! Number 3: Or do sqrt( dot_product(v, v) )
-          ! Number 4: Or use sqrt( sum(v**2) )
-          ! It turns you number 1 is the slowest by far. Number 2, 3 and 4 are
-          ! often similar in speed. The difference is small and they fluctuate a lot,
-          ! with no clear winner.
-          !
-          ! We add a small number (length_scale**3) to the results to
-          ! prevent a singularity when calulating 1/r**3
-          !
-          r = sqrt( sum(diff**2) ) + length_scale**3
-          !r = sqrt( dot_product(diff, diff) ) + length_scale**3
-          !r = NORM2(diff) + length_scale**3
+        diff = pos_1 - pos_2
+        ! There are fours ways to calculate the distance
+        ! Number 1: Use the intrinsic function NORM2(v)
+        ! Number 2: Use the equation for it sqrt( v(1)**2 + v(2)**2 + v(3)**2 )
+        ! Number 3: Or do sqrt( dot_product(v, v) )
+        ! Number 4: Or use sqrt( sum(v**2) )
+        ! It turns you number 1 is the slowest by far. Number 2, 3 and 4 are
+        ! often similar in speed. The difference is small and they fluctuate a lot,
+        ! with no clear winner.
+        !
+        ! We add a small number (length_scale**3) to the results to
+        ! prevent a singularity when calulating 1/r**3
+        !
+        r = sqrt( sum(diff**2) ) + length_scale**3
+        !r = sqrt( dot_product(diff, diff) ) + length_scale**3
+        !r = NORM2(diff) + length_scale**3
 
-          ! Calculate the Coulomb force
-          ! F = (r_1 - r_2) / |r_1 - r_2|^3
-          ! F = (diff / r) * 1/r^2
-          ! (diff / r) is a unit vector
-          force_c = pre_fac_c * diff / r**3
-        else
-          force_c = 0.0d0
-        end if
+        ! Calculate the Coulomb force
+        ! F = (r_1 - r_2) / |r_1 - r_2|^3
+        ! F = (diff / r) * 1/r^2
+        ! (diff / r) is a unit vector
+        force_c = pre_fac_c * diff / r**3
 
         ! Do image charge
         force_ic = pre_fac_c * ptr_Image_Charge_effect(pos_1, pos_2)
@@ -306,16 +302,16 @@ contains
         ! force_ic = force_ic + (-1.0d0)*pre_fac_c * diff / r**3
 
 
-        !$OMP CRITICAL(ACCEL_UPDATE)
+        !!!$OMP CRITICAL(ACCEL_UPDATE)
         !particles_cur_accel(:, i) = particles_cur_accel(:, i) + force_c*im_1 + force_ic*im_1
         particles_cur_accel(:, j) = particles_cur_accel(:, j) - force_c * im_2 + force_ic_N * im_2
         particles_cur_accel(:, i) = particles_cur_accel(:, i) + force_c * im_1 + force_ic   * im_1
-        !$OMP END CRITICAL(ACCEL_UPDATE)
+        !!!$OMP END CRITICAL(ACCEL_UPDATE)
       end do
 
-      !$OMP CRITICAL(ACCEL_UPDATE)
+      !!!$OMP CRITICAL(ACCEL_UPDATE)
       particles_cur_accel(:, i) = particles_cur_accel(:, i) + force_E * im_1 + force_ic_self * im_1
-      !$OMP END CRITICAL(ACCEL_UPDATE)
+      !!!$OMP END CRITICAL(ACCEL_UPDATE)
     end do
     !$OMP END PARALLEL DO
   end subroutine Calculate_Acceleration_Particles

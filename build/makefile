@@ -14,7 +14,7 @@ GIT_VERSION := $(shell git describe --dirty --always --tags)
 CUBA_LIB=../cuba/lib/libcuba.a
 
 #UNIT_TEST = 1
-#OPENMP = 1
+OPENMP = 1
 
 # Compile flags
 # UNKNOWN COMPILERS
@@ -62,7 +62,7 @@ FFLAGS+=-D_UNIT_TEST_
 endif
 
 # Chunk size for OpenMP
-FFLAGS+=-DCHUNK_SIZE=100
+FFLAGS+=-DCHUNK_SIZE=250
 
 # Name of the output file
 PROJECT_NAME=Vacuum-MD
