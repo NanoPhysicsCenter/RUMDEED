@@ -36,10 +36,14 @@ contains
     !if (nrElecHole > 0) then
       call Update_ElecHole_Position(step)
 
+      if (EMISSION_MODE == EMISSION_UNIT_TEST) then
+        call Write_Position_Test(step)
+      end if
+
       call Calculate_Acceleration_Particles()
 
       if (EMISSION_MODE == EMISSION_UNIT_TEST) then
-        call Write_Acceleration(step)
+        call Write_Acceleration_Test(step)
       end if
 
       ! Reset the ramo current. Note, this should be done after set_voltage,
@@ -100,6 +104,35 @@ contains
     end do
     !$OMP END PARALLEL DO
   end subroutine Update_ElecHole_Position
+
+
+  subroutine Write_Position_Test(step)
+    integer, intent(in)              :: step
+    integer                          :: ud_pos_test, IFAIL, i
+    character(len=1024)              :: filename
+    double precision, dimension(1:3) :: par_pos
+
+    ! Prepare the name of the output file
+    ! each file is named accel-0.dt where the number
+    ! represents the current time step.
+    write(filename, '(a8, i0, a4)') 'pos/pos-', step, '.bin'
+
+    open(newunit=ud_pos_test, iostat=IFAIL, file=filename, status='replace', action='write', access='STREAM')
+    if (IFAIL /= 0) then
+      print '(a)', 'Vacuum: ERROR UNABLE TO OPEN file for position'
+      print *, filename
+      print *, step
+    end if
+
+    do i = 1, nrPart
+      par_pos(:) = particles_cur_pos(:, i) ! Position of the particle
+
+      ! Write out x, y, z and which emitter the particle came from
+      write(unit=ud_pos_test) par_pos(1), par_pos(2), par_pos(3)
+    end do
+
+    close(unit=ud_pos_test, iostat=IFAIL, status='keep')
+  end subroutine Write_Position_Test
 
   ! ----------------------------------------------------------------------------
   ! Checks the boundary conditions of the box.
@@ -287,7 +320,7 @@ contains
     !$OMP END PARALLEL DO
   end subroutine Calculate_Acceleration_Particles
 
-  subroutine Write_Acceleration(step)
+  subroutine Write_Acceleration_Test(step)
     integer, intent(in)              :: step
     integer                          :: ud_accel, IFAIL, i
     character(len=1024)              :: filename
@@ -296,7 +329,7 @@ contains
     ! Prepare the name of the output file
     ! each file is named accel-0.dt where the number
     ! represents the current time step.
-    write(filename, '(a10, i0, a4)') 'out/accel-', step, '.bin'
+    write(filename, '(a12, i0, a4)') 'accel/accel-', step, '.bin'
 
     open(newunit=ud_accel, iostat=IFAIL, file=filename, status='replace', action='write', access='STREAM')
     if (IFAIL /= 0) then
@@ -313,7 +346,7 @@ contains
     end do
 
     close(unit=ud_accel, iostat=IFAIL, status='keep')
-  end subroutine Write_Acceleration
+  end subroutine Write_Acceleration_Test
 
 
   !-----------------------------------------------------------------------------
