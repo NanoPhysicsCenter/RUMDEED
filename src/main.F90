@@ -411,6 +411,9 @@ contains
     call execute_command_line ('mkdir -p out/')
 #endif
 
+    ! Set the number of cores Cuba should use to 1.
+    call cubacores(1, 1000)
+
 
     ! Open data file for writing
     open(newunit=ud_pos, iostat=IFAIL, file='out/position.bin', status='REPLACE', action='write', access='STREAM')

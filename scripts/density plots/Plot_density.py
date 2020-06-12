@@ -30,7 +30,7 @@ dt_layout_abs = [('x', np.float64), \
                  ('sec', np.int32)]
 
 data_mem_emit = np.memmap(filename_emit, dtype=dt_layout_emit, mode='r', order='F')
-data_mem_abs = np.memmap(filename_abs, dtype=dt_layout_abs, mode='r', order='F')
+#data_mem_abs = np.memmap(filename_abs, dtype=dt_layout_abs, mode='r', order='F')
 
 # Read the data from the files
 df_density_emit = pd.DataFrame.from_records(data=data_mem_emit, columns=data_mem_emit.dtype.names)
@@ -44,10 +44,24 @@ g = g.plot_marginals(sns.kdeplot, shade=True)
 g.set_axis_labels('x [nm]', "y [nm]")
 plt.show()
 
+sns.jointplot(x=df_density_emit['x'], y=df_density_emit['y'], kind='hex')
+plt.show()
+
+h = sns.jointplot(x=df_density_emit['x'], y=df_density_emit['y'], kind='kde')
+h.set_axis_labels('x [nm]', 'y [nm]')
+plt.show()
+
 # Plot absorption data
 g = sns.JointGrid(x="x", y="y", data=df_density_abs, space=0.125, height=10)
 g = g.plot_joint(sns.scatterplot)
 g = g.plot_joint(sns.kdeplot, cmap="Blues_d", alpha=0.75)
 g = g.plot_marginals(sns.kdeplot, shade=True)
 g.set_axis_labels('x [nm]', "y [nm]")
+plt.show()
+
+sns.jointplot(x=df_density_abs['x'], y=df_density_abs['y'], kind='hex')
+plt.show()
+
+h = sns.jointplot(x=df_density_abs['x'], y=df_density_abs['y'], kind='kde')
+h.set_axis_labels('x [nm]', 'y [nm]')
 plt.show()

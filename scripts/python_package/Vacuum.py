@@ -102,6 +102,9 @@ def Calc_Entropy(Mat, x_len, y_len, w_1, w_2, r_mean):
 # theta is the rotation of the ellipse [deg]
 # See http://uspas.fnal.gov/materials/10MIT/Emittance.pdf
 # or J. Buon, "Beam phase space and emittance".
+# See also USPAS notes Barletta, Spentzouris, Harms
+# https://uspas.fnal.gov/materials/10MIT/MIT-Fund.shtml
+# https://uspas.fnal.gov/materials/10MIT/Emittance.pdf
 def Calc_Emittance(df_emitt, x, xp):
     sigma_x = df_emitt[x].std(ddof=0) # \sigma_x, ddof=0 means use N as normalization
     sigma_xp = df_emitt[xp].std(ddof=0) # \sigma_{x^\prime}
