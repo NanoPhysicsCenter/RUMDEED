@@ -57,6 +57,15 @@ FFLAGS+=-mp
 endif
 endif
 
+# NV FORTRAN
+ifeq ($(FCOMPILER),nvfortran)
+$(info Using NVidia Fortran)
+FFLAGS=-O3 -fastsse
+ifdef OPENMP
+FFLAGS+=-mp=multicore
+endif
+endif
+
 ifdef UNIT_TEST
 FFLAGS+=-D_UNIT_TEST_
 endif

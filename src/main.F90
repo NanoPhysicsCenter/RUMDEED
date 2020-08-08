@@ -402,7 +402,9 @@ contains
     call init_random_seed()
 
     ! Register a subroutine to catch the SIGINT signal
+#if defined(__GNUC__)
     IFAIL = SIGNAL(SIGINT, Signal_Handler)
+#endif
 
     ! Create folder for output files
 #if defined(__PGI)
