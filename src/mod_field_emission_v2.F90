@@ -21,7 +21,7 @@ Module mod_field_emission_v2
   integer                            :: nrElecEmitAll
   !integer                            :: nrEmitted
   double precision, dimension(1:3)   :: F_avg = 0.0d0
-  integer, parameter                 :: N_MH_step = 10 ! Number of steps to do in the MH algorithm
+  integer, parameter                 :: N_MH_step = 10*2 ! Number of steps to do in the MH algorithm
   double precision                   :: residual = 0.0d0 ! Should be a array the size of the number of emitters
 
   ! ----------------------------------------------------------------------------
@@ -710,7 +710,7 @@ contains
     double precision, dimension(1:3)              :: cur_pos, new_pos, field
     double precision                              :: df_cur, df_new
 
-    std(1:2) = emitters_dim(1:2, emit)*0.075d0/100.d0 ! Standard deviation for the normal distribution is 0.075% of the emitter length.
+    std(1:2) = emitters_dim(1:2, emit)*0.0075d0/100.d0 ! Standard deviation for the normal distribution is 0.075% of the emitter length.
     ! This means that 68% of jumps are less than this value.
     ! The expected value of the absolute value of the normal distribution is std*sqrt(2/pi).
 

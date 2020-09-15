@@ -7,6 +7,7 @@ ifndef FCOMPILER
 #FCOMPILER=ifort
 FCOMPILER=gfortran
 #FCOMPILER=pgfortran
+#FCOMPILER=nvfortran
 endif
 
 GIT_VERSION := $(shell git describe --dirty --always --tags)
@@ -60,7 +61,8 @@ endif
 # NV FORTRAN
 ifeq ($(FCOMPILER),nvfortran)
 $(info Using NVidia Fortran)
-FFLAGS=-O3 -fastsse
+FFLAGS=-O3 -fastsse -Mipa=fast,inline -Munroll
+FFLAGS=-O3 -fast
 ifdef OPENMP
 FFLAGS+=-mp=multicore
 endif
