@@ -452,7 +452,7 @@ contains
     integer            :: maxeval = 5000000 ! Maximum number of integrand evaluations
     integer            :: nnew = 2500 ! Number of integrand evaluations in each subdivision
     integer            :: nmin = 1000 ! Minimum number of samples a former pass must contribute to a subregion to be considered in the region's compound integral value.
-    double precision   :: flatness = 0.5d0 ! Determine how prominently out-liers, i.e. samples with a large fluctuation, 
+    double precision   :: flatness = 2.5d0 ! Determine how prominently out-liers, i.e. samples with a large fluctuation, 
                                            ! figure in the total fluctuation, which in turn determines how a region is split up.
                                            ! As suggested by its name, flatness should be chosen large for 'flat" integrand and small for 'volatile' integrands
                                            ! with high peaks.
@@ -493,8 +493,10 @@ contains
      F_avg = F_avg / neval
 
      ! Write the output variables of the integration to a file
+     !$OMP MASTER
      write(ud_integrand, '(i3, tr2, i8, tr2, i4, tr2, i4, tr2, ES12.4, tr2, ES12.4, tr2, ES12.4)', iostat=IFAIL) &
                           & emit, nregions, neval, fail, integral(1), error(1), prob(1)
+     !$OMP END MASTER
   end subroutine Do_Cuba_Suave_FE
 
   ! ----------------------------------------------------------------------------
