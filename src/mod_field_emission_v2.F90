@@ -437,21 +437,22 @@ contains
     ! Input / output variables
     integer, intent(in)           :: emit
     double precision, intent(out) :: N_sup
+    integer                       :: IFAIL
 
     ! Cuba integration variables
     integer, parameter :: ndim = 2 ! Number of dimensions
     integer, parameter :: ncomp = 1 ! Number of components in the integrand
     integer            :: userdata = 0 ! User data passed to the integrand
     integer, parameter :: nvec = 1 ! Number of points given to the integrand function
-    double precision   :: epsrel = 1.0d-2 ! Requested relative error
-    double precision   :: epsabs = 1.0d-4 ! Requested absolute error
+    double precision   :: epsrel = 1.0d-3 ! Requested relative error
+    double precision   :: epsabs = 1.0d-5 ! Requested absolute error
     integer            :: flags = 0+4 ! Flags
     integer            :: seed = 0 ! Seed for the rng. Zero will use Sobol.
     integer            :: mineval = 10000 ! Minimum number of integrand evaluations
     integer            :: maxeval = 5000000 ! Maximum number of integrand evaluations
     integer            :: nnew = 2500 ! Number of integrand evaluations in each subdivision
     integer            :: nmin = 1000 ! Minimum number of samples a former pass must contribute to a subregion to be considered in the region's compound integral value.
-    double precision   :: flatness = 5.0d0 ! Determine how prominently out-liers, i.e. samples with a large fluctuation, 
+    double precision   :: flatness = 0.5d0 ! Determine how prominently out-liers, i.e. samples with a large fluctuation, 
                                            ! figure in the total fluctuation, which in turn determines how a region is split up.
                                            ! As suggested by its name, flatness should be chosen large for 'flat" integrand and small for 'volatile' integrands
                                            ! with high peaks.
@@ -490,6 +491,10 @@ contains
 
      ! Finish calculating the average field
      F_avg = F_avg / neval
+
+     ! Write the output variables of the integration to a file
+     write(ud_integrand, '(i3, tr2, i8, tr2, i4, tr2, i4, tr2, ES12.4, tr2, ES12.4, tr2, ES12.4)', iostat=IFAIL) &
+                          & emit, nregions, neval, fail, integral(1), error(1), prob(1)
   end subroutine Do_Cuba_Suave_FE
 
   ! ----------------------------------------------------------------------------
@@ -710,7 +715,7 @@ contains
     double precision, dimension(1:3)              :: cur_pos, new_pos, field
     double precision                              :: df_cur, df_new
 
-    std(1:2) = emitters_dim(1:2, emit)*0.0075d0/100.d0 ! Standard deviation for the normal distribution is 0.075% of the emitter length.
+    std(1:2) = emitters_dim(1:2, emit)*0.050d0/100.d0 ! Standard deviation for the normal distribution is 0.050% of the emitter length.
     ! This means that 68% of jumps are less than this value.
     ! The expected value of the absolute value of the normal distribution is std*sqrt(2/pi).
 
@@ -728,7 +733,10 @@ contains
         exit ! We found a nice spot so we exit the loop
       else
         count = count + 1
-        if (count > 10000) exit ! The loop is infnite, must stop it at some point.
+        if (count > 10000) then ! The loop is infnite, must stop it at some point.
+          print *, 'WARNING: MH was unable to find a favourable spot for emission!'
+          exit
+        end if
         ! In field emission it is rare the we reach the CL limit.
       end if
     end do

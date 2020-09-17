@@ -249,6 +249,7 @@ module mod_global
   integer :: ud_debug ! File for debuging and testing
   integer :: ud_field ! File for surface field
   integer :: ud_coll ! Collisions
+  integer :: ud_integrand ! Information about the surface integration
 
   ! unit descriptors for data files (binary files)
   integer :: ud_ramo_sec ! File for the ramo current broken down into emitters and sections

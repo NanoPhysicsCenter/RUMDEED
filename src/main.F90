@@ -484,6 +484,12 @@ contains
       print '(a)', 'Vacuum: ERROR UNABLE TO OPEN file collisions.dt'
       stop
     end if
+
+    open(newunit=ud_integrand, iostat=IFAIL, file='out/integration.dt', status='replace', action='write')
+    if (IFAIL /= 0) then
+      print '(a)', 'Vacuum: ERROR UNABLE TO OPEN file integration.dt'
+      stop
+    end if
     
     !------------------------------------------------------------------------------------
     ! Emission density
@@ -696,6 +702,7 @@ contains
     close(unit=ud_volt, status='keep')
     close(unit=ud_field,status='keep')
     close(unit=ud_coll,status='keep')
+    close(unit=ud_integrand, status='keep')
     close(unit=ud_debug, status='keep')
 
     close(unit=ud_density_emit, status='keep')
