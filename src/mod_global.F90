@@ -234,7 +234,8 @@ module mod_global
 
   ! ----------------------------------------------------------------------------
   ! Other stuff
-  logical, parameter :: write_ramo_sec = .True. ! Write out the ramo current for each section.
+  logical            :: write_ramo_sec = .False. ! Write out the ramo current for each section.
+  logical            :: write_position_file = .False. ! Write ot the particle position information.
 
 
   ! ----------------------------------------------------------------------------
@@ -278,7 +279,8 @@ module mod_global
   namelist /input/ V_s, box_dim, time_step, steps, &
                    nrEmit, emitters_pos, emitters_dim, &
                    emitters_type, emitters_delay, EMISSION_MODE, &
-                   image_charge, N_ic_max, collisions, T_temp, P_abs
+                   image_charge, N_ic_max, collisions, T_temp, P_abs, &
+                   write_ramo_sec, write_position_file
 
   ! ----------------------------------------------------------------------------
   ! Prodecure interfaces and pointers
