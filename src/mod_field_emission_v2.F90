@@ -483,7 +483,7 @@ contains
       print *, fail
       print *, error
       print *, prob
-      flush(ud_integrand)
+      call Flush_all_files()
      end if
 
 

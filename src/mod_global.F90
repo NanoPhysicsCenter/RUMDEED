@@ -318,6 +318,29 @@ module mod_global
   procedure(Get_Emission_Velocity), pointer :: ptr_Get_Emission_Velocity => null()
 contains
 
+  ! Flush all files to disk
+  subroutine Flush_all_files()
+   flush(ud_pos)
+   flush(ud_emit)
+   flush(ud_absorb)
+   flush(ud_absorb_top)
+   flush(ud_absorb_bot)
+   flush(ud_ramo)
+   flush(ud_volt)
+   flush(ud_debug)
+   flush(ud_field)
+   flush(ud_coll)
+   flush(ud_integrand)
+
+   flush(ud_ramo_sec)
+
+   flush(ud_density_emit)
+   flush(ud_density_ion)
+
+   flush(ud_density_absorb_top)
+   flush(ud_density_absorb_bot)
+  end subroutine Flush_all_files
+
   ! Check if a number is infinit.
   logical function isinf(a)
     double precision, intent(in) :: a
