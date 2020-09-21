@@ -125,7 +125,7 @@ program VacuumMD
     call Do_Collisions(i)
 
     ! Flush data
-    !call Flush_Data()
+    call Flush_Data()
 
     !do j = 1, 9
     !  if (i == progress(j)) then
@@ -139,7 +139,7 @@ program VacuumMD
     ! then print the progress and flush data
     if (any(i .eq. progress) .eqv. .true.) then
       call PrintProgress(nint(i*10.0d0/steps))
-      call Flush_Data()
+      !call Flush_Data()
     end if
 
     if (cought_stop_signal .eqv. .true.) then
@@ -579,21 +579,21 @@ contains
 
   ! ----------------------------------------------------------------------------
   ! Flush data written to files such that it can be read
-  subroutine Flush_Data()
+  ! subroutine Flush_Data()
 
-    flush(ud_emit)
-    flush(ud_absorb)
-    flush(ud_volt)
-    flush(ud_field)
-    flush(ud_debug)
+  !   flush(ud_emit)
+  !   flush(ud_absorb)
+  !   flush(ud_volt)
+  !   flush(ud_field)
+  !   flush(ud_debug)
 
-    flush(ud_density_emit)
-    flush(ud_density_ion)
+  !   flush(ud_density_emit)
+  !   flush(ud_density_ion)
 
-    flush(ud_density_absorb_top)
-    flush(ud_density_absorb_bot)
+  !   flush(ud_density_absorb_top)
+  !   flush(ud_density_absorb_bot)
 
-  end subroutine Flush_Data
+  ! end subroutine Flush_Data
 
 
   ! ----------------------------------------------------------------------------

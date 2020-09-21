@@ -319,7 +319,7 @@ module mod_global
 contains
 
   ! Flush all files to disk
-  subroutine Flush_all_files()
+  subroutine Flush_Data()
    flush(ud_pos)
    flush(ud_emit)
    flush(ud_absorb)
@@ -339,7 +339,7 @@ contains
 
    flush(ud_density_absorb_top)
    flush(ud_density_absorb_bot)
-  end subroutine Flush_all_files
+  end subroutine Flush_Data
 
   ! Check if a number is infinit.
   logical function isinf(a)

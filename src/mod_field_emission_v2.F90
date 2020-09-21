@@ -482,8 +482,11 @@ contains
       print '(a)', 'Vacuum: WARNING Cuba did not return 0'
       print *, fail
       print *, error
+      print *, integral(1)*epsrel
+      print *, epsabs
       print *, prob
-      call Flush_all_files()
+      print *, integral(1)
+      call Flush_Data()
      end if
 
 
