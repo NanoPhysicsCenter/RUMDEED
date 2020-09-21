@@ -483,6 +483,7 @@ contains
       print *, fail
       print *, error
       print *, prob
+      flush(ud_integrand)
      end if
 
 
