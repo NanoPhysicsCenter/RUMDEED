@@ -444,15 +444,15 @@ contains
     integer, parameter :: ncomp = 1 ! Number of components in the integrand
     integer            :: userdata = 0 ! User data passed to the integrand
     integer, parameter :: nvec = 1 ! Number of points given to the integrand function
-    double precision   :: epsrel = 1.0d-3 ! Requested relative error
-    double precision   :: epsabs = 1.0d-5 ! Requested absolute error
+    double precision   :: epsrel = 1.0d-10 ! Requested relative error
+    double precision   :: epsabs = 0.5d-2 ! Requested absolute error
     integer            :: flags = 0+4 ! Flags
     integer            :: seed = 0 ! Seed for the rng. Zero will use Sobol.
     integer            :: mineval = 100000 ! Minimum number of integrand evaluations
     integer            :: maxeval = 10000000 ! Maximum number of integrand evaluations
-    integer            :: nnew = 25000 ! Number of integrand evaluations in each subdivision
-    integer            :: nmin = 10000 ! Minimum number of samples a former pass must contribute to a subregion to be considered in the region's compound integral value.
-    double precision   :: flatness = 2.5d0 ! Determine how prominently out-liers, i.e. samples with a large fluctuation, 
+    integer            :: nnew = 1250 ! Number of integrand evaluations in each subdivision
+    integer            :: nmin = 1000 ! Minimum number of samples a former pass must contribute to a subregion to be considered in the region's compound integral value.
+    double precision   :: flatness = 5.0d0 ! Determine how prominently out-liers, i.e. samples with a large fluctuation, 
                                            ! figure in the total fluctuation, which in turn determines how a region is split up.
                                            ! As suggested by its name, flatness should be chosen large for 'flat" integrand and small for 'volatile' integrands
                                            ! with high peaks.
@@ -485,6 +485,7 @@ contains
       print *, prob
      end if
 
+
      !! Round the results to the nearest integer
      !N_sup = nint( integral(1) )
      N_sup = integral(1)
@@ -493,10 +494,8 @@ contains
      F_avg = F_avg / neval
 
      ! Write the output variables of the integration to a file
-     !$OMP MASTER
      write(ud_integrand, '(i3, tr2, i8, tr2, i8, tr2, i4, tr2, ES12.4, tr2, ES12.4, tr2, ES12.4)', iostat=IFAIL) &
                           & emit, nregions, neval, fail, integral(1), error(1), prob(1)
-     !$OMP END MASTER
   end subroutine Do_Cuba_Suave_FE
 
   ! ----------------------------------------------------------------------------
