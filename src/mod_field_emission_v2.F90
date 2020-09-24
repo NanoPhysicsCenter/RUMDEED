@@ -556,12 +556,14 @@ contains
 
     if (fail /= 0) then
       print '(a)', 'Vacuum: WARNING Cuba did not return 0'
-      print *, fail
-      print *, error
-      print *, integral(1)*epsrel
-      print *, epsabs
-      print *, prob
-      print *, integral(1)
+      print *, 'Fail = ', fail
+      print *, 'nregions = ', nregions
+      print *, 'neval = ', neval, ' max is ', maxeval
+      print *, 'error = ', error
+      print *, 'integral(1)*epsrel = ', integral(1)*epsrel
+      print *, 'epsabs = ', epsabs
+      print *, 'prob = ', prob
+      print *, 'integral(1) = ', integral(1)
       call Flush_Data()
      end if
 
