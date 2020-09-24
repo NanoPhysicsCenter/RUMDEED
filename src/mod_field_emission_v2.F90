@@ -456,7 +456,7 @@ contains
                   ! For other values of key1, a quasi-random sample of n_1=|key1| points is used,
                   ! where the sign of key1 determines the type of sample,
                   ! –key1>0, use a Korobov quasi-random sample,
-                  ! –key1<0, use a “standard” sample (a Sobol quasi-random sample ifseed= 0,otherwise a pseudo-random sample).
+                  ! –key1<0, use a “standard” sample (a Sobol quasi-random sample if seed= 0, otherwise a pseudo-random sample).
   integer :: key2 = 1 !<in>, determines sampling in the final integration phase:
                   ! key2 = 7; 9; 11; 13 selects the cubature rule of degree key2. Note that the degree-11
                   ! rule is available only in 3 dimensions, the degree-13 rule only in 2 dimensions.
@@ -465,8 +465,8 @@ contains
                   ! - key2 > 0, use a Korobov quasi-random sample,
                   ! - key2 < 0, use a \standard" sample (see description of key1 above),
                   ! and n_2 = |key2| determines the number of points,
-                  ! - n2 > 40, sample n2 points,
-                  ! - n2 < 40, sample n2 nneed points, where nneed is the number of points needed to
+                  ! - n_2 > 40, sample n2 points,
+                  ! - n_2 < 40, sample n2 nneed points, where nneed is the number of points needed to
                   ! reach the prescribed accuracy, as estimated by Divonne from the results of the
                   ! partitioning phase.
   integer :: key3 = 1 ! <in>, sets the strategy for the refinement phase:
@@ -476,8 +476,7 @@ contains
                   ! parameters exactly as key2 above.
   integer :: maxpass = 5! <in>, controls the thoroughness of the partitioning phase: The
 ! partitioning phase terminates when the estimated total number of integrand evaluations
-! (partitioning plus final integration) does not decrease for maxpass successive
-! iterations.
+! (partitioning plus final integration) does not decrease for maxpass successive iterations.
 ! A decrease in points generally indicates that Divonne discovered new structures of
 ! the integrand and was able to find a more effective partitioning. maxpass can be
 ! understood as the number of `safety' iterations that are performed before the partition
@@ -524,14 +523,18 @@ contains
 
     allocate(xgiven(1:ldxgiven, 1:MAX_PARTICLES))
 
-    ! Find possible peaks, i.e. all electrons with z < 10 nm.
+    ! Find possible peaks, i.e. all electrons with z < 5 nm.
+    !$OMP PARALLEL DO DEFAULT(NONE) PRIVATE(i) shared(ngiven, xgiven, particles_cur_pos, nrPart) SCHEDULE(GUIDED, CHUNK_SIZE)
     do i = 1, nrPart
-      if (particles_cur_pos(3, i) < 10.0d-9) then
+      if (particles_cur_pos(3, i) < 5.0d-9) then
+        !$OMP CRITICAL
         ngiven = ngiven + 1
         xgiven(1, ngiven) = particles_cur_pos(1, i)
         xgiven(2, ngiven) = particles_cur_pos(2, i)
+        !$OMP END CRITICAL
       end if
     end do
+    !$OMP END PARALLEL DO
 
     call divonne(ndim, ncomp, integrand_cuba_fe, userdata, nvec,&
               epsrel, epsabs, flags, seed, mineval, maxeval,&
