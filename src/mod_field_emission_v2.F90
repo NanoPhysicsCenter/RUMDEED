@@ -516,18 +516,18 @@ contains
   double precision, dimension(1:ncomp) :: error ! <out> The presumed absolute error
   double precision, dimension(1:ncomp) :: prob ! <out> The chi-square probability
 
-  allocate(xgiven(1:ldxgiven, 1:MAX_PARTICLES))
+    !allocate(xgiven(1:ldxgiven, 1:MAX_PARTICLES))
 
-  ! Find possible peaks, i.e. all electrons with z < 10 nm.
-  do i = 1, nrPart
-    if (particles_cur_pos(3, i) < 10.0d-9) then
-      ngiven = ngiven + 1
-      xgiven(1, ngiven) = particles_cur_pos(1, i)
-      xgiven(2, ngiven) = particles_cur_pos(2, i)
-    end if
-  end do
+    ! Find possible peaks, i.e. all electrons with z < 10 nm.
+    !do i = 1, nrPart
+    !  if (particles_cur_pos(3, i) < 10.0d-9) then
+    !    ngiven = ngiven + 1
+    !    xgiven(1, ngiven) = particles_cur_pos(1, i)
+    !    xgiven(2, ngiven) = particles_cur_pos(2, i)
+    !  end if
+    !end do
 
-  call divonne(ndim, ncomp, integrand_cuba_fe, userdata, nvec,&
+    call divonne(ndim, ncomp, integrand_cuba_fe, userdata, nvec,&
               epsrel, epsabs, flags, seed, mineval, maxeval,&
               key1, key2, key3, maxpass,&
               border, maxchisq, mindeviation,&
@@ -535,7 +535,7 @@ contains
               statefile, spin,&
               nregions, neval, fail, integral, error, prob)
 
-    deallocate(xgiven)
+    !deallocate(xgiven)
 
     if (fail /= 0) then
       print '(a)', 'Vacuum: WARNING Cuba did not return 0'
