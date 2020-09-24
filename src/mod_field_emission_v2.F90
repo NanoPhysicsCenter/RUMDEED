@@ -531,23 +531,24 @@ contains
     !allocated(xgiven(1:ndim, 1:MAX_PARTICLES))
 
     ! Find possible peaks, i.e. all electrons with z < 5 nm.
-    !$OMP PARALLEL DO DEFAULT(NONE) PRIVATE(i) shared(ngiven, xgiven, particles_cur_pos, nrPart) SCHEDULE(GUIDED, CHUNK_SIZE)
-    do i = 1, nrPart
-      if (particles_cur_pos(3, i) < 5.0d-9) then
-        !$OMP CRITICAL
-        ngiven = ngiven + 1
-        xgiven(1, ngiven) = particles_cur_pos(1, i)
-        xgiven(2, ngiven) = particles_cur_pos(2, i)
-        !$OMP END CRITICAL
-      end if
-    end do
-    !$OMP END PARALLEL DO
+    !!$OMP PARALLEL DO DEFAULT(NONE) PRIVATE(i) shared(ngiven, xgiven, particles_cur_pos, nrPart) SCHEDULE(GUIDED, CHUNK_SIZE)
+    !do i = 1, nrPart
+    !  if (particles_cur_pos(3, i) < 5.0d-9) then
+    !    !$OMP CRITICAL
+    !    ngiven = ngiven + 1
+    !    xgiven(1, ngiven) = particles_cur_pos(1, i)
+    !    xgiven(2, ngiven) = particles_cur_pos(2, i)
+    !    !$OMP END CRITICAL
+    !  end if
+    !end do
+    !!$OMP END PARALLEL DO
+    ngiven = nrPart
 
     call divonne(ndim, ncomp, integrand_cuba_fe, userdata, nvec,&
               epsrel, epsabs, flags, seed, mineval, maxeval,&
               key1, key2, key3, maxpass,&
               border, maxchisq, mindeviation,&
-              ngiven, ldxgiven, xgiven, nextra, 0,&
+              ngiven, ldxgiven, particles_cur_pos(1:2, 1:nrPart), nextra, 0,&
               statefile, spin,&
               nregions, neval, fail, integral, error, prob)
 
