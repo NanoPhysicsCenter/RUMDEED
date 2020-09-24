@@ -525,13 +525,13 @@ contains
     !allocate(xgiven(1:ldxgiven, 1:MAX_PARTICLES))
 
     ! Find possible peaks, i.e. all electrons with z < 10 nm.
-    !do i = 1, nrPart
-    !  if (particles_cur_pos(3, i) < 10.0d-9) then
-    !    ngiven = ngiven + 1
-    !    xgiven(1, ngiven) = particles_cur_pos(1, i)
-    !    xgiven(2, ngiven) = particles_cur_pos(2, i)
-    !  end if
-    !end do
+    do i = 1, nrPart
+      if (particles_cur_pos(3, i) < 10.0d-9) then
+        ngiven = ngiven + 1
+        xgiven(1, ngiven) = particles_cur_pos(1, i)
+        xgiven(2, ngiven) = particles_cur_pos(2, i)
+      end if
+    end do
 
     call divonne(ndim, ncomp, integrand_cuba_fe, userdata, nvec,&
               epsrel, epsabs, flags, seed, mineval, maxeval,&
