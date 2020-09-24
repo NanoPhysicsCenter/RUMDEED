@@ -516,6 +516,12 @@ contains
   double precision, dimension(1:ncomp) :: error ! <out> The presumed absolute error
   double precision, dimension(1:ncomp) :: prob ! <out> The chi-square probability
 
+    ! Initialize the average field to zero
+    F_avg = 0.0d0
+
+    ! Pass the number of the emitter being integraded over to the integrand as userdata
+    userdata = emit
+
     !allocate(xgiven(1:ldxgiven, 1:MAX_PARTICLES))
 
     ! Find possible peaks, i.e. all electrons with z < 10 nm.
