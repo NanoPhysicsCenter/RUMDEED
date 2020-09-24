@@ -203,7 +203,7 @@ contains
     Df_avg = 0.0d0
 
     write (ud_field, "(i8, tr2, E16.8, tr2, E16.8, tr2, E16.8, tr2, E16.8, tr2, E16.8, tr2, E16.8, tr2, E16.8)", iostat=IFAIL) &
-                                      step, F_avg(1), F_avg(2), F_avg(3), N_sup, df_avg, a_rate, MH_std
+                                      step, F_avg(1), F_avg(2), F_avg(3), N_sup, Df_avg, a_rate, MH_std
 
     nrElecEmitAll = nrElecEmitAll + nrElecEmit
   end subroutine
@@ -303,8 +303,8 @@ contains
 
     df_avg = df_avg / N_sup
 
-    write (ud_field, "(i8, tr2, E16.8, tr2, E16.8, tr2, E16.8, tr2, E16.8, tr2, E16.8)", iostat=IFAIL) &
-                                      step, F_avg(1), F_avg(2), F_avg(3), N_sup, df_avg
+    write (ud_field, "(i8, tr2, E16.8, tr2, E16.8, tr2, E16.8, tr2, E16.8, tr2, E16.8, tr2, E16.8, tr2, E16.8)", iostat=IFAIL) &
+                                      step, F_avg(1), F_avg(2), F_avg(3), N_sup, df_avg, a_rate, MH_std
 
     nrElecEmitAll = nrElecEmitAll + nrElecEmit
     !nrEmitted = nrEmitted + nrElecEmit
