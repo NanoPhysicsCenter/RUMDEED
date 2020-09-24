@@ -25,7 +25,7 @@ Module mod_field_emission_v2
   double precision                   :: residual = 0.0d0 ! Should be a array the size of the number of emitters
 
   ! Cuba
-  double precision, allocatable :: xgiven(:,:) ! xgiven(ldxgiven,ngiven) <in>, a list of points where the integrand
+  ! double precision, allocatable :: xgiven(:,:) ! xgiven(ldxgiven,ngiven) <in>, a list of points where the integrand
 
   ! ----------------------------------------------------------------------------
   ! Constants for field emission
@@ -112,7 +112,7 @@ contains
     ! Initialize the Ziggurat algorithm
     !call zigset(my_seed(1))
 
-    allocate(xgiven(1:2, 1:MAX_PARTICLES))
+    !allocate(xgiven(1:2, 1:MAX_PARTICLES))
 
   end subroutine Init_Field_Emission_v2
 
@@ -121,7 +121,7 @@ contains
 
     call Work_fun_cleanup()
 
-    deallocate(xgiven)
+    !deallocate(xgiven)
   end subroutine Clean_Up_Field_Emission_v2
 
   !-----------------------------------------------------------------------------
@@ -441,7 +441,8 @@ contains
   implicit none
   integer, intent(in)           :: emit
   double precision, intent(out) :: N_sup
-  integer                       :: i, IFAIL
+  !integer                       :: i
+  integer                       :: IFAIL
 
   
   ! Cuba integration variables (common)
