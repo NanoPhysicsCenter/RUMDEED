@@ -522,7 +522,7 @@ contains
     ! Pass the number of the emitter being integraded over to the integrand as userdata
     userdata = emit
 
-    !allocate(xgiven(1:ldxgiven, 1:MAX_PARTICLES))
+    allocate(xgiven(1:ldxgiven, 1:MAX_PARTICLES))
 
     ! Find possible peaks, i.e. all electrons with z < 10 nm.
     do i = 1, nrPart
@@ -541,7 +541,7 @@ contains
               statefile, spin,&
               nregions, neval, fail, integral, error, prob)
 
-    !deallocate(xgiven)
+    deallocate(xgiven)
 
     if (fail /= 0) then
       print '(a)', 'Vacuum: WARNING Cuba did not return 0'
