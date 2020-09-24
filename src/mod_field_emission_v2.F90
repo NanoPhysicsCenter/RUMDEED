@@ -451,7 +451,7 @@ contains
   integer            :: userdata = 0 ! User data passed to the integrand
   integer, parameter :: nvec = 1 ! Number of points given to the integrand function
   double precision   :: epsrel = 1.0d-6 ! Requested relative error
-  double precision   :: epsabs = 0.5d0 ! Requested absolute error
+  double precision   :: epsabs = 0.1d0 ! Requested absolute error
   integer            :: flags = 0+4 ! Flags
   integer            :: seed = 0 ! Seed for the rng. Zero will use Sobol.
   integer            :: mineval = 10000 ! Minimum number of integrand evaluations
