@@ -24,6 +24,9 @@ Module mod_field_emission_v2
   integer, parameter                 :: N_MH_step = 10*2 ! Number of steps to do in the MH algorithm
   double precision                   :: residual = 0.0d0 ! Should be a array the size of the number of emitters
 
+  ! Cuba
+  double precision, allocatable :: xgiven(:,:) ! xgiven(ldxgiven,ngiven) <in>, a list of points where the integrand
+
   ! ----------------------------------------------------------------------------
   ! Constants for field emission
   ! Fyrst Fowler-Nordheim constant in units [ A eV V^{-2} ]
@@ -109,12 +112,16 @@ contains
     ! Initialize the Ziggurat algorithm
     !call zigset(my_seed(1))
 
+    allocate(xgiven(1:2, 1:MAX_PARTICLES))
+
   end subroutine Init_Field_Emission_v2
 
   subroutine Clean_Up_Field_Emission_v2()
     deallocate(nrEmitted_emitters)
 
     call Work_fun_cleanup()
+
+    deallocate(xgiven)
   end subroutine Clean_Up_Field_Emission_v2
 
   !-----------------------------------------------------------------------------
@@ -495,7 +502,7 @@ contains
 ! obtained for the region differ by more than this bound is the region further treated.
   integer :: ngiven = 0 ! <in>, the number of points in the xgiven array.
   integer :: ldxgiven = ndim ! <in>, the leading dimension of xgiven, i.e. the offset between one point and the next in memory.
-  double precision, allocatable :: xgiven(:,:) ! xgiven(ldxgiven,ngiven) <in>, a list of points where the integrand
+  !double precision, allocatable :: xgiven(:,:) ! xgiven(ldxgiven,ngiven) <in>, a list of points where the integrand
 ! might have peaks. Divonne will consider these points when partitioning the
 ! integration region. The idea here is to help the integrator find the extrema of the integrand
 ! in the presence of very narrow peaks. Even if only the approximate location
@@ -521,7 +528,7 @@ contains
     ! Pass the number of the emitter being integraded over to the integrand as userdata
     userdata = emit
 
-    allocate(xgiven(1:ldxgiven, 1:MAX_PARTICLES))
+    !allocated(xgiven(1:ndim, 1:MAX_PARTICLES))
 
     ! Find possible peaks, i.e. all electrons with z < 5 nm.
     !$OMP PARALLEL DO DEFAULT(NONE) PRIVATE(i) shared(ngiven, xgiven, particles_cur_pos, nrPart) SCHEDULE(GUIDED, CHUNK_SIZE)
@@ -544,7 +551,7 @@ contains
               statefile, spin,&
               nregions, neval, fail, integral, error, prob)
 
-    deallocate(xgiven)
+    !deallocate(xgiven)
 
     if (fail /= 0) then
       print '(a)', 'Vacuum: WARNING Cuba did not return 0'
