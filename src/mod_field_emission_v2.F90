@@ -451,7 +451,7 @@ contains
   integer            :: userdata = 0 ! User data passed to the integrand
   integer, parameter :: nvec = 1 ! Number of points given to the integrand function
   double precision   :: epsrel = 1.0d-6 ! Requested relative error
-  double precision   :: epsabs = 0.1d0 ! Requested absolute error
+  double precision   :: epsabs = 0.5d0 ! Requested absolute error
   integer            :: flags = 0+4 ! Flags
   integer            :: seed = 0 ! Seed for the rng. Zero will use Sobol.
   integer            :: mineval = 10000 ! Minimum number of integrand evaluations
@@ -459,37 +459,36 @@ contains
 
   ! Divonne specific
   integer :: key1 = 47 ! 〈in〉, determines sampling in the partitioning phase:
-                  ! key1= 7,9,11,13 selects the cubature rule of degree key1.
+                  ! key1 = 7,9,11,13 selects the cubature rule of degree key1.
                   ! Note that the degree-11 rule is available only in 3 dimensions, the degree-13 rule only in 2 dimensions.
                   ! For other values of key1, a quasi-random sample of n_1=|key1| points is used,
                   ! where the sign of key1 determines the type of sample,
-                  ! –key1>0, use a Korobov quasi-random sample,
-                  ! –key1<0, use a “standard” sample (a Sobol quasi-random sample if seed= 0, otherwise a pseudo-random sample).
+                  ! – key1 > 0, use a Korobov quasi-random sample,
+                  ! – key1 < 0, use a “standard” sample (a Sobol quasi-random sample if seed= 0, otherwise a pseudo-random sample).
   integer :: key2 = 1 !<in>, determines sampling in the final integration phase:
-                  ! key2 = 7; 9; 11; 13 selects the cubature rule of degree key2. Note that the degree-11
+                  ! key2 = 7, 9, 11, 13 selects the cubature rule of degree key2. Note that the degree-11
                   ! rule is available only in 3 dimensions, the degree-13 rule only in 2 dimensions.
                   ! For other values of key2, a quasi-random sample is used, where the sign of key2
                   ! determines the type of sample,
                   ! - key2 > 0, use a Korobov quasi-random sample,
-                  ! - key2 < 0, use a \standard" sample (see description of key1 above),
+                  ! - key2 < 0, use a "standard" sample (see description of key1 above),
                   ! and n_2 = |key2| determines the number of points,
                   ! - n_2 > 40, sample n2 points,
                   ! - n_2 < 40, sample n2 nneed points, where nneed is the number of points needed to
                   ! reach the prescribed accuracy, as estimated by Divonne from the results of the
                   ! partitioning phase.
-  integer :: key3 = 1 ! <in>, sets the strategy for the refinement phase:
+  integer :: key3 = -1 ! <in>, sets the strategy for the refinement phase:
                   ! key3 = 0, do not treat the subregion any further.
                   ! key3 = 1, split the subregion up once more.
                   ! Otherwise, the subregion is sampled a third time with key3 specifying the sampling
                   ! parameters exactly as key2 above.
-  integer :: maxpass = 5! <in>, controls the thoroughness of the partitioning phase: The
+  integer :: maxpass = 2! <in>, controls the thoroughness of the partitioning phase: The
 ! partitioning phase terminates when the estimated total number of integrand evaluations
 ! (partitioning plus final integration) does not decrease for maxpass successive iterations.
 ! A decrease in points generally indicates that Divonne discovered new structures of
 ! the integrand and was able to find a more effective partitioning. maxpass can be
 ! understood as the number of `safety' iterations that are performed before the partition
-! is accepted as final and counting consequently restarts at zero whenever new
-! structures are found.
+! is accepted as final and counting consequently restarts at zero whenever new structures are found.
   double precision :: border = 0.0d0 ! <in>, the width of the border of the integration region.
 ! Points falling into this border region will not be sampled directly, but will be extrapolated
 ! from two samples from the interior. Use a non-zero border if the integrand
@@ -529,6 +528,8 @@ contains
     ! Pass the number of the emitter being integraded over to the integrand as userdata
     userdata = emit
 
+    seed = sum(my_seed(:))
+
     !allocated(xgiven(1:ndim, 1:MAX_PARTICLES))
 
     ! Find possible peaks, i.e. all electrons with z < 5 nm.
@@ -556,16 +557,18 @@ contains
     !deallocate(xgiven)
 
     if (fail /= 0) then
-      print '(a)', 'Vacuum: WARNING Cuba did not return 0'
-      print *, 'Fail = ', fail
-      print *, 'nregions = ', nregions
-      print *, 'neval = ', neval, ' max is ', maxeval
-      print *, 'error = ', error
-      print *, 'integral(1)*epsrel = ', integral(1)*epsrel
-      print *, 'epsabs = ', epsabs
-      print *, 'prob = ', prob
-      print *, 'integral(1) = ', integral(1)
-      call Flush_Data()
+      if (abs(error(1) - epsabs) > 1.0d-2) then
+        print '(a)', 'Vacuum: WARNING Cuba did not return 0'
+        print *, 'Fail = ', fail
+        print *, 'nregions = ', nregions
+        print *, 'neval = ', neval, ' max is ', maxeval
+        print *, 'error(1) = ', error(1)
+        print *, 'integral(1)*epsrel = ', integral(1)*epsrel
+        print *, 'epsabs = ', epsabs
+        print *, 'prob(1) = ', prob(1)
+        print *, 'integral(1) = ', integral(1)
+        call Flush_Data()
+      end if
      end if
 
 
@@ -602,8 +605,8 @@ contains
     integer            :: seed = 0 ! Seed for the rng. Zero will use Sobol.
     integer            :: mineval = 0 ! Minimum number of integrand evaluations
     integer            :: maxeval = 10000000 ! Maximum number of integrand evaluations
-    integer            :: nnew = 125 ! Number of integrand evaluations in each subdivision
-    integer            :: nmin = 100 ! Minimum number of samples a former pass must contribute to a subregion to be considered in the region's compound integral value.
+    integer            :: nnew = 100 ! Number of integrand evaluations in each subdivision
+    integer            :: nmin = 2   ! Minimum number of samples a former pass must contribute to a subregion to be considered in the region's compound integral value.
     double precision   :: flatness = 5.0d0 ! Determine how prominently out-liers, i.e. samples with a large fluctuation, 
                                            ! figure in the total fluctuation, which in turn determines how a region is split up.
                                            ! As suggested by its name, flatness should be chosen large for 'flat" integrand and small for 'volatile' integrands
