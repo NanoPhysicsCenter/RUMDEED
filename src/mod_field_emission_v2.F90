@@ -21,7 +21,7 @@ Module mod_field_emission_v2
   integer                            :: nrElecEmitAll
   !integer                            :: nrEmitted
   double precision, dimension(1:3)   :: F_avg = 0.0d0
-  integer, parameter                 :: N_MH_step = 10*2 ! Number of steps to do in the MH algorithm
+  integer, parameter                 :: N_MH_step = 10*3 ! Number of steps to do in the MH algorithm
   double precision                   :: residual = 0.0d0 ! Should be a array the size of the number of emitters
 
   ! Cuba
@@ -1079,8 +1079,8 @@ contains
     ! Limits on how big or low the standard deviation can be.
     if (MH_std > 0.1250d0) then
       MH_std = 0.1250d0
-    else if (MH_std < 0.005d0) then
-      MH_std = 0.005d0
+    else if (MH_std < 0.00005d0) then
+      MH_std = 0.00005d0
     end if
 
     std(1:2) = emitters_dim(1:2, emit)*MH_std ! Standard deviation for the normal distribution is 0.075% of the emitter length.
