@@ -264,18 +264,18 @@ contains
 
       ! Check if the field is favourable for emission or not
       if (F >= 0.0d0) then
-        D_f = 0.0d0
-        !print *, 'Warning: F > 0.0d0'
+        D_f = -huge(1.0d0)
+        print *, 'Warning: F > 0.0d0'
       !else
       !  if (D_f > 1.0d0) then
       !    print *, 'Warning D_f > 1.0d0'
       !    print *, 'D_f = ', D_f
       !  end if
       end if
-      df_avg = df_avg + D_f
+      df_avg = df_avg + exp(D_f)
 
       CALL RANDOM_NUMBER(rnd)
-      if (rnd <= D_f) then
+      if (log(rnd) <= D_f) then
         !par_vel(1:2) = box_muller((/1.0d0, 1.0d0/), (/0.25d0, 0.25d0/))
         !if (par_vel(1) < 0.0d0) then
         !  if (par_vel(2) < 0.0d0) then
@@ -369,6 +369,16 @@ contains
     Escape_Prob = exp(b_FN * (sqrt(w_theta_xy(pos, emit)))**3 * v_y(F, pos, emit) / (-1.0d0*F))
 
   end function Escape_Prob
+
+  ! Returns the log of the escape probability.
+  double precision function Escape_Prob_log(F, pos, emit)
+  double precision, intent(in)                 :: F
+  double precision, dimension(1:3), intent(in) :: pos
+  integer, intent(in)                          :: emit
+
+  Escape_Prob_log = b_FN * (sqrt(w_theta_xy(pos, emit)))**3 * v_y(F, pos, emit) / (-1.0d0*F)
+
+end function Escape_Prob_log
 
   !-----------------------------------------------------------------------------
   ! A simple function that calculates
@@ -1071,7 +1081,7 @@ contains
     ! changing the standard deviation.
     ratio_change = 0.5d0*100.0d0/maxval(emitters_dim(:, emit))
     CALL RANDOM_NUMBER(rnd) ! Change be a random number
-    if (a_rate < 0.525d0) then
+    if (a_rate < 0.2525d0) then
       MH_std = MH_std * (1.0d0 - rnd*0.00025d0)
     else
       MH_std = MH_std * (1.0d0 + rnd*0.00025d0)
@@ -1088,7 +1098,7 @@ contains
     ! The expected value of the absolute value of the normal distribution is std*sqrt(2/pi).
 
     !ndim = nint( 2.0d0/(MH_std*sqrt(2.0d0/pi)) )
-    ndim = 25
+    ndim = 25*4
 
     ! Get a random initial position on the surface.
     ! We pick this location from a uniform distribution.
@@ -1120,9 +1130,9 @@ contains
     ! Calculate the escape probability at this location
     if (field(3) < 0.0d0) then
       !df_cur = Get_Kevin_Jgtf(field(3), T_temp, cur_w)
-      df_cur = Escape_Prob(field(3), cur_pos, emit)
+      df_cur = Escape_Prob_log(field(3), cur_pos, emit)
     else
-      df_cur = 1.0d-12 ! Zero escape probabilty if field is not favourable
+      df_cur = -huge(1.0d0)! Zero escape probabilty if field is not favourable
     end if
 
     !---------------------------------------------------------------------------
@@ -1152,7 +1162,7 @@ contains
       ! Calculate the escape probability at the new position, to compair with
       ! the current position.
       !df_new = Get_Kevin_Jgtf(field(3), T_temp, new_w)
-      df_new = Escape_Prob(field(3), cur_pos, emit)
+      df_new = Escape_Prob_log(field(3), cur_pos, emit)
 
       ! if (abs(cur_w - new_w) > 0.25) then
       !   print *, df_new / df_cur
@@ -1164,9 +1174,9 @@ contains
       !   pause
       ! end if
 
-      alpha = df_new / df_cur
+      alpha = df_new - df_cur
 
-      if (alpha >= 1.0d0) then
+      if (df_new >= df_cur ) then
         cur_pos = new_pos
         df_cur = df_new
         cur_w = new_w
@@ -1174,7 +1184,7 @@ contains
         jump_a = jump_a + 1
       else
         CALL RANDOM_NUMBER(rnd)
-        if (rnd < alpha) then
+        if (log(rnd) <= alpha) then
           cur_pos = new_pos
           df_cur = df_new
           cur_w = new_w
