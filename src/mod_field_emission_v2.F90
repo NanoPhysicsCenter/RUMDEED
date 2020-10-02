@@ -1077,28 +1077,10 @@ end function Escape_Prob_log
     !ndim = ndim_in
     ndim_in = 0
 
-    ! Try to keep the acceptance ratio around 50% by
-    ! changing the standard deviation.
-    ratio_change = 0.5d0*100.0d0/maxval(emitters_dim(:, emit))
-    CALL RANDOM_NUMBER(rnd) ! Change be a random number
-    if (a_rate < 0.2525d0) then
-      MH_std = MH_std * (1.0d0 - rnd*0.00025d0)
-    else
-      MH_std = MH_std * (1.0d0 + rnd*0.00025d0)
-    end if
-    ! Limits on how big or low the standard deviation can be.
-    if (MH_std > 0.1250d0) then
-      MH_std = 0.1250d0
-    else if (MH_std < 0.00005d0) then
-      MH_std = 0.00005d0
-    end if
-
-    std(1:2) = emitters_dim(1:2, emit)*MH_std ! Standard deviation for the normal distribution is 0.075% of the emitter length.
-    ! This means that 68% of jumps are less than this value.
-    ! The expected value of the absolute value of the normal distribution is std*sqrt(2/pi).
-
     !ndim = nint( 2.0d0/(MH_std*sqrt(2.0d0/pi)) )
-    ndim = 25*4
+    ndim = 25*2
+    ratio_change = 0.5d0*100.0d0/maxval(emitters_dim(:, emit))
+    std(1:2) = emitters_dim(1:2, emit)*0.10d0 ! 10% of emitter size
 
     ! Get a random initial position on the surface.
     ! We pick this location from a uniform distribution.
@@ -1139,6 +1121,30 @@ end function Escape_Prob_log
     ! We now pick a random distance and direction to jump to from our
     ! current location. We do this ndim times.
     do i = 1, ndim
+
+      ! Make first 25% of jumps with std as 10% of emitter length.
+      if (i > ndim*0.25d0) then
+
+        ! Try to keep the acceptance ratio around 25% by
+        ! changing the standard deviation.
+        CALL RANDOM_NUMBER(rnd) ! Change be a random number
+        if (a_rate < 0.2525d0) then
+          MH_std = MH_std * (1.0d0 - rnd*0.00025d0)
+        else
+          MH_std = MH_std * (1.0d0 + rnd*0.00025d0)
+        end if
+        ! Limits on how big or low the standard deviation can be.
+        if (MH_std > 0.1250d0) then
+          MH_std = 0.1250d0
+        else if (MH_std < 0.00005d0) then
+          MH_std = 0.00005d0
+        end if
+
+        std(1:2) = emitters_dim(1:2, emit)*MH_std ! Standard deviation for the normal distribution is 0.075% of the emitter length.
+        ! This means that 68% of jumps are less than this value.
+        ! The expected value of the absolute value of the normal distribution is std*sqrt(2/pi).
+      end if
+
       ! Find a new position using a normal distribution.
 
       !std = std/((1.15d0)**i)
@@ -1229,6 +1235,10 @@ end function Escape_Prob_log
     pos_out = cur_pos
     df_out = df_cur
   end subroutine Metropolis_Hastings_rectangle_J
+
+  ! Adaptive MH in log space
+  !subroutine Adpative_MH_log()
+  !end subroutine Adpative_MH_log
 
   ! ----------------------------------------------------------------------------
   ! Checks the limits of the rectangular region of the emitter
