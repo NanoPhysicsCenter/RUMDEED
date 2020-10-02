@@ -251,6 +251,7 @@ module mod_global
   integer :: ud_field ! File for surface field
   integer :: ud_coll ! Collisions
   integer :: ud_integrand ! Information about the surface integration
+  integer :: ud_mh ! Information about MH
 
   ! unit descriptors for data files (binary files)
   integer :: ud_ramo_sec ! File for the ramo current broken down into emitters and sections
@@ -331,6 +332,7 @@ contains
    flush(ud_field)
    flush(ud_coll)
    flush(ud_integrand)
+   flush(ud_mh)
 
    flush(ud_ramo_sec)
 

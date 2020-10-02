@@ -490,6 +490,13 @@ contains
       print '(a)', 'Vacuum: ERROR UNABLE TO OPEN file integration.dt'
       stop
     end if
+
+    open(newunit=ud_mh, iostat=IFAIL, file='out/mh.bin', &
+    status='REPLACE', action='WRITE', access='STREAM')
+    if (IFAIL /= 0) then
+      print *, 'Vacuum: Failed to open file mh.bin. ABORTING'
+      stop
+    end if
     
     !------------------------------------------------------------------------------------
     ! Emission density

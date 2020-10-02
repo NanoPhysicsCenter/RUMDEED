@@ -52,7 +52,7 @@ Module mod_field_emission_v2
 
   ! MH Acceptance rate
   double precision :: a_rate = 1.0d0
-  double precision :: MH_std = 0.125d0
+  double precision :: MH_std = 0.0125d0
 
   integer          :: jump_a = 0, jump_r = 0 ! Number of jumps accepted and rejected
 
@@ -1117,6 +1117,11 @@ end function Escape_Prob_log
       df_cur = -huge(1.0d0)! Zero escape probabilty if field is not favourable
     end if
 
+    write(unit=ud_mh) ndim
+    print *, ndim
+    write(unit=ud_mh) cur_pos(1), cur_pos(2), std(1), std(2)
+    print *, 0, cur_pos(1)/1.0d-9, cur_pos(2)/1.0d-9, std(1)/1.0d-9, std(2)/1.0d-9
+
     !---------------------------------------------------------------------------
     ! We now pick a random distance and direction to jump to from our
     ! current location. We do this ndim times.
@@ -1163,7 +1168,12 @@ end function Escape_Prob_log
       ! Check if the field is favourable for emission at the new position.
       ! If it is not then cycle, i.e. we reject this location and
       ! pick another one.
-      if (field(3) > 0.0d0) cycle ! Do the next loop iteration, i.e. find a new position.
+      if (field(3) > 0.0d0) then
+        write(unit=ud_mh) cur_pos(1), cur_pos(2), std(1), std(2)
+        print *, i, cur_pos(1)/1.0d-9, cur_pos(2)/1.0d-9, std(1)/1.0d-9, std(2)/1.0d-9
+        print *, 'WARNING UNFAVOURABLE FIELD'
+        cycle ! Do the next loop iteration, i.e. find a new position.
+      end if
 
       ! Calculate the escape probability at the new position, to compair with
       ! the current position.
@@ -1220,6 +1230,9 @@ end function Escape_Prob_log
       !     F_out = field(3)
       !   end if
       ! end if
+
+      write(unit=ud_mh) cur_pos(1), cur_pos(2), std(1), std(2)
+      print *, i, cur_pos(1)/1.0d-9, cur_pos(2)/1.0d-9, std(1)/1.0d-9, std(2)/1.0d-9
     end do
 
     ! Acceptance rate
@@ -1234,6 +1247,9 @@ end function Escape_Prob_log
     ! Return the current position
     pos_out = cur_pos
     df_out = df_cur
+
+    close(unit=ud_mh)
+    stop
   end subroutine Metropolis_Hastings_rectangle_J
 
   ! Adaptive MH in log space
@@ -1293,5 +1309,12 @@ end function Escape_Prob_log
       !end if
     end if
   end subroutine check_limits_metro_rec
+
+  ! Adaptive Metropolis algorithm is log space
+  ! See: Haario, Heikki, Eero Saksman, and Johanna Tamminen. "An adaptive Metropolis algorithm." Bernoulli 7.2 (2001): 223-242.
+  ! https://projecteuclid.org/download/pdf_1/euclid.bj/1080222083
+  !subroutine Adaptive_MH_log()
+    
+  !end subroutine
 
 end Module mod_field_emission_v2
