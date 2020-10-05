@@ -1151,9 +1151,6 @@ end function Escape_Prob_log
       end if
 
       ! Find a new position using a normal distribution.
-
-      !std = std/((1.15d0)**i)
-
       !new_pos(1:2) = box_muller(cur_pos(1:2)/length_scale, std)*length_scale
       new_pos(1:2) = box_muller(cur_pos(1:2), std)
       new_pos(3) = 0.0d0 ! At the surface
@@ -1282,18 +1279,18 @@ end function Escape_Prob_log
       d_x = par_pos(1) - x_max
       par_pos(1) = x_max - d_x
 
-      !if(d_x > emitters_dim(1, emit)) then
-      !  print *, 'Warning: d_x to large >'
-      !  print *, d_x
-      !end if
+      if(d_x > emitters_dim(1, emit)) then
+        print *, 'Warning: d_x to large >'
+        print *, d_x
+      end if
     else if (par_pos(1) < x_min) then
       d_x = x_min - par_pos(1)
       par_pos(1) = d_x + x_min
 
-      !if(d_x > emitters_dim(1, emit)) then
-      !  print *, 'Warning: d_x to large <'
-      !  print *, d_x
-      !end if
+      if(d_x > emitters_dim(1, emit)) then
+        print *, 'Warning: d_x to large <'
+        print *, d_x
+      end if
     end if
 
     !Check y ----------------------------------------
@@ -1301,18 +1298,18 @@ end function Escape_Prob_log
       d_y = par_pos(2) - y_max
       par_pos(2) = y_max - d_y
 
-      !if(d_y > emitters_dim(2, emit)) then
-      !  print *, 'Warning: d_y to large >'
-      !  print *, d_y
-      !end if
+      if(d_y > emitters_dim(2, emit)) then
+        print *, 'Warning: d_y to large >'
+        print *, d_y
+      end if
     else if (par_pos(2) < y_min) then
       d_y = y_min - par_pos(2)
       par_pos(2) = d_y + y_min
 
-      !if(d_y > emitters_dim(2, emit)) then
-      !  print *, 'Warning: d_x to large <'
-      !  print *, d_y
-      !end if
+      if(d_y > emitters_dim(2, emit)) then
+        print *, 'Warning: d_x to large <'
+        print *, d_y
+      end if
     end if
   end subroutine check_limits_metro_rec
 
