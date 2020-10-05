@@ -170,15 +170,15 @@ contains
     !$OMP& REDUCTION(+:avg_vel) SCHEDULE(GUIDED, CHUNK_SIZE)
     do i = 1, nrPart
       ! Verlet
-      particles_cur_vel(:, i) = particles_cur_vel(:, i) &
-                            & + 0.5d0*( particles_prev_accel(:, i) &
-                            & + particles_cur_accel(:, i) )*time_step
+      !particles_cur_vel(:, i) = particles_cur_vel(:, i) &
+      !                      & + 0.5d0*( particles_prev_accel(:, i) &
+      !                      & + particles_cur_accel(:, i) )*time_step
 
       !! Beeman
-      !particles_cur_vel(:, i) = particles_cur_vel(:, i) &
-      !                      & + 1.0d0/6.0d0*( 2.0d0*particles_cur_accel(:, i) &
-      !                      & + 5.0d0*particles_prev_accel(:, i) & 
-      !                      & - particles_prev2_accel(:, i) )*time_step
+      particles_cur_vel(:, i) = particles_cur_vel(:, i) &
+                            & + 1.0d0/6.0d0*( 2.0d0*particles_cur_accel(:, i) &
+                            & + 5.0d0*particles_prev_accel(:, i) & 
+                            & - particles_prev2_accel(:, i) )*time_step
 
       q = particles_charge(i)
       k = particles_species(i)
