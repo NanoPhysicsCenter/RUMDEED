@@ -1080,7 +1080,7 @@ end function Escape_Prob_log
     !ndim = nint( 2.0d0/(MH_std*sqrt(2.0d0/pi)) )
     ndim = 25*2
     ratio_change = 0.5d0*100.0d0/maxval(emitters_dim(:, emit))
-    std(1:2) = emitters_dim(1:2, emit)*0.10d0 ! 10% of emitter size
+    std(1:2) = emitters_dim(1:2, emit)*0.05d0 ! 5% of emitter size
 
     ! Get a random initial position on the surface.
     ! We pick this location from a uniform distribution.
@@ -1118,16 +1118,16 @@ end function Escape_Prob_log
     end if
 
     write(unit=ud_mh) ndim
-    print *, ndim
+    !print *, ndim
     write(unit=ud_mh) cur_pos(1), cur_pos(2), std(1), std(2)
-    print *, 0, cur_pos(1)/1.0d-9, cur_pos(2)/1.0d-9, std(1)/1.0d-9, std(2)/1.0d-9
+    !print *, 0, cur_pos(1)/1.0d-9, cur_pos(2)/1.0d-9, std(1)/1.0d-9, std(2)/1.0d-9
 
     !---------------------------------------------------------------------------
     ! We now pick a random distance and direction to jump to from our
     ! current location. We do this ndim times.
     do i = 1, ndim
 
-      ! Make first 25% of jumps with std as 10% of emitter length.
+      ! Make first 25% of jumps with std as 5% of emitter length.
       if (i > ndim*0.25d0) then
 
         ! Try to keep the acceptance ratio around 25% by
@@ -1168,10 +1168,16 @@ end function Escape_Prob_log
       ! Check if the field is favourable for emission at the new position.
       ! If it is not then cycle, i.e. we reject this location and
       ! pick another one.
-      if (field(3) > 0.0d0) then
+      if (field(3) >= 0.0d0) then
         write(unit=ud_mh) cur_pos(1), cur_pos(2), std(1), std(2)
-        print *, i, cur_pos(1)/1.0d-9, cur_pos(2)/1.0d-9, std(1)/1.0d-9, std(2)/1.0d-9
-        print *, 'WARNING UNFAVOURABLE FIELD'
+        !print *, i, cur_pos(1)/1.0d-9, cur_pos(2)/1.0d-9, std(1)/1.0d-9, std(2)/1.0d-9
+        !print *, 'WARNING UNFAVOURABLE FIELD'
+        !print *, field
+        !print *, new_pos/1.0E-9
+        !print *, nrPart
+        !print *, i
+        !pause
+        jump_r = jump_r + 1
         cycle ! Do the next loop iteration, i.e. find a new position.
       end if
 
@@ -1232,7 +1238,7 @@ end function Escape_Prob_log
       ! end if
 
       write(unit=ud_mh) cur_pos(1), cur_pos(2), std(1), std(2)
-      print *, i, cur_pos(1)/1.0d-9, cur_pos(2)/1.0d-9, std(1)/1.0d-9, std(2)/1.0d-9
+      !print *, i, cur_pos(1)/1.0d-9, cur_pos(2)/1.0d-9, std(1)/1.0d-9, std(2)/1.0d-9
     end do
 
     ! Acceptance rate
@@ -1248,8 +1254,8 @@ end function Escape_Prob_log
     pos_out = cur_pos
     df_out = df_cur
 
-    close(unit=ud_mh)
-    stop
+    !close(unit=ud_mh)
+    !stop
   end subroutine Metropolis_Hastings_rectangle_J
 
   ! Adaptive MH in log space
