@@ -375,7 +375,7 @@ contains
   subroutine Write_Ramo_Current(step)
     integer, intent(in) :: step
     integer             :: IFAIL, i
-    double precision    :: ramo_cur = 0.0d0
+    double precision    :: ramo_cur
     double precision    :: avg_speed
 
     avg_speed = sqrt(avg_vel(1)**2 + avg_vel(2)**2 + avg_vel(3)**2)

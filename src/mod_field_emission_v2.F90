@@ -1061,7 +1061,7 @@ end function Escape_Prob_log
     integer, intent(inout)                        :: ndim_in
     integer, intent(in)                           :: emit
     double precision, intent(out)                 :: df_out, F_out
-    integer                                       :: ndim
+    integer                                       :: ndim, ndim_first
     double precision, intent(out), dimension(1:3) :: pos_out
     integer                                       :: count, i
     double precision                              :: rnd, alpha
@@ -1122,13 +1122,15 @@ end function Escape_Prob_log
     write(unit=ud_mh) cur_pos(1), cur_pos(2), std(1), std(2)
     !print *, 0, cur_pos(1)/1.0d-9, cur_pos(2)/1.0d-9, std(1)/1.0d-9, std(2)/1.0d-9
 
+    ndim_first = nint(ndim*0.25d0)
+
     !---------------------------------------------------------------------------
     ! We now pick a random distance and direction to jump to from our
     ! current location. We do this ndim times.
     do i = 1, ndim
 
       ! Make first 25% of jumps with std as 5% of emitter length.
-      if (i > ndim*0.25d0) then
+      if (i > ndim_first) then
 
         ! Try to keep the acceptance ratio around 25% by
         ! changing the standard deviation.
@@ -1174,7 +1176,9 @@ end function Escape_Prob_log
         !print *, nrPart
         !print *, i
         !pause
-        jump_r = jump_r + 1
+        if (i > ndim_first) then
+          jump_r = jump_r + 1
+        end if
         cycle ! Do the next loop iteration, i.e. find a new position.
       end if
 
@@ -1200,7 +1204,9 @@ end function Escape_Prob_log
         df_cur = df_new
         cur_w = new_w
         F_out = field(3)
-        jump_a = jump_a + 1
+        if (i > ndim_first) then
+          jump_a = jump_a + 1
+        end if
       else
         CALL RANDOM_NUMBER(rnd)
         if (log(rnd) <= alpha) then
@@ -1208,31 +1214,15 @@ end function Escape_Prob_log
           df_cur = df_new
           cur_w = new_w
           F_out = field(3)
-          jump_a = jump_a + 1
+          if (i > ndim_first) then
+            jump_a = jump_a + 1
+          end if
         else
-          jump_r = jump_r + 1
+          if (i > ndim_first) then
+            jump_r = jump_r + 1
+          end if
         end if
       end if
-      
-      ! ! If the escape probability is higher in the new location,
-      ! ! then we jump to that location. If it is not then we jump to that
-      ! ! location with the probabilty df_new / df_cur.
-      ! if (df_new > df_cur) then
-      !   cur_pos = new_pos ! New position becomes the current position
-      !   df_cur = df_new
-      !   F_out = field(3)
-      ! else
-      !   alpha = df_new / df_cur
-
-      !   CALL RANDOM_NUMBER(rnd)
-      !   ! Jump to this position with probability alpha, i.e. if rnd is less than alpha
-      !   !pause
-      !   if (rnd < alpha) then
-      !     cur_pos = new_pos ! New position becomes the current position
-      !     df_cur = df_new
-      !     F_out = field(3)
-      !   end if
-      ! end if
 
       write(unit=ud_mh) cur_pos(1), cur_pos(2), std(1), std(2)
       !print *, i, cur_pos(1)/1.0d-9, cur_pos(2)/1.0d-9, std(1)/1.0d-9, std(2)/1.0d-9
