@@ -86,14 +86,14 @@ contains
     !$OMP& SCHEDULE(GUIDED, CHUNK_SIZE)
     do i = 1, nrPart
       ! Verlet
-      particles_prev_pos(:, i) = particles_cur_pos(:, i) ! Store the previous position
-      particles_cur_pos(:, i)  = particles_cur_pos(:, i) + particles_cur_vel(:, i)*time_step &
-                             & + 0.5d0*particles_cur_accel(:, i)*time_step2
-
-      ! Beeman
       !particles_prev_pos(:, i) = particles_cur_pos(:, i) ! Store the previous position
       !particles_cur_pos(:, i)  = particles_cur_pos(:, i) + particles_cur_vel(:, i)*time_step &
-      !                       & + 1.0d0/6.0d0*( 4.0d0*particles_cur_accel(:, i) - particles_prev_accel(:, i) )*time_step2
+      !                       & + 0.5d0*particles_cur_accel(:, i)*time_step2
+
+      ! Beeman
+      particles_prev_pos(:, i) = particles_cur_pos(:, i) ! Store the previous position
+      particles_cur_pos(:, i)  = particles_cur_pos(:, i) + particles_cur_vel(:, i)*time_step &
+                             & + 1.0d0/6.0d0*( 4.0d0*particles_cur_accel(:, i) - particles_prev_accel(:, i) )*time_step2
 
       particles_prev2_accel(:, i) = particles_prev_accel(:, i) ! Beeman
       particles_prev_accel(:, i) = particles_cur_accel(:, i)
