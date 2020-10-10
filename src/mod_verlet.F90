@@ -488,16 +488,17 @@ contains
   subroutine Set_Voltage(step)
     integer, intent(in) :: step
     integer             :: IFAIL
-    double precision    :: V_R = 0.0d0, V_C = 0.0d0
+    double precision    :: V_R, V_C
 
-    !V_R = Voltage_Resistor()
+    V_R = Voltage_Resistor()
     !V_C = Voltage_Capacitor()
-    !V_d = V_s + V_R + V_C
+    V_C = 0.0d0
+    V_d = V_s + V_R + V_C
 
     !V_C = Voltage_Parallel_Capacitor(step)
     !V_d = V_C
 
-    V_d = V_s
+    !V_d = V_s
 
     E_z = -1.0d0*V_d/d
     !E_zunit = -1.0d0*sign(1.0d0, V)/d
@@ -506,14 +507,13 @@ contains
   end subroutine Set_Voltage
 
   double precision pure function Voltage_Resistor()
-    double precision, parameter :: R = 5.0d5 ! Ohm
     double precision            :: ramo_cur
 
     ! Calculate the total ramo current
     ramo_cur = sum(ramo_current)
 
     ! Calculate the voltage drop over the resistor
-    Voltage_Resistor = -1.0d0*R*ramo_cur
+    Voltage_Resistor = -1.0d0*R_s*ramo_cur
   end function Voltage_Resistor
 
   double precision function Voltage_Capacitor()

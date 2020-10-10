@@ -144,6 +144,8 @@ module mod_global
   double precision :: P_abs = P_ntp  ! Pressure as fraction of P_std
   double precision :: n_d = P_ntp/(k_b*T_ntp) ! Density of N2
 
+  double precision :: R_s = 0.0d0 ! Series resistor
+
 
   ! ----------------------------------------------------------------------------
   ! Define run time variables
@@ -281,7 +283,7 @@ module mod_global
                    nrEmit, emitters_pos, emitters_dim, &
                    emitters_type, emitters_delay, EMISSION_MODE, &
                    image_charge, N_ic_max, collisions, T_temp, P_abs, &
-                   write_ramo_sec, write_position_file
+                   write_ramo_sec, write_position_file, R_s
 
   ! ----------------------------------------------------------------------------
   ! Prodecure interfaces and pointers
