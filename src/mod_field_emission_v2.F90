@@ -1117,9 +1117,9 @@ end function Escape_Prob_log
       df_cur = -huge(1.0d0)! Zero escape probabilty if field is not favourable
     end if
 
-    write(unit=ud_mh) ndim
+    !write(unit=ud_mh) ndim
     !print *, ndim
-    write(unit=ud_mh) cur_pos(1), cur_pos(2), std(1), std(2)
+    !write(unit=ud_mh) cur_pos(1), cur_pos(2), std(1), std(2)
     !print *, 0, cur_pos(1)/1.0d-9, cur_pos(2)/1.0d-9, std(1)/1.0d-9, std(2)/1.0d-9
 
     ndim_first = nint(ndim*0.25d0)
@@ -1168,7 +1168,7 @@ end function Escape_Prob_log
       ! If it is not then cycle, i.e. we reject this location and
       ! pick another one.
       if (field(3) >= 0.0d0) then
-        write(unit=ud_mh) cur_pos(1), cur_pos(2), std(1), std(2)
+        !write(unit=ud_mh) cur_pos(1), cur_pos(2), std(1), std(2)
         !print *, i, cur_pos(1)/1.0d-9, cur_pos(2)/1.0d-9, std(1)/1.0d-9, std(2)/1.0d-9
         !print *, 'WARNING UNFAVOURABLE FIELD'
         !print *, field
@@ -1224,7 +1224,7 @@ end function Escape_Prob_log
         end if
       end if
 
-      write(unit=ud_mh) cur_pos(1), cur_pos(2), std(1), std(2)
+      !write(unit=ud_mh) cur_pos(1), cur_pos(2), std(1), std(2)
       !print *, i, cur_pos(1)/1.0d-9, cur_pos(2)/1.0d-9, std(1)/1.0d-9, std(2)/1.0d-9
     end do
 
