@@ -1078,7 +1078,7 @@ end function Escape_Prob_log
     ndim_in = 0
 
     !ndim = nint( 2.0d0/(MH_std*sqrt(2.0d0/pi)) )
-    ndim = 25*2
+    ndim = 25*4
     ratio_change = 0.5d0*100.0d0/maxval(emitters_dim(:, emit))
     std(1:2) = emitters_dim(1:2, emit)*0.05d0 ! 5% of emitter size
 
@@ -1122,7 +1122,7 @@ end function Escape_Prob_log
     !write(unit=ud_mh) cur_pos(1), cur_pos(2), std(1), std(2)
     !print *, 0, cur_pos(1)/1.0d-9, cur_pos(2)/1.0d-9, std(1)/1.0d-9, std(2)/1.0d-9
 
-    ndim_first = nint(ndim*0.25d0)
+    ndim_first = nint(ndim*0.5d0)
 
     !---------------------------------------------------------------------------
     ! We now pick a random distance and direction to jump to from our
