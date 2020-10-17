@@ -1078,9 +1078,9 @@ end function Escape_Prob_log
     ndim_in = 0
 
     !ndim = nint( 2.0d0/(MH_std*sqrt(2.0d0/pi)) )
-    ndim = 25*4
+    ndim = 25*8
     ratio_change = 0.5d0*100.0d0/maxval(emitters_dim(:, emit))
-    std(1:2) = emitters_dim(1:2, emit)*0.05d0 ! 5% of emitter size
+    std(1:2) = emitters_dim(1:2, emit)*0.10d0 ! 5% of emitter size
 
     ! Get a random initial position on the surface.
     ! We pick this location from a uniform distribution.
