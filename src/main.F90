@@ -18,6 +18,7 @@ program VacuumMD
   !use mod_therminoic_emission
   use mod_pair
   use mod_unit_tests
+  use mod_manual_emission
 #if defined(__INTEL_COMPILER)
   use IFPORT ! Needed for getpid()
 #endif
@@ -82,6 +83,9 @@ program VacuumMD
   case(EMISSION_TEST)
     print '(a)', 'Vacuum: Doing Field emission DEV V2'
     call Init_Field_Emission_v2()
+  case(EMISSION_MANUAL)
+    print '(a)', 'Vacuum: Doing manual emission'
+    call Init_Manual()
   case DEFAULT
     print '(a)', 'Vacuum: ERROR UNKNOWN EMISSION MODEL'
     print *, EMISSION_MODE
@@ -194,6 +198,8 @@ program VacuumMD
     call Clean_Up_Field_Thermo_Emission()
   case(EMISSION_TEST)
     call Clean_Up_Field_Emission_v2()
+  case(EMISSION_MANUAL)
+    call Clean_Up_Manual()
   END SELECT
 
   print '(a)', 'Vacuum: Final clean up'
