@@ -2,6 +2,9 @@
 ! Module for photo emission                 !
 ! Kristinn Torfason                         !
 ! 05.04.13                                  !
+! Modifications                             !
+! Hákon Örn Árnason                         !
+! 04.12.20                                  !
 !-------------------------------------------!
 
 Module mod_photo_emission
@@ -17,7 +20,6 @@ Module mod_photo_emission
   logical                                     :: EmitGauss = .false.
   integer                                     :: maxElecEmit = -1
   integer                                     :: nrEmitted
-
   integer                                     :: ud_gauss
 
   ! ----------------------------------------------------------------------------
