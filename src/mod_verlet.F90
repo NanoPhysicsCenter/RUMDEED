@@ -36,7 +36,15 @@ contains
     !if (nrElecHole > 0) then
       call Update_ElecHole_Position(step)
 
+      if (EMISSION_MODE == EMISSION_UNIT_TEST) then
+        call Write_Position_Test(step)
+      end if
+
       call Calculate_Acceleration_Particles()
+
+      if ((EMISSION_MODE == EMISSION_UNIT_TEST) .or. (EMISSION_MODE == EMISSION_MANUAL)) then
+        call Write_Acceleration_Test(step)
+      end if
 
       ! Reset the ramo current. Note, this should be done after set_voltage,
       ! since the ramo current may be used there.
@@ -78,14 +86,14 @@ contains
     !$OMP& SCHEDULE(GUIDED, CHUNK_SIZE)
     do i = 1, nrPart
       ! Verlet
-      particles_prev_pos(:, i) = particles_cur_pos(:, i) ! Store the previous position
-      particles_cur_pos(:, i)  = particles_cur_pos(:, i) + particles_cur_vel(:, i)*time_step &
-                             & + 0.5d0*particles_cur_accel(:, i)*time_step2
-
-      ! Beeman
       !particles_prev_pos(:, i) = particles_cur_pos(:, i) ! Store the previous position
       !particles_cur_pos(:, i)  = particles_cur_pos(:, i) + particles_cur_vel(:, i)*time_step &
-      !                       & + 1.0d0/6.0d0*( 4.0d0*particles_cur_accel(:, i) - particles_prev_accel(:, i) )*time_step2
+      !                       & + 0.5d0*particles_cur_accel(:, i)*time_step2
+
+      ! Beeman
+      particles_prev_pos(:, i) = particles_cur_pos(:, i) ! Store the previous position
+      particles_cur_pos(:, i)  = particles_cur_pos(:, i) + particles_cur_vel(:, i)*time_step &
+                             & + 1.0d0/6.0d0*( 4.0d0*particles_cur_accel(:, i) - particles_prev_accel(:, i) )*time_step2
 
       particles_prev2_accel(:, i) = particles_prev_accel(:, i) ! Beeman
       particles_prev_accel(:, i) = particles_cur_accel(:, i)
@@ -96,6 +104,35 @@ contains
     end do
     !$OMP END PARALLEL DO
   end subroutine Update_ElecHole_Position
+
+
+  subroutine Write_Position_Test(step)
+    integer, intent(in)              :: step
+    integer                          :: ud_pos_test, IFAIL, i
+    character(len=1024)              :: filename
+    double precision, dimension(1:3) :: par_pos
+
+    ! Prepare the name of the output file
+    ! each file is named accel-0.dt where the number
+    ! represents the current time step.
+    write(filename, '(a8, i0, a4)') 'pos/pos-', step, '.bin'
+
+    open(newunit=ud_pos_test, iostat=IFAIL, file=filename, status='replace', action='write', access='STREAM')
+    if (IFAIL /= 0) then
+      print '(a)', 'Vacuum: ERROR UNABLE TO OPEN file for position'
+      print *, filename
+      print *, step
+    end if
+
+    do i = 1, nrPart
+      par_pos(:) = particles_cur_pos(:, i) ! Position of the particle
+
+      ! Write out x, y, z
+      write(unit=ud_pos_test) par_pos(1), par_pos(2), par_pos(3)
+    end do
+
+    close(unit=ud_pos_test, iostat=IFAIL, status='keep')
+  end subroutine Write_Position_Test
 
   ! ----------------------------------------------------------------------------
   ! Checks the boundary conditions of the box.
@@ -137,7 +174,7 @@ contains
       !                      & + 0.5d0*( particles_prev_accel(:, i) &
       !                      & + particles_cur_accel(:, i) )*time_step
 
-      ! Beeman
+      !! Beeman
       particles_cur_vel(:, i) = particles_cur_vel(:, i) &
                             & + 1.0d0/6.0d0*( 2.0d0*particles_cur_accel(:, i) &
                             & + 5.0d0*particles_prev_accel(:, i) & 
@@ -169,19 +206,20 @@ contains
   ! Update the acceleration for all the particles
   subroutine Calculate_Acceleration_Particles()
     double precision, dimension(1:3) :: force_E, force_c, force_ic, force_ic_N, force_ic_self
-    double precision, dimension(1:3) :: pos_1, pos_2, diff
+    double precision, dimension(1:3) :: pos_1, pos_2, diff, pos_ic, pos_2_per
     double precision                 :: r
     double precision                 :: q_1, q_2
     double precision                 :: im_1, im_2
     double precision                 :: pre_fac_c
-    integer                          :: i, j, k_1, k_2
+    integer                          :: i, j, k_1, k_2, u, v
 
     ! We do not use GUIDED scheduling in OpenMP here because the inner loop changes size.
-    !$OMP PARALLEL DO DEFAULT(NONE) PRIVATE(i, j, k_1, k_2, pos_1, pos_2, diff, r) &
+    !$OMP PARALLEL DO DEFAULT(NONE) PRIVATE(i, j, k_1, k_2, pos_1, pos_2, pos_2_per, diff, r, pos_ic) &
     !$OMP& PRIVATE(force_E, force_c, force_ic, force_ic_N, force_ic_self, im_1, q_1, im_2, q_2, pre_fac_c) &
-    !$OMP SHARED(nrPart, particles_cur_pos, particles_mass, particles_species, ptr_field_E) &
-    !$OMP SHARED(ptr_Image_Charge_effect, particles_cur_accel, particles_charge) &
-    !$OMP& SCHEDULE(DYNAMIC, 4)
+    !$OMP SHARED(nrPart, particles_cur_pos, particles_mass, particles_species, ptr_field_E, Num_per, box_dim) &
+    !$OMP SHARED(ptr_Image_Charge_effect, particles_charge, d) &
+    !$OMP& SCHEDULE(DYNAMIC, 1) &
+    !$OMP& REDUCTION(+:particles_cur_accel)
     do i = 1, nrPart
       ! Information about the particle we are calculating the force/acceleration on
       pos_1 = particles_cur_pos(:, i)
@@ -204,8 +242,7 @@ contains
       ! Loop over particles from i+1 to nrElec.
       ! There is no need to loop over all particles since
       ! The forces are equal but in opposite directions
-      do j = i+1, nrPart
-
+      do j = i, nrPart
         ! Information about the particle that is acting on the particle at pos_1
         pos_2 = particles_cur_pos(:, j)
         !if (particles_mass(j) == 0.0d0) then
@@ -218,50 +255,129 @@ contains
         ! Prefactor for Coloumb's law
         pre_fac_c = q_1*q_2 * div_fac_c ! q_1*q_2 / (4*pi*epsilon)
 
-        ! Calculate the distance between the two particles
-        diff = pos_1 - pos_2
-        ! There are fours ways to calculate the distance
-        ! Number 1: Use the intrinsic function NORM2(v)
-        ! Number 2: Use the equation for it sqrt( v(1)**2 + v(2)**2 + v(3)**2 )
-        ! Number 3: Or do sqrt( dot_product(v, v) )
-        ! Number 4: Or use sqrt( sum(v**2) )
-        ! It turns you number 1 is the slowest by far. Number 2, 3 and 4 are
-        ! often similar in speed. The difference is small and they fluctuate a lot,
-        ! with no clear winner.
-        !
-        ! We add a small number (length_scale**3) to the results to
-        ! prevent a singularity when calulating 1/r**3
-        !
-        r = sqrt( sum(diff**2) ) + length_scale**3
-        !r = sqrt( dot_product(diff, diff) ) + length_scale**3
-        !r = NORM2(diff) + length_scale**3
+        do v = -1*Num_per, Num_per, 1 ! x
+          do u = -1*Num_per, Num_per, 1 ! y
 
-        ! Calculate the Coulomb force
-        ! F = (r_1 - r_2) / |r_1 - r_2|^3
-        ! F = (diff / r) * 1/r^2
-        ! (diff / r) is a unit vector
-        force_c = pre_fac_c * diff / r**3
+            print *, 'u = ', u
+            print *, 'v = ', v
 
-        ! Do image charge
-        force_ic = pre_fac_c * ptr_Image_Charge_effect(pos_1, pos_2)
+            ! The inner coulomb loop usally goes from j = 1+i, nrPart
+            ! We have to skip the self interaction. But we want the periodic part of it.
+            if ((i == j) .and. (u == 0) .and. (v == 0)) then
+              cycle
+            end if
 
-        ! The image charge force of particle i on particle j is the same in the z-direction
-        ! but we reverse the x and y directions of the force due to symmetry.
-        force_ic_N(1:2) = -1.0d0*force_ic(1:2)
-        force_ic_N(3)   = +1.0d0*force_ic(3)
+            ! Shift the position
+            pos_2_per(1) = pos_2(1) + v*(box_dim(1) + per_padding)
+            pos_2_per(2) = pos_2(2) + u*(box_dim(2) + per_padding)
+            pos_2_per(3) = pos_2(3)
 
-        !$OMP CRITICAL(ACCEL_UPDATE)
-        particles_cur_accel(:, j) = particles_cur_accel(:, j) - force_c * im_2 + force_ic_N * im_2
-        particles_cur_accel(:, i) = particles_cur_accel(:, i) + force_c * im_1 + force_ic   * im_1
-        !$OMP END CRITICAL(ACCEL_UPDATE)
+            ! Calculate the distance between the two particles
+            diff = pos_1 - pos_2_per
+            ! There are fours ways to calculate the distance
+            ! Number 1: Use the intrinsic function NORM2(v)
+            ! Number 2: Use the equation for it sqrt( v(1)**2 + v(2)**2 + v(3)**2 )
+            ! Number 3: Or do sqrt( dot_product(v, v) )
+            ! Number 4: Or use sqrt( sum(v**2) )
+            ! It turns out number 1 is the slowest by far. Number 2, 3 and 4 are
+            ! often similar in speed. The difference is small and they fluctuate a lot,
+            ! with no clear winner.
+            !
+            ! We add a small number (length_scale**3) to the results to
+            ! prevent a singularity when calulating 1/r**3
+            !
+            r = sqrt( sum(diff**2) ) + length_scale**3
+            print *, r/length_scale
+            !r = sqrt( dot_product(diff, diff) ) + length_scale**3
+            !r = NORM2(diff) + length_scale**3
+
+            ! Calculate the Coulomb force
+            ! F = (r_1 - r_2) / |r_1 - r_2|^3
+            ! F = (diff / r) * 1/r^2
+            ! (diff / r) is a unit vector
+            force_c = pre_fac_c * diff / r**3
+            print *, force_c
+            print *, im_1
+            print *, force_c*im_1
+
+            ! Do image charge
+            force_ic = pre_fac_c * ptr_Image_Charge_effect(pos_1, pos_2_per)
+
+            ! The image charge force of particle i on particle j is the same in the z-direction
+            ! but we reverse the x and y directions of the force due to symmetry.
+            force_ic_N(1:2) = -1.0d0*force_ic(1:2)
+            force_ic_N(3)   = +1.0d0*force_ic(3)
+
+            print *, force_ic
+
+            ! ! Below plane
+            ! pos_ic(1:2) = pos_2(1:2)
+            ! pos_ic(3) = -1.0d0*pos_2(3)
+            ! diff = pos_1 - pos_ic
+            ! r = sqrt( sum(diff**2) ) + length_scale**3
+            ! force_ic = (-1.0d0)*pre_fac_c * diff / r**3
+
+            ! ! Above plane
+            ! pos_ic(1:2) = pos_2(1:2)
+            ! pos_ic(3) = 2*d - pos_2(3)
+            ! diff = pos_1 - pos_ic
+            ! r = sqrt( sum(diff**2) ) + length_scale**3
+            ! force_ic = force_ic + (-1.0d0)*pre_fac_c * diff / r**3
+
+
+            !!!$OMP CRITICAL(ACCEL_UPDATE)
+            !particles_cur_accel(:, i) = particles_cur_accel(:, i) + force_c*im_1 + force_ic*im_1
+            if (j /= i) then ! Do not double count!!!
+              particles_cur_accel(:, j) = particles_cur_accel(:, j) - force_c * im_2 + force_ic_N * im_2
+            end if
+            particles_cur_accel(:, i) = particles_cur_accel(:, i) + force_c * im_1 !+ force_ic     * im_1
+            !!!$OMP END CRITICAL(ACCEL_UPDATE)
+
+            print *, ''
+          end do
+        end do
       end do
 
-      !$OMP CRITICAL(ACCEL_UPDATE)
+      !!!$OMP CRITICAL(ACCEL_UPDATE)
       particles_cur_accel(:, i) = particles_cur_accel(:, i) + force_E * im_1 + force_ic_self * im_1
-      !$OMP END CRITICAL(ACCEL_UPDATE)
+      !!!$OMP END CRITICAL(ACCEL_UPDATE)
     end do
     !$OMP END PARALLEL DO
   end subroutine Calculate_Acceleration_Particles
+
+  subroutine Write_Acceleration_Test(step)
+    integer, intent(in)              :: step
+    integer                          :: ud_accel, IFAIL, i
+    character(len=1024)              :: filename
+    double precision, dimension(1:3) :: par_accel
+
+    print *, 'ACCEL DATA'
+
+    ! Prepare the name of the output file
+    ! each file is named accel-0.dt where the number
+    ! represents the current time step.
+    write(filename, '(a12, i0, a4)') 'accel/accel-', step, '.bin'
+
+    open(newunit=ud_accel, iostat=IFAIL, file=filename, status='replace', action='write', access='STREAM')
+    if (IFAIL /= 0) then
+      print '(a)', 'Vacuum: ERROR UNABLE TO OPEN file for acceleration'
+      print *, filename
+      print *, step
+    end if
+
+    do i = 1, nrPart
+      par_accel(:) = particles_cur_accel(:, i) ! Position of the particle
+
+      ! Write out x, y, z and which emitter the particle came from
+      write(unit=ud_accel) par_accel(1), par_accel(2), par_accel(3)
+      
+      print *, i
+      print *, par_accel
+      print *, ''
+    end do
+
+    close(unit=ud_accel, iostat=IFAIL, status='keep')
+  end subroutine Write_Acceleration_Test
 
 
   !-----------------------------------------------------------------------------
@@ -272,11 +388,11 @@ contains
     double precision, dimension(1:3), intent(in) :: pos
 
     double precision, dimension(1:3) :: force_c, force_tot, force_ic
-    double precision, dimension(1:3) :: pos_1, pos_2, diff
+    double precision, dimension(1:3) :: pos_1, pos_2, diff, pos_2_per
     double precision                 :: r
     double precision                 :: q_1, q_2
     double precision                 :: pre_fac_c
-    integer                          :: j
+    integer                          :: j, v, u
 
     ! Position of the particle we are calculating the force/acceleration on
     pos_1 = pos
@@ -285,8 +401,8 @@ contains
     force_tot = ptr_field_E(pos_1)
     !print *, force_tot
 
-    !$OMP PARALLEL DO DEFAULT(NONE) PRIVATE(j, pos_2, diff, r, force_c, force_ic, q_2, pre_fac_c) &
-    !$OMP& SHARED(nrPart, particles_cur_pos, particles_charge, ptr_Image_Charge_effect, pos_1) &
+    !$OMP PARALLEL DO DEFAULT(NONE) PRIVATE(j, pos_2, pos_2_per, diff, r, force_c, force_ic, q_2, pre_fac_c) &
+    !$OMP& SHARED(nrPart, particles_cur_pos, particles_charge, ptr_Image_Charge_effect, pos_1, Num_per, box_dim) &
     !$OMP& REDUCTION(+:force_tot) SCHEDULE(GUIDED, CHUNK_SIZE)
     do j = 1, nrPart
 
@@ -296,24 +412,57 @@ contains
 
       pre_fac_c = q_2 * div_fac_c ! q_2 / (4*pi*epsilon)
 
-      ! Calculate the distance between the two particles
-      diff = pos_1 - pos_2
-      r = sqrt( sum(diff**2) ) + length_scale**3
-      !r = sqrt( dot_product(diff, diff) ) + length_scale**3
-      !r = NORM2(diff) + length_scale**3 ! distance + Prevent singularity
+        ! Loop over the periodic systems
+        !
+        ! ---------------------------------------------------
+        ! |         |         |         |         |         |
+        ! | -2x,+2y | -1x,+2y | +0x,+2y | +1x,+2y | +2x,+2y |
+        ! |         |         |         |         |         |
+        ! |--------------------------------------------------
+        ! |         |         |         |         |         |
+        ! | -2x,+1y | -1x,+1y | +0x,+1y | +1x,+1y | +2x,+1y |
+        ! |         |         |         |         |         |
+        ! |--------------------------------------------------
+        ! |         |         |         |         |         |
+        ! | -2x,+0y | -1x,+0y | +0x,+0y | +1x,+0y | +2x,+0y |
+        ! |         |         |         |         |         |
+        ! |--------------------------------------------------
+        ! |         |         |         |         |         |
+        ! | -2x,-1y | -1x,-1y | +0x,-1y | +1x,-1y | +2x,-1y |
+        ! |         |         |         |         |         |
+        ! |--------------------------------------------------
+        ! |         |         |         |         |         |
+        ! | -2x,-2y | -1x,-2y | +0x,-2y | +1x,-2y | +2x,-2y |
+        ! |         |         |         |         |         |
+        ! |--------------------------------------------------
+      do v = -1*Num_per, Num_per, 1 ! x
+        do u = -1*Num_per, Num_per, 1 ! y
 
-      ! Calculate the Coulomb force
-      ! F = (r_1 - r_2) / |r_1 - r_2|^3
-      ! F = (diff / r) * 1/r^2
-      ! (diff / r) is a unit vector
-      force_c = diff / r**3
-      !force_c = diff / (r*r*r)
+          ! Shift the position
+          pos_2_per(1) = pos_2(1) + v*(box_dim(1) + per_padding)
+          pos_2_per(2) = pos_2(2) + u*(box_dim(2) + per_padding)
+          pos_2_per(3) = pos_2(3)
 
-      ! Image charge effect
-      force_ic = ptr_Image_Charge_effect(pos_1, pos_2)
+          ! Calculate the distance between the two particles
+          diff = pos_1 - pos_2_per
+          r = sqrt( sum(diff**2) ) + length_scale**3
+          !r = sqrt( dot_product(diff, diff) ) + length_scale**3
+          !r = NORM2(diff) + length_scale**3 ! distance + Prevent singularity
 
-      ! The total force
-      force_tot = force_tot + pre_fac_c * force_c + pre_fac_c * force_ic
+          ! Calculate the Coulomb force
+          ! F = (r_1 - r_2) / |r_1 - r_2|^3
+          ! F = (diff / r) * 1/r^2
+          ! (diff / r) is a unit vector
+          force_c = diff / r**3
+          !force_c = diff / (r*r*r)
+
+          ! Image charge effect
+          force_ic = ptr_Image_Charge_effect(pos_1, pos_2_per)
+
+          ! The total force
+          force_tot = force_tot + pre_fac_c * force_c + pre_fac_c * force_ic
+        end do
+      end do
     end do
     !$OMP END PARALLEL DO
 
@@ -407,16 +556,17 @@ contains
   subroutine Set_Voltage(step)
     integer, intent(in) :: step
     integer             :: IFAIL
-    double precision    :: V_R = 0.0d0, V_C = 0.0d0
+    double precision    :: V_R, V_C
 
-    !V_R = Voltage_Resistor()
+    V_R = Voltage_Resistor()
     !V_C = Voltage_Capacitor()
-    !V_d = V_s + V_R + V_C
+    V_C = 0.0d0
+    V_d = V_s + V_R + V_C
 
     !V_C = Voltage_Parallel_Capacitor(step)
     !V_d = V_C
 
-    V_d = V_s
+    !V_d = V_s
 
     E_z = -1.0d0*V_d/d
     !E_zunit = -1.0d0*sign(1.0d0, V)/d
@@ -425,14 +575,13 @@ contains
   end subroutine Set_Voltage
 
   double precision pure function Voltage_Resistor()
-    double precision, parameter :: R = 5.0d5 ! Ohm
     double precision            :: ramo_cur
 
     ! Calculate the total ramo current
     ramo_cur = sum(ramo_current)
 
     ! Calculate the voltage drop over the resistor
-    Voltage_Resistor = -1.0d0*R*ramo_cur
+    Voltage_Resistor = -1.0d0*R_s*ramo_cur
   end function Voltage_Resistor
 
   double precision function Voltage_Capacitor()
