@@ -14,9 +14,11 @@ program VacuumMD
   use mod_field_emission_v2
   use mod_field_emission_tip
   use mod_field_emission_2D
+  !use mod_field_thermo_emission
   !use mod_therminoic_emission
   use mod_pair
   use mod_unit_tests
+ ! use mod_manual_emission
 #if defined(__INTEL_COMPILER)
   use IFPORT ! Needed for getpid()
 #endif
@@ -49,9 +51,6 @@ program VacuumMD
   nthreads = 1
 #endif
 
-#if defined(_UNIT_TEST_)
-  print '(a)', 'Vacuum: **** UNIT TESTING IS ACTIVE ****'
-#endif
 
   print '(a)', 'Vacuum: Reading input values'
   call Read_Input_Variables()
@@ -60,6 +59,9 @@ program VacuumMD
   call Init()
 
   SELECT CASE (EMISSION_MODE)
+  case(EMISSION_UNIT_TEST)
+    print '(a)', 'Vacuum: **** UNIT TESTING IS ACTIVE ****'
+    call Init_Unit_Test()
   case(EMISSION_PHOTO)
     print '(a)', 'Vacuum: Doing Photo emission'
     call Init_Photo_Emission()
@@ -75,9 +77,15 @@ program VacuumMD
   case(EMISSION_THERMIONIC)
     print '(a)', 'Vacuum: Doing Thermionic emission'
     !call Init_Thermionic_Emission()
+  case(EMISSION_FIELD_THERMO)
+    print '(a)', 'Vacuum: Doing General Field+Thermionic emission'
+    call Init_Field_Thermo_Emission()
   case(EMISSION_TEST)
     print '(a)', 'Vacuum: Doing Field emission DEV V2'
     call Init_Field_Emission_v2()
+  case(EMISSION_MANUAL)
+    print '(a)', 'Vacuum: Doing manual emission'
+    call Init_Manual()
   case DEFAULT
     print '(a)', 'Vacuum: ERROR UNKNOWN EMISSION MODEL'
     print *, EMISSION_MODE
@@ -94,17 +102,8 @@ program VacuumMD
   !call Init_Dipoles(0, 0, 0)
   !call Write_Dipole_data()
 
-#if defined(_UNIT_TEST_)
-  print '(a)', 'Vacuum: Starting Unit Tests'
-  print *, ''
-#else
   print '(a)', 'Vacuum: Starting main loop'
-  print '(tr1, a, i0, a, ES12.4, a)', 'Doing ', steps, ' time steps of size ', time_step, ' seconds'
-#endif
-
-#if defined(_UNIT_TEST_)
-  call Run_Unit_Tests()
-#else
+  print '(tr1, a, i0, a, ES12.4, a)', 'Doing ', steps, ' time steps of size ', time_step/1.0E-12, ' ps'
 
   print *, ''
 
@@ -120,7 +119,7 @@ program VacuumMD
     ! Update the position of all particles
     !print *, 'Update position'
     call Update_Position(i)
-    !call Write_Position(i)
+    call Write_Position(i)
 
     ! Remove particles from the system
     !print *, 'Remove particles'
@@ -130,7 +129,7 @@ program VacuumMD
     call Do_Collisions(i)
 
     ! Flush data
-    !call Flush_Data()
+    call Flush_Data()
 
     !do j = 1, 9
     !  if (i == progress(j)) then
@@ -144,7 +143,7 @@ program VacuumMD
     ! then print the progress and flush data
     if (any(i .eq. progress) .eqv. .true.) then
       call PrintProgress(nint(i*10.0d0/steps))
-      call Flush_Data()
+      !call Flush_Data()
     end if
 
     if (cought_stop_signal .eqv. .true.) then
@@ -177,19 +176,14 @@ program VacuumMD
   call PrintProgress(10)
   print '(a)', 'Vacuum: Main loop finished'
 
-! End of else for unit test
-#endif
 
-
-#if defined(_UNIT_TEST_)
-  print '(a)', 'Vacuum: Unit tests finished'
-#else
   print '(a)', 'Vacuum: Writing data'
   call Write_Life_Time()
-#endif
 
   print '(a)', 'Vacuum: Emission clean up'
   SELECT CASE (EMISSION_MODE)
+  case(EMISSION_UNIT_TEST)
+    call Clean_Up_Unit_Test()
   case(EMISSION_PHOTO)
     call Clean_Up_Photo_Emission()
   case(EMISSION_FIELD)
@@ -200,8 +194,12 @@ program VacuumMD
     call Clean_Up_Field_Emission_2D()
   !case(EMISSION_THERMIONIC)
     !call Clean_Up_Thermionic_Emission()
+  case(EMISSION_FIELD_THERMO)
+    call Clean_Up_Field_Thermo_Emission()
   case(EMISSION_TEST)
     call Clean_Up_Field_Emission_v2()
+  case(EMISSION_MANUAL)
+    call Clean_Up_Manual()
   END SELECT
 
   print '(a)', 'Vacuum: Final clean up'
@@ -289,6 +287,10 @@ contains
     !time_step: The size of the time step
     time_step = time_step * time_scale
     time_step2 = time_step**2 ! Time_step squared
+
+    ! Temperature, pressure and density
+    P_abs = P_abs * P_ntp 
+    n_d = P_abs/(k_b*T_temp)
 
     ! steps: Number of time steps that the program will simulate
     if (steps <= 0) then
@@ -406,7 +408,9 @@ contains
     call init_random_seed()
 
     ! Register a subroutine to catch the SIGINT signal
+#if defined(__GNUC__)
     IFAIL = SIGNAL(SIGINT, Signal_Handler)
+#endif
 
     ! Create folder for output files
 #if defined(__PGI)
@@ -414,6 +418,9 @@ contains
 #else
     call execute_command_line ('mkdir -p out/')
 #endif
+
+    ! Set the number of cores Cuba should use to 1.
+    call cubacores(1, 1000)
 
 
     ! Open data file for writing
@@ -481,6 +488,19 @@ contains
     open(newunit=ud_coll, iostat=IFAIL, file='out/collisions.dt', status='replace', action='write')
     if (IFAIL /= 0) then
       print '(a)', 'Vacuum: ERROR UNABLE TO OPEN file collisions.dt'
+      stop
+    end if
+
+    open(newunit=ud_integrand, iostat=IFAIL, file='out/integration.dt', status='replace', action='write')
+    if (IFAIL /= 0) then
+      print '(a)', 'Vacuum: ERROR UNABLE TO OPEN file integration.dt'
+      stop
+    end if
+
+    open(newunit=ud_mh, iostat=IFAIL, file='out/mh.bin', &
+    status='REPLACE', action='WRITE', access='STREAM')
+    if (IFAIL /= 0) then
+      print *, 'Vacuum: Failed to open file mh.bin. ABORTING'
       stop
     end if
     
@@ -572,21 +592,21 @@ contains
 
   ! ----------------------------------------------------------------------------
   ! Flush data written to files such that it can be read
-  subroutine Flush_Data()
+  ! subroutine Flush_Data()
 
-    flush(ud_emit)
-    flush(ud_absorb)
-    flush(ud_volt)
-    flush(ud_field)
-    flush(ud_debug)
+  !   flush(ud_emit)
+  !   flush(ud_absorb)
+  !   flush(ud_volt)
+  !   flush(ud_field)
+  !   flush(ud_debug)
 
-    flush(ud_density_emit)
-    flush(ud_density_ion)
+  !   flush(ud_density_emit)
+  !   flush(ud_density_ion)
 
-    flush(ud_density_absorb_top)
-    flush(ud_density_absorb_bot)
+  !   flush(ud_density_absorb_top)
+  !   flush(ud_density_absorb_bot)
 
-  end subroutine Flush_Data
+  ! end subroutine Flush_Data
 
 
   ! ----------------------------------------------------------------------------
@@ -657,6 +677,7 @@ contains
     write(ud_init, fmt_int) 'NrEmit        = ', NrEmit,        'Number of emitters'
     write(ud_init, fmt_int) 'EMISSION_MODE = ', EMISSION_MODE, 'The emission mechanism'
     write(ud_init, *) '---------------------------------------------------------'
+    write(ud_init, *) 'GIT VERSION'
 #if defined(_GIT_VERSION_)
     write(ud_init, *) _GIT_VERSION_
 #endif
@@ -694,6 +715,7 @@ contains
     close(unit=ud_volt, status='keep')
     close(unit=ud_field,status='keep')
     close(unit=ud_coll,status='keep')
+    close(unit=ud_integrand, status='keep')
     close(unit=ud_debug, status='keep')
 
     close(unit=ud_density_emit, status='keep')
