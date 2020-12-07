@@ -5,7 +5,7 @@
     + Differing workfunction pattern across the emitter
       + checkerboard patter
       + random generated pattern 
-    
+    + Intensity function?
     See master branch for more info
 
 
