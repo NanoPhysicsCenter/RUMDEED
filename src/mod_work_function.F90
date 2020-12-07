@@ -17,9 +17,9 @@ module mod_work_function
   ! Gaussians
   integer                                     :: num_gauss ! Number of Gaussian points
   double precision                            :: w_theta_base
-  double precision, allocatable, dimension(:) :: w_gaussians_A ! Amplitude
-  double precision, allocatable, dimension(:) :: w_gaussians_x ! x - center
-  double precision, allocatable, dimension(:) :: w_gaussians_y ! y - center
+  double precision, allocatable, dimension(:) :: w_gaussians_A     ! Amplitude
+  double precision, allocatable, dimension(:) :: w_gaussians_x     ! x - center
+  double precision, allocatable, dimension(:) :: w_gaussians_y     ! y - center
   double precision, allocatable, dimension(:) :: w_gaussians_std_x ! standard deviation / spread in x
   double precision, allocatable, dimension(:) :: w_gaussians_std_y ! standard deviation / spread in y
 
@@ -29,7 +29,6 @@ module mod_work_function
   double precision, allocatable, dimension(:) :: vor_sites_y   ! y-position of a site
   double precision, allocatable, dimension(:) :: vor_w_theta   ! Work function in cell
   integer,          allocatable, dimension(:) :: vor_sec       ! The number for the section of the cell
-
 
   ! Type of work function models
   integer, parameter :: WORK_CHECKBOARD = 1
@@ -117,6 +116,27 @@ contains
     case (WORK_CIRCLE)
       print '(a)', 'Vacuum: Using circle work function model'
       ptr_Work_fun => w_theta_circle
+    case (WORK_VORONOI)
+      print '(a)', 'Vacuum: Using Voronoi work function model'
+      ptr_Work_fun => w_theta_voronoi
+
+      ! Read the number of sites
+      read(unit=ud_work, FMT=*) num_vor_sites
+
+      ! Allocate variables
+      allocate(vor_sites_x(1:num_vor_sites))
+      allocate(vor_sites_y(1:num_vor_sites))
+      allocate(vor_w_theta(1:num_vor_sites))
+      allocate(vor_sec(1:num_vor_sites))
+
+      ! Loop over number of sites and read in each one
+      do i = 1, num_vor_sites
+        read(unit=ud_work, FMT=*) vor_sites_x(i), vor_sites_y(i), vor_w_theta(i), vor_sec(i)
+
+        ! Coordinates in the file should be given on scale from [0, 1]
+        vor_sites_x(i) = emitters_pos(1, 1) + vor_sites_x(i)*emitters_dim(1, 1)
+        vor_sites_y(i) = emitters_pos(2, 1) + vor_sites_y(i)*emitters_dim(2, 1)
+      end do
     case DEFAULT
       print '(a)', 'Vacuum: ERROR UNKNOWN WORK FUNCTION TYPE'
       print *, WORK_TYPE
@@ -138,6 +158,14 @@ contains
       deallocate(w_gaussians_y)
       deallocate(w_gaussians_std_x)
       deallocate(w_gaussians_std_y)
+    end if
+
+
+    if (WORK_TYPE == WORK_VORONOI) then
+      deallocate(vor_sites_x)
+      deallocate(vor_sites_y)
+      deallocate(vor_w_theta)
+      deallocate(vor_sec)
     end if
   end subroutine Work_fun_cleanup
 
@@ -220,40 +248,91 @@ contains
     end if
   end function w_theta_gaussian
 
-  ! ----------------------------------------------------------------------------
-  ! Circular work function
-  ! work in progress?
-  ! 
-  ! 
-  ! 
-  ! 
-  ! 
-  !
+  double precision function Check_in_circles(pos, x_s, y_s, sec)
+  double precision, dimension(1:3), intent(in) :: pos
+  double precision, intent(in)                 :: x_s, y_s
+  integer, intent(out)                         :: sec
+  double precision                             :: r, x, y
+  double precision, parameter                  :: r_c = 150.0d0, r_o = 250.0d0
+
+  x = pos(1)/length_scale - x_s
+  y = pos(2)/length_scale - y_s
+
+  r = sqrt(x**2 + y**2)
+
+  if (r <= r_c) then
+    Check_in_circles = 2.00d0
+    sec = 1
+  else if (r <= r_o) then
+    Check_in_circles = 1.60d0
+    sec = 2
+  else
+    Check_in_circles = 2.50d0
+    sec = 3
+  end if
+
+  end function Check_in_circles
+
   double precision function w_theta_circle(pos, emit, sec)
   double precision, intent(in), dimension(1:3) :: pos
   integer, intent(in)                          :: emit
   integer, intent(out), optional               :: sec
 
   integer                                      :: sec_
-  double precision                             :: r
-  double precision, parameter                  :: r_1 = 150.0d0, r_2 = 333.0d0, r_3 = 600.0d0
+  double precision                             :: r, x, y
+  !double precision, parameter                  :: r_1 = 150.0d0, r_2 = 333.0d0, r_3 = 600.0d0
+  !double precision, parameter                  :: r_c = 150.0d0, r_o = 250.0d0
+  double precision                             :: x_s, y_s
 
-  r = sqrt(pos(1)**2 + pos(2)**2) / length_scale
+  ! Middle
+  x_s = 0.0d0
+  y_s = 0.0d0
+  w_theta_circle = Check_in_circles(pos, x_s, y_s, sec_)
 
-
-  if (r <= r_1) then
-    w_theta_circle = 2.20d0
-    sec_ = 1
-  else if (r <= r_2) then
-    w_theta_circle = 1.60d0
-    sec_ = 2
-  else if (r <= r_3) then
-    w_theta_circle = 2.20d0
-    sec_ = 3
-  else
-    w_theta_circle = 2.20d0
-    sec_ = 4
+  ! Left
+  if (sec_ == 3) then
+    x_s = -600.0d0
+    y_s = 0.0d0
+    w_theta_circle = Check_in_circles(pos, x_s, y_s, sec_)
   end if
+
+  ! Right
+  if (sec_ == 3) then
+    x_s = 600.0d0
+    y_s = 0.0d0
+    w_theta_circle = Check_in_circles(pos, x_s, y_s, sec_)
+  end if
+
+  ! Top
+  if (sec_ == 3) then
+    x_s = 0.0d0
+    y_s = 600.0d0
+    w_theta_circle = Check_in_circles(pos, x_s, y_s, sec_)
+  end if
+
+  ! Bottom
+  if (sec_ == 3) then
+    x_s = 0.0d0
+    y_s = -600.0d0
+    w_theta_circle = Check_in_circles(pos, x_s, y_s, sec_)
+  end if
+
+
+  ! r = sqrt(pos(1)**2 + pos(2)**2) / length_scale
+
+  ! if (r <= r_1) then
+  !   w_theta_circle = 2.20d0
+  !   sec_ = 1
+  ! else if (r <= r_2) then
+  !   w_theta_circle = 1.60d0
+  !   sec_ = 2
+  ! else if (r <= r_3) then
+  !   w_theta_circle = 2.20d0
+  !   sec_ = 3
+  ! else
+  !   w_theta_circle = 2.50d0
+  !   sec_ = 4
+  ! end if
 
   if (present(sec) .eqv. .true.) then
     sec = sec_
@@ -302,89 +381,98 @@ contains
   ! |----|----|----|
   ! would map exactly like this to the emitter area
   !
-  double precision function w_theta_checkerboard(pos, emit, sec)
-    double precision, intent(in), dimension(1:3)  :: pos
-    integer, intent(in)                          :: emit
-    integer, intent(out), optional                :: sec
-    double precision, dimension(1:3)              :: pos_scaled
-    double precision                              :: x, y
-    integer                                       :: x_i, y_i
-    !integer, parameter                            :: emit = 1 ! Assume emitter nr. 1 for now
+    double precision function w_theta_checkerboard(pos, emit, sec)
+      double precision, intent(in), dimension(1:3)  :: pos
+      integer, intent(in)                           :: emit
+      integer, intent(out), optional                :: sec
+      double precision, dimension(1:3)              :: pos_scaled
+      double precision                              :: x, y
+      integer                                       :: x_i, y_i
+      !integer, parameter                            :: emit = 1 ! Assume emitter nr. 1 for now
 
-    ! To do: Read this from a file
-    !w_theta_arr(1, 1:4) = (/ 4.70d0, 4.70d0, 4.70d0, 4.70d0 /)
-    !w_theta_arr(2, 1:4) = (/ 4.70d0, 4.60d0, 4.60d0, 4.70d0 /)
-    !w_theta_arr(3, 1:4) = (/ 4.70d0, 4.60d0, 4.60d0, 4.70d0 /)
-    !w_theta_arr(4, 1:4) = (/ 4.70d0, 4.70d0, 4.70d0, 4.70d0 /)
+      if (nrEmit > 1) then
+        if (mod(emit, 2) == 0) then
+          w_theta_checkerboard = 2.5
+        else
+          w_theta_checkerboard = 2.0
+        endif
 
-    !w_theta_arr(1, 1:4) = (/ 4.65d0, 4.65d0, 4.65d0, 4.65d0 /)
-    !w_theta_arr(2, 1:4) = (/ 4.65d0, 4.70d0, 4.70d0, 4.65d0 /)
-    !w_theta_arr(3, 1:4) = (/ 4.65d0, 4.70d0, 4.70d0, 4.65d0 /)
-    !w_theta_arr(4, 1:4) = (/ 4.65d0, 4.65d0, 4.65d0, 4.65d0 /)
+        if (present(sec) .eqv. .true.) then
+          sec = 1
+        end if
+      else
 
-    !w_theta_arr(1, 1:4) = (/ 4.65d0, 4.65d0, 4.65d0, 4.65d0 /)
-    !w_theta_arr(2, 1:4) = (/ 4.65d0, 4.65d0, 4.65d0, 4.65d0 /)
-    !w_theta_arr(3, 1:4) = (/ 4.65d0, 4.65d0, 4.65d0, 4.65d0 /)
-    !w_theta_arr(4, 1:4) = (/ 4.65d0, 4.65d0, 4.65d0, 4.65d0 /)
+          ! To do: Read this from a file
+          !w_theta_arr(1, 1:4) = (/ 4.70d0, 4.70d0, 4.70d0, 4.70d0 /)
+          !w_theta_arr(2, 1:4) = (/ 4.70d0, 4.60d0, 4.60d0, 4.70d0 /)
+          !w_theta_arr(3, 1:4) = (/ 4.70d0, 4.60d0, 4.60d0, 4.70d0 /)
+          !w_theta_arr(4, 1:4) = (/ 4.70d0, 4.70d0, 4.70d0, 4.70d0 /)
 
-    !w_theta_arr(1, 1:4) = (/ 4.70d0, 4.70d0, 4.70d0, 4.70d0 /)
-    !w_theta_arr(2, 1:4) = (/ 4.70d0, 4.70d0, 4.70d0, 4.70d0 /)
-    !w_theta_arr(3, 1:4) = (/ 4.70d0, 4.70d0, 4.70d0, 4.70d0 /)
-    !w_theta_arr(4, 1:4) = (/ 4.70d0, 4.70d0, 4.70d0, 4.70d0 /)
+          !w_theta_arr(1, 1:4) = (/ 4.65d0, 4.65d0, 4.65d0, 4.65d0 /)
+          !w_theta_arr(2, 1:4) = (/ 4.65d0, 4.70d0, 4.70d0, 4.65d0 /)
+          !w_theta_arr(3, 1:4) = (/ 4.65d0, 4.70d0, 4.70d0, 4.65d0 /)
+          !w_theta_arr(4, 1:4) = (/ 4.65d0, 4.65d0, 4.65d0, 4.65d0 /)
 
-    ! Scale x, y to unit square
-    pos_scaled(1:2) = (pos(1:2) - emitters_pos(1:2, emit)) / emitters_dim(1:2, emit)
+          !w_theta_arr(1, 1:4) = (/ 4.65d0, 4.65d0, 4.65d0, 4.65d0 /)
+          !w_theta_arr(2, 1:4) = (/ 4.65d0, 4.65d0, 4.65d0, 4.65d0 /)
+          !w_theta_arr(3, 1:4) = (/ 4.65d0, 4.65d0, 4.65d0, 4.65d0 /)
+          !w_theta_arr(4, 1:4) = (/ 4.65d0, 4.65d0, 4.65d0, 4.65d0 /)
 
-    x = pos_scaled(1)
-    y = pos_scaled(2)
+          !w_theta_arr(1, 1:4) = (/ 4.70d0, 4.70d0, 4.70d0, 4.70d0 /)
+          !w_theta_arr(2, 1:4) = (/ 4.70d0, 4.70d0, 4.70d0, 4.70d0 /)
+          !w_theta_arr(3, 1:4) = (/ 4.70d0, 4.70d0, 4.70d0, 4.70d0 /)
+          !w_theta_arr(4, 1:4) = (/ 4.70d0, 4.70d0, 4.70d0, 4.70d0 /)
 
-    ! Calculate the position in the matrix
-    x_i = floor(x/x_len) + 1
-    y_i = floor(y/y_len) + 1
+          ! Scale x, y to unit square
+          pos_scaled(1:2) = (pos(1:2) - emitters_pos(1:2, emit)) / emitters_dim(1:2, emit)
 
-    ! Check the numbers
-    if (x_i > x_num) then
-      x_i = x_num
-    else if (x_i < 1) then
-      x_i = 1
-    end if
-    if (y_i > y_num) then
-      y_i = y_num
-    else if (y_i < 1) then
-      y_i = 1
-    end if
+          x = pos_scaled(1)
+          y = pos_scaled(2)
 
-    ! Return the section on the emitter
-    ! The numbering scheme is,
-    ! |----|----|----|
-    ! | 1  | 2  | 3  |
-    ! |----|----|----|
-    ! | 4  | 5  | 6  |
-    ! |----|----|----|
-    ! and so forth.
-    if (present(sec) .eqv. .true.) then
-      sec = x_num*(y_i - 1) + x_i
-    end if
+          ! Calculate the position in the matrix
+          x_i = floor(x/x_len) + 1
+          y_i = floor(y/y_len) + 1
 
-    ! Reverse the y-direction in the array
-    y_i = y_num - y_i + 1
+          ! Check the numbers
+          if (x_i > x_num) then
+            x_i = x_num
+          else if (x_i < 1) then
+            x_i = 1
+          end if
+          if (y_i > y_num) then
+            y_i = y_num
+          else if (y_i < 1) then
+            y_i = 1
+          end if
 
-    ! Return the results
-    w_theta_checkerboard = w_theta_arr(y_i, x_i)
-
-  end function w_theta_checkerboard
-
-  ! ----------------------------------------------------------------------------
-  ! 2x2 Checkerboard work function
-  ! Takes an array and maps it to the emitter area
-  ! An array like this
-  ! |----|----|
-  ! | 1  | 2  |
-  ! |----|----|
-  ! | 3  | 4  |
-  ! |----|----|
-  ! would map exactly like this to the emitter area
-  !
+      ! Return the section on the emitter
+      ! The numbering scheme is,
+      ! |----|----|----|
+      ! | 1  | 2  | 3  |
+      ! |----|----|----|
+      ! | 4  | 5  | 6  |
+      ! |----|----|----|
+      ! and so forth.
+          if (present(sec) .eqv. .true.) then
+            sec = x_num*(y_i - 1) + x_i
+          end if
+    
+          ! Reverse the y-direction in the array
+          y_i = y_num - y_i + 1
+    
+          ! if (present(sec) .eqv. .true.) then
+          !   if (abs(w_theta_arr(y_i, x_i) - 2.00d0) < 1.0E-6) then
+          !     sec = 1
+          !   else
+          !     sec = 2
+          !   end if
+          ! end if
+    
+          ! Return the results
+          w_theta_checkerboard = w_theta_arr(y_i, x_i)
+        end if
+    
+      end function w_theta_checkerboard
   
   double precision function w_theta_checkerboard_2x2(pos, sec)
     double precision, intent(in), dimension(1:3) :: pos
@@ -514,4 +602,5 @@ contains
     deallocate(vor_w_theta)
     deallocate(vor_sec)
   end function unit_test_voronoi
+  
 end module mod_work_function
