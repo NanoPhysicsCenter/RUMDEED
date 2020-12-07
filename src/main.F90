@@ -18,7 +18,7 @@ program VacuumMD
   !use mod_therminoic_emission
   use mod_pair
   use mod_unit_tests
- ! use mod_manual_emission
+  !use mod_manual_emission
 #if defined(__INTEL_COMPILER)
   use IFPORT ! Needed for getpid()
 #endif
