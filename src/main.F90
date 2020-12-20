@@ -108,7 +108,7 @@ program VacuumMD
   print *, ''
 
   cur_time = 0
-  call Set_Voltage(0) ! Set voltage for time step 0
+  !!call Set_Voltage(0) ! Set voltage for time step 0
 
   do i = 1, steps
 
@@ -357,15 +357,13 @@ contains
 
     ramo_current = 0.0d0
     ramo_current_emit(1:MAX_SECTIONS, 1:MAX_EMITTERS) = 0.0d0
-    ramo_cur_prev = 0.0d0
-    ramo_integral = 0.0d0
     life_time = 0
 
     density_map_elec = 0
     density_map_hole = 0
 
-    V_cur = 0.0d0
-    V_prev = 0.0d0
+    !V_cur = 0.0d0
+    !V_prev = 0.0d0
 
     ! Start with an empty system
     nrPart      = 0

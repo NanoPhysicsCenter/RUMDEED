@@ -258,14 +258,14 @@ contains
         do v = -1*Num_per, Num_per, 1 ! x
           do u = -1*Num_per, Num_per, 1 ! y
 
-            print *, 'u = ', u
-            print *, 'v = ', v
+            !print *, 'u = ', u
+            !print *, 'v = ', v
 
             ! The inner coulomb loop usally goes from j = 1+i, nrPart
             ! We have to skip the self interaction. But we want the periodic part of it.
-            if ((i == j) .and. (u == 0) .and. (v == 0)) then
-              cycle
-            end if
+            !if ((i == j) .and. (u == 0) .and. (v == 0)) then
+            !  cycle
+            !end if
 
             ! Shift the position
             pos_2_per(1) = pos_2(1) + v*(box_dim(1) + per_padding)
@@ -287,7 +287,7 @@ contains
             ! prevent a singularity when calulating 1/r**3
             !
             r = sqrt( sum(diff**2) ) + length_scale**3
-            print *, r/length_scale
+            !print *, r/length_scale
             !r = sqrt( dot_product(diff, diff) ) + length_scale**3
             !r = NORM2(diff) + length_scale**3
 
@@ -296,9 +296,9 @@ contains
             ! F = (diff / r) * 1/r^2
             ! (diff / r) is a unit vector
             force_c = pre_fac_c * diff / r**3
-            print *, force_c
-            print *, im_1
-            print *, force_c*im_1
+            !print *, force_c
+            !print *, im_1
+            !print *, force_c*im_1
 
             ! Do image charge
             force_ic = pre_fac_c * ptr_Image_Charge_effect(pos_1, pos_2_per)
@@ -308,7 +308,7 @@ contains
             force_ic_N(1:2) = -1.0d0*force_ic(1:2)
             force_ic_N(3)   = +1.0d0*force_ic(3)
 
-            print *, force_ic
+            !print *, force_ic
 
             ! ! Below plane
             ! pos_ic(1:2) = pos_2(1:2)
@@ -333,7 +333,7 @@ contains
             particles_cur_accel(:, i) = particles_cur_accel(:, i) + force_c * im_1 !+ force_ic     * im_1
             !!!$OMP END CRITICAL(ACCEL_UPDATE)
 
-            print *, ''
+            !print *, ''
           end do
         end do
       end do
@@ -556,12 +556,36 @@ contains
   subroutine Set_Voltage(step)
     integer, intent(in) :: step
     integer             :: IFAIL
-    double precision    :: V_R, V_C
+    !double precision    :: V_R, V_C
+    !double precision    :: ramo_cur
+    double precision, save :: V_rf = 0.0d0, V_rf_prev = 0.0d0, V_rf_next = 0.0d0
+    double precision, save :: I_cur = 0.0d0, I_prev = 0.0d0, I = 0.0d0
 
-    V_R = Voltage_Resistor()
+    ! Calculate the total ramo current
+    !ramo_cur = sum(ramo_current)
+    !I_prev = I_cur
+    !I_cur = ramo_cur
+
+    !I = Get_Current(step)
+    I = sum(ramo_current)
+    I_prev = I_cur
+    I_cur = I
+
+    !V_R = Voltage_Resistor()
     !V_C = Voltage_Capacitor()
-    V_C = 0.0d0
-    V_d = V_s + V_R + V_C
+    !V_C = 0.0d0
+    !V_d = V_s + V_R + V_C
+    
+    if (step == 1) then
+      print *, step
+      print *, V_rf
+    end if
+
+    V_rf_next = Parallel_RLC_FD(step, I_cur, I_prev, V_rf, V_rf_prev)
+    V_rf_prev = V_rf
+    V_rf = V_rf_next
+
+    V_d = V_s + V_rf ! DC voltage + RF voltage
 
     !V_C = Voltage_Parallel_Capacitor(step)
     !V_d = V_C
@@ -571,7 +595,8 @@ contains
     E_z = -1.0d0*V_d/d
     !E_zunit = -1.0d0*sign(1.0d0, V)/d
 
-    write (ud_volt, "(ES12.4, tr2, i8, tr2, ES12.4, tr2, ES12.4, tr2, ES12.4)", iostat=IFAIL) cur_time, step, V_d, V_R, V_C
+    write (ud_volt, "(ES12.4, tr2, i8, tr2, ES18.8, tr2, ES18.8)", iostat=IFAIL) &
+          & cur_time, step, V_d, V_rf
   end subroutine Set_Voltage
 
   double precision pure function Voltage_Resistor()
@@ -584,122 +609,45 @@ contains
     Voltage_Resistor = -1.0d0*R_s*ramo_cur
   end function Voltage_Resistor
 
-  double precision function Voltage_Capacitor()
-    double precision, parameter :: C = 10.0E-18 ! Farad (Atto Farads?)
-    double precision            :: ramo_cur
+  double precision function Get_Current(step)
+    integer, intent(in) :: step
+    Get_Current = 10.0E-3 ! Amper
+  end function Get_Current
 
-    ! Calculate the total ramo current
-    ramo_cur = sum(ramo_current)
+  double precision function Parallel_RLC_FD(step, I_cur, I_prev, V_cur, V_prev)
+    integer, intent(in) :: step
+    double precision, intent(in) :: V_cur, V_prev ! Current V(t) and previous V(t-Δt) values of the voltage
+    double precision, intent(in) :: I_cur, I_prev ! Current I(t) and previous I(t-Δt) values of the current
 
-    ! Colculate the voltage drop over the capacitor
-    ramo_integral = ramo_integral + time_step * (ramo_cur_prev + ramo_cur) * 0.5d0
-    ramo_cur_prev = ramo_cur
-    Voltage_Capacitor = -1.0d0/C * ramo_integral
-  end function Voltage_Capacitor
+    !double precision, parameter  :: R = 2.0d0  ! Ohm
+    !double precision, parameter  :: L = 1.0d-7  ! Henry
+    !double precision, parameter  :: C = 1.0d-22 ! Farad
 
-  double precision function Voltage_Parallel_Capacitor_Resistor()
-    double precision, parameter :: C   = 10.0d-18 ! Farad
-    double precision, parameter :: R_C = 0.5d6 ! Ohm
-    double precision, parameter :: R   = 0.5d6 ! Ohm
-    double precision, parameter :: ib   = 1.0d0/(C*(R+R_C))
-    double precision            :: ramo_cur
+    double precision, parameter  :: R = 10.0d0*13.5d0  ! Ohm
+    double precision, parameter  :: L = 500.0d0*1.04d-7  ! Henry
+    double precision, parameter  :: C = 1.0d0/5.0d0*2.54d-14 ! Farad
+    
 
-    ! Calculate the total ramo current
-    ramo_cur = sum(ramo_current)
+    double precision :: V_next ! Next value of the voltage V(t+Δt)
 
-    ! Caclulate the voltage over the diode
-    ramo_integral = ramo_integral + time_step * (ramo_cur_prev*exp(-1.0d0*time_step*ib) + ramo_cur) * 0.5d0
-    ramo_cur_prev = ramo_cur
+    V_next = time_step/C * I_cur + V_cur * (2.0d0 + time_step/(R*C) - time_step2/(L*C)) &
+               & - V_prev - time_step/C * I_prev
+    V_next = V_next / (1.0d0 + time_step/(R*C))
 
-    Voltage_Parallel_Capacitor_Resistor = (R**2)/(C*(R+R_C)**2) * ramo_integral - R*R_C/(R+R_C)*ramo_cur
-  end function Voltage_Parallel_Capacitor_Resistor
+    Parallel_RLC_FD = V_next
 
-  double precision function Voltage_Parallel_Capacitor(step)
-    integer, intent(in)         :: step
-    double precision, parameter :: C = 1.0E-15 ! Farad
-    double precision, parameter :: R = 1.0d3 ! Ohm
-    double precision, parameter :: RC = R*C
-    double precision, parameter :: iRC = 1.0d0/RC
-    double precision            :: ramo_cur, cur_time_s
+    if (step < 2) then
+      print *, 'Parallel_RLC_FD'
+      print *, I_cur
+      print *, I_prev
+      print *, V_cur
+      print *, V_prev
+      print *, time_step
 
-    ! Calculate the total ramo current
-    ramo_cur = sum(ramo_current)
-
-    ! Current time in seconds
-    cur_time_s = time_step * step
-
-    ! Caclulate the voltage over the diode
-    ramo_integral = ramo_integral + time_step * (ramo_cur_prev*exp(-1.0d0*time_step*iRC) + ramo_cur) * 0.5d0
-    ramo_cur_prev = ramo_cur
-
-    Voltage_Parallel_Capacitor = V_s*exp(-1.0d0*cur_time_s*iRC)*( RC*(exp(cur_time_s*iRC) - 1.0d0) + 0.0d0 ) &
-                               - 1.0d0/C * ramo_integral
-  end function Voltage_Parallel_Capacitor
-
-  double precision function Parallel_Capacitor_MNA(step, I_D)
-    integer, intent(in)          :: step
-    double precision, intent(in) :: I_D
-    double precision, parameter  :: C = 10.0d-18 ! Farad
-    double precision, parameter  :: R_D = 1.0d6  ! Ohm
-    double precision, parameter  :: R_S = 1.0d6  ! Ohm
-    double precision, parameter  :: R_C = 1.0d6  ! Ohm
-
-    double precision, dimension(1:5, 1:5) :: A, A_inv
-    double precision, dimension(1:5)      :: b
-    logical                               :: OK_FLAG
-
-    A = 0.0d0
-    A_inv = 0.0d0
-    b = 0.0d0
-
-    A(1, 1) = 1.0d0/R_D + 1.0d0/R_C
-    A(1, 2) = -1.0d0/R_D
-    A(1, 3) = -1.0d0/R_C
-    A(1, 4) = 1.0d0/R_S
-    b(1)    = 0.0
-
-    A(2, 1) = 1.0d0
-    A(2, 4) = -1.0d0
-    b(2)    = V_S
-
-    A(3, 1) = -1.0d0
-    A(3, 2) = 1.0d0
-    b(3)    = -1.0d0*I_D*R_D
-
-    A(4, 3) = 2.0d0*C/time_step
-    A(4, 5) = -1.0d0
-    b(4)    = V_prev(4) + 2.0d0*C/time_step*V_prev(2)
-
-    A(5, 4) = 1.0d0/R_S
-    A(5, 5) = 1.0d0
-    b(5)    = -I_D
-
-    ! Store previous values of the voltages
-    V_prev = V_cur
-
-    ! Solve the system of equations Ax=b or x=A^-1*b
-    ! Find the inverse of A
-    call M55INV(A, A_inv, OK_FLAG)
-
-    ! x = A^-1*b
-    V_cur = matmul(A_inv, b)
-
-    ! Calculate voltages
-    !V_D(step) = V_cur(1)             ! Voltage over the diode
-    !V_C(step) = V_cur(2)             ! Voltage of the capacitor
-    !V_SC(step) = V_cur(0) - V_cur(3) ! Source voltage (Should be equal to V_S)
-
-    ! Calculate currents from voltages over resistors
-    !I_T(step)  = ( -1.0d0*V_cur(3) / R_S ) / 1.0d-6          ! Total current
-    !!I_C(step)  = ( (V_cur(0) - V_cur(2)) / R_C ) / 1.0d-6  ! Capacitor current
-    !I_C(step)  = V_cur(4) / 1.0d-6                         ! Capacitor current
-    !I_DC(step) = ( (V_cur(0) - V_cur(1)) / R_D ) / 1.0d-6  ! Diode current
-
-    !I_D = Current_Diode_Child(V_D(step), step)
-    !I_D = Current_Diode(V_D[step], step)
-
-    ! Store the current time
-    !time = step*time_step / time_scale
-  end function Parallel_Capacitor_MNA
+      print *, time_step/C
+      print *, (2.0d0 + time_step/(R*C) - time_step2/(L*C))
+      print *, (1.0d0 + time_step/(R*C))
+    end if
+  end function Parallel_RLC_FD
 
 end module mod_verlet

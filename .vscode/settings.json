@@ -3,5 +3,5 @@
         "/home/kristor/Work/Vacuum-MD/build"
     ],
     "fortran.gfortranExecutable": "gfortran",
-    "python.dataScience.jupyterServerURI": "https://127.0.0.1:8888/"
+    "jupyter.jupyterServerType": "remote"
 }

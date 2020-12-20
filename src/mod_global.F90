@@ -183,8 +183,6 @@ module mod_global
 
   double precision, dimension(:), allocatable :: ramo_current
   double precision, dimension(:, :), allocatable :: ramo_current_emit
-  double precision :: ramo_cur_prev
-  double precision :: ramo_integral
 
   double precision                 :: avg_mob ! Average mobility
   double precision, dimension(1:3) :: avg_vel ! Average speed
@@ -275,7 +273,7 @@ module mod_global
 
   !-----------------------------------------------------------------------------
   ! Nodal Analysis
-  double precision, dimension(1:5) :: V_cur, V_prev ! Voltage and branch currents for the nodal analysis
+  !!double precision, dimension(1:5) :: V_cur, V_prev ! Voltage and branch currents for the nodal analysis
 
   !-----------------------------------------------------------------------------
   ! Other
