@@ -623,31 +623,39 @@ contains
     !double precision, parameter  :: L = 1.0d-7  ! Henry
     !double precision, parameter  :: C = 1.0d-22 ! Farad
 
-    double precision, parameter  :: R = 10.0d0*13.5d0  ! Ohm
-    double precision, parameter  :: L = 500.0d0*1.04d-7  ! Henry
-    double precision, parameter  :: C = 1.0d0/5.0d0*2.54d-14 ! Farad
+    !double precision, parameter  :: R = 10.0d0*13.5d0  ! Ohm
+    !double precision, parameter  :: L = 500.0d0*1.04d-7  ! Henry
+    !double precision, parameter  :: C = 1.0d0/5.0d0*2.54d-14 ! Farad
+
+    double precision, parameter :: R = 13.5d0
+    double precision, parameter :: omega_0 = 2.0d0*pi*3.1d9 ! rad/s [omega_0 = 1/sqrt(LC)]
+    double precision, parameter :: Q = 150.0d0 ! Dimensionless [Q = R*sqrt(C/L)]
     
 
     double precision :: V_next ! Next value of the voltage V(t+Δt)
 
-    V_next = time_step/C * I_cur + V_cur * (2.0d0 + time_step/(R*C) - time_step2/(L*C)) &
-               & - V_prev - time_step/C * I_prev
-    V_next = V_next / (1.0d0 + time_step/(R*C))
+    !V_next = time_step/C * I_cur + V_cur * (2.0d0 + time_step/(R*C) - time_step2/(L*C)) &
+    !           & - V_prev - time_step/C * I_prev
+    !V_next = V_next / (1.0d0 + time_step/(R*C))
+
+    V_next = time_step*R*omega_0/Q * I_cur + V_cur * (2.0d0 + time_step*omega_0/Q - time_step2*omega_0**2) &
+         & - V_prev - time_step*R*omega_0/Q * I_prev
+    V_next = V_next / (1.0d0 + time_step*omega_0/Q)
 
     Parallel_RLC_FD = V_next
 
-    if (step < 2) then
-      print *, 'Parallel_RLC_FD'
-      print *, I_cur
-      print *, I_prev
-      print *, V_cur
-      print *, V_prev
-      print *, time_step
+    ! if (step < 2) then
+    !   print *, 'Parallel_RLC_FD'
+    !   print *, I_cur
+    !   print *, I_prev
+    !   print *, V_cur
+    !   print *, V_prev
+    !   print *, time_step
 
-      print *, time_step/C
-      print *, (2.0d0 + time_step/(R*C) - time_step2/(L*C))
-      print *, (1.0d0 + time_step/(R*C))
-    end if
+    !   print *, time_step/C
+    !   print *, (2.0d0 + time_step/(R*C) - time_step2/(L*C))
+    !   print *, (1.0d0 + time_step/(R*C))
+    ! end if
   end function Parallel_RLC_FD
 
 end module mod_verlet
