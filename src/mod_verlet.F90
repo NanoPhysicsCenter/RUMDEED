@@ -566,7 +566,7 @@ contains
     !I_prev = I_cur
     !I_cur = ramo_cur
 
-    !I = Get_Current(step)
+    !I = Get_Current_Const(step)
     I = sum(ramo_current)
     I_prev = I_cur
     I_cur = I
@@ -576,10 +576,10 @@ contains
     !V_C = 0.0d0
     !V_d = V_s + V_R + V_C
     
-    if (step == 1) then
-      print *, step
-      print *, V_rf
-    end if
+    ! if (step == 1) then
+    !   print *, step
+    !   print *, V_rf
+    ! end if
 
     V_rf_next = Parallel_RLC_FD(step, I_cur, I_prev, V_rf, V_rf_prev)
     V_rf_prev = V_rf
@@ -609,10 +609,10 @@ contains
     Voltage_Resistor = -1.0d0*R_s*ramo_cur
   end function Voltage_Resistor
 
-  double precision function Get_Current(step)
-    integer, intent(in) :: step
-    Get_Current = 10.0E-3 ! Amper
-  end function Get_Current
+  ! double precision function Get_Current_Const(step)
+  !   integer, intent(in) :: step
+  !   Get_Current_Const = 10.0E-3 ! Amper
+  ! end function Get_Current_Const
 
   double precision function Parallel_RLC_FD(step, I_cur, I_prev, V_cur, V_prev)
     integer, intent(in) :: step
@@ -623,9 +623,13 @@ contains
     !double precision, parameter  :: L = 1.0d-7  ! Henry
     !double precision, parameter  :: C = 1.0d-22 ! Farad
 
-    double precision, parameter  :: R = 10.0d0*13.5d0  ! Ohm
-    double precision, parameter  :: L = 500.0d0*1.04d-7  ! Henry
-    double precision, parameter  :: C = 1.0d0/5.0d0*2.54d-14 ! Farad
+    !double precision, parameter  :: R = 10.0d0*13.5d0  ! Ohm
+    !double precision, parameter  :: L = 500.0d0*1.04d-7  ! Henry
+    !double precision, parameter  :: C = 1.0d0/5.0d0*2.54d-14 ! Farad
+
+    double precision, parameter :: R = 103.0d0 ! Ohm
+    double precision, parameter :: L = 1.2d-9  ! Henry
+    double precision, parameter :: C = 5.3d-18 ! Farad
     
 
     double precision :: V_next ! Next value of the voltage V(t+Δt)
@@ -636,18 +640,18 @@ contains
 
     Parallel_RLC_FD = V_next
 
-    if (step < 2) then
-      print *, 'Parallel_RLC_FD'
-      print *, I_cur
-      print *, I_prev
-      print *, V_cur
-      print *, V_prev
-      print *, time_step
+    ! if (step < 2) then
+    !   print *, 'Parallel_RLC_FD'
+    !   print *, I_cur
+    !   print *, I_prev
+    !   print *, V_cur
+    !   print *, V_prev
+    !   print *, time_step
 
-      print *, time_step/C
-      print *, (2.0d0 + time_step/(R*C) - time_step2/(L*C))
-      print *, (1.0d0 + time_step/(R*C))
-    end if
+    !   print *, time_step/C
+    !   print *, (2.0d0 + time_step/(R*C) - time_step2/(L*C))
+    !   print *, (1.0d0 + time_step/(R*C))
+    ! end if
   end function Parallel_RLC_FD
 
 end module mod_verlet
