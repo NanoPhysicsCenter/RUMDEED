@@ -108,7 +108,7 @@ program VacuumMD
   print *, ''
 
   cur_time = 0
-  !!call Set_Voltage(0) ! Set voltage for time step 0
+  call Set_Voltage(0) ! Set voltage for time step 0
 
   do i = 1, steps
 

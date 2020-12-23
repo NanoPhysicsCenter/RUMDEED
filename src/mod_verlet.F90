@@ -10,6 +10,10 @@ Module mod_verlet
   use mod_collisions
   implicit none
 
+  ! RLC
+  double precision :: V_rf = 0.0d0, V_rf_prev = 0.0d0, V_rf_next = 0.0d0
+  double precision :: I_cur = 0.0d0, I_prev = 0.0d0
+
 contains
 
   ! ----------------------------------------------------------------------------
@@ -558,8 +562,6 @@ contains
     integer             :: IFAIL
     !double precision    :: V_R, V_C
     !double precision    :: ramo_cur
-    double precision, save :: V_rf = 0.0d0, V_rf_prev = 0.0d0, V_rf_next = 0.0d0
-    double precision, save :: I_cur = 0.0d0, I_prev = 0.0d0, I = 0.0d0
 
     ! Calculate the total ramo current
     !ramo_cur = sum(ramo_current)
@@ -567,9 +569,8 @@ contains
     !I_cur = ramo_cur
 
     !I = Get_Current_Const(step)
-    I = sum(ramo_current)
     I_prev = I_cur
-    I_cur = I
+    I_cur = sum(ramo_current)
 
     !V_R = Voltage_Resistor()
     !V_C = Voltage_Capacitor()
@@ -581,6 +582,12 @@ contains
     !   print *, V_rf
     ! end if
 
+    if (step == 0) then
+      I_prev = 0.0d0
+      V_rf_prev = 0.0d0
+      V_rf = V_s
+    end if
+    
     V_rf_next = Parallel_RLC_FD(step, I_cur, I_prev, V_rf, V_rf_prev)
     V_rf_prev = V_rf
     V_rf = V_rf_next
@@ -624,9 +631,12 @@ contains
     !double precision, parameter  :: L = 1.0d-7  ! Henry
     !double precision, parameter  :: C = 1.0d-22 ! Farad
 
-    double precision, parameter  :: R = 105.0d0  ! Ohm
-    double precision, parameter  :: L = 5.2d-9  ! Henry
+    double precision, parameter  :: R = 1000.0d0  ! Ohm
+    double precision, parameter  :: L = 1.04d-9  ! Henry
     double precision, parameter  :: C = 5.53d-17 ! Farad
+
+    double precision  :: RC = R*C
+    double precision  :: LC = L*C
 
     !double precision, parameter :: R = 13.5d0
     !double precision, parameter :: omega_0 = 2.0d0*pi*3.1d9 ! rad/s [omega_0 = 1/sqrt(LC)]
@@ -634,9 +644,9 @@ contains
     
     double precision :: V_next ! Next value of the voltage V(t+Δt)
 
-    V_next = time_step/C * I_cur + V_cur * (2.0d0 + time_step/(R*C) - time_step2/(L*C)) &
+    V_next = time_step/C * I_cur + V_cur * (2.0d0 + time_step/RC - time_step2/LC) &
          & - V_prev - time_step/C * I_prev
-    V_next = V_next / (1.0d0 + time_step/(R*C))
+    V_next = V_next / (1.0d0 + time_step/RC)
 
     !V_next = time_step*R*omega_0/Q * I_cur + V_cur * (2.0d0 + time_step*omega_0/Q - time_step2*omega_0**2) &
     !     & - V_prev - time_step*R*omega_0/Q * I_prev
