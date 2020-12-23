@@ -631,12 +631,12 @@ contains
     !double precision, parameter  :: L = 1.0d-7  ! Henry
     !double precision, parameter  :: C = 1.0d-22 ! Farad
 
-    double precision, parameter  :: R = 7500.0d0  ! Ohm
-    double precision, parameter  :: L = 1.04d-9  ! Henry
-    double precision, parameter  :: C = 0.53d-17 ! Farad
+    !double precision, parameter  :: R_p = 7500.0d0  ! Ohm
+    !double precision, parameter  :: L_p = 1.04d-9  ! Henry
+    !double precision, parameter  :: C_p = 0.53d-17 ! Farad
 
-    double precision  :: RC = R*C
-    double precision  :: LC = L*C
+    double precision :: RC
+    double precision :: LC
 
     !double precision, parameter :: R = 13.5d0
     !double precision, parameter :: omega_0 = 2.0d0*pi*3.1d9 ! rad/s [omega_0 = 1/sqrt(LC)]
@@ -644,8 +644,11 @@ contains
     
     double precision :: V_next ! Next value of the voltage V(t+Δt)
 
-    V_next = time_step/C * I_cur + V_cur * (2.0d0 + time_step/RC - time_step2/LC) &
-         & - V_prev - time_step/C * I_prev
+    RC = R_p*C_p
+    LC = L_p*C_p
+
+    V_next = time_step/C_p * I_cur + V_cur * (2.0d0 + time_step/RC - time_step2/LC) &
+         & - V_prev - time_step/C_p * I_prev
     V_next = V_next / (1.0d0 + time_step/RC)
 
     !V_next = time_step*R*omega_0/Q * I_cur + V_cur * (2.0d0 + time_step*omega_0/Q - time_step2*omega_0**2) &

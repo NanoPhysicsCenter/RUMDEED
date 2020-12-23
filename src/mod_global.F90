@@ -146,6 +146,11 @@ module mod_global
 
   double precision :: R_s = 0.0d0 ! Series resistor
 
+  ! Parallel
+  double precision :: R_p = 7500.0d0 ! Ohm, parallel resistor
+  double precision :: L_p = 1.04d-9  ! Henry, parallel inductor
+  double precision :: C_p = 0.53d-17 ! Farad, parallel capacitor
+
 
   ! ----------------------------------------------------------------------------
   ! Define run time variables
@@ -288,7 +293,8 @@ module mod_global
                    nrEmit, emitters_pos, emitters_dim, &
                    emitters_type, emitters_delay, EMISSION_MODE, &
                    image_charge, N_ic_max, collisions, T_temp, P_abs, &
-                   write_ramo_sec, write_position_file, R_s, Num_per
+                   write_ramo_sec, write_position_file, R_s, &
+                   R_p, L_p, C_p, Num_per
 
   ! ----------------------------------------------------------------------------
   ! Prodecure interfaces and pointers
