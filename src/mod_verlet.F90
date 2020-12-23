@@ -631,9 +631,9 @@ contains
     !double precision, parameter  :: L = 1.0d-7  ! Henry
     !double precision, parameter  :: C = 1.0d-22 ! Farad
 
-    double precision, parameter  :: R = 1000.0d0  ! Ohm
+    double precision, parameter  :: R = 7500.0d0  ! Ohm
     double precision, parameter  :: L = 1.04d-9  ! Henry
-    double precision, parameter  :: C = 5.53d-17 ! Farad
+    double precision, parameter  :: C = 0.53d-17 ! Farad
 
     double precision  :: RC = R*C
     double precision  :: LC = L*C

@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 from scipy.constants import m_e, epsilon_0, e
 
 #N = 1000000
-N = 10000
+N = 6000
 
 time_scale = 1.0E-12
 time_step = 0.25*time_scale # Sek
@@ -15,13 +15,13 @@ time_step = 0.25*time_scale # Sek
 time_step2 = time_step**2
 
 A = (100.0E-9)**2
-V_s = 1.0
+V_s = 0.25
 d = 1000.0E-9
 
 L = 1.04E-9 # Henry
 C = 5.52E-17 # Farad
 #C = epsilon_0*A/d
-R = 1000.0
+R = 5000.0
 #R = 0.5*np.sqrt(L/C)*1.5 # Ohm
 #R = 2000.0
 
@@ -87,15 +87,16 @@ def V_next(I_cur, I_prev, V_cur, V_prev):
 
     return V_n
 
-def Child_Lang_Current(V_):
-    return A*4*epsilon_0/9*np.sqrt(2*e/m_e)*V_**(3/2)/d**2
+def Child_Lang_Current(V_cur, V_prev):
+    I_cl_cur = A*4*epsilon_0/9*np.sqrt(2*e/m_e)*V_cur**(3/2)/d**2
+    return I_cl_cur
 
-def I_next(t, V_cur):
+def I_next(t, V_cur, V_prev):
     #I_n = 10.0E-3 # Amper
     if (V_cur <= 0):
         I_n = 0.0
     else:
-        I_n = Child_Lang_Current(V_cur)
+        I_n = Child_Lang_Current(V_cur, V_prev)
     #I_n = 10.0E-3*np.sin(2*np.pi/(T)*t)
     #I_n = 0.0
     return I_n
@@ -108,9 +109,10 @@ I_prev = 0.0
 for k in range(N):
     t = k*time_step
 
-    I = I_next(t, V_cur+V_s)
+    I = I_next(t, V_cur+V_s, V_prev+V_s)
     I_prev = I_cur
-    I_cur = I
+    #I_cur = I
+    I_cur = 0.75*I_prev + 0.25*I
 
     V = V_next(I_cur, I_prev, V_cur, V_prev)
     #print(V)
