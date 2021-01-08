@@ -627,11 +627,11 @@ contains
     double precision, intent(in) :: V_cur, V_prev ! Current V(t) and previous V(t-Δt) values of the voltage
     double precision, intent(in) :: I_cur, I_prev ! Current I(t) and previous I(t-Δt) values of the current
 
-    !double precision, parameter  :: R = 2.0d0  ! Ohm
+    !double precision, parameter  :: R = 2.0d0   ! Ohm
     !double precision, parameter  :: L = 1.0d-7  ! Henry
     !double precision, parameter  :: C = 1.0d-22 ! Farad
 
-    !double precision, parameter  :: R_p = 7500.0d0  ! Ohm
+    !double precision, parameter  :: R_p = 7500.0d0 ! Ohm
     !double precision, parameter  :: L_p = 1.04d-9  ! Henry
     !double precision, parameter  :: C_p = 0.53d-17 ! Farad
 
