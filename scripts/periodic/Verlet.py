@@ -19,7 +19,7 @@ mu_0 = 4.0*pi * 1.0E-7 # Vacuum permeability (H/m)
 epsilon_0 = 1.0/(mu_0 * c**2) # Vacuum permittivity (F/m)
 
 # Numerical parameters
-steps = 250
+steps = 10
 maxElec = 1000
 nrElec = 0
 nrRemove = 0
@@ -46,7 +46,7 @@ particles_mask        = np.zeros(maxElec*3, dtype=bool)
 #dt = np.dtype([('x', np.float64), ('y', np.float64), ('z', np.float64), ('step', np.int32), ('species', np.int32)])
 #data = np.memmap(filename, dtype=dt, mode='r', order='F')
 
-plot_data = False
+plot_data = True
 
 if (plot_data == True):
     fig = plt.figure()
@@ -61,11 +61,19 @@ def Do_Emission(step):
     y_0 = -70.4*length_scale
     z_0 = 36.2*length_scale
 
-    for i in range(-num_per, num_per+1):
-        for j in range(-num_per, num_per+1):
-            particles_cur_pos[0, nrElec] = x_0 + i*num_per
-            particles_cur_pos[1, nrElec] = y_0 + j*num_per
-            particles_cur_pos[2, nrElec] = z_0
+    if (step == 1):
+        for i in range(-num_per, num_per+1):
+            for j in range(-num_per, num_per+1):
+                if ((i == 0) and (j == 0)):
+                    print('Electron in unit box is number {}'.format(nrElec))
+                x = x_0 + i*num_per*L
+                y = y_0 + j*num_per*L
+                z = z_0
+                particles_cur_pos[0, nrElec] = x
+                particles_cur_pos[1, nrElec] = y
+                particles_cur_pos[2, nrElec] = z
+                nrElec = nrElec+1
+                print('Added electron at x = {}, y = {}, z = {}, number = {}'.format(x/length_scale, y/length_scale, z/length_scale, nrElec))
 
 
     # for (x, y, z, emit_step, species) in data:
@@ -265,8 +273,8 @@ def Plot_Particles(step):
 
     if (plot_data == True):
         ax.cla()
-        ax.set_xlim3d(-50.0, 50.0)
-        ax.set_ylim3d(-50.0, 50.0)
+        ax.set_xlim3d(-350.0, 350.0)
+        ax.set_ylim3d(-350.0, 350.0)
         ax.set_zlim3d(0.0, 1000.0)
         ax.view_init(elev=0.0, azim=0.0)
         ax.scatter(particles_cur_pos[0, 0:nrElec]/length_scale, particles_cur_pos[1, 0:nrElec]/length_scale, particles_cur_pos[2, 0:nrElec]/length_scale, marker='o', c='blue')
