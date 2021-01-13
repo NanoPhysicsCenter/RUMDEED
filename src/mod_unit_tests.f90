@@ -68,30 +68,58 @@ subroutine Do_Unit_Test_Emission(step)
   double precision                 :: cur_time, x, y, z
   integer                          :: ud_file
   double precision, dimension(1:3) :: par_pos, par_vel
+  double precision                 :: x_0, y_0, z_0
+  double precision                 :: x_1, y_1, z_1
 
   nrElecEmitAll = 0
   nrEmitted_emitters = 0
 
-  open(newunit=ud_file, iostat=IFAIL, file='Unit_Test_1.bin', status='OLD', action='READ', access='STREAM')
+  ! open(newunit=ud_file, iostat=IFAIL, file='Unit_Test_1.bin', status='OLD', action='READ', access='STREAM')
 
-  do
-    read(unit=ud_file, iostat=IFAIL) x, y, z, emit_step, species
-    if (IFAIL == 0) then
-      if (emit_step == step) then
-        par_pos(1) = x
-        par_pos(2) = y
-        par_pos(3) = z
-        par_vel = 0.0d0
+  ! do
+  !   read(unit=ud_file, iostat=IFAIL) x, y, z, emit_step, species
+  !   if (IFAIL == 0) then
+  !     if (emit_step == step) then
+  !       par_pos(1) = x
+  !       par_pos(2) = y
+  !       par_pos(3) = z
+  !       par_vel = 0.0d0
 
-        ! Add a particle to the system
-        call Add_Particle(par_pos, par_vel, species, step, 1, -1, 1)
-      end if
-    else
-      exit
-    end if
-  end do
+  !       ! Add a particle to the system
+  !       call Add_Particle(par_pos, par_vel, species, step, 1, -1, 1)
+  !     end if
+  !   else
+  !     exit
+  !   end if
+  ! end do
 
-  close(unit=ud_file, status='keep')
+  ! close(unit=ud_file, status='keep')
+
+  ! P1
+  x_0 = 5.5d0*length_scale
+  y_0 = -70.4d0*length_scale
+  z_0 = 36.2d0*length_scale
+
+  par_pos(1) = x_0
+  par_pos(2) = y_0
+  par_pos(3) = z_0
+  par_vel = 0.0d0
+  species = species_elec
+
+  call Add_Particle(par_pos, par_vel, species, step, 1, -1, 1)
+
+  ! P2
+  x_1 = -33.4d0*length_scale
+  y_1 = 4.0d0*length_scale
+  z_1 = 45.3d0*length_scale
+
+  par_pos(1) = x_1
+  par_pos(2) = y_1
+  par_pos(3) = z_1
+  par_vel = 0.0d0
+  species = species_elec
+
+  call Add_Particle(par_pos, par_vel, species, step, 1, -1, 1)
 
   cur_time = time_step * step / time_scale ! Scaled in units of time_scale
   write (ud_emit, "(E14.6, *(tr8, i6))", iostat=IFAIL) cur_time, step, nrElecEmitAll, nrElec, &

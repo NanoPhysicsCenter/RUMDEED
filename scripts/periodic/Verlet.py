@@ -61,6 +61,10 @@ def Do_Emission(step):
     y_0 = -70.4*length_scale
     z_0 = 36.2*length_scale
 
+    x_1 = -33.4*length_scale
+    y_1 = 4.0*length_scale
+    z_1 = 45.3*length_scale
+
     if (step == 1):
         for i in range(-num_per, num_per+1):
             for j in range(-num_per, num_per+1):
@@ -69,6 +73,20 @@ def Do_Emission(step):
                 x = x_0 + i*num_per*L
                 y = y_0 + j*num_per*L
                 z = z_0
+                particles_cur_pos[0, nrElec] = x
+                particles_cur_pos[1, nrElec] = y
+                particles_cur_pos[2, nrElec] = z
+                nrElec = nrElec+1
+                print('Added electron at x = {}, y = {}, z = {}, number = {}'.format(x/length_scale, y/length_scale, z/length_scale, nrElec))
+        
+        print('')
+        for i in range(-num_per, num_per+1):
+            for j in range(-num_per, num_per+1):
+                if ((i == 0) and (j == 0)):
+                    print('Electron in unit box is number {}'.format(nrElec))
+                x = x_1 + i*num_per*L
+                y = y_1 + j*num_per*L
+                z = z_1
                 particles_cur_pos[0, nrElec] = x
                 particles_cur_pos[1, nrElec] = y
                 particles_cur_pos[2, nrElec] = z
@@ -183,6 +201,13 @@ def Calculate_Acceleration(step):
             if (j >= nrElec): # Check if this is an image charge, they have +q
                 force_c = (-1.0)*force_c # Flip the sign if image charge
 
+            if (j < nrElec):
+                print('i = {}, j = {}'.format(i, j))
+                print(force_c/m_0)
+                print(pos_1/length_scale)
+                print(pos_2/length_scale)
+                print('')
+
             particles_cur_accel[:, i] = particles_cur_accel[:, i] + force_c/m_0
             if (np.any(np.isinf(particles_cur_accel[:,i])) == True):
                 print('INF')
@@ -206,6 +231,17 @@ def Calculate_Acceleration(step):
                 print(force_c/m_0)
                 print('')
                 input()
+
+    print('Accel')
+    print(particles_cur_accel[:, 4])
+    print(particles_cur_accel[:, 13])
+    print('')
+    print('Pos')
+    print(particles_cur_pos[:, 4]/length_scale)
+    print(particles_cur_pos[:, 13]/length_scale)
+    print('Done')
+    print(nrElec)
+    input()
 
     return None
 

@@ -231,7 +231,7 @@ module mod_global
   ! Periodic boundary conditions
   ! Num_per = 0, means don't use periodic boundary conditions
   double precision, parameter :: per_padding = 0.0d0 ! Padding between periodic systems
-  integer                     :: Num_per = 0 
+  integer                     :: Num_per = 1
 
   ! ----------------------------------------------------------------------------
   ! Define constants

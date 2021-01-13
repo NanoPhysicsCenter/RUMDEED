@@ -141,7 +141,6 @@ contains
   ! ----------------------------------------------------------------------------
   ! Checks the boundary conditions of the box.
   ! Check which particles to remove
-  ! Enforce periodic boundary conditions (ToDo, Edwald sum in slab?)
   subroutine Check_Boundary_ElecHole_Planar(i)
     integer, intent(in) :: i
     double precision    :: z
@@ -157,6 +156,28 @@ contains
 
   end subroutine Check_Boundary_ElecHole_Planar
 
+
+    ! ----------------------------------------------------------------------------
+  ! Checks the boundary conditions of the box.
+  ! Check which particles to remove
+  ! Enforce periodic boundary conditions
+  subroutine Check_Boundary_ElecHole_Periodic(i)
+    integer, intent(in) :: i
+    double precision    :: z
+
+    z = particles_cur_pos(3, i)
+
+    ! Check if the particle should be removed from the system
+    if (z < 0.0d0) then
+        call Mark_Particles_Remove(i, remove_bot)
+    else if (z > box_dim(3)) then
+        call Mark_Particles_Remove(i, remove_top)
+    end if
+
+    ! Do periodic boundary conditions
+    
+
+  end subroutine Check_Boundary_ElecHole_Periodic
 
   ! ----------------------------------------------------------------------------
   ! Update the velocity in the verlet integration
@@ -246,7 +267,7 @@ contains
       ! Loop over particles from i+1 to nrElec.
       ! There is no need to loop over all particles since
       ! The forces are equal but in opposite directions
-      do j = i, nrPart
+      do j = 1, nrPart
         ! Information about the particle that is acting on the particle at pos_1
         pos_2 = particles_cur_pos(:, j)
         !if (particles_mass(j) == 0.0d0) then
@@ -334,10 +355,16 @@ contains
             if (j /= i) then ! Do not double count!!!
               particles_cur_accel(:, j) = particles_cur_accel(:, j) - force_c * im_2 + force_ic_N * im_2
             end if
-            particles_cur_accel(:, i) = particles_cur_accel(:, i) + force_c * im_1 !+ force_ic     * im_1
+            !particles_cur_accel(:, i) = particles_cur_accel(:, i) + force_c * im_1 !+ force_ic     * im_1
             !!!$OMP END CRITICAL(ACCEL_UPDATE)
 
             !print *, ''
+
+            print *, 'u = ', u, ', v = ', v
+            print *, force_c*im_2
+            print *, pos_1/length_scale
+            print *, pos_2_per/length_scale
+            print *, ''
           end do
         end do
       end do
@@ -347,6 +374,15 @@ contains
       !!!$OMP END CRITICAL(ACCEL_UPDATE)
     end do
     !$OMP END PARALLEL DO
+
+    print *, 'Accel'
+    print *, particles_cur_accel(:, 1:nrPart)
+    print *, ''
+    print *, 'Pos'
+    print *, particles_cur_pos(:, 1:nrPart)/length_scale
+    print *, 'Done'
+    print *, nrPart
+    stop
   end subroutine Calculate_Acceleration_Particles
 
   subroutine Write_Acceleration_Test(step)
@@ -560,48 +596,52 @@ contains
   subroutine Set_Voltage(step)
     integer, intent(in) :: step
     integer             :: IFAIL
-    !double precision    :: V_R, V_C
-    !double precision    :: ramo_cur
+    ! !double precision    :: V_R, V_C
+    ! !double precision    :: ramo_cur
 
-    ! Calculate the total ramo current
-    !ramo_cur = sum(ramo_current)
-    !I_prev = I_cur
-    !I_cur = ramo_cur
+    ! ! Calculate the total ramo current
+    ! !ramo_cur = sum(ramo_current)
+    ! !I_prev = I_cur
+    ! !I_cur = ramo_cur
 
-    !I = Get_Current_Const(step)
-    I_prev = I_cur
-    I_cur = sum(ramo_current)
+    ! !I = Get_Current_Const(step)
+    ! I_prev = I_cur
+    ! I_cur = sum(ramo_current)
 
-    !V_R = Voltage_Resistor()
-    !V_C = Voltage_Capacitor()
-    !V_C = 0.0d0
-    !V_d = V_s + V_R + V_C
+    ! !V_R = Voltage_Resistor()
+    ! !V_C = Voltage_Capacitor()
+    ! !V_C = 0.0d0
+    ! !V_d = V_s + V_R + V_C
     
-    ! if (step == 1) then
-    !   print *, step
-    !   print *, V_rf
+    ! ! if (step == 1) then
+    ! !   print *, step
+    ! !   print *, V_rf
+    ! ! end if
+
+    ! if (step == 0) then
+    !   I_prev = 0.0d0
+    !   V_rf_prev = 0.0d0
+    !   V_rf = V_s
     ! end if
-
-    if (step == 0) then
-      I_prev = 0.0d0
-      V_rf_prev = 0.0d0
-      V_rf = V_s
-    end if
     
-    V_rf_next = Parallel_RLC_FD(step, I_cur, I_prev, V_rf, V_rf_prev)
-    V_rf_prev = V_rf
-    V_rf = V_rf_next
+    ! V_rf_next = Parallel_RLC_FD(step, I_cur, I_prev, V_rf, V_rf_prev)
+    ! V_rf_prev = V_rf
+    ! V_rf = V_rf_next
 
-    V_d = V_s + V_rf ! DC voltage + RF voltage
-    !V_d = V_s
+    ! V_d = V_s + V_rf ! DC voltage + RF voltage
+    ! !V_d = V_s
 
-    !V_C = Voltage_Parallel_Capacitor(step)
-    !V_d = V_C
+    ! !V_C = Voltage_Parallel_Capacitor(step)
+    ! !V_d = V_C
 
-    !V_d = V_s
+    ! !V_d = V_s
 
+    ! E_z = -1.0d0*V_d/d
+    ! !E_zunit = -1.0d0*sign(1.0d0, V)/d
+
+    V_d = V_s
+    V_rf = 0.0d0
     E_z = -1.0d0*V_d/d
-    !E_zunit = -1.0d0*sign(1.0d0, V)/d
 
     write (ud_volt, "(ES12.4, tr2, i8, tr2, ES18.8, tr2, ES18.8)", iostat=IFAIL) &
           & cur_time, step, V_d, V_rf
