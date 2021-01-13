@@ -163,8 +163,10 @@ contains
   ! Enforce periodic boundary conditions
   subroutine Check_Boundary_ElecHole_Periodic(i)
     integer, intent(in) :: i
-    double precision    :: z
+    double precision    :: x, y, z
 
+    x = particles_cur_pos(1, i)
+    y = particles_cur_pos(2, i)
     z = particles_cur_pos(3, i)
 
     ! Check if the particle should be removed from the system
@@ -175,7 +177,8 @@ contains
     end if
 
     ! Do periodic boundary conditions
-    
+    particles_cur_pos(1, i) = modulo(x, box_dim(1))
+    particles_cur_pos(1, i) = modulo(y, box_dim(2))
 
   end subroutine Check_Boundary_ElecHole_Periodic
 
