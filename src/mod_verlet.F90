@@ -363,11 +363,16 @@ contains
 
             !print *, ''
 
-            print *, 'u = ', u, ', v = ', v
-            print *, force_c*im_2
-            print *, pos_1/length_scale
-            print *, pos_2_per/length_scale
-            print *, ''
+            ! if ((isnan(force_c(1)*im_2) .eqv. .true.) &
+            !    & .or. (isnan(force_c(2)*im_2) .eqv. .true.) &
+            !    & .or. (isnan(force_c(3)*im_2) .eqv. .true.)) then
+            !   print *, 'u = ', u, ', v = ', v
+            !   print *, force_c*im_2
+            !   print *, pos_1/length_scale
+            !   print *, pos_2_per/length_scale
+            !   print *, ''
+            !   pause
+            ! end if
           end do
         end do
       end do
@@ -378,14 +383,14 @@ contains
     end do
     !$OMP END PARALLEL DO
 
-    print *, 'Accel'
-    print *, particles_cur_accel(:, 1:nrPart)
-    print *, ''
-    print *, 'Pos'
-    print *, particles_cur_pos(:, 1:nrPart)/length_scale
-    print *, 'Done'
-    print *, nrPart
-    stop
+    !print *, 'Accel'
+    !print *, particles_cur_accel(:, 1:nrPart)
+    !print *, ''
+    !print *, 'Pos'
+    !print *, particles_cur_pos(:, 1:nrPart)/length_scale
+    !print *, 'Done'
+    !print *, nrPart
+    !stop
   end subroutine Calculate_Acceleration_Particles
 
   subroutine Write_Acceleration_Test(step)

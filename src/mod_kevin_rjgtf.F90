@@ -79,6 +79,9 @@ double precision function ThetaE(Phi,Chem,Field,E)
                     & Field, E, vy, ty, y, phix
 
   y = sqrt(4*Qo*Field)/Phi
+  if (y > 1.0d0) then
+    print *, 'Error: y > 1.0'
+  end if
   phix = Phi - sqrt(4*Qo*Field)
   vy = 1.0 - (3.0d0 - log(y))*(y**2)/3
   ty = 1.0 + (1.0d0 - log(y))*(y**2)/9
