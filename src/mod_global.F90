@@ -181,9 +181,10 @@ module mod_global
 
   ! ----------------------------------------------------------------------------
   ! Emitter types
-  integer, parameter :: EMIT_UNKNOWN   = 0
-  integer, parameter :: EMIT_CIRCLE    = 1
-  integer, parameter :: EMIT_RECTANGLE = 2
+  integer, parameter :: EMIT_UNKNOWN         = 0
+  integer, parameter :: EMIT_CIRCLE          = 1
+  integer, parameter :: EMIT_RECTANGLE       = 2
+  integer, parameter :: EMIT_RECTANGLE_SPOTS = 3
 
 
   double precision, dimension(:), allocatable :: ramo_current
