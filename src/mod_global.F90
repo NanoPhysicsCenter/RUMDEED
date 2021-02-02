@@ -210,7 +210,7 @@ module mod_global
   integer, parameter :: EMISSION_FIELD_2D_DIRAC_NC = 8 ! Field emission from 2D material
   integer, parameter :: EMISSION_FIELD_THERMO      = 9 ! Planar Field + Thermionic emission
   integer, parameter :: EMISSION_MANUAL            = 999 ! Manual placement of electrons for testing/debuging
-  integer, parameter :: EMISSION_TEST              = 99 ! Development emission
+  integer, parameter :: EMISSION_FIELD_V2          = 10 ! Development emission
 
   integer            :: EMISSION_MODE           ! Parameter that defines the emission mode
 

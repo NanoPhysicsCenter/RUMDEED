@@ -80,8 +80,8 @@ program VacuumMD
   case(EMISSION_FIELD_THERMO)
     print '(a)', 'Vacuum: Doing General Field+Thermionic emission'
     call Init_Field_Thermo_Emission()
-  case(EMISSION_TEST)
-    print '(a)', 'Vacuum: Doing Field emission DEV V2'
+  case(EMISSION_FIELD_V2)
+    print '(a)', 'Vacuum: Doing Field emission V2'
     call Init_Field_Emission_v2()
   case(EMISSION_MANUAL)
     print '(a)', 'Vacuum: Doing manual emission'
@@ -196,7 +196,7 @@ program VacuumMD
     !call Clean_Up_Thermionic_Emission()
   case(EMISSION_FIELD_THERMO)
     call Clean_Up_Field_Thermo_Emission()
-  case(EMISSION_TEST)
+  case(EMISSION_FIELD_V2)
     call Clean_Up_Field_Emission_v2()
   case(EMISSION_MANUAL)
     call Clean_Up_Manual()
