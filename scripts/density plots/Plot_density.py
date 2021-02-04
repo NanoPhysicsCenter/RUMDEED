@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 # Path to the folder with the density_emit.bin and density_absorb_top.bin files
-filepath = '.'
+filepath = './out/'
 
 # Full path with filename
 filename_emit = path.join(filepath, 'density_emit.bin') # density_emit.bin
@@ -30,7 +30,7 @@ dt_layout_abs = [('x', np.float64), \
                  ('sec', np.int32)]
 
 data_mem_emit = np.memmap(filename_emit, dtype=dt_layout_emit, mode='r', order='F')
-#data_mem_abs = np.memmap(filename_abs, dtype=dt_layout_abs, mode='r', order='F')
+data_mem_abs = np.memmap(filename_abs, dtype=dt_layout_abs, mode='r', order='F')
 
 # Read the data from the files
 df_density_emit = pd.DataFrame.from_records(data=data_mem_emit, columns=data_mem_emit.dtype.names)
@@ -42,13 +42,16 @@ g = g.plot_joint(sns.scatterplot)
 g = g.plot_joint(sns.kdeplot, cmap="Blues_d", alpha=0.75)
 g = g.plot_marginals(sns.kdeplot, shade=True)
 g.set_axis_labels('x [nm]', "y [nm]")
+g.fig.suptitle("Emission")
 plt.show()
 
-sns.jointplot(x=df_density_emit['x'], y=df_density_emit['y'], kind='hex')
+g = sns.jointplot(x=df_density_emit['x'], y=df_density_emit['y'], kind='hex')
+g.fig.suptitle("Emission")
 plt.show()
 
-h = sns.jointplot(x=df_density_emit['x'], y=df_density_emit['y'], kind='kde')
-h.set_axis_labels('x [nm]', 'y [nm]')
+g = sns.jointplot(x=df_density_emit['x'], y=df_density_emit['y'], kind='kde')
+g.set_axis_labels('x [nm]', 'y [nm]')
+g.fig.suptitle("Emission")
 plt.show()
 
 # Plot absorption data
@@ -57,11 +60,14 @@ g = g.plot_joint(sns.scatterplot)
 g = g.plot_joint(sns.kdeplot, cmap="Blues_d", alpha=0.75)
 g = g.plot_marginals(sns.kdeplot, shade=True)
 g.set_axis_labels('x [nm]', "y [nm]")
+g.fig.suptitle("Absorption")
 plt.show()
 
-sns.jointplot(x=df_density_abs['x'], y=df_density_abs['y'], kind='hex')
+g = sns.jointplot(x=df_density_abs['x'], y=df_density_abs['y'], kind='hex')
+g.fig.suptitle("Absorption")
 plt.show()
 
-h = sns.jointplot(x=df_density_abs['x'], y=df_density_abs['y'], kind='kde')
-h.set_axis_labels('x [nm]', 'y [nm]')
+g = sns.jointplot(x=df_density_abs['x'], y=df_density_abs['y'], kind='kde')
+g.set_axis_labels('x [nm]', 'y [nm]')
+g.fig.suptitle("Absorption")
 plt.show()

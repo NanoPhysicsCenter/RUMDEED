@@ -55,7 +55,7 @@ contains
     !$OMP& PRIVATE(old_vel, ion_life_time) &
     !$OMP& SHARED(nrPart, particles_species, particles_life, step, particles_cur_pos) &
     !$OMP& SHARED(particles_prev_pos, particles_cur_vel, time_step, n_d) &
-    !$OMP& REDUCTION(+:nrColl, count_n, mean_path_avg, nrIon) SCHEDULE(GUIDED, CHUNK_SIZE)
+    !$OMP& REDUCTION(+:nrColl, count_n, mean_path_avg, nrIon)
     do i = 1, nrPart
       if (particles_species(i) /= species_elec) then
         if (step >= particles_life(i)) then
@@ -165,9 +165,10 @@ contains
               ! Calculate the life time of the Ion
               ! This number is drawn from an exponential distribution
               ! The half life is 0.13843690559395497 ps
-              alpha = -0.13843690559395497E-12 / time_step
-              call random_number(rnd)
-              ion_life_time = NINT(alpha*log(1.0d0 - rnd))
+              !alpha = -0.13843690559395497E-12 / time_step
+              !call random_number(rnd)
+              !ion_life_time = NINT(alpha*log(1.0d0 - rnd))
+              ion_life_time = 1000000
 
               !$OMP CRITICAL
               ! Add the new positively charged ion to the system

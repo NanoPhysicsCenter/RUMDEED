@@ -7,7 +7,7 @@
   NREMIT = 1,
   IMAGE_CHARGE = .True.,
   N_IC_MAX = 1,
-  COLLISIONS = .True.,
+  COLLISIONS = .False.,
   T_temp = 293.15d0,
   P_abs = 1.0d0,
 

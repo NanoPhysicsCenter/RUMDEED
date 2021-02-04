@@ -86,8 +86,7 @@ contains
 
     !$OMP PARALLEL DO PRIVATE(i) &
     !$OMP& SHARED(particles_prev_pos, particles_cur_pos, particles_cur_vel, particles_cur_accel) &
-    !$OMP& SHARED(time_step, time_step2, particles_prev2_accel, particles_prev_accel) &
-    !$OMP& SCHEDULE(GUIDED, CHUNK_SIZE)
+    !$OMP& SHARED(time_step, time_step2, particles_prev2_accel, particles_prev_accel)
     do i = 1, nrPart
       ! Verlet
       !particles_prev_pos(:, i) = particles_cur_pos(:, i) ! Store the previous position
@@ -195,7 +194,7 @@ contains
     !$OMP& SHARED(nrPart, particles_cur_vel, particles_prev_accel, particles_cur_accel, time_step) &
     !$OMP& SHARED(ramo_current, ramo_current_emit, E_zunit, particles_section, particles_charge) &
     !$OMP& SHARED(particles_species, particles_emitter, particles_prev2_accel) &
-    !$OMP& REDUCTION(+:avg_vel) SCHEDULE(GUIDED, CHUNK_SIZE)
+    !$OMP& REDUCTION(+:avg_vel)
     do i = 1, nrPart
       ! Verlet
       !particles_cur_vel(:, i) = particles_cur_vel(:, i) &
@@ -451,7 +450,7 @@ contains
 
     !$OMP PARALLEL DO DEFAULT(NONE) PRIVATE(j, pos_2, pos_2_per, diff, r, force_c, force_ic, q_2, pre_fac_c) &
     !$OMP& SHARED(nrPart, particles_cur_pos, particles_charge, ptr_Image_Charge_effect, pos_1, Num_per, box_dim) &
-    !$OMP& REDUCTION(+:force_tot) SCHEDULE(GUIDED, CHUNK_SIZE)
+    !$OMP& REDUCTION(+:force_tot)
     do j = 1, nrPart
 
       ! Position of the particle that is acting on the particle at pos_1
