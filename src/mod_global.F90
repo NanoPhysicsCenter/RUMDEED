@@ -239,6 +239,12 @@ module mod_global
   ! The constant in front of Coulomb's law, often called k
   double precision, parameter :: div_fac_c = 1.0d0/(4.0d0*pi*epsilon_0*epsilon_r) ! 1/(4*pi*epsilon_0*epsilon_r)
 
+  ! ----------------------------------------------------------------------------
+  ! Planes where to record information about particles when they pass through
+  integer, parameter                          :: planes_N = 6
+  double precision, dimension(1:planes_N), parameter :: planes_z = (/ 5.0d0, 10.0d0, 25.0d0, 50.0d0, 100.0d0, 500.0d0 /)
+  integer, dimension(1:planes_N)                     :: planes_ud
+
 
   ! ----------------------------------------------------------------------------
   ! Parameters for random number generators

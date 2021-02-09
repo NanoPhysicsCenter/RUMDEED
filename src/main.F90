@@ -317,6 +317,7 @@ contains
   ! allocate and initilize variables, open data files for writing, etc.
   subroutine Init()
     integer :: IFAIL
+    character(len=128)  :: filename
     !integer, dimension(:), allocatable :: my_seed
 
     ! Allocate arrays
@@ -534,6 +535,21 @@ contains
       stop
     end if
 
+    !-------------------------------------------------------------------------------------
+    ! Files for planes
+    do i = 1, planes_N
+      if (planes_z(i) > 0.0d0) then
+        write(filename, '(a11, i0, a3)') 'out/planes-', i, '.dt'
+        open(newunit=planes_ud(i), iostat=IFAIL, file=filename, status='REPLACE', action='WRITE', access='STREAM')
+        if (IFAIL /= 0) then
+          print *, 'Vacuum: Failed to open file for planes. ABORTING'
+          stop
+        end if
+      else
+        planes_ud(i) = -1
+      end if
+    end do
+
   end subroutine Init
 
   !---------------------------------------------------------------------------------------
@@ -700,6 +716,7 @@ contains
   ! Clean up after the program
   ! Deallocate variables, close files, etc.
   subroutine Clean_up()
+    integer :: i
 
     ! Close file descriptors
     close(unit=ud_pos, status='keep')
@@ -720,6 +737,10 @@ contains
     close(unit=ud_density_ion, status='keep')
     close(unit=ud_density_absorb_top, status='keep')
     close(unit=ud_density_absorb_bot, status='keep')
+
+    do i = 1, planes_N
+      close(unit=planes_ud(i), status='keep')
+    end do
 
     ! Deallocate arrays
     deallocate(particles_cur_pos)

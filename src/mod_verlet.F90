@@ -104,6 +104,9 @@ contains
 
       ! Mark particles that should be removed with .false. in the mask array
       call ptr_Check_Boundary(i)
+
+      ! Record information about particles when to pass trough certain planes
+      call Check_Planes(i)
     end do
     !$OMP END PARALLEL DO
   end subroutine Update_ElecHole_Position
@@ -155,8 +158,33 @@ contains
 
   end subroutine Check_Boundary_ElecHole_Planar
 
+  ! ----------------------------------------------------------------------------
+  ! Check planes where to record information
+  !
+  subroutine Check_Planes(i)
+    integer, intent(in) :: i ! particle to check
+    integer             :: k ! loop index
+    double precision    :: z, z_cur, z_prev
 
-    ! ----------------------------------------------------------------------------
+    do k = 1, planes_N
+      z = planes_z(k)
+      if (z > 0.0d0) then ! A value of less then 0 means don't use this plane
+        z_cur = particles_cur_pos(3, i) ! Particle current position
+        z_prev = particles_prev_pos(3, i) ! Particle previous position
+
+        ! If current position is above the plane and previous is below then the particles passed trough the plane in this time step
+        if ((z_cur > z) .and. (z_prev < z)) then
+          ! Record information about this particle
+          write(unit=planes_ud(k)) particles_cur_pos(1, i)/length_scale, particles_cur_pos(2, i)/length_scale, &
+                                          & particles_cur_vel(1, i), particles_cur_vel(2, i), particles_cur_vel(3, i), &
+                                          & particles_emitter(i), particles_section(i)
+        end if
+      end if
+    end do
+  end subroutine Check_Planes
+
+
+  ! ----------------------------------------------------------------------------
   ! Checks the boundary conditions of the box.
   ! Check which particles to remove
   ! Enforce periodic boundary conditions
