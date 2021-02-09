@@ -241,8 +241,9 @@ module mod_global
 
   ! ----------------------------------------------------------------------------
   ! Planes where to record information about particles when they pass through
-  integer, parameter                          :: planes_N = 6
-  double precision, dimension(1:planes_N), parameter :: planes_z = (/ 5.0d0, 10.0d0, 25.0d0, 50.0d0, 100.0d0, 500.0d0 /)
+  integer, parameter                                 :: planes_N = 6
+  double precision, dimension(1:planes_N), parameter :: planes_z = &
+                    & (/ 5.0d0, 10.0d0, 25.0d0, 50.0d0, 100.0d0, 500.0d0 /) * length_scale
   integer, dimension(1:planes_N)                     :: planes_ud
 
 
