@@ -272,6 +272,7 @@ module mod_global
   integer :: ud_coll ! Collisions
   integer :: ud_integrand ! Information about the surface integration
   integer :: ud_mh ! Information about MH
+  integer :: ud_gauss
 
   ! unit descriptors for data files (binary files)
   integer :: ud_ramo_sec ! File for the ramo current broken down into emitters and sections

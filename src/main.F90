@@ -12,7 +12,7 @@ program VacuumMD
   use mod_photo_emission
   use mod_field_emission
   use mod_field_emission_v2
-  use mod_field_emission_tip
+  use mod_emission_tip
   use mod_field_emission_2D
   use mod_field_thermo_emission
   !use mod_therminoic_emission
@@ -70,7 +70,7 @@ program VacuumMD
     call Init_Field_Emission()
   case(EMISSION_FIELD_TIP)
     print '(a)', 'Vacuum: Doing Field emission from a tip'
-    call Init_Field_Emission_Tip()
+    call Init_Emission_Tip()
   case(EMISSION_FIELD_2D_2DEG_C, EMISSION_FIELD_2D_2DEG_NC, EMISSION_FIELD_2D_DIRAC_C, EMISSION_FIELD_2D_DIRAC_NC)
     print '(a)', 'Vacuum: Doing Field emission from 2D material'
     call Init_Field_Emission_2D()
@@ -189,7 +189,7 @@ program VacuumMD
   case(EMISSION_FIELD)
     call Clean_Up_Field_Emission()
   case(EMISSION_FIELD_TIP)
-    call Clean_Up_Field_Emission_Tip()
+    call Clean_Up_Emission_Tip()
   case(EMISSION_FIELD_2D_2DEG_C, EMISSION_FIELD_2D_2DEG_NC, EMISSION_FIELD_2D_DIRAC_C, EMISSION_FIELD_2D_DIRAC_NC)
     call Clean_Up_Field_Emission_2D()
   !case(EMISSION_THERMIONIC)
@@ -493,6 +493,12 @@ contains
     open(newunit=ud_integrand, iostat=IFAIL, file='out/integration.dt', status='replace', action='write')
     if (IFAIL /= 0) then
       print '(a)', 'Vacuum: ERROR UNABLE TO OPEN file integration.dt'
+      stop
+    end if
+
+    open(newunit=ud_gauss, iostat=IFAIL, file='out/gauss.dt', status='replace', action='write')
+    if (IFAIL /= 0) then
+      print '(a)', 'Vacuum: ERROR UNABLE TO OPEN file gauss.dt'
       stop
     end if
 

@@ -4,7 +4,7 @@
 ! 04.06.18                                  !
 !-------------------------------------------!
 
-Module mod_field_emission_tip
+Module mod_emission_tip
   use mod_global
   use mod_hyperboloid_tip
   use mod_verlet
@@ -44,11 +44,18 @@ Module mod_field_emission_tip
   ! Use image Charge or not
   !logical, parameter          :: image_charge = .true.
 
+  ! Gauss photo emission
+  logical                                     :: EmitGauss = .True.
+  integer                                     :: maxElecEmit = -1
+
+  ! Photo emission
+  integer, parameter                          :: MAX_EMISSION_TRY_PHOTO = 100
+
 contains
 
   !-----------------------------------------------------------------------------
   ! Initialize the Field Emission
-  subroutine Init_Field_Emission_Tip()
+  subroutine Init_Emission_Tip()
 
     ! Function that checks the boundary conditions for the System
     ptr_Check_Boundary => Check_Boundary_ElecHole_Tip
@@ -57,7 +64,7 @@ contains
     ptr_field_E => field_E_Hyperboloid
 
     ! The function that does the emission
-    ptr_Do_Emission => Do_Field_Emission_Tip
+    ptr_Do_Emission => Do_Emission_Tip
     !ptr_Do_Emission => Do_Simple_Field_Emission_tip
     !ptr_Do_Emission => Do_Field_Emission_Tip_Test
 
@@ -92,31 +99,42 @@ contains
     pre_fac_E_tip = log( (1.0d0 + eta_1)/(1.0d0 - eta_1) * (1.0d0 - eta_2)/(1.0d0 + eta_2) )
     pre_fac_E_tip = 2.0d0 * V_s / (a_foci * pre_fac_E_tip)
 
-  end subroutine Init_Field_Emission_Tip
+  end subroutine Init_Emission_Tip
 
-  subroutine Clean_Up_Field_Emission_Tip()
+  subroutine Clean_Up_Emission_Tip()
     ! Nothing to do here
-  end subroutine Clean_Up_Field_Emission_Tip
+  end subroutine Clean_Up_Emission_Tip
 
-  subroutine Do_Field_Emission_Tip(step)
+  subroutine Do_Emission_Tip(step)
     integer, intent(in) :: step
     integer             :: IFAIL
 
     posInit = 0
     nrEmitted = 0
 
-    if (emitters_Type(1) == 1) then
-      !call Do_Field_Emission_Tip_1(step)
+    select case (emitters_type(1))
+    case (1)
+      ! Field emission
       call Do_Field_Emission_Tip_Test(step)
-    else
+
+    case (2)
       ! Reverse the voltage
       call Do_Field_Emission_Tip_2(step)
-    end if
+
+    case (3)
+      ! Photo emission
+      call Do_Photo_Emission_Tip(step)
+
+    case default
+      print *, 'Vacuum: ERROR unknown emitter type!!'
+      stop
+      print *, emitters_type(1)
+    end select
 
     cur_time = time_step * step / time_scale ! Scaled in units of time_scale
     write (ud_emit, "(E14.6, *(tr8, i6))", iostat=IFAIL) cur_time, step, posInit, &
     & nrEmitted, nrElec
-  end subroutine Do_Field_Emission_Tip
+  end subroutine Do_Emission_Tip
 
 !----------------------------------------------------------------------------------------
 subroutine Do_Field_Emission_Tip_2(step)
@@ -233,6 +251,84 @@ subroutine Do_Field_Emission_Tip_Test(step)
   posInit = posInit + nrElecEmit
   nrEmitted = nrEmitted + nrElecEmit
 end subroutine Do_Field_Emission_Tip_Test
+
+!----------------------------------------------------------------------------------------
+
+subroutine Do_Photo_Emission_Tip(step)
+  integer, intent(in)              :: step
+  integer                          :: emit, nrElecEmit, nrTry
+  double precision                 :: r_pos
+  double precision                 :: xi, phi
+  !double precision                 :: x, y, z
+  double precision, dimension(1:3) :: par_pos, par_vel
+  double precision, dimension(1:3) :: field, surf_norm
+
+  emit = 1
+  nrElecEmit = 0
+
+  ! Check if we are doing a Gaussian distributed emission
+  ! and set the max number of electrons allowed to be emitted if we are
+  if (EmitGauss .eqv. .TRUE.) then
+    maxElecEmit = Gauss_Emission(step)
+  end if
+
+  do while (nrTry <= MAX_EMISSION_TRY_PHOTO)
+    ! Check if we have reached the max number
+    ! of electrons to be emitted
+    if ((nrElecEmit >= maxElecEmit) .and. (maxElecEmit /= -1)) then
+      exit
+    end if
+
+
+    if (nrElec == MAX_PARTICLES-1) then
+      print *, 'WARNING: Reached maximum number of electrons!!!'
+      exit
+    end if
+
+    CALL RANDOM_NUMBER(par_pos(1:2)) ! Gives a random number [0,1]
+    ! Get random x and y coordinates
+    par_pos(1:2) = par_pos(1:2)*R_base
+
+    ! Check if position is inside tip
+    r_pos = sqrt(par_pos(1)**2 + par_pos(2)**2)
+    if (r_pos > R_base) then
+      cycle ! Not with in the emitter area. Try again
+    end if
+
+    ! Calculate the z-coordinate (see eq. 38 in sec. 3.3 in doc)
+    par_pos(3) = eta_1/sqrt(1.0d0 - eta_1**2) * sqrt(par_pos(1)**2 + par_pos(2)**2 + a_foci**2*(1.0d0 - eta_1**2))
+
+    nrTry = nrTry + 1
+    !Check in plane
+    field = Calc_Field_at(par_pos)
+
+    if (field(3) < 0.0d0) then
+      !1 nm Above plane
+      surf_norm = surface_normal(par_pos)
+      par_pos = par_pos + surf_norm*length_scale
+      field = Calc_Field_at(par_pos)
+
+      if (field(3) < 0.0d0) then
+
+        ! Place 1 nm above plane
+        par_vel = 0.0d0
+        call Add_Particle(par_pos, par_vel, species_elec, step, emit, -1)
+
+        !print *, 'field = ', field
+        !pause
+        !call Add_Plane_Graph_emitt(par_pos, par_vel)
+
+        nrElecEmit = nrElecEmit + 1
+        nrTry = 0
+
+      end if
+    end if
+
+  end do
+
+  posInit = posInit + nrElecEmit
+  nrEmitted = nrEmitted + nrElecEmit
+end subroutine Do_Photo_Emission_Tip
 
 !----------------------------------------------------------------------------------------
 
@@ -1212,4 +1308,20 @@ end function Elec_supply_tip
      ! Finish calculating the average field
      !F_avg = F_avg / neval
   end subroutine Do_Cuba_Suave_FE_Tip_Test
-end module mod_field_emission_tip
+
+  ! Gives a gaussian emission curve
+  ! where step is the current time step
+  ! returns the number of electrons allowed to be emitted in that time step
+  integer function Gauss_Emission(step)
+    integer, intent(in)         :: step ! Current time step
+    integer                     :: IFAIL
+    double precision, parameter :: sigma = 1000.0d0 ! Width / standard deviation
+    double precision, parameter :: mu = 3000.0d0 ! Center
+    double precision, parameter :: A = 6.0d0 ! Height
+    double precision, parameter :: b = 1.0d0/(2.0d0*pi*sigma**2)
+
+    Gauss_Emission = IDNINT(  A * exp( -1.0d0*b*(step - mu)**2 )  )
+
+    write (ud_gauss, "(i6, tr2, i6)", iostat=IFAIL) step, Gauss_Emission
+  end function Gauss_Emission
+end module mod_emission_tip

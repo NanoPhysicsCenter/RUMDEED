@@ -14,11 +14,11 @@ Module mod_photo_emission
   ! Variables
   integer, dimension(:), allocatable          :: nrEmitted_emitters
   integer                                     :: posInit
-  logical                                     :: EmitGauss = .false.
+  logical                                     :: EmitGauss = .True.
   integer                                     :: maxElecEmit = -1
   integer                                     :: nrEmitted
 
-  integer                                     :: ud_gauss
+  !integer                                     :: ud_gauss
 
   ! ----------------------------------------------------------------------------
   ! Parameters
@@ -490,7 +490,7 @@ contains
     integer, intent(in)         :: step ! Current time step
     integer                     :: IFAIL
     double precision, parameter :: sigma = 1000.0d0 ! Width / standard deviation
-    double precision, parameter :: mu = 0.0d0 ! Center
+    double precision, parameter :: mu = 3000.0d0 ! Center
     double precision, parameter :: A = 6.0d0 ! Height
     double precision, parameter :: b = 1.0d0/(2.0d0*pi*sigma**2)
 
