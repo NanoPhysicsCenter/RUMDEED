@@ -202,7 +202,7 @@ module mod_global
   integer, parameter :: EMISSION_UNIT_TEST         = 0 ! Units test
   integer, parameter :: EMISSION_PHOTO             = 1 ! Planar photo emission
   integer, parameter :: EMISSION_FIELD             = 2 ! Planar field emission
-  integer, parameter :: EMISSION_FIELD_TIP         = 3 ! Field emission from a hyperboloid tip
+  integer, parameter :: EMISSION_TIP               = 3 ! Field emission from a hyperboloid tip
   integer, parameter :: EMISSION_THERMIONIC        = 4 ! Thermionic emission
   integer, parameter :: EMISSION_FIELD_2D_2DEG_C   = 5 ! Field emission from 2D material
   integer, parameter :: EMISSION_FIELD_2D_2DEG_NC  = 6 ! Field emission from 2D material

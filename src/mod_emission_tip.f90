@@ -112,6 +112,8 @@ contains
     posInit = 0
     nrEmitted = 0
 
+    print *, 'Emission from tip'
+
     select case (emitters_type(1))
     case (1)
       ! Field emission
@@ -124,6 +126,7 @@ contains
     case (3)
       ! Photo emission
       call Do_Photo_Emission_Tip(step)
+      print *, 'Photo'
 
     case default
       print *, 'Vacuum: ERROR unknown emitter type!!'
@@ -292,7 +295,7 @@ subroutine Do_Photo_Emission_Tip(step)
     ! Check if position is inside tip
     r_pos = sqrt(par_pos(1)**2 + par_pos(2)**2)
     if (r_pos > R_base) then
-      cycle ! Not with in the emitter area. Try again
+      cycle ! Not within the emitter area. Try again
     end if
 
     ! Calculate the z-coordinate (see eq. 38 in sec. 3.3 in doc)
