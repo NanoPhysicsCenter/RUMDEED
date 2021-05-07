@@ -202,7 +202,7 @@ contains
     ! Check if we are doing a Gaussian distributed emission
     ! and set the max number of electrons allowed to be emitted if we are
     if (EmitGauss .eqv. .TRUE.) then
-      maxElecEmit = Gauss_Emission(step)
+      maxElecEmit = Rand_Poission( Gauss_Emission(step) )
     end if
 
     !i = 1
@@ -486,7 +486,7 @@ contains
   ! Gives a gaussian emission curve
   ! where step is the current time step
   ! returns the number of electrons allowed to be emitted in that time step
-  integer function Gauss_Emission(step)
+  integer function Gauss_Emission_int(step)
     integer, intent(in)         :: step ! Current time step
     integer                     :: IFAIL
     double precision, parameter :: sigma = 1000.0d0 ! Width / standard deviation
@@ -494,8 +494,21 @@ contains
     double precision, parameter :: A = 6.0d0 ! Height
     double precision, parameter :: b = 1.0d0/(2.0d0*pi*sigma**2)
 
-    Gauss_Emission = IDNINT(  A * exp( -1.0d0*b*(step - mu)**2 )  )
+    Gauss_Emission_int = IDNINT(  A * exp( -1.0d0*b*(step - mu)**2 )  )
 
     write (ud_gauss, "(i6, tr2, i6)", iostat=IFAIL) step, Gauss_Emission
-  end function Gauss_Emission
+  end function Gauss_Emission_int
+
+  double precision function Gauss_Emission(step)
+  integer, intent(in)         :: step ! Current time step
+  integer                     :: IFAIL
+  double precision, parameter :: sigma = 1000.0d0 ! Width / standard deviation
+  double precision, parameter :: mu = 3000.0d0 ! Center
+  double precision, parameter :: A = 6.0d0 ! Height
+  double precision, parameter :: b = 1.0d0/(2.0d0*pi*sigma**2)
+
+  Gauss_Emission = A * exp( -1.0d0*b*(step - mu)**2 )
+
+  write (ud_gauss, "(i6, tr2, ES12.4)", iostat=IFAIL) step, Gauss_Emission
+end function Gauss_Emission
 end module mod_photo_emission
