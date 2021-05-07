@@ -45,7 +45,7 @@ Module mod_emission_tip
   !logical, parameter          :: image_charge = .true.
 
   ! Gauss photo emission
-  logical                                     :: EmitGauss = .False.
+  logical                                     :: EmitGauss = .True.
   integer                                     :: maxElecEmit = -1
 
   ! Photo emission
@@ -267,9 +267,11 @@ subroutine Do_Photo_Emission_Tip(step)
   nrElecEmit = 0
 
   ! Check if we are doing a Gaussian distributed emission
-  ! and set the max number of electrons allowed to be emitted if we are
+  ! and set the max number of electrons allowed to be emitted if we are.
+  ! We treat the number from the gauss distribution as a mean number of a
+  ! poission random number generator.
   if (EmitGauss .eqv. .TRUE.) then
-    maxElecEmit = Gauss_Emission(step)
+    maxElecEmit = Rand_Poission( Gauss_Emission(step) )
   end if
 
   do while (nrTry <= MAX_EMISSION_TRY_PHOTO)
@@ -1313,7 +1315,7 @@ end function Elec_supply_tip
   ! Gives a gaussian emission curve
   ! where step is the current time step
   ! returns the number of electrons allowed to be emitted in that time step
-  integer function Gauss_Emission(step)
+  double precision function Gauss_Emission(step)
     integer, intent(in)         :: step ! Current time step
     integer                     :: IFAIL
     double precision, parameter :: sigma = 1000.0d0 ! Width / standard deviation
@@ -1321,8 +1323,8 @@ end function Elec_supply_tip
     double precision, parameter :: A = 6.0d0 ! Height
     double precision, parameter :: b = 1.0d0/(2.0d0*pi*sigma**2)
 
-    Gauss_Emission = IDNINT(  A * exp( -1.0d0*b*(step - mu)**2 )  )
+    Gauss_Emission = A * exp( -1.0d0*b*(step - mu)**2 )
 
-    write (ud_gauss, "(i6, tr2, i6)", iostat=IFAIL) step, Gauss_Emission
+    write (ud_gauss, "(i6, tr2, ES12.4)", iostat=IFAIL) step, Gauss_Emission
   end function Gauss_Emission
 end module mod_emission_tip
