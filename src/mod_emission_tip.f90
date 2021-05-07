@@ -45,7 +45,7 @@ Module mod_emission_tip
   !logical, parameter          :: image_charge = .true.
 
   ! Gauss photo emission
-  logical                                     :: EmitGauss = .True.
+  logical                                     :: EmitGauss = .False.
   integer                                     :: maxElecEmit = -1
 
   ! Photo emission
@@ -112,8 +112,6 @@ contains
     posInit = 0
     nrEmitted = 0
 
-    print *, 'Emission from tip'
-
     select case (emitters_type(1))
     case (1)
       ! Field emission
@@ -126,7 +124,6 @@ contains
     case (3)
       ! Photo emission
       call Do_Photo_Emission_Tip(step)
-      print *, 'Photo'
 
     case default
       print *, 'Vacuum: ERROR unknown emitter type!!'
@@ -299,11 +296,12 @@ subroutine Do_Photo_Emission_Tip(step)
     end if
 
     ! Calculate the z-coordinate (see eq. 38 in sec. 3.3 in doc)
-    par_pos(3) = eta_1/sqrt(1.0d0 - eta_1**2) * sqrt(par_pos(1)**2 + par_pos(2)**2 + a_foci**2*(1.0d0 - eta_1**2))
+    par_pos(3) = eta_1/sqrt(1.0d0 - eta_1**2) * sqrt(par_pos(1)**2 + par_pos(2)**2 + a_foci**2*(1.0d0 - eta_1**2)) + shift_z
 
     nrTry = nrTry + 1
     !Check in plane
     field = Calc_Field_at(par_pos)
+    !print *, par_pos/length_scale
 
     if (field(3) < 0.0d0) then
       !1 nm Above plane
