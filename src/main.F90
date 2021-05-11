@@ -418,8 +418,8 @@ contains
     call execute_command_line ('mkdir -p out/')
 #endif
 
-    ! Set the number of cores Cuba should use to 1.
-    call cubacores(1, 1000)
+    ! Set the number of cores Cuba should use to 0, i.e. no parallelization in cuba.
+    call cubacores(0, 1000)
 
 
     ! Open data file for writing
