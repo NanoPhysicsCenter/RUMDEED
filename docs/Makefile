@@ -7,6 +7,7 @@ SPHINXOPTS    ?=
 SPHINXBUILD   ?= sphinx-build
 SOURCEDIR     = source
 BUILDDIR      = build
+VENV          = ${CURDIR}/.venv
 
 # Put it first so that "make" without argument is like "make help".
 help:
@@ -16,5 +17,16 @@ help:
 
 # Catch-all target: route all unknown targets to Sphinx using the new
 # "make mode" option.  $(O) is meant as a shortcut for $(SPHINXOPTS).
-%: Makefile
-	@$(SPHINXBUILD) -M $@ "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) $(O)
+%: Makefile $(VENV)
+	@(\
+		. $(VENV)/bin/activate; \
+		$(SPHINXBUILD) -M $@ "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) $(O); \
+		deactivate; \
+	)
+
+$(VENV):
+	python -m venv .venv; \
+	. $(VENV)/bin/activate; \
+	pip install --upgrade pip; \
+	pip install -r $(CURDIR)/requirements.txt; \
+	deactivate; \
