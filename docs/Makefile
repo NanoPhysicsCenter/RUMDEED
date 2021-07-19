@@ -25,8 +25,10 @@ help:
 	)
 
 $(VENV):
-	python -m venv .venv; \
-	. $(VENV)/bin/activate; \
-	pip install --upgrade pip; \
-	pip install -r $(CURDIR)/requirements.txt; \
-	deactivate; \
+	@(\
+		python -m venv .venv; \
+		. $(VENV)/bin/activate; \
+		pip install --upgrade pip; \
+		pip install -r $(CURDIR)/requirements.txt; \
+		deactivate; \
+	)
