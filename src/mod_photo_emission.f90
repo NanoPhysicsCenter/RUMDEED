@@ -239,7 +239,8 @@ contains
     integer, intent(in)              :: step, emit
     integer                          :: nrElecEmit, nrTry
     double precision, dimension(1:3) :: par_pos, par_vel, field
-    double precision                 :: r_e, theta_e
+    !double precision                 :: r_e, theta_e
+    double precision                  :: r_e, r_e2, r2
 
     par_pos = 0.0d0
     nrTry = 0
@@ -258,14 +259,24 @@ contains
       !  exit
       !end if
 
-      CALL RANDOM_NUMBER(par_pos(1:2)) ! Gives a random number between 0 and 1
+      r_e = emitters_dim(1, emit) ! Radius of emitter
+      r_e2 = r_e**2 ! Radius of emitter squared
+      r2 = r_e2 + 1.0d0 ! Must be larger then r_e2 for the do while loop to run
+      do while (r2 > r_e2)
+        CALL RANDOM_NUMBER(par_pos(1:2)) ! Gives a random number between 0 and 1
 
-      ! This does not give an equal distribution of random points on the circle
-      ! Rewrite to x and y random to accpect or reject if x^2+y^2<r^2
-      r_e = emitters_dim(1, emit) * par_pos(1)
-      theta_e = 2.0d0*pi * par_pos(2)
-      par_pos(1) = r_e * cos(theta_e) + emitters_pos(1, emit)
-      par_pos(2) = r_e * sin(theta_e) + emitters_pos(2, emit)
+        par_pos(1:2) = 2.0d0*(par_pos(1:2) - 0.5d0)*r_e ! Range is -r_e to +r_e
+        r2 = par_pos(1)**2 + par_pos(2)**2 ! Radius squared of our random point
+      end do
+
+
+      ! ! This does not give an equal distribution of random points on the circle
+      ! ! Rewrite to x and y random to accpect or reject if x^2+y^2<r^2
+      ! CALL RANDOM_NUMBER(par_pos(1:2)) ! Gives a random number between 0 and 1
+      ! r_e = emitters_dim(1, emit) * par_pos(1)
+      ! theta_e = 2.0d0*pi * par_pos(2)
+      ! par_pos(1) = r_e * cos(theta_e) + emitters_pos(1, emit)
+      ! par_pos(2) = r_e * sin(theta_e) + emitters_pos(2, emit)
 
       nrTry = nrTry + 1 ! Add one more try
       par_pos(3) = 0.0d0 * length_scale ! Check in plane
