@@ -124,7 +124,7 @@ mod_pair.mod mod_pair.o: ../src/mod_pair.F90 mod_global.mod
 mod_unit_tests.mod mod_unit_tests.o: ../src/mod_unit_tests.f90 mod_global.mod mod_verlet.mod mod_pair.mod
 		$(FCOMPILER) -c $(FFLAGS) ../src/mod_unit_tests.f90
 
-mod_photo_emission.mod mod_photo_emission.o: ../src/mod_photo_emission.f90 mod_global.mod mod_verlet.mod mod_pair.mod mod_velocity.mod
+mod_photo_emission.mod mod_photo_emission.o: ../src/mod_photo_emission.f90 mod_global.mod mod_verlet.mod mod_pair.mod mod_velocity.mod mod_velocity.mod
 		$(FCOMPILER) -c $(FFLAGS) ../src/mod_photo_emission.f90
 
 mod_field_emission.mod mod_field_emission.o: ../src/mod_field_emission.f90 mod_global.mod mod_verlet.mod mod_pair.mod mod_velocity.mod

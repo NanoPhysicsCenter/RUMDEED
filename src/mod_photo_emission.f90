@@ -8,13 +8,14 @@ Module mod_photo_emission
   use mod_global
   use mod_verlet
   use mod_pair
+  use mod_velocity
   implicit none
 
   ! ----------------------------------------------------------------------------
   ! Variables
   integer, dimension(:), allocatable          :: nrEmitted_emitters
   integer                                     :: posInit
-  logical                                     :: EmitGauss = .True.
+  logical                                     :: EmitGauss = .False.
   integer                                     :: maxElecEmit = -1
   integer                                     :: nrEmitted
 
@@ -48,6 +49,9 @@ contains
 
     ! The function to do image charge effects
     ptr_Image_Charge_effect => Force_Image_charges_v2
+
+    ! Initial velocity
+    call Init_Emission_Velocity(VELOCITY_ZERO)
 
     do i = 1, nrEmit
       if (emitters_type(i) == EMIT_RECTANGLE_SPOTS) then
@@ -247,18 +251,22 @@ contains
     nrElecEmit = 0
     nrEmitted_emitters(emit) = 0
 
-    do while ((nrTry <= MAX_EMISSION_TRY) .or. ((nrElecEmit >= maxElecEmit) .and. (maxElecEmit /= -1)))
-      ! Check if we have reached the max number
-      ! of electrons to be emitted
-      !if ((nrElecEmit >= maxElecEmit) .and. (maxElecEmit /= -1)) then
-      !  exit
-      !end if
+    do while (nrTry <= MAX_EMISSION_TRY)
+      ! Check if we have reached the max number of electrons to be emitted,
+      ! if we are using Gaussian limited emission.
+      if ((nrElecEmit >= maxElecEmit) .and. (EmitGauss .eqv. .True.)) then
+       exit
+      end if
 
-      !if (nrElec == MAX_PARTICLES-1) then
-      !  print *, 'WARNING: Reached maximum number of electrons!!!'
-      !  exit
-      !end if
+      ! Check if we have reached the maximum number of electrons.
+      ! If this happends then the parameter MAX_PARTICLES (in mod_gobal)
+      ! needs to be increased and the code recompiled.
+      if (nrElec == MAX_PARTICLES-1) then
+       print *, 'WARNING: Reached maximum number of electrons!!!'
+       exit
+      end if
 
+      ! Find a random spot on the cathode.
       r_e = emitters_dim(1, emit) ! Radius of emitter
       r_e2 = r_e**2 ! Radius of emitter squared
       r2 = r_e2 + 1.0d0 ! Must be larger then r_e2 for the do while loop to run
@@ -298,7 +306,8 @@ contains
         !CALL RANDOM_NUMBER(par_pos(3))
         !par_pos(3) = (par_pos(3) + 1.0d0)*0.5d0 * length_scale ! Place above plane
         par_pos(3) = 1.0d0*length_scale ! Place 1 nm above plane
-        par_vel = 0.0d0 ! Set the velocity
+        !par_vel = 0.0d0 ! Set the velocity
+        par_vel = ptr_Get_Emission_Velocity()
 
         ! Escape velocity from image charge partner
         !par_vel(3) = q_0 / sqrt(8.0d0*pi*epsilon_0*epsilon_r*m_0*par_pos(3)) 
