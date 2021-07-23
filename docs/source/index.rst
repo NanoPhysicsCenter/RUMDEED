@@ -11,8 +11,8 @@ creates recipes mixing random ingredients.  It pulls data from the `Open Food
 Facts database <https://world.openfoodfacts.org/>`_ and offers a *simple* and
 *intuitive* API.
 
-Check out the :doc:`usage` section for further information.
-:ref:`install <installation>` the project.
+Check out the :doc:`build` section for further information.
+:ref:`Building the code <installation>` the project.
 
 Since Pythagoras, we know that :math:`a^2 + b^2 = c^2`.
 
@@ -23,10 +23,6 @@ Since Pythagoras, we know that :math:`a^2 + b^2 = c^2`.
 Euler's identity, equation :math:numref:`euler`, was elected one of the
 most beautiful mathematical formulas.
 
-I like birds
-
-.. f:autoprogram:: Awesome
-
 .. note::
 
    This project is under active development.
@@ -35,7 +31,9 @@ I like birds
    :maxdepth: 2
    :caption: Contents:
 
-   usage
+   intro
+   build
+   code
 
 
 

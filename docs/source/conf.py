@@ -64,6 +64,5 @@ def setup(app):
     app.add_css_file('css/custom.css')
 
 # -- Fortran code
-fortran_src = [
-        '../src/main.f90',
-        ]
+fortran_src = ['../src/']
+fortran_ext = ['F90', 'f90']
