@@ -30,6 +30,7 @@ author = 'Kristinn Torfason'
 extensions = [
         'sphinxfortran.fortran_domain',
         'sphinxfortran.fortran_autodoc',
+        'sphinxcontrib.bibtex',
 ]
 
 # Add any paths that contain templates here, relative to this directory.
@@ -66,3 +67,8 @@ def setup(app):
 # -- Fortran code
 fortran_src = ['../src/']
 fortran_ext = ['F90', 'f90']
+
+# -- Bibtext refs
+bibtex_bibfiles = ['refs.bib']
+bibtex_default_style = 'plain'
+bibtex_reference_style = 'label'
