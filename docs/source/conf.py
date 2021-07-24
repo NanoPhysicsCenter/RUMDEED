@@ -70,5 +70,5 @@ fortran_ext = ['F90', 'f90']
 
 # -- Bibtext refs
 bibtex_bibfiles = ['refs.bib']
-bibtex_default_style = 'plain'
+bibtex_default_style = 'unsrt'
 bibtex_reference_style = 'label'
