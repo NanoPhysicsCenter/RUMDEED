@@ -28,6 +28,9 @@ most beautiful mathematical formulas.
 
    intro
    build
+   run
+   output
+   data
    code
    bib
 
