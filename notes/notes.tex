@@ -36,7 +36,7 @@ Force on a particle at \(\mathbf{r}\) due to all other particles at positions \(
 \begin{equation}
   \mathbf{F}(\mathbf{r}) = \frac{q^2}{4\pi\varepsilon_0} \sum_{i=1}^{N} \frac{\mathbf{r} - \mathbf{r}_i}{|\mathbf{r} - \mathbf{r}_i|^3}
 \end{equation}
-Force on a particle due to an electric field drgdrterter
+Force on a particle due to an electric field
 \begin{equation}
   F(\mathbf{r}) = qE(\mathbf{r})
 \end{equation}
@@ -52,11 +52,11 @@ Initial fictitious previous position
 where \(v_0\) is the initial velocity.
 
 \subsection{Velocity Verlet}
-  The Velocity Verlet method is done in three steps, fyrst update the position,
+  The Velocity Verlet method is done in three steps, first update the position,
   \begin{equation}
     x_{n+1} = x_n + v_n\Delta t + \frac{1}{2}a_n{\Delta t}^2\, ,
   \end{equation}
-  then calculate the acceleration \(a_{n+1}\) using \(x_{n+1}\) and finaly
+  then calculate the acceleration \(a_{n+1}\) using \(x_{n+1}\) and finally
   update the velocity,
   \begin{equation}
     v_{n+1} = v_n + \frac{a_n + a_{n+1}}{2}{\Delta t}^2\, .
@@ -128,7 +128,7 @@ Step one is to calculate the positions
 \begin{equation}
  x_{n+1} = x_n + v_n\Delta t + \frac{1}{6}\left( 4a_n - a_{n-1}\right)\Delta t^2
 \end{equation}
-then updated acceleration and finaly calculate the velocity
+then updated acceleration and finally calculate the velocity
 \begin{equation}
  v_{n+1} = v_n + \frac{1}{6}\left( 2a_{n+1} + 5a_n - a_{n-1} \right)\Delta t
 \end{equation}

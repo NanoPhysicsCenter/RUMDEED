@@ -4,3 +4,11 @@
 .eqno {
     float: right;
 }
+
+hr {
+    margin: 12px 0;
+}
+
+p {
+    margin-bottom: 12px;
+ }

@@ -13,13 +13,26 @@
 # import os
 # import sys
 # sys.path.insert(0, os.path.abspath('.'))
+from datetime import date
 
 
 # -- Project information -----------------------------------------------------
 
+# Function borrowed from Lammps conf.py.in
+def get_git_commit():
+    import subprocess, time
+    try:
+        commit = subprocess.run(['git', 'rev-parse', 'HEAD'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        if commit.returncode == 0:
+            return commit.stdout.decode()
+    except:
+        pass
+    return ''
+
 project = 'Vacuum-MD'
-copyright = '2021, Kristinn Torfason'
+copyright = '{}, Kristinn Torfason'.format(date.today().year)
 author = 'Kristinn Torfason'
+release = get_git_commit()
 
 
 # -- General configuration ---------------------------------------------------
@@ -41,6 +54,9 @@ templates_path = ['_templates']
 # This pattern also affects html_static_path and html_extra_path.
 exclude_patterns = []
 
+# Master document
+master_doc = 'manual'
+
 
 # -- Options for HTML output -------------------------------------------------
 
@@ -51,8 +67,10 @@ html_theme = 'sphinx_rtd_theme'
 #html_theme = 'alabaster'
 
 html_theme_options = {
-    'navigation_depth': -1
+    'navigation_depth': 3
 }
+
+html_show_sourcelink = False
 
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
