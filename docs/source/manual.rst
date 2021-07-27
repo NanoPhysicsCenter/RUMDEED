@@ -6,21 +6,7 @@
 Vacuum-MD's documentation!
 =====================================
 
-Check out the :doc:`build` section for further information.
-:ref:`Building the code <installation>` the project.
-
-Since Pythagoras, we know that :math:`a^2 + b^2 = c^2`.
-
-.. math::
-    e^{i\pi} + 1 = 0
-    :label: eq:euler
-
-Euler's identity, equation :math:numref:`euler`, was elected one of the
-most beautiful mathematical formulas.
-
-.. note::
-
-   This project is under active development.
+Check out the :doc:`build` section for further information how to compile the code.
 
 .. toctree::
    :maxdepth: 2
@@ -34,8 +20,6 @@ most beautiful mathematical formulas.
    data
    code
    bib
-
-
 
 Indices and tables
 ==================

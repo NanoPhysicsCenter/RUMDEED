@@ -3,21 +3,26 @@ Code description
 
 The code
 
-.. f:autoprogram:: VacuumMD
-
 Verlet
 ------
-For particle advancement the code uses the Velocity Verlet algorithm. The updated positions are
-calculated with:
+For particle advancement the code uses the Velocity Verlet algorithm. The code for it can be found in **mod_verlet.F90** and the main subroutine is:
+
+.. f:autosubroutine:: velocity_verlet
+
+The updated positions are calculated with:
 
 .. math::
     x_{n+1} = x_n + v_n\Delta t + \frac{1}{2}a_n \Delta t^2
+
+.. f:autosubroutine:: Update_ElecHole_Position
 
 Then the force on each particle is calculate using Coulomb's law, after which the velocity is
 update using:
 
 .. math::
     v_{n+1} = v_n + \frac{a_n+a_{n+1}}{2} \Delta t^2
+
+.. f:autosubroutine:: Update_Velocity
 
 Photo emission
 --------------
