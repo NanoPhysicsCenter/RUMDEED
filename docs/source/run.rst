@@ -16,16 +16,21 @@ in the table below.
 Variable             Units  Description
 ===================  =====  ===========
 V_S                  V      Voltage from the source.
-BOX_DIM              nm     Dimensions of the simulations box.
+BOX_DIM(1:3)         nm     Dimensions of the simulations box. Should specify x, y and z. For now only the z value is used.
 TIME_STEP            ps     The size of the timestep Δt in the simulation.
 STEPS                #      Number of timesteps to do in the simulations.
-EMISSION_MODE        #      The emission mode.
+EMISSION_MODE        #      The emission mode. Can take on the values of 1 for photo emission, 3 for field emission from a hyperboloid tip, 10 for planar field emission and 10 for thermal-field emission. 
 NREMIT               #      Number of emitters in the system.
 EMITTERS_DIM(1:3,:)  nm     Dimensions of the emitter.
 EMITTERS_POS(1:3,:)  nm     Position of the emitter.
 EMITTERS_TYPE(:)     #      Geometry of the emitter.
-EMITTERS_DELAY(:)    #      The timestep the emitter should start emitting.
+EMITTERS_DELAY(:)    #      The timestep the emitter should become active and start emitting.
 ===================  =====  ===========
+
+.. bibliographic fields (which also require a transform):
+
+:V_s: Voltage from the source.
+:BOX_DIM(1:3): Dimensions of the simulations box. Should specify x, y and z. For now only the z value is used.
 
 Example input file:
 
@@ -60,9 +65,34 @@ Collisions
 N\ :sub:`2` files
 
 
-Output and data files
----------------------
+Running the code
+-----------------
 
-To do output from the code
+To do
+
+Definition Lists
+----------------
+
+Term
+    Definition
+Term : classifier
+    Definition paragraph 1.
+
+    Definition paragraph 2.
+Term
+    Definition
+
+I have no clue why the definition list below is classified as a different style
+of definition list than the one above.
+
+Is it the spaces in the term?
+    Maybe it was the multiple line paragraph
+    in the line below that caused this?
+
+Is it the paragraph above the list maybe?
+    I guess a lot of these lists don't have leading paragraphs?
+
+Is it everything all at once?
+    Who knows?!
 
 .. index:: Collisions, N₂, input, w_theta, work function, time_step, time step, box_dim, steps, emission_mode, nremit

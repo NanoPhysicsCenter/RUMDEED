@@ -57,7 +57,6 @@ exclude_patterns = []
 # Master document
 master_doc = 'manual'
 
-
 # -- Options for HTML output -------------------------------------------------
 
 # The theme to use for HTML and HTML Help pages.  See the documentation for
@@ -67,7 +66,10 @@ html_theme = 'sphinx_rtd_theme'
 #html_theme = 'alabaster'
 
 html_theme_options = {
-    'navigation_depth': 3
+    'navigation_depth': 4,
+    'collapse_navigation': False,
+    'prev_next_buttons_location': 'both',
+    'style_external_links': True,
 }
 
 html_show_sourcelink = False
