@@ -34,6 +34,7 @@ This documentation can also be generate using the make file with:
 
    make docs
 
-This will produce html and pdf files in the docs/build directory.
+This will produce html and pdf files in the docs/build directory. You must have **Python** installed to generate the documentation.
+To make the pdf file **xelatex** and **xindy** must be installed.
 
 .. index:: build, make, git, compiler, gfortran, github, Intel

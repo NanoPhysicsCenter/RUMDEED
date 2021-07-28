@@ -96,3 +96,13 @@ fortran_ext = ['F90', 'f90']
 bibtex_bibfiles = ['refs.bib']
 bibtex_default_style = 'unsrt'
 bibtex_reference_style = 'label'
+
+# -- Latex
+
+latex_engine = 'xelatex'
+latex_elements = {
+    'papersize': 'a4paper',
+    'fncychap': r'\usepackage[Bjornstrup]{fncychap}',
+    'printindex': r'\footnotesize\raggedright\printindex',
+}
+latex_show_urls = 'footnote'
