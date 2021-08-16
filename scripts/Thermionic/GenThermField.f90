@@ -40,39 +40,50 @@ PROGRAM GenThermField
 !.....When not specified, units are eV-nm-fs-q
 !––––––––––––––––––––––––––––––––––––––––––––––––-
 use MaterialEnvironment !parameters used in subroutines
-real :: Tmp, Fld
+real :: Tmp, Fld, out
 !....Read in needed parameters
 call NameDropping
-!––––––––––––––––––––––––––––––––––––––––––––––––-
-!....Create temperature variation output
-!....Let ln(F(j)) be evenly spaced
-!––––––––––––––––––––––––––––––––––––––––––––––––-
-write(*,*) 'Creating file Jfield.txt:  field variation'
-write(*,*) '  Temp taken to be T = ',Temp,' Kelvin'
-open(unit=11,file='Jfield.txt')
-write(11,*) 'F [eV/nm]',tb,'JGTF [A/cm ̂ 2]',tb, &
-& 'JRLD',tb,'JFN'
-do i = 1, Nx
-Fld = Fmin*(Fmax/Fmin)**(float(i-1)/(Nx-1))
-write(11,*) Fld,tb,RJgtf(Phi,Chem,Fld,Temp), tb, &
-& RJrldo(Phi,Fld,Temp),tb,RJfno(Phi,Fld)
-end do
-close(unit=11)
-!––––––––––––––––––––––––––––––––––––––––––––––––-
-!....Create field variation output
-!....Let T(j) be evenly spaced
-!––––––––––––––––––––––––––––––––––––––––––––––––-
-write(*,*) 'Creating file Jtemp.txt: thermal variation'
-write(*,*) '  Field taken to be F = ',Field,' eV/nm'
-open(unit=12,file='JTemp.txt')
-write(12,*) 'T [K]',tb,'JGTF [A/cm ̂ 2]',tb,&
-& 'JRLD',tb,'JFN'
-do i = 1, Nx
-Tmp = Tmin + (Tmax-Tmin)*float(i-1)/(Nx-1)
-write(12,*) Tmp,tb,RJgtf(Phi,Chem,Field,Tmp), tb, &
-& RJrldo(Phi,Field,Tmp),tb,RJfno(Phi,Field)
-end do
-close(unit=12)
+! !––––––––––––––––––––––––––––––––––––––––––––––––-
+! !....Create temperature variation output
+! !....Let ln(F(j)) be evenly spaced
+! !––––––––––––––––––––––––––––––––––––––––––––––––-
+! write(*,*) 'Creating file Jfield.txt:  field variation'
+! write(*,*) '  Temp taken to be T = ',Temp,' Kelvin'
+! open(unit=11,file='Jfield.txt')
+! write(11,*) 'F [eV/nm]',tb,'JGTF [A/cm ̂ 2]',tb, &
+! & 'JRLD',tb,'JFN'
+! do i = 1, Nx
+! Fld = Fmin*(Fmax/Fmin)**(float(i-1)/(Nx-1))
+! write(11,*) Fld,tb,RJgtf(Phi,Chem,Fld,Temp), tb, &
+! & RJrldo(Phi,Fld,Temp),tb,RJfno(Phi,Fld)
+! end do
+! close(unit=11)
+! !––––––––––––––––––––––––––––––––––––––––––––––––-
+! !....Create field variation output
+! !....Let T(j) be evenly spaced
+! !––––––––––––––––––––––––––––––––––––––––––––––––-
+! write(*,*) 'Creating file Jtemp.txt: thermal variation'
+! write(*,*) '  Field taken to be F = ',Field,' eV/nm'
+! open(unit=12,file='JTemp.txt')
+! write(12,*) 'T [K]',tb,'JGTF [A/cm ̂ 2]',tb,&
+! & 'JRLD',tb,'JFN'
+! do i = 1, Nx
+! Tmp = Tmin + (Tmax-Tmin)*float(i-1)/(Nx-1)
+! write(12,*) Tmp,tb,RJgtf(Phi,Chem,Field,Tmp), tb, &
+! & RJrldo(Phi,Field,Tmp),tb,RJfno(Phi,Field)
+! end do
+! close(unit=12)
+
+print *, 'Enter Kevin'
+Tmp = 293.15
+print *, Phi
+print *, Chem
+print *, Field
+print *, Tmp
+print *, ''
+out = RJgtf(Phi,Chem,Field,Tmp)
+print *, ''
+print *, out
 !––––––––––––––––––––––––––––––––––––––––––––––––-
 END PROGRAM GenThermField
 !==============================================================

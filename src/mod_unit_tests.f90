@@ -12,9 +12,121 @@ module mod_unit_tests
   use mod_verlet
   implicit none
 
+  PRIVATE
+  PUBLIC :: Init_Unit_Test, Clean_Up_Unit_Test
+
+  ! ----------------------------------------------------------------------------
+  ! Variables
+  integer, dimension(:), allocatable :: nrEmitted_emitters
+  integer                            :: nrElecEmitAll
+
+  ! Constant used in MC integration
+  double precision :: time_step_div_q0
+
   double precision, parameter :: tolerance_rel = 0.02d0 ! 2% relative error tolerance
   double precision, parameter :: tolerance_abs = 1.0d-6 ! absolute error tolerance 
 contains
+  !-----------------------------------------------------------------------------
+  ! Initialize the Field Emission
+subroutine Init_Unit_Test()
+  ! Allocate the number of emitters
+  nrEmit = 1
+  allocate(nrEmitted_emitters(1:nrEmit))
+
+  ! Initialize variables
+  nrEmitted_emitters = 0 ! Number of electrons emitted from emitter number i in this time step
+
+  ! Function that checks the boundary conditions for the System
+  ptr_Check_Boundary => Check_Boundary_ElecHole_Planar
+
+  ! Function for the electric field in the system
+  ptr_field_E => field_E_planar
+
+  ! The function that does the emission
+  ptr_Do_Emission => Do_Unit_Test_Emission
+
+  ! The function to do image charge effects
+  ptr_Image_Charge_effect => Force_Image_charges_v2
+
+  ! Parameters used in the module
+  time_step_div_q0 = time_step / q_0
+
+  ! Initialize the Ziggurat algorithm
+  !call zigset(my_seed(1))
+
+end subroutine Init_Unit_Test
+
+subroutine Clean_Up_Unit_Test()
+  deallocate(nrEmitted_emitters)
+end subroutine Clean_Up_Unit_Test
+
+  !-----------------------------------------------------------------------------
+  ! This subroutine gets called from main when the emitters should emit the electrons
+subroutine Do_Unit_Test_Emission(step)
+  integer, intent(in)              :: step
+  integer                          :: i, IFAIL = 0, emit_step, species
+  double precision                 :: cur_time, x, y, z
+  integer                          :: ud_file
+  double precision, dimension(1:3) :: par_pos, par_vel
+  double precision                 :: x_0, y_0, z_0
+  double precision                 :: x_1, y_1, z_1
+
+  nrElecEmitAll = 0
+  nrEmitted_emitters = 0
+
+  ! open(newunit=ud_file, iostat=IFAIL, file='Unit_Test_1.bin', status='OLD', action='READ', access='STREAM')
+
+  ! do
+  !   read(unit=ud_file, iostat=IFAIL) x, y, z, emit_step, species
+  !   if (IFAIL == 0) then
+  !     if (emit_step == step) then
+  !       par_pos(1) = x
+  !       par_pos(2) = y
+  !       par_pos(3) = z
+  !       par_vel = 0.0d0
+
+  !       ! Add a particle to the system
+  !       call Add_Particle(par_pos, par_vel, species, step, 1, -1, 1)
+  !     end if
+  !   else
+  !     exit
+  !   end if
+  ! end do
+
+  ! close(unit=ud_file, status='keep')
+
+  ! P1
+  x_0 = 5.5d0*length_scale
+  y_0 = -70.4d0*length_scale
+  z_0 = 36.2d0*length_scale
+
+  par_pos(1) = x_0
+  par_pos(2) = y_0
+  par_pos(3) = z_0
+  par_vel = 0.0d0
+  species = species_elec
+
+  call Add_Particle(par_pos, par_vel, species, step, 1, -1, 1)
+
+  ! P2
+  x_1 = -33.4d0*length_scale
+  y_1 = 4.0d0*length_scale
+  z_1 = 45.3d0*length_scale
+
+  par_pos(1) = x_1
+  par_pos(2) = y_1
+  par_pos(3) = z_1
+  par_vel = 0.0d0
+  species = species_elec
+
+  call Add_Particle(par_pos, par_vel, species, step, 1, -1, 1)
+
+  cur_time = time_step * step / time_scale ! Scaled in units of time_scale
+  write (ud_emit, "(E14.6, *(tr8, i6))", iostat=IFAIL) cur_time, step, nrElecEmitAll, nrElec, &
+                                                     & (nrEmitted_emitters(i), i = 1, nrEmit)
+end subroutine Do_Unit_Test_Emission
+
+
   subroutine Run_Unit_Tests()
     call Test_Acceleration_Without_Image_Charge()
 

@@ -9,9 +9,7 @@ Module mod_field_emission_v2
   use mod_global
   use mod_verlet
   use mod_pair
-  use ziggurat
   use mod_work_function
-  !use mod_mc_integration
   implicit none
 
   PRIVATE
@@ -23,8 +21,11 @@ Module mod_field_emission_v2
   integer                            :: nrElecEmitAll
   !integer                            :: nrEmitted
   double precision, dimension(1:3)   :: F_avg = 0.0d0
-  integer, parameter                 :: N_MH_step = 20 ! Number of steps to do in the MH algorithm
-  double precision                   :: residual = 0.0d0
+  integer, parameter                 :: N_MH_step = 10*3 ! Number of steps to do in the MH algorithm
+  double precision                   :: residual = 0.0d0 ! Should be a array the size of the number of emitters
+
+  ! Cuba
+  ! double precision, allocatable :: xgiven(:,:) ! xgiven(ldxgiven,ngiven) <in>, a list of points where the integrand
 
   ! ----------------------------------------------------------------------------
   ! Constants for field emission
@@ -48,6 +49,12 @@ Module mod_field_emission_v2
 
   ! Constant used in MC integration (function Elec_Supply_V2)
   double precision :: time_step_div_q0
+
+  ! MH Acceptance rate
+  double precision :: a_rate = 1.0d0
+  double precision :: MH_std = 0.0125d0
+
+  integer          :: jump_a = 0, jump_r = 0 ! Number of jumps accepted and rejected
 
   ! interface 
   !     ! ! Interface for the work function submodule
@@ -109,7 +116,9 @@ contains
     time_step_div_q0 = time_step / q_0
 
     ! Initialize the Ziggurat algorithm
-    call zigset(my_seed(1))
+    !call zigset(my_seed(1))
+
+    !allocate(xgiven(1:2, 1:MAX_PARTICLES))
 
   end subroutine Init_Field_Emission_v2
 
@@ -117,6 +126,8 @@ contains
     deallocate(nrEmitted_emitters)
 
     call Work_fun_cleanup()
+
+    !deallocate(xgiven)
   end subroutine Clean_Up_Field_Emission_v2
 
   !-----------------------------------------------------------------------------
@@ -141,6 +152,7 @@ contains
         !case (EMIT_RECTANGLE)
           !print *, 'Doing Rectangle'
           call Do_Field_Emission_Planar_rectangle(step, i)
+          !call Do_Field_Emission_Planar_simple(step, i)
         !case default
         !  print *, 'Vacuum: WARNING unknown emitter type!!'
         !  print *, emitters_type(i)
@@ -153,6 +165,49 @@ contains
                                                        & (nrEmitted_emitters(i), i = 1, nrEmit)
   end subroutine Do_Field_Emission
 
+  subroutine Do_Field_Emission_Planar_simple(step, emit)
+    integer, intent(in)              :: step, emit
+
+    ! Integration
+    double precision                 :: N_sup
+    integer                          :: N_round
+
+    ! Emission variables
+    integer                          :: i, sec, nrElecEmit, IFAIL
+    double precision                 :: rnd, D_f, F, Df_avg
+    double precision, dimension(1:3) :: par_pos, par_vel
+
+
+    ! Do integration
+    call Do_Cuba_Suave_Simple(emit, N_sup)
+
+    N_round = nint(N_sup + residual) ! Round to whole number
+    residual = N_sup - N_round
+
+    ! Loop over all electrons and place them
+    do i = 1, N_round
+      call Metropolis_Hastings_rectangle_v2(N_MH_step, emit, D_f, F, par_pos)
+    
+
+      par_pos(3) = 1.0d0*length_scale
+      par_vel = 0.0d0
+      rnd = w_theta_xy(par_pos, emit, sec) ! Get the section
+
+      ! Add a particle to the system
+      call Add_Particle(par_pos, par_vel, species_elec, step, emit, -1, sec)
+
+      nrElecEmit = nrElecEmit + 1
+      nrEmitted_emitters(emit) = nrEmitted_emitters(emit) + 1
+    end do
+
+    Df_avg = 0.0d0
+
+    write (ud_field, "(i8, tr2, E16.8, tr2, E16.8, tr2, E16.8, tr2, E16.8, tr2, E16.8, tr2, E16.8, tr2, E16.8)", iostat=IFAIL) &
+                                      step, F_avg(1), F_avg(2), F_avg(3), N_sup, Df_avg, a_rate, MH_std
+
+    nrElecEmitAll = nrElecEmitAll + nrElecEmit
+  end subroutine
+
   !-----------------------------------------------------------------------------
   ! Do the field emission from a planar rectangular emitter
   ! step: The current time step
@@ -163,7 +218,7 @@ contains
 
     ! Integration
     double precision                 :: N_sup
-    integer                          :: N_round
+    integer                          :: N_round, i
 
     ! Emission variables
     double precision                 :: D_f, Df_avg, F, rnd
@@ -198,7 +253,9 @@ contains
     !!$OMP PARALLEL DO DEFAULT(NONE) PRIVATE(s, par_pos, F, D_f, rnd, par_vel) REDUCTION(+:df_avg) SCHEDULE(GUIDED, CHUNK_SIZE)
     do s = 1, N_round
 
-      call Metropolis_Hastings_rectangle_v2(N_MH_step, emit, D_f, F, par_pos)
+      !call Metropolis_Hastings_rectangle_v2(N_MH_step, emit, D_f, F, par_pos)
+      i = N_MH_step
+      call Metropolis_Hastings_rectangle_J(i, emit, D_f, F, par_pos)
       !call Metropolis_Hastings_rectangle_v2_field(N_MH_step, emit, D_f, F, par_pos)
       !print *, 'D_f = ', D_f
       !print *, 'F = ', F
@@ -207,18 +264,18 @@ contains
 
       ! Check if the field is favourable for emission or not
       if (F >= 0.0d0) then
-        D_f = 0.0d0
-        !print *, 'Warning: F > 0.0d0'
+        D_f = -huge(1.0d0)
+        print *, 'Warning: F > 0.0d0'
       !else
       !  if (D_f > 1.0d0) then
       !    print *, 'Warning D_f > 1.0d0'
       !    print *, 'D_f = ', D_f
       !  end if
       end if
-      df_avg = df_avg + D_f
+      df_avg = df_avg + exp(D_f)
 
       CALL RANDOM_NUMBER(rnd)
-      if (rnd <= D_f) then
+      if (log(rnd) <= D_f) then
         !par_vel(1:2) = box_muller((/1.0d0, 1.0d0/), (/0.25d0, 0.25d0/))
         !if (par_vel(1) < 0.0d0) then
         !  if (par_vel(2) < 0.0d0) then
@@ -231,7 +288,7 @@ contains
         !end if
         par_pos(3) = 1.0d0*length_scale
         par_vel = 0.0d0
-        rnd = w_theta_xy(par_pos, sec) ! Get the section
+        rnd = w_theta_xy(par_pos, emit, sec) ! Get the section
         !!$OMP CRITICAL(EMIT_PAR)
 
           ! Add a particle to the system
@@ -246,8 +303,8 @@ contains
 
     df_avg = df_avg / N_sup
 
-    write (ud_field, "(i8, tr2, E16.8, tr2, E16.8, tr2, E16.8, tr2, E16.8, tr2, E16.8)", iostat=IFAIL) &
-                                      step, F_avg(1), F_avg(2), F_avg(3), N_sup, df_avg
+    write (ud_field, "(i8, tr2, E16.8, tr2, E16.8, tr2, E16.8, tr2, E16.8, tr2, E16.8, tr2, E16.8, tr2, E16.8)", iostat=IFAIL) &
+                                      step, F_avg(1), F_avg(2), F_avg(3), N_sup, df_avg, a_rate, MH_std
 
     nrElecEmitAll = nrElecEmitAll + nrElecEmit
     !nrEmitted = nrEmitted + nrElecEmit
@@ -261,13 +318,14 @@ contains
 ! In Proceedings of the Royal Society of London A: Mathematical,
 ! Physical and Engineering Sciences (Vol. 463, No. 2087, pp. 2907-2927). The Royal Society.
 !
-  double precision function v_y(F, pos)
+  double precision function v_y(F, pos, emit)
     double precision, intent(in)                 :: F
     double precision, dimension(1:3), intent(in) :: pos
+    integer, intent(in)                          :: emit
     double precision                             :: l
 
     if (image_charge .eqv. .true.) then
-      l = l_const * (-1.0d0*F) / w_theta_xy(pos)**2 ! l = y^2, y = 3.79E-4 * sqrt(F_old) / w_theta
+      l = l_const * (-1.0d0*F) / w_theta_xy(pos, emit)**2 ! l = y^2, y = 3.79E-4 * sqrt(F_old) / w_theta
       if (l > 1.0d0) then
         l = 1.0d0
       end if
@@ -277,13 +335,14 @@ contains
     end if
   end function v_y
 
-  double precision function t_y(F, pos)
+  double precision function t_y(F, pos, emit)
     double precision, intent(in)                 :: F
     double precision, dimension(1:3), intent(in) :: pos
+    integer, intent(in)                          :: emit
     double precision                             :: l
 
     if (image_charge .eqv. .true.) then
-      l = l_const * (-1.0d0*F) / w_theta_xy(pos)**2 ! l = y^2, y = 3.79E-4 * sqrt(F_old) / w_theta
+      l = l_const * (-1.0d0*F) / w_theta_xy(pos, emit)**2 ! l = y^2, y = 3.79E-4 * sqrt(F_old) / w_theta
       if (l > 1.0d0) then
         print *, 'Error: l > 1.0'
         print *, 'l = ', l, ', F = ', F, ', t_y = ', t_y
@@ -302,29 +361,36 @@ contains
   !-----------------------------------------------------------------------------
   ! This function returns the escape probability of the Electrons.
   ! Escape_prob = exp(-b_FN*w_theta^(3/2)*v_y/F) .
-  double precision function Escape_Prob(F, pos)
+  double precision function Escape_Prob(F, pos, emit)
     double precision, intent(in)                 :: F
     double precision, dimension(1:3), intent(in) :: pos
+    integer, intent(in)                          :: emit
 
-    Escape_Prob = exp(b_FN * (sqrt(w_theta_xy(pos)))**3 * v_y(F, pos) / (-1.0d0*F))
+    Escape_Prob = exp(b_FN * (sqrt(w_theta_xy(pos, emit)))**3 * v_y(F, pos, emit) / (-1.0d0*F))
 
-    if (Escape_Prob > 1.0d0) then
-      print *, 'Escape_prob is larger than 1.0'
-      print *, 'Escape_prob = ', Escape_prob
-      print *, ''
-    end if
   end function Escape_Prob
+
+  ! Returns the log of the escape probability.
+  double precision function Escape_Prob_log(F, pos, emit)
+  double precision, intent(in)                 :: F
+  double precision, dimension(1:3), intent(in) :: pos
+  integer, intent(in)                          :: emit
+
+  Escape_Prob_log = b_FN * (sqrt(w_theta_xy(pos, emit)))**3 * v_y(F, pos, emit) / (-1.0d0*F)
+
+end function Escape_Prob_log
 
   !-----------------------------------------------------------------------------
   ! A simple function that calculates
   ! A_FN/(t**2(l)*w_theta(x,y)) F**2(x,y)
   ! pos: Position to calculate the function
   ! F: The z-component of the field at par_pos, it should be F < 0.0d0.
-  double precision function Elec_Supply_V2(F, pos)
+  double precision function Elec_Supply_V2(F, pos, emit)
     double precision, dimension(1:3), intent(in) :: pos
     double precision,                 intent(in) :: F
+    integer, intent(in)                          :: emit
 
-    Elec_Supply_V2 = time_step_div_q0 * a_FN/(t_y(F, pos)**2*w_theta_xy(pos)) * F**2
+    Elec_Supply_V2 = time_step_div_q0 * a_FN/(t_y(F, pos, emit)**2*w_theta_xy(pos, emit)) * F**2
   end function Elec_Supply_V2
 
 
@@ -337,7 +403,8 @@ contains
     double precision, intent(out) :: N_sup ! Number of electrons
 
     !call Do_2D_MC_plain(emit, N_sup)
-    call Do_Cuba_Suave_FE(emit, N_sup)
+    !call Do_Cuba_Suave_FE(emit, N_sup)
+    call Do_Cuba_Divonne_FE(emit, N_sup)
   end subroutine Do_Surface_Integration_FE
 
   ! ----------------------------------------------------------------------------
@@ -374,7 +441,7 @@ contains
     if (field(3) < 0.0d0) then
       ! The field is favourable for emission
       ! Calculate the electron supply at this point
-      ff(1) = Elec_Supply_V2(field(3), par_pos)
+      ff(1) = Elec_Supply_V2(field(3), par_pos, userdata)
     else
       ! The field is NOT favourable for emission
       ! This point does not contribute
@@ -388,11 +455,275 @@ contains
     integrand_cuba_fe = 0 ! Return value to Cuba, 0 = success
   end function integrand_cuba_fe
 
+  subroutine Do_Cuba_Divonne_FE(emit,  N_sup)
+  implicit none
+  integer, intent(in)           :: emit
+  double precision, intent(out) :: N_sup
+  !integer                       :: i
+  integer                       :: IFAIL
+
+  
+  ! Cuba integration variables (common)
+  integer, parameter :: ndim = 2 ! Number of dimensions
+  integer, parameter :: ncomp = 1 ! Number of components in the integrand
+  integer            :: userdata = 0 ! User data passed to the integrand
+  integer, parameter :: nvec = 1 ! Number of points given to the integrand function
+  double precision   :: epsrel = 1.0d-6 ! Requested relative error
+  double precision   :: epsabs = 0.25d0 ! Requested absolute error
+  integer            :: flags = 0+4 ! Flags
+  integer            :: seed = 0 ! Seed for the rng. Zero will use Sobol.
+  integer            :: mineval = 10000 ! Minimum number of integrand evaluations
+  integer            :: maxeval = 10000000 ! Maximum number of integrand evaluations
+
+  ! Divonne specific
+  integer :: key1 = 47 ! 〈in〉, determines sampling in the partitioning phase:
+                  ! key1 = 7,9,11,13 selects the cubature rule of degree key1.
+                  ! Note that the degree-11 rule is available only in 3 dimensions, the degree-13 rule only in 2 dimensions.
+                  ! For other values of key1, a quasi-random sample of n_1=|key1| points is used,
+                  ! where the sign of key1 determines the type of sample,
+                  ! – key1 > 0, use a Korobov quasi-random sample,
+                  ! – key1 < 0, use a “standard” sample (a Sobol quasi-random sample if seed= 0, otherwise a pseudo-random sample).
+  integer :: key2 = 1 !<in>, determines sampling in the final integration phase:
+                  ! key2 = 7, 9, 11, 13 selects the cubature rule of degree key2. Note that the degree-11
+                  ! rule is available only in 3 dimensions, the degree-13 rule only in 2 dimensions.
+                  ! For other values of key2, a quasi-random sample is used, where the sign of key2
+                  ! determines the type of sample,
+                  ! - key2 > 0, use a Korobov quasi-random sample,
+                  ! - key2 < 0, use a "standard" sample (see description of key1 above),
+                  ! and n_2 = |key2| determines the number of points,
+                  ! - n_2 > 40, sample n2 points,
+                  ! - n_2 < 40, sample n2 nneed points, where nneed is the number of points needed to
+                  ! reach the prescribed accuracy, as estimated by Divonne from the results of the
+                  ! partitioning phase.
+  integer :: key3 = -1 ! <in>, sets the strategy for the refinement phase:
+                  ! key3 = 0, do not treat the subregion any further.
+                  ! key3 = 1, split the subregion up once more.
+                  ! Otherwise, the subregion is sampled a third time with key3 specifying the sampling
+                  ! parameters exactly as key2 above.
+  integer :: maxpass = 2! <in>, controls the thoroughness of the partitioning phase: The
+! partitioning phase terminates when the estimated total number of integrand evaluations
+! (partitioning plus final integration) does not decrease for maxpass successive iterations.
+! A decrease in points generally indicates that Divonne discovered new structures of
+! the integrand and was able to find a more effective partitioning. maxpass can be
+! understood as the number of `safety' iterations that are performed before the partition
+! is accepted as final and counting consequently restarts at zero whenever new structures are found.
+  double precision :: border = 0.0d0 ! <in>, the width of the border of the integration region.
+! Points falling into this border region will not be sampled directly, but will be extrapolated
+! from two samples from the interior. Use a non-zero border if the integrand
+! subroutine cannot produce values directly on the integration boundary.
+  double precision :: maxchisq = 10.0d0!<in>, the maximum \chi^2 value a single subregion is allowed
+! to have in the final integration phase. Regions which fail this \chi^2 test and whose
+! sample averages differ by more than mindeviation move on to the refinement phase.
+  double precision :: mindeviation = 0.25d0 !<in>, a bound, given as the fraction of the requested
+! error of the entire integral, which determines whether it is worthwhile further
+! examining a region that failed the \chi^2 test. Only if the two sampling averages
+! obtained for the region differ by more than this bound is the region further treated.
+  integer :: ngiven = 0 ! <in>, the number of points in the xgiven array.
+  integer :: ldxgiven = ndim ! <in>, the leading dimension of xgiven, i.e. the offset between one point and the next in memory.
+  !double precision, allocatable :: xgiven(:,:) ! xgiven(ldxgiven,ngiven) <in>, a list of points where the integrand
+! might have peaks. Divonne will consider these points when partitioning the
+! integration region. The idea here is to help the integrator find the extrema of the integrand
+! in the presence of very narrow peaks. Even if only the approximate location
+! of such peaks is known, this can considerably speed up convergence.
+  integer :: nextra = 0 ! <in>, the maximum number of extra points the peak-finder subroutine
+! will return. If nextra is zero, peakfinder is not called and an arbitrary object
+! may be passed in its place, e.g. just 0.
+
+
+  ! Output
+  character          :: statefile = "" ! File to save the state in. Empty string means don't do it.
+  integer            :: spin = -1 ! Spinning cores
+  integer            :: nregions ! <out> The actual number of subregions nedded
+  integer            :: neval ! <out> The actual number of integrand evaluations needed
+  integer            :: fail ! <out> Error flag (0 = Success, -1 = Dimension out of range, >0 = Accuracy goal was not met)
+  double precision, dimension(1:ncomp) :: integral ! <out> The integral of the integrand over the unit hybercube
+  double precision, dimension(1:ncomp) :: error ! <out> The presumed absolute error
+  double precision, dimension(1:ncomp) :: prob ! <out> The chi-square probability
+
+    ! Initialize the average field to zero
+    F_avg = 0.0d0
+
+    ! Pass the number of the emitter being integraded over to the integrand as userdata
+    userdata = emit
+
+    seed = sum(my_seed(:))
+
+    !allocated(xgiven(1:ndim, 1:MAX_PARTICLES))
+
+    ! Find possible peaks, i.e. all electrons with z < 5 nm.
+    !!$OMP PARALLEL DO DEFAULT(NONE) PRIVATE(i) shared(ngiven, xgiven, particles_cur_pos, nrPart) SCHEDULE(GUIDED, CHUNK_SIZE)
+    !do i = 1, nrPart
+    !  if (particles_cur_pos(3, i) < 5.0d-9) then
+    !    !$OMP CRITICAL
+    !    ngiven = ngiven + 1
+    !    xgiven(1, ngiven) = particles_cur_pos(1, i)
+    !    xgiven(2, ngiven) = particles_cur_pos(2, i)
+    !    !$OMP END CRITICAL
+    !  end if
+    !end do
+    !!$OMP END PARALLEL DO
+    ngiven = nrPart
+
+    call divonne(ndim, ncomp, integrand_cuba_fe, userdata, nvec,&
+              epsrel, epsabs, flags, seed, mineval, maxeval,&
+              key1, key2, key3, maxpass,&
+              border, maxchisq, mindeviation,&
+              ngiven, ldxgiven, particles_cur_pos(1:2, 1:nrPart), nextra, 0,&
+              statefile, spin,&
+              nregions, neval, fail, integral, error, prob)
+
+    !deallocate(xgiven)
+
+    if (fail /= 0) then
+      if (abs(error(1) - epsabs) > 1.0d-2) then
+        print '(a)', 'Vacuum: WARNING Cuba did not return 0'
+        print *, 'Fail = ', fail
+        print *, 'nregions = ', nregions
+        print *, 'neval = ', neval, ' max is ', maxeval
+        print *, 'error(1) = ', error(1)
+        print *, 'integral(1)*epsrel = ', integral(1)*epsrel
+        print *, 'epsabs = ', epsabs
+        print *, 'prob(1) = ', prob(1)
+        print *, 'integral(1) = ', integral(1)
+        call Flush_Data()
+      end if
+     end if
+
+
+     !! Round the results to the nearest integer
+     !N_sup = nint( integral(1) )
+     N_sup = integral(1)
+
+     ! Finish calculating the average field
+     F_avg = F_avg / neval
+
+     ! Write the output variables of the integration to a file
+     write(ud_integrand, '(i3, tr2, i8, tr2, i8, tr2, i4, tr2, ES12.4, tr2, ES12.4, tr2, ES12.4)', iostat=IFAIL) &
+                          & emit, nregions, neval, fail, integral(1), error(1), prob(1)
+  end subroutine Do_Cuba_Divonne_FE
+
   ! ----------------------------------------------------------------------------
   ! Use the Cuba library to do the surface integration
   ! http://www.feynarts.de/cuba/
   !
   subroutine Do_Cuba_Suave_FE(emit, N_sup)
+    ! Input / output variables
+    integer, intent(in)           :: emit
+    double precision, intent(out) :: N_sup
+    integer                       :: IFAIL
+
+    ! Cuba integration variables
+    integer, parameter :: ndim = 2 ! Number of dimensions
+    integer, parameter :: ncomp = 1 ! Number of components in the integrand
+    integer            :: userdata = 0 ! User data passed to the integrand
+    integer, parameter :: nvec = 1 ! Number of points given to the integrand function
+    double precision   :: epsrel = 1.0d-4 ! Requested relative error
+    double precision   :: epsabs = 0.5d-1 ! Requested absolute error
+    integer            :: flags = 0+4 ! Flags
+    integer            :: seed = 0 ! Seed for the rng. Zero will use Sobol.
+    integer            :: mineval = 0 ! Minimum number of integrand evaluations
+    integer            :: maxeval = 10000000 ! Maximum number of integrand evaluations
+    integer            :: nnew = 100 ! Number of integrand evaluations in each subdivision
+    integer            :: nmin = 2   ! Minimum number of samples a former pass must contribute to a subregion to be considered in the region's compound integral value.
+    double precision   :: flatness = 5.0d0 ! Determine how prominently out-liers, i.e. samples with a large fluctuation, 
+                                           ! figure in the total fluctuation, which in turn determines how a region is split up.
+                                           ! As suggested by its name, flatness should be chosen large for 'flat" integrand and small for 'volatile' integrands
+                                           ! with high peaks.
+    character          :: statefile = "" ! File to save the state in. Empty string means don't do it.
+    integer            :: spin = -1 ! Spinning cores
+    integer            :: nregions ! <out> The actual number of subregions nedded
+    integer            :: neval ! <out> The actual number of integrand evaluations needed
+    integer            :: fail ! <out> Error flag (0 = Success, -1 = Dimension out of range, >0 = Accuracy goal was not met)
+    double precision, dimension(1:ncomp) :: integral ! <out> The integral of the integrand over the unit hybercube
+    double precision, dimension(1:ncomp) :: error ! <out> The presumed absolute error
+    double precision, dimension(1:ncomp) :: prob ! <out> The chi-square probability
+
+
+    ! Initialize the average field to zero
+    F_avg = 0.0d0
+
+    ! Pass the number of the emitter being integraded over to the integrand as userdata
+    userdata = emit
+
+    call suave(ndim, ncomp, integrand_cuba_fe, userdata, nvec, &
+     & epsrel, epsabs, flags, seed, &
+     & mineval, maxeval, nnew, nmin, flatness, &
+     & statefile, spin, &
+     & nregions, neval, fail, integral, error, prob)
+
+     if (fail /= 0) then
+      print '(a)', 'Vacuum: WARNING Cuba did not return 0'
+      print *, fail
+      print *, error
+      print *, integral(1)*epsrel
+      print *, epsabs
+      print *, prob
+      print *, integral(1)
+      call Flush_Data()
+     end if
+
+
+     !! Round the results to the nearest integer
+     !N_sup = nint( integral(1) )
+     N_sup = integral(1)
+
+     ! Finish calculating the average field
+     F_avg = F_avg / neval
+
+     ! Write the output variables of the integration to a file
+     write(ud_integrand, '(i3, tr2, i8, tr2, i8, tr2, i4, tr2, ES12.4, tr2, ES12.4, tr2, ES12.4)', iostat=IFAIL) &
+                          & emit, nregions, neval, fail, integral(1), error(1), prob(1)
+  end subroutine Do_Cuba_Suave_FE
+
+  ! ----------------------------------------------------------------------------
+  ! The integration function for the Cuba library
+  !
+  integer function integrand_cuba_simple(ndim, xx, ncomp, ff, userdata)
+    ! Input / output variables
+    integer, intent(in) :: ndim ! Number of dimensions (Should be 2)
+    integer, intent(in) :: ncomp ! Number of vector-components in the integrand (Always 1 here)
+    integer, intent(in) :: userdata ! Additional data passed to the integral function (In our case the number of the emitter)
+    double precision, intent(in), dimension(1:ndim)   :: xx ! Integration points, between 0 and 1
+    double precision, intent(out), dimension(1:ncomp) :: ff ! Results of the integrand function
+
+    ! Variables used for calculations
+    double precision, dimension(1:3) :: par_pos, field
+    double precision                 :: A ! Emitter area
+
+    ! Emitter area
+    A = emitters_dim(1, userdata)*emitters_dim(2, userdata)
+
+    ! Surface position
+    ! Cuba does the intergration over the hybercube.
+    ! It gives us coordinates between 0 and 1.
+    par_pos(1:2) = emitters_pos(1:2, userdata) + xx(1:2)*emitters_dim(1:2, userdata) ! x and y position on the surface
+    par_pos(3) = 0.0d0 ! Height, i.e. on the surface
+
+    ! Calculate the electric field on the surface
+    field = Calc_Field_at(par_pos)
+
+    ! Add to the average field
+    F_avg = F_avg + field
+
+    ! Check if the field is favourable for emission
+    if (field(3) < 0.0d0) then
+      ! The field is favourable for emission
+      ! Calculate the current density at this point
+      ff(1) = Elec_Supply_V2(field(3), par_pos, userdata) * Escape_Prob(field(3), par_pos, userdata)
+    else
+      ! The field is NOT favourable for emission
+      ! This point does not contribute
+      ff(1) = 0.0d0
+    end if
+
+    ! We mutiply with the area of the emitter because Cuba does the 
+    ! integration over the hybercube, i.e. from 0 to 1.
+    ff(1) = A*ff(1)
+    
+    integrand_cuba_simple = 0 ! Return value to Cuba, 0 = success
+  end function integrand_cuba_simple
+
+  subroutine Do_Cuba_Suave_Simple(emit, N_sup)
     ! Input / output variables
     integer, intent(in)           :: emit
     double precision, intent(out) :: N_sup
@@ -430,7 +761,7 @@ contains
     ! Pass the number of the emitter being integraded over to the integrand as userdata
     userdata = emit
 
-    call suave(ndim, ncomp, integrand_cuba_fe, userdata, nvec, &
+    call suave(ndim, ncomp, integrand_cuba_simple, userdata, nvec, &
      & epsrel, epsabs, flags, seed, &
      & mineval, maxeval, nnew, nmin, flatness, &
      & statefile, spin, &
@@ -449,7 +780,7 @@ contains
 
      ! Finish calculating the average field
      F_avg = F_avg / neval
-  end subroutine Do_Cuba_Suave_FE
+  end subroutine
 
   ! ----------------------------------------------------------------------------
   ! Plain 2D Monte Carlo integration
@@ -502,7 +833,7 @@ contains
         N_mc = N_mc + 1
 
         !Calculate <f> and <f^2>
-        e_sup_res = Elec_Supply_V2(field(3), par_pos)
+        e_sup_res = Elec_Supply_V2(field(3), par_pos, emit)
         e_sup = e_sup + e_sup_res
         e_sup2 = e_sup2 + e_sup_res**2
 
@@ -562,7 +893,7 @@ contains
     double precision, dimension(1:3)              :: cur_pos, new_pos, field
     double precision                              :: df_cur, df_new
 
-    std(1:2) = emitters_dim(1:2, emit)*0.075d0/100.d0 ! Standard deviation for the normal distribution is 0.075% of the emitter length.
+    std(1:2) = emitters_dim(1:2, emit)*0.025d0/100.d0 ! Standard deviation for the normal distribution is 0.025% of the emitter length.
     ! This means that 68% of jumps are less than this value.
     ! The expected value of the absolute value of the normal distribution is std*sqrt(2/pi).
 
@@ -580,7 +911,10 @@ contains
         exit ! We found a nice spot so we exit the loop
       else
         count = count + 1
-        if (count > 10000) exit ! The loop is infnite, must stop it at some point.
+        if (count > 10000) then ! The loop is infnite, must stop it at some point.
+          print *, 'WARNING: MH was unable to find a favourable spot for emission!'
+          exit
+        end if
         ! In field emission it is rare the we reach the CL limit.
       end if
     end do
@@ -589,7 +923,7 @@ contains
 
     ! Calculate the escape probability at this location
     if (field(3) < 0.0d0) then
-      df_cur = Escape_Prob(field(3), cur_pos)
+      df_cur = Escape_Prob(field(3), cur_pos, emit)
     else
       df_cur = 0.0d0 ! Zero escape probabilty if field is not favourable
     end if
@@ -616,7 +950,7 @@ contains
 
       ! Calculate the escape probability at the new position, to compair with
       ! the current position.
-      df_new = Escape_Prob(field(3), new_pos)
+      df_new = Escape_Prob(field(3), new_pos, emit)
 
       ! If the escape probability is higher in the new location,
       ! then we jump to that location. If it is not then we jump to that
@@ -716,9 +1050,204 @@ contains
     end do
 
     F_out = cur_field(3)
-    df_out = Escape_Prob(F_out, cur_pos)
+    df_out = Escape_Prob(F_out, cur_pos, emit)
     pos_out = cur_pos
   end subroutine Metropolis_Hastings_rectangle_v2_field
+
+    !-----------------------------------------------------------------------------
+  ! Metropolis-Hastings algorithm
+  ! Includes that the work function can vary with position
+  subroutine Metropolis_Hastings_rectangle_J(ndim_in, emit, df_out, F_out, pos_out)
+    integer, intent(inout)                        :: ndim_in
+    integer, intent(in)                           :: emit
+    double precision, intent(out)                 :: df_out, F_out
+    integer                                       :: ndim, ndim_first
+    double precision, intent(out), dimension(1:3) :: pos_out
+    integer                                       :: count, i
+    double precision                              :: rnd, alpha
+    double precision, dimension(1:2)              :: std
+    double precision, dimension(1:3)              :: cur_pos, new_pos, field
+    double precision                              :: df_cur, df_new
+    double precision                              :: cur_w, new_w
+    !integer                                       :: jump_a, jump_r ! Number of jumps accepted and rejected
+    double precision                              :: ratio_change
+
+    !jump_a = 0
+    !jump_r = 0
+    !ndim = ndim_in
+    ndim_in = 0
+
+    !ndim = nint( 2.0d0/(MH_std*sqrt(2.0d0/pi)) )
+    ndim = 25*8
+    ratio_change = 0.5d0*100.0d0/maxval(emitters_dim(:, emit))
+    std(1:2) = emitters_dim(1:2, emit)*0.10d0 ! 5% of emitter size
+
+    ! Get a random initial position on the surface.
+    ! We pick this location from a uniform distribution.
+    count = 0
+    do ! Infinite loop, we try to find a favourable position to start from
+      CALL RANDOM_NUMBER(cur_pos(1:2))
+      cur_pos(1:2) = cur_pos(1:2)*emitters_dim(1:2, emit) + emitters_pos(1:2, emit)
+      cur_pos(3) = 0.0d0 ! On the surface
+
+      ! Calculate the electric field at this position
+      field = Calc_Field_at(cur_pos)
+      cur_w = w_theta_xy(cur_pos, emit)
+
+      if (field(3) < 0.0d0) then
+        exit ! We found a nice spot so we exit the loop
+      else
+        count = count + 1
+        if (count > 10000) then ! The loop is infnite, must stop it at some point.
+        ! In field emission it is rare the we reach the CL limit.
+          ndim_in = -1
+          print *, 'Failed to find spot for emission'
+          return ! Exit the function
+        end if
+      end if
+    end do
+
+    F_out = field(3)
+
+    ! Calculate the escape probability at this location
+    if (field(3) < 0.0d0) then
+      !df_cur = Get_Kevin_Jgtf(field(3), T_temp, cur_w)
+      df_cur = Escape_Prob_log(field(3), cur_pos, emit)
+    else
+      df_cur = -huge(1.0d0)! Zero escape probabilty if field is not favourable
+    end if
+
+    !write(unit=ud_mh) ndim
+    !print *, ndim
+    !write(unit=ud_mh) cur_pos(1), cur_pos(2), std(1), std(2)
+    !print *, 0, cur_pos(1)/1.0d-9, cur_pos(2)/1.0d-9, std(1)/1.0d-9, std(2)/1.0d-9
+
+    ndim_first = nint(ndim*0.25d0)
+
+    !---------------------------------------------------------------------------
+    ! We now pick a random distance and direction to jump to from our
+    ! current location. We do this ndim times.
+    do i = 1, ndim
+
+      ! Make first 25% of jumps with std as 5% of emitter length.
+      if (i > ndim_first) then
+
+        ! Try to keep the acceptance ratio around 25% by
+        ! changing the standard deviation.
+        CALL RANDOM_NUMBER(rnd) ! Change be a random number
+        if (a_rate < 0.2525d0) then
+          MH_std = MH_std * (1.0d0 - rnd*0.00025d0)
+        else
+          MH_std = MH_std * (1.0d0 + rnd*0.00025d0)
+        end if
+        ! Limits on how big or low the standard deviation can be.
+        if (MH_std > 0.1250d0) then
+          MH_std = 0.1250d0
+        else if (MH_std < 0.00005d0) then
+          MH_std = 0.00005d0
+        end if
+
+        std(1:2) = emitters_dim(1:2, emit)*MH_std ! Standard deviation for the normal distribution is 0.075% of the emitter length.
+        ! This means that 68% of jumps are less than this value.
+        ! The expected value of the absolute value of the normal distribution is std*sqrt(2/pi).
+      end if
+
+      ! Find a new position using a normal distribution.
+      !new_pos(1:2) = box_muller(cur_pos(1:2)/length_scale, std)*length_scale
+      new_pos(1:2) = box_muller(cur_pos(1:2), std)
+      new_pos(3) = 0.0d0 ! At the surface
+
+      ! Make sure that the new position is within the limits of the emitter area.
+      call check_limits_metro_rec(new_pos, emit)
+
+      ! Calculate the field at the new position
+      field = Calc_Field_at(new_pos)
+      new_w = w_theta_xy(new_pos, emit)
+
+      ! Check if the field is favourable for emission at the new position.
+      ! If it is not then cycle, i.e. we reject this location and
+      ! pick another one.
+      if (field(3) >= 0.0d0) then
+        !write(unit=ud_mh) cur_pos(1), cur_pos(2), std(1), std(2)
+        !print *, i, cur_pos(1)/1.0d-9, cur_pos(2)/1.0d-9, std(1)/1.0d-9, std(2)/1.0d-9
+        !print *, 'WARNING UNFAVOURABLE FIELD'
+        !print *, field
+        !print *, new_pos/1.0E-9
+        !print *, nrPart
+        !print *, i
+        !pause
+        if (i > ndim_first) then
+          jump_r = jump_r + 1
+        end if
+        cycle ! Do the next loop iteration, i.e. find a new position.
+      end if
+
+      ! Calculate the escape probability at the new position, to compair with
+      ! the current position.
+      !df_new = Get_Kevin_Jgtf(field(3), T_temp, new_w)
+      df_new = Escape_Prob_log(field(3), cur_pos, emit)
+
+      ! if (abs(cur_w - new_w) > 0.25) then
+      !   print *, df_new / df_cur
+      !   print *, cur_w
+      !   print *, df_cur
+      !   print *, new_w
+      !   print *, df_new
+      !   print *, ''
+      !   pause
+      ! end if
+
+      alpha = df_new - df_cur
+
+      if (df_new >= df_cur ) then
+        cur_pos = new_pos
+        df_cur = df_new
+        cur_w = new_w
+        F_out = field(3)
+        if (i > ndim_first) then
+          jump_a = jump_a + 1
+        end if
+      else
+        CALL RANDOM_NUMBER(rnd)
+        if (log(rnd) <= alpha) then
+          cur_pos = new_pos
+          df_cur = df_new
+          cur_w = new_w
+          F_out = field(3)
+          if (i > ndim_first) then
+            jump_a = jump_a + 1
+          end if
+        else
+          if (i > ndim_first) then
+            jump_r = jump_r + 1
+          end if
+        end if
+      end if
+
+      !write(unit=ud_mh) cur_pos(1), cur_pos(2), std(1), std(2)
+      !print *, i, cur_pos(1)/1.0d-9, cur_pos(2)/1.0d-9, std(1)/1.0d-9, std(2)/1.0d-9
+    end do
+
+    ! Acceptance rate
+    a_rate = DBLE(jump_a) / DBLE(jump_r + jump_a)
+    !print *, jump_a
+    !print *, jump_r
+    !print *, a_rate
+    !print *, MH_std
+    !print *, std(1:2)/length_scale
+    !print *, ''
+
+    ! Return the current position
+    pos_out = cur_pos
+    df_out = df_cur
+
+    !close(unit=ud_mh)
+    !stop
+  end subroutine Metropolis_Hastings_rectangle_J
+
+  ! Adaptive MH in log space
+  !subroutine Adpative_MH_log()
+  !end subroutine Adpative_MH_log
 
   ! ----------------------------------------------------------------------------
   ! Checks the limits of the rectangular region of the emitter
@@ -740,18 +1269,18 @@ contains
       d_x = par_pos(1) - x_max
       par_pos(1) = x_max - d_x
 
-      !if(d_x > emitters_dim(1, emit)) then
-      !  print *, 'Warning: d_x to large >'
-      !  print *, d_x
-      !end if
+      if(d_x > emitters_dim(1, emit)) then
+        print *, 'Warning: d_x to large >'
+        print *, d_x
+      end if
     else if (par_pos(1) < x_min) then
       d_x = x_min - par_pos(1)
       par_pos(1) = d_x + x_min
 
-      !if(d_x > emitters_dim(1, emit)) then
-      !  print *, 'Warning: d_x to large <'
-      !  print *, d_x
-      !end if
+      if(d_x > emitters_dim(1, emit)) then
+        print *, 'Warning: d_x to large <'
+        print *, d_x
+      end if
     end if
 
     !Check y ----------------------------------------
@@ -759,40 +1288,26 @@ contains
       d_y = par_pos(2) - y_max
       par_pos(2) = y_max - d_y
 
-      !if(d_y > emitters_dim(2, emit)) then
-      !  print *, 'Warning: d_y to large >'
-      !  print *, d_y
-      !end if
+      if(d_y > emitters_dim(2, emit)) then
+        print *, 'Warning: d_y to large >'
+        print *, d_y
+      end if
     else if (par_pos(2) < y_min) then
       d_y = y_min - par_pos(2)
       par_pos(2) = d_y + y_min
 
-      !if(d_y > emitters_dim(2, emit)) then
-      !  print *, 'Warning: d_x to large <'
-      !  print *, d_y
-      !end if
+      if(d_y > emitters_dim(2, emit)) then
+        print *, 'Warning: d_x to large <'
+        print *, d_y
+      end if
     end if
   end subroutine check_limits_metro_rec
 
-  ! ----------------------------------------------------------------------------
-  ! Generate random numbers using the Ziggurat method.
-  ! Normal distributed random numbers.
-  ! This is faster than the Box-Muller.
-  function ziggurat_normal(mean, std)
-    double precision, intent(in), dimension(1:2) :: mean
-    double precision, intent(in), dimension(1:2) :: std
-    double precision, dimension(1:2)             :: ziggurat_normal
-
-    ! This stuff is not thread safe.
-    ! The Intel compiler barfs at this while using OpenMP.
-    ! It has to do with the fact that the save attribute is used in the module.
-    ! Variables with the save attribute are shared.
-    !$OMP CRITICAL(ZIGGURAT)
-    ziggurat_normal(1) = rnor()
-    ziggurat_normal(2) = rnor()
-    !$OMP END CRITICAL(ZIGGURAT)
-
-    ziggurat_normal(:) = mean(:) + std(:)*ziggurat_normal(:)
-  end function ziggurat_normal
+  ! Adaptive Metropolis algorithm is log space
+  ! See: Haario, Heikki, Eero Saksman, and Johanna Tamminen. "An adaptive Metropolis algorithm." Bernoulli 7.2 (2001): 223-242.
+  ! https://projecteuclid.org/download/pdf_1/euclid.bj/1080222083
+  !subroutine Adaptive_MH_log()
+    
+  !end subroutine
 
 end Module mod_field_emission_v2

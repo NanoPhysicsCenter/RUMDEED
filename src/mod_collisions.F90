@@ -30,9 +30,6 @@ contains
     double precision, dimension(1:3) :: cur_pos, prev_pos, par_vec, old_vel
     double precision, parameter      :: v2_min      = (2.0d0*q_0*0.1d0/m_0) ! Minimum velocity squared
     double precision, parameter      :: v2_max      = (2.0d0*q_0*5000.0d0/m_0) ! Maximum velocity squared
-    double precision, parameter      :: T_temp = 293.15d0 ! Temperature in Kelvin
-    double precision, parameter      :: P_abs = 101325.0d0 ! Absolute pressure in Pa
-    double precision, parameter      :: n_d = P_abs/(k_b*T_temp) ! Density
     double precision                 :: mean_path, mean_path_avg, mean_actual_avg ! Mean free path
     integer                          :: count_n
     double precision                 :: cross_tot, cross_ion
@@ -57,8 +54,8 @@ contains
     !$OMP& PRIVATE(i, cur_pos, prev_pos, d, alpha, rnd, par_vec, vel2, KE, mean_path, cross_tot, cross_ion) &
     !$OMP& PRIVATE(old_vel, ion_life_time) &
     !$OMP& SHARED(nrPart, particles_species, particles_life, step, particles_cur_pos) &
-    !$OMP& SHARED(particles_prev_pos, particles_cur_vel, time_step) &
-    !$OMP& REDUCTION(+:nrColl, count_n, mean_path_avg, nrIon) SCHEDULE(GUIDED, CHUNK_SIZE)
+    !$OMP& SHARED(particles_prev_pos, particles_cur_vel, time_step, n_d) &
+    !$OMP& REDUCTION(+:nrColl, count_n, mean_path_avg, nrIon)
     do i = 1, nrPart
       if (particles_species(i) /= species_elec) then
         if (step >= particles_life(i)) then
@@ -74,7 +71,7 @@ contains
         d = sqrt( (cur_pos(1) - prev_pos(1))**2 + (cur_pos(2) - prev_pos(2))**2 + (cur_pos(3) - prev_pos(3))**2 )
         vel2 = old_vel(1)**2 + old_vel(2)**2 + old_vel(3)**2
       
-        ! Check if we do a collision or not
+        ! The velocity should be above the minimum velocity we set.
         !if ((vel2 > v2_min) .and. (vel2 < v2_max)) then
         if (vel2 > v2_min) then
 
@@ -90,6 +87,7 @@ contains
           mean_path_avg = mean_path_avg + mean_path
           count_n = count_n + 1
 
+          ! Calculate the ratio between the distance travled and the mean free path
           alpha = d/mean_path
           ! if (alpha > 1.0d0) then
           !   print *, 'WARNING: alpha > 1 in mean path'
@@ -130,6 +128,8 @@ contains
             !particles_last_col_pos(:, i) = cur_pos(:)
             !mean_actual_avg = mean_actual_avg + d
 
+            !---------------------------------------------
+            ! Check if the collision ionizes the N2 or not  
             cross_ion = Find_Cross_ion_data(KE)
             
             alpha = cross_ion/cross_tot
@@ -138,10 +138,10 @@ contains
             !   print *, 'WARNING: alpha > 1 in cross section'
             ! end if
             
-            ! Check if the collision ionizes the N2 or not  
             call random_number(rnd)
-            if (rnd < alpha) then
+            if (rnd < alpha) then ! Check if we ionize or not
 
+              ! We ionize
               ! Pick a position for the new electron to appear at some where close to where the collision occurred
               call random_number(prev_pos)
               prev_pos = prev_pos - 0.5d0
@@ -165,9 +165,10 @@ contains
               ! Calculate the life time of the Ion
               ! This number is drawn from an exponential distribution
               ! The half life is 0.13843690559395497 ps
-              alpha = -0.13843690559395497E-12 / time_step
-              call random_number(rnd)
-              ion_life_time = NINT(alpha*log(1.0d0 - rnd))
+              !alpha = -0.13843690559395497E-12 / time_step
+              !call random_number(rnd)
+              !ion_life_time = NINT(alpha*log(1.0d0 - rnd))
+              ion_life_time = 1000000
 
               !$OMP CRITICAL
               ! Add the new positively charged ion to the system
@@ -194,7 +195,9 @@ contains
 
     end if
 
-    mean_path_avg = mean_path_avg / count_n
+    if (count_n > 1) then
+      mean_path_avg = mean_path_avg / count_n
+    end if
     mean_actual_avg = 0.0d0
 
     cur_time = time_step * step / time_scale ! Scaled in units of time_scale

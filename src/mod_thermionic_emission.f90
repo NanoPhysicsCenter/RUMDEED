@@ -8,7 +8,6 @@ Module mod_therminoic_emission
   use mod_global
   use mod_verlet
   use mod_pair
-  use ziggurat
   implicit none
 
   PRIVATE

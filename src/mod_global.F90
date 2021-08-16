@@ -41,6 +41,9 @@ module mod_global
   double precision, parameter :: q_0 = 1.6021766208d-19 ! Elementary charge (C)
   double precision, parameter :: q_02 = q_0**2 ! Elementary charge squared (C)
 
+  double precision, parameter :: T_ntp = 293.15d0 ! Normal temperature in Kelvin (NIST)
+  double precision, parameter :: P_ntp = 101325.0d0 ! Normal pressure in Pa (NIST)
+
   ! ----------------------------------------------------------------------------
   ! Define scales used when reading and writing data
   double precision, parameter :: length_scale = 1.0d-9 ! Length scale (1 nanometer)
@@ -53,8 +56,8 @@ module mod_global
   ! Define maximum size constants.
   ! These can be increased if needed.
   integer, parameter :: MAX_PARTICLES = 500000 ! Maximum number of particles allowed in the system
-  integer, parameter :: MAX_EMITTERS  = 10     ! Maximum number of emitters in the system
-  integer, parameter :: MAX_SECTIONS  = 48*48  ! Maximum number of sections an emitter can have
+  integer, parameter :: MAX_EMITTERS  = 1      ! Maximum number of emitters in the system
+  integer, parameter :: MAX_SECTIONS  = 96*96    ! Maximum number of sections an emitter can have
 
 
   !! ----------------------------------------------------------------------------
@@ -87,11 +90,11 @@ module mod_global
   double precision, dimension(:, :), allocatable :: particles_prev_accel ! Previous acceleration
   double precision, dimension(:, :), allocatable :: particles_prev2_accel ! Previous acceleration
 
-  ! Other information about particles, the dimension if the number of particles
+  ! Other information about particles, the dimension is the number of particles
   double precision, dimension(:)   , allocatable :: particles_charge     ! Charge
   integer         , dimension(:)   , allocatable :: particles_species    ! Type of particle
   double precision, dimension(:)   , allocatable :: particles_mass       ! Mass
-  integer         , dimension(:)   , allocatable :: particles_step       ! Time step when particle was created
+  integer         , dimension(:)   , allocatable :: particles_step       ! Time step when the particle was created
   integer         , dimension(:)   , allocatable :: particles_emitter    ! The emitter the particle came from
   integer         , dimension(:)   , allocatable :: particles_section    ! The section of the emitter the particles came from
   integer         , dimension(:)   , allocatable :: particles_life       ! The time step when the particle should be removed from the system
@@ -137,6 +140,17 @@ module mod_global
 
   logical          :: collisions = .false. ! Do ion colissions or not
 
+  double precision :: T_temp = T_ntp ! Temperature in Kelvin
+  double precision :: P_abs = P_ntp  ! Pressure as fraction of P_std
+  double precision :: n_d = P_ntp/(k_b*T_ntp) ! Density of N2
+
+  double precision :: R_s = 0.0d0 ! Series resistor
+
+  ! Parallel
+  double precision :: R_p = 7500.0d0 ! Ohm, parallel resistor
+  double precision :: L_p = 1.04d-9  ! Henry, parallel inductor
+  double precision :: C_p = 0.53d-17 ! Farad, parallel capacitor
+
 
   ! ----------------------------------------------------------------------------
   ! Define run time variables
@@ -167,15 +181,14 @@ module mod_global
 
   ! ----------------------------------------------------------------------------
   ! Emitter types
-  integer, parameter :: EMIT_UNKNOWN   = 0
-  integer, parameter :: EMIT_CIRCLE    = 1
-  integer, parameter :: EMIT_RECTANGLE = 2
+  integer, parameter :: EMIT_UNKNOWN         = 0
+  integer, parameter :: EMIT_CIRCLE          = 1
+  integer, parameter :: EMIT_RECTANGLE       = 2
+  integer, parameter :: EMIT_RECTANGLE_SPOTS = 3
 
 
   double precision, dimension(:), allocatable :: ramo_current
   double precision, dimension(:, :), allocatable :: ramo_current_emit
-  double precision :: ramo_cur_prev
-  double precision :: ramo_integral
 
   double precision                 :: avg_mob ! Average mobility
   double precision, dimension(1:3) :: avg_vel ! Average speed
@@ -186,15 +199,18 @@ module mod_global
 
   ! ----------------------------------------------------------------------------
   ! Emission models
+  integer, parameter :: EMISSION_UNIT_TEST         = 0 ! Units test
   integer, parameter :: EMISSION_PHOTO             = 1 ! Planar photo emission
   integer, parameter :: EMISSION_FIELD             = 2 ! Planar field emission
-  integer, parameter :: EMISSION_FIELD_TIP         = 3 ! Field emission from a hyperboloid tip
+  integer, parameter :: EMISSION_TIP               = 3 ! Field emission from a hyperboloid tip
   integer, parameter :: EMISSION_THERMIONIC        = 4 ! Thermionic emission
   integer, parameter :: EMISSION_FIELD_2D_2DEG_C   = 5 ! Field emission from 2D material
   integer, parameter :: EMISSION_FIELD_2D_2DEG_NC  = 6 ! Field emission from 2D material
   integer, parameter :: EMISSION_FIELD_2D_DIRAC_C  = 7 ! Field emission from 2D material
   integer, parameter :: EMISSION_FIELD_2D_DIRAC_NC = 8 ! Field emission from 2D material
-  integer, parameter :: EMISSION_TEST              = 99 ! Development emission
+  integer, parameter :: EMISSION_FIELD_THERMO      = 9 ! Planar Field + Thermionic emission
+  integer, parameter :: EMISSION_MANUAL            = 999 ! Manual placement of electrons for testing/debuging
+  integer, parameter :: EMISSION_FIELD_V2          = 10 ! Development emission
 
   integer            :: EMISSION_MODE           ! Parameter that defines the emission mode
 
@@ -213,9 +229,22 @@ module mod_global
   integer           :: N_ic_max = 0
 
   ! ----------------------------------------------------------------------------
+  ! Periodic boundary conditions
+  ! Num_per = 0, means don't use periodic boundary conditions
+  double precision, parameter :: per_padding = 0.0d0 ! Padding between periodic systems
+  integer                     :: Num_per = 0
+
+  ! ----------------------------------------------------------------------------
   ! Define constants
   ! The constant in front of Coulomb's law, often called k
   double precision, parameter :: div_fac_c = 1.0d0/(4.0d0*pi*epsilon_0*epsilon_r) ! 1/(4*pi*epsilon_0*epsilon_r)
+
+  ! ----------------------------------------------------------------------------
+  ! Planes where to record information about particles when they pass through
+  integer, parameter                                 :: planes_N = 6
+  double precision, dimension(1:planes_N), parameter :: planes_z = &
+                    & (/ 5.0d0, 10.0d0, 25.0d0, 50.0d0, 100.0d0, 500.0d0 /) * length_scale
+  integer, dimension(1:planes_N)                     :: planes_ud
 
 
   ! ----------------------------------------------------------------------------
@@ -225,7 +254,8 @@ module mod_global
 
   ! ----------------------------------------------------------------------------
   ! Other stuff
-  logical, parameter :: write_ramo_sec = .false. ! Write out the ramo current for each section.
+  logical            :: write_ramo_sec = .False. ! Write out the ramo current for each section.
+  logical            :: write_position_file = .False. ! Write ot the particle position information.
 
 
   ! ----------------------------------------------------------------------------
@@ -240,6 +270,9 @@ module mod_global
   integer :: ud_debug ! File for debuging and testing
   integer :: ud_field ! File for surface field
   integer :: ud_coll ! Collisions
+  integer :: ud_integrand ! Information about the surface integration
+  integer :: ud_mh ! Information about MH
+  integer :: ud_gauss
 
   ! unit descriptors for data files (binary files)
   integer :: ud_ramo_sec ! File for the ramo current broken down into emitters and sections
@@ -254,7 +287,7 @@ module mod_global
 
   !-----------------------------------------------------------------------------
   ! Nodal Analysis
-  double precision, dimension(1:5) :: V_cur, V_prev ! Voltage and branch currents for the nodal analysis
+  !!double precision, dimension(1:5) :: V_cur, V_prev ! Voltage and branch currents for the nodal analysis
 
   !-----------------------------------------------------------------------------
   ! Other
@@ -268,7 +301,9 @@ module mod_global
   namelist /input/ V_s, box_dim, time_step, steps, &
                    nrEmit, emitters_pos, emitters_dim, &
                    emitters_type, emitters_delay, EMISSION_MODE, &
-                   image_charge, N_ic_max, collisions
+                   image_charge, N_ic_max, collisions, T_temp, P_abs, &
+                   write_ramo_sec, write_position_file, R_s, &
+                   R_p, L_p, C_p, Num_per
 
   ! ----------------------------------------------------------------------------
   ! Prodecure interfaces and pointers
@@ -292,14 +327,43 @@ module mod_global
       double precision, dimension(1:3)             :: Image_Charge_effect
       double precision, dimension(1:3), intent(in) :: pos_1, pos_2
    end function Image_Charge_effect
+
+   function Get_Emission_Velocity()
+      double precision, dimension(1:3) :: Get_Emission_Velocity
+   end function Get_Emission_Velocity
   end interface
 
   ! Pointers
-  procedure(Check_Boundary), pointer      :: ptr_Check_Boundary => null()
-  procedure(Electric_Field), pointer      :: ptr_field_E => null()
-  procedure(Do_Emission), pointer         :: ptr_Do_Emission => null()
-  procedure(Image_Charge_effect), pointer :: ptr_Image_Charge_effect => null()
+  procedure(Check_Boundary), pointer        :: ptr_Check_Boundary => null()
+  procedure(Electric_Field), pointer        :: ptr_field_E => null()
+  procedure(Do_Emission), pointer           :: ptr_Do_Emission => null()
+  procedure(Image_Charge_effect), pointer   :: ptr_Image_Charge_effect => null()
+  procedure(Get_Emission_Velocity), pointer :: ptr_Get_Emission_Velocity => null()
 contains
+
+  ! Flush all files to disk
+  subroutine Flush_Data()
+   flush(ud_pos)
+   flush(ud_emit)
+   flush(ud_absorb)
+   flush(ud_absorb_top)
+   flush(ud_absorb_bot)
+   flush(ud_ramo)
+   flush(ud_volt)
+   flush(ud_debug)
+   flush(ud_field)
+   flush(ud_coll)
+   flush(ud_integrand)
+   flush(ud_mh)
+
+   flush(ud_ramo_sec)
+
+   flush(ud_density_emit)
+   flush(ud_density_ion)
+
+   flush(ud_density_absorb_top)
+   flush(ud_density_absorb_bot)
+  end subroutine Flush_Data
 
   ! Check if a number is infinit.
   logical function isinf(a)
@@ -346,7 +410,8 @@ contains
 ! standard, normally distributed (zero expectation, unit variance) random numbers,
 ! given a source of uniformly distributed random numbers."
 ! See https://en.wikipedia.org/wiki/Box%E2%80%93Muller_transform
-! and https://en.wikipedia.org/wiki/Marsaglia_polar_method
+! We use the polar form version here see:
+! https://en.wikipedia.org/wiki/Marsaglia_polar_method
 function box_muller(mean, std)
   double precision, dimension(1:2)             :: box_muller
   double precision, dimension(1:2), intent(in) :: mean, std

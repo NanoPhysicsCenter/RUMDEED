@@ -10,6 +10,10 @@ Module mod_verlet
   use mod_collisions
   implicit none
 
+  ! RLC
+  double precision :: V_rf = 0.0d0, V_rf_prev = 0.0d0, V_rf_next = 0.0d0
+  double precision :: I_cur = 0.0d0, I_prev = 0.0d0
+
 contains
 
   ! ----------------------------------------------------------------------------
@@ -36,7 +40,15 @@ contains
     !if (nrElecHole > 0) then
       call Update_ElecHole_Position(step)
 
+      if (EMISSION_MODE == EMISSION_UNIT_TEST) then
+        call Write_Position_Test(step)
+      end if
+
       call Calculate_Acceleration_Particles()
+
+      if ((EMISSION_MODE == EMISSION_UNIT_TEST) .or. (EMISSION_MODE == EMISSION_MANUAL)) then
+        call Write_Acceleration_Test(step)
+      end if
 
       ! Reset the ramo current. Note, this should be done after set_voltage,
       ! since the ramo current may be used there.
@@ -74,18 +86,17 @@ contains
 
     !$OMP PARALLEL DO PRIVATE(i) &
     !$OMP& SHARED(particles_prev_pos, particles_cur_pos, particles_cur_vel, particles_cur_accel) &
-    !$OMP& SHARED(time_step, time_step2, particles_prev2_accel, particles_prev_accel) &
-    !$OMP& SCHEDULE(GUIDED, CHUNK_SIZE)
+    !$OMP& SHARED(time_step, time_step2, particles_prev2_accel, particles_prev_accel)
     do i = 1, nrPart
       ! Verlet
-      particles_prev_pos(:, i) = particles_cur_pos(:, i) ! Store the previous position
-      particles_cur_pos(:, i)  = particles_cur_pos(:, i) + particles_cur_vel(:, i)*time_step &
-                             & + 0.5d0*particles_cur_accel(:, i)*time_step2
-
-      ! Beeman
       !particles_prev_pos(:, i) = particles_cur_pos(:, i) ! Store the previous position
       !particles_cur_pos(:, i)  = particles_cur_pos(:, i) + particles_cur_vel(:, i)*time_step &
-      !                       & + 1.0d0/6.0d0*( 4.0d0*particles_cur_accel(:, i) - particles_prev_accel(:, i) )*time_step2
+      !                       & + 0.5d0*particles_cur_accel(:, i)*time_step2
+
+      ! Beeman
+      particles_prev_pos(:, i) = particles_cur_pos(:, i) ! Store the previous position
+      particles_cur_pos(:, i)  = particles_cur_pos(:, i) + particles_cur_vel(:, i)*time_step &
+                             & + 1.0d0/6.0d0*( 4.0d0*particles_cur_accel(:, i) - particles_prev_accel(:, i) )*time_step2
 
       particles_prev2_accel(:, i) = particles_prev_accel(:, i) ! Beeman
       particles_prev_accel(:, i) = particles_cur_accel(:, i)
@@ -93,14 +104,45 @@ contains
 
       ! Mark particles that should be removed with .false. in the mask array
       call ptr_Check_Boundary(i)
+
+      ! Record information about particles when to pass trough certain planes
+      call Check_Planes(i)
     end do
     !$OMP END PARALLEL DO
   end subroutine Update_ElecHole_Position
 
+
+  subroutine Write_Position_Test(step)
+    integer, intent(in)              :: step
+    integer                          :: ud_pos_test, IFAIL, i
+    character(len=1024)              :: filename
+    double precision, dimension(1:3) :: par_pos
+
+    ! Prepare the name of the output file
+    ! each file is named accel-0.dt where the number
+    ! represents the current time step.
+    write(filename, '(a8, i0, a4)') 'pos/pos-', step, '.bin'
+
+    open(newunit=ud_pos_test, iostat=IFAIL, file=filename, status='replace', action='write', access='STREAM')
+    if (IFAIL /= 0) then
+      print '(a)', 'Vacuum: ERROR UNABLE TO OPEN file for position'
+      print *, filename
+      print *, step
+    end if
+
+    do i = 1, nrPart
+      par_pos(:) = particles_cur_pos(:, i) ! Position of the particle
+
+      ! Write out x, y, z
+      write(unit=ud_pos_test) par_pos(1), par_pos(2), par_pos(3)
+    end do
+
+    close(unit=ud_pos_test, iostat=IFAIL, status='keep')
+  end subroutine Write_Position_Test
+
   ! ----------------------------------------------------------------------------
   ! Checks the boundary conditions of the box.
   ! Check which particles to remove
-  ! Enforce periodic boundary conditions (ToDo, Edwald sum in slab?)
   subroutine Check_Boundary_ElecHole_Planar(i)
     integer, intent(in) :: i
     double precision    :: z
@@ -116,6 +158,56 @@ contains
 
   end subroutine Check_Boundary_ElecHole_Planar
 
+  ! ----------------------------------------------------------------------------
+  ! Check planes where to record information
+  !
+  subroutine Check_Planes(i)
+    integer, intent(in) :: i ! particle to check
+    integer             :: k ! loop index
+    double precision    :: z, z_cur, z_prev
+
+    do k = 1, planes_N
+      z = planes_z(k)
+      if (z > 0.0d0) then ! A value of less then 0 means don't use this plane
+        z_cur = particles_cur_pos(3, i) ! Particle current position
+        z_prev = particles_prev_pos(3, i) ! Particle previous position
+
+        ! If current position is above the plane and previous is below then the particles passed trough the plane in this time step
+        if ((z_cur > z) .and. (z_prev < z)) then
+          ! Record information about this particle
+          write(unit=planes_ud(k)) particles_cur_pos(1, i)/length_scale, particles_cur_pos(2, i)/length_scale, &
+                                          & particles_cur_vel(1, i), particles_cur_vel(2, i), particles_cur_vel(3, i), &
+                                          & particles_emitter(i), particles_section(i)
+        end if
+      end if
+    end do
+  end subroutine Check_Planes
+
+
+  ! ----------------------------------------------------------------------------
+  ! Checks the boundary conditions of the box.
+  ! Check which particles to remove
+  ! Enforce periodic boundary conditions
+  subroutine Check_Boundary_ElecHole_Periodic(i)
+    integer, intent(in) :: i
+    double precision    :: x, y, z
+
+    x = particles_cur_pos(1, i)
+    y = particles_cur_pos(2, i)
+    z = particles_cur_pos(3, i)
+
+    ! Check if the particle should be removed from the system
+    if (z < 0.0d0) then
+        call Mark_Particles_Remove(i, remove_bot)
+    else if (z > box_dim(3)) then
+        call Mark_Particles_Remove(i, remove_top)
+    end if
+
+    ! Do periodic boundary conditions
+    particles_cur_pos(1, i) = modulo(x, box_dim(1))
+    particles_cur_pos(1, i) = modulo(y, box_dim(2))
+
+  end subroutine Check_Boundary_ElecHole_Periodic
 
   ! ----------------------------------------------------------------------------
   ! Update the velocity in the verlet integration
@@ -130,14 +222,14 @@ contains
     !$OMP& SHARED(nrPart, particles_cur_vel, particles_prev_accel, particles_cur_accel, time_step) &
     !$OMP& SHARED(ramo_current, ramo_current_emit, E_zunit, particles_section, particles_charge) &
     !$OMP& SHARED(particles_species, particles_emitter, particles_prev2_accel) &
-    !$OMP& REDUCTION(+:avg_vel) SCHEDULE(GUIDED, CHUNK_SIZE)
+    !$OMP& REDUCTION(+:avg_vel)
     do i = 1, nrPart
       ! Verlet
       !particles_cur_vel(:, i) = particles_cur_vel(:, i) &
       !                      & + 0.5d0*( particles_prev_accel(:, i) &
       !                      & + particles_cur_accel(:, i) )*time_step
 
-      ! Beeman
+      !! Beeman
       particles_cur_vel(:, i) = particles_cur_vel(:, i) &
                             & + 1.0d0/6.0d0*( 2.0d0*particles_cur_accel(:, i) &
                             & + 5.0d0*particles_prev_accel(:, i) & 
@@ -169,19 +261,20 @@ contains
   ! Update the acceleration for all the particles
   subroutine Calculate_Acceleration_Particles()
     double precision, dimension(1:3) :: force_E, force_c, force_ic, force_ic_N, force_ic_self
-    double precision, dimension(1:3) :: pos_1, pos_2, diff
+    double precision, dimension(1:3) :: pos_1, pos_2, diff, pos_ic, pos_2_per
     double precision                 :: r
     double precision                 :: q_1, q_2
     double precision                 :: im_1, im_2
     double precision                 :: pre_fac_c
-    integer                          :: i, j, k_1, k_2
+    integer                          :: i, j, k_1, k_2, u, v
 
     ! We do not use GUIDED scheduling in OpenMP here because the inner loop changes size.
-    !$OMP PARALLEL DO DEFAULT(NONE) PRIVATE(i, j, k_1, k_2, pos_1, pos_2, diff, r) &
+    !$OMP PARALLEL DO DEFAULT(NONE) PRIVATE(i, j, k_1, k_2, pos_1, pos_2, pos_2_per, diff, r, pos_ic) &
     !$OMP& PRIVATE(force_E, force_c, force_ic, force_ic_N, force_ic_self, im_1, q_1, im_2, q_2, pre_fac_c) &
-    !$OMP SHARED(nrPart, particles_cur_pos, particles_mass, particles_species, ptr_field_E) &
-    !$OMP SHARED(ptr_Image_Charge_effect, particles_cur_accel, particles_charge) &
-    !$OMP& SCHEDULE(DYNAMIC, 4)
+    !$OMP SHARED(nrPart, particles_cur_pos, particles_mass, particles_species, ptr_field_E, Num_per, box_dim) &
+    !$OMP SHARED(ptr_Image_Charge_effect, particles_charge, d) &
+    !$OMP& SCHEDULE(DYNAMIC, 1) &
+    !$OMP& REDUCTION(+:particles_cur_accel)
     do i = 1, nrPart
       ! Information about the particle we are calculating the force/acceleration on
       pos_1 = particles_cur_pos(:, i)
@@ -205,7 +298,6 @@ contains
       ! There is no need to loop over all particles since
       ! The forces are equal but in opposite directions
       do j = i+1, nrPart
-
         ! Information about the particle that is acting on the particle at pos_1
         pos_2 = particles_cur_pos(:, j)
         !if (particles_mass(j) == 0.0d0) then
@@ -218,50 +310,149 @@ contains
         ! Prefactor for Coloumb's law
         pre_fac_c = q_1*q_2 * div_fac_c ! q_1*q_2 / (4*pi*epsilon)
 
-        ! Calculate the distance between the two particles
-        diff = pos_1 - pos_2
-        ! There are fours ways to calculate the distance
-        ! Number 1: Use the intrinsic function NORM2(v)
-        ! Number 2: Use the equation for it sqrt( v(1)**2 + v(2)**2 + v(3)**2 )
-        ! Number 3: Or do sqrt( dot_product(v, v) )
-        ! Number 4: Or use sqrt( sum(v**2) )
-        ! It turns you number 1 is the slowest by far. Number 2, 3 and 4 are
-        ! often similar in speed. The difference is small and they fluctuate a lot,
-        ! with no clear winner.
-        !
-        ! We add a small number (length_scale**3) to the results to
-        ! prevent a singularity when calulating 1/r**3
-        !
-        r = sqrt( sum(diff**2) ) + length_scale**3
-        !r = sqrt( dot_product(diff, diff) ) + length_scale**3
-        !r = NORM2(diff) + length_scale**3
+        do v = -1*Num_per, Num_per, 1 ! x
+          do u = -1*Num_per, Num_per, 1 ! y
 
-        ! Calculate the Coulomb force
-        ! F = (r_1 - r_2) / |r_1 - r_2|^3
-        ! F = (diff / r) * 1/r^2
-        ! (diff / r) is a unit vector
-        force_c = pre_fac_c * diff / r**3
+            !print *, 'u = ', u
+            !print *, 'v = ', v
 
-        ! Do image charge
-        force_ic = pre_fac_c * ptr_Image_Charge_effect(pos_1, pos_2)
+            ! The inner coulomb loop usally goes from j = 1+i, nrPart
+            ! We have to skip the self interaction. But we want the periodic part of it.
+            !if ((i == j) .and. (u == 0) .and. (v == 0)) then
+            !  cycle
+            !end if
 
-        ! The image charge force of particle i on particle j is the same in the z-direction
-        ! but we reverse the x and y directions of the force due to symmetry.
-        force_ic_N(1:2) = -1.0d0*force_ic(1:2)
-        force_ic_N(3)   = +1.0d0*force_ic(3)
+            ! Shift the position
+            pos_2_per(1) = pos_2(1) + v*(box_dim(1) + per_padding)
+            pos_2_per(2) = pos_2(2) + u*(box_dim(2) + per_padding)
+            pos_2_per(3) = pos_2(3)
 
-        !$OMP CRITICAL(ACCEL_UPDATE)
-        particles_cur_accel(:, j) = particles_cur_accel(:, j) - force_c * im_2 + force_ic_N * im_2
-        particles_cur_accel(:, i) = particles_cur_accel(:, i) + force_c * im_1 + force_ic   * im_1
-        !$OMP END CRITICAL(ACCEL_UPDATE)
+            ! Calculate the distance between the two particles
+            diff = pos_1 - pos_2_per
+            ! There are fours ways to calculate the distance
+            ! Number 1: Use the intrinsic function NORM2(v)
+            ! Number 2: Use the equation for it sqrt( v(1)**2 + v(2)**2 + v(3)**2 )
+            ! Number 3: Or do sqrt( dot_product(v, v) )
+            ! Number 4: Or use sqrt( sum(v**2) )
+            ! It turns out number 1 is the slowest by far. Number 2, 3 and 4 are
+            ! often similar in speed. The difference is small and they fluctuate a lot,
+            ! with no clear winner.
+            !
+            ! We add a small number (length_scale**3) to the results to
+            ! prevent a singularity when calulating 1/r**3
+            !
+            r = sqrt( sum(diff**2) ) + length_scale**3
+            !print *, r/length_scale
+            !r = sqrt( dot_product(diff, diff) ) + length_scale**3
+            !r = NORM2(diff) + length_scale**3
+
+            ! Calculate the Coulomb force
+            ! F = (r_1 - r_2) / |r_1 - r_2|^3
+            ! F = (diff / r) * 1/r^2
+            ! (diff / r) is a unit vector
+            force_c = pre_fac_c * diff / r**3
+            !print *, force_c
+            !print *, im_1
+            !print *, force_c*im_1
+
+            ! Do image charge
+            force_ic = pre_fac_c * ptr_Image_Charge_effect(pos_1, pos_2_per)
+
+            ! The image charge force of particle i on particle j is the same in the z-direction
+            ! but we reverse the x and y directions of the force due to symmetry.
+            force_ic_N(1:2) = -1.0d0*force_ic(1:2)
+            force_ic_N(3)   = +1.0d0*force_ic(3)
+
+            !print *, force_ic
+
+            ! ! Below plane
+            ! pos_ic(1:2) = pos_2(1:2)
+            ! pos_ic(3) = -1.0d0*pos_2(3)
+            ! diff = pos_1 - pos_ic
+            ! r = sqrt( sum(diff**2) ) + length_scale**3
+            ! force_ic = (-1.0d0)*pre_fac_c * diff / r**3
+
+            ! ! Above plane
+            ! pos_ic(1:2) = pos_2(1:2)
+            ! pos_ic(3) = 2*d - pos_2(3)
+            ! diff = pos_1 - pos_ic
+            ! r = sqrt( sum(diff**2) ) + length_scale**3
+            ! force_ic = force_ic + (-1.0d0)*pre_fac_c * diff / r**3
+
+
+            !!!$OMP CRITICAL(ACCEL_UPDATE)
+            !particles_cur_accel(:, i) = particles_cur_accel(:, i) + force_c*im_1 + force_ic*im_1
+            if (j /= i) then ! Do not double count!!!
+              particles_cur_accel(:, j) = particles_cur_accel(:, j) - force_c * im_2 + force_ic_N * im_2
+            end if
+            particles_cur_accel(:, i) = particles_cur_accel(:, i) + force_c * im_1 !+ force_ic     * im_1
+            !!!$OMP END CRITICAL(ACCEL_UPDATE)
+
+            !print *, ''
+
+            ! if ((isnan(force_c(1)*im_2) .eqv. .true.) &
+            !    & .or. (isnan(force_c(2)*im_2) .eqv. .true.) &
+            !    & .or. (isnan(force_c(3)*im_2) .eqv. .true.)) then
+            !   print *, 'u = ', u, ', v = ', v
+            !   print *, force_c*im_2
+            !   print *, pos_1/length_scale
+            !   print *, pos_2_per/length_scale
+            !   print *, ''
+            !   pause
+            ! end if
+          end do
+        end do
       end do
 
-      !$OMP CRITICAL(ACCEL_UPDATE)
+      !!!$OMP CRITICAL(ACCEL_UPDATE)
       particles_cur_accel(:, i) = particles_cur_accel(:, i) + force_E * im_1 + force_ic_self * im_1
-      !$OMP END CRITICAL(ACCEL_UPDATE)
+      !!!$OMP END CRITICAL(ACCEL_UPDATE)
     end do
     !$OMP END PARALLEL DO
+
+    !print *, 'Accel'
+    !print *, particles_cur_accel(:, 1:nrPart)
+    !print *, ''
+    !print *, 'Pos'
+    !print *, particles_cur_pos(:, 1:nrPart)/length_scale
+    !print *, 'Done'
+    !print *, nrPart
+    !stop
   end subroutine Calculate_Acceleration_Particles
+
+  subroutine Write_Acceleration_Test(step)
+    integer, intent(in)              :: step
+    integer                          :: ud_accel, IFAIL, i
+    character(len=1024)              :: filename
+    double precision, dimension(1:3) :: par_accel
+
+    print *, 'ACCEL DATA'
+
+    ! Prepare the name of the output file
+    ! each file is named accel-0.dt where the number
+    ! represents the current time step.
+    write(filename, '(a12, i0, a4)') 'accel/accel-', step, '.bin'
+
+    open(newunit=ud_accel, iostat=IFAIL, file=filename, status='replace', action='write', access='STREAM')
+    if (IFAIL /= 0) then
+      print '(a)', 'Vacuum: ERROR UNABLE TO OPEN file for acceleration'
+      print *, filename
+      print *, step
+    end if
+
+    do i = 1, nrPart
+      par_accel(:) = particles_cur_accel(:, i) ! Position of the particle
+
+      ! Write out x, y, z and which emitter the particle came from
+      write(unit=ud_accel) par_accel(1), par_accel(2), par_accel(3)
+      
+      print *, i
+      print *, par_accel
+      print *, ''
+    end do
+
+    close(unit=ud_accel, iostat=IFAIL, status='keep')
+  end subroutine Write_Acceleration_Test
 
 
   !-----------------------------------------------------------------------------
@@ -272,11 +463,11 @@ contains
     double precision, dimension(1:3), intent(in) :: pos
 
     double precision, dimension(1:3) :: force_c, force_tot, force_ic
-    double precision, dimension(1:3) :: pos_1, pos_2, diff
+    double precision, dimension(1:3) :: pos_1, pos_2, diff, pos_2_per
     double precision                 :: r
     double precision                 :: q_1, q_2
     double precision                 :: pre_fac_c
-    integer                          :: j
+    integer                          :: j, v, u
 
     ! Position of the particle we are calculating the force/acceleration on
     pos_1 = pos
@@ -285,9 +476,9 @@ contains
     force_tot = ptr_field_E(pos_1)
     !print *, force_tot
 
-    !$OMP PARALLEL DO DEFAULT(NONE) PRIVATE(j, pos_2, diff, r, force_c, force_ic, q_2, pre_fac_c) &
-    !$OMP& SHARED(nrPart, particles_cur_pos, particles_charge, ptr_Image_Charge_effect, pos_1) &
-    !$OMP& REDUCTION(+:force_tot) SCHEDULE(GUIDED, CHUNK_SIZE)
+    !$OMP PARALLEL DO DEFAULT(NONE) PRIVATE(j, pos_2, pos_2_per, diff, r, force_c, force_ic, q_2, pre_fac_c) &
+    !$OMP& SHARED(nrPart, particles_cur_pos, particles_charge, ptr_Image_Charge_effect, pos_1, Num_per, box_dim) &
+    !$OMP& REDUCTION(+:force_tot)
     do j = 1, nrPart
 
       ! Position of the particle that is acting on the particle at pos_1
@@ -296,24 +487,57 @@ contains
 
       pre_fac_c = q_2 * div_fac_c ! q_2 / (4*pi*epsilon)
 
-      ! Calculate the distance between the two particles
-      diff = pos_1 - pos_2
-      r = sqrt( sum(diff**2) ) + length_scale**3
-      !r = sqrt( dot_product(diff, diff) ) + length_scale**3
-      !r = NORM2(diff) + length_scale**3 ! distance + Prevent singularity
+        ! Loop over the periodic systems
+        !
+        ! ---------------------------------------------------
+        ! |         |         |         |         |         |
+        ! | -2x,+2y | -1x,+2y | +0x,+2y | +1x,+2y | +2x,+2y |
+        ! |         |         |         |         |         |
+        ! |--------------------------------------------------
+        ! |         |         |         |         |         |
+        ! | -2x,+1y | -1x,+1y | +0x,+1y | +1x,+1y | +2x,+1y |
+        ! |         |         |         |         |         |
+        ! |--------------------------------------------------
+        ! |         |         |         |         |         |
+        ! | -2x,+0y | -1x,+0y | +0x,+0y | +1x,+0y | +2x,+0y |
+        ! |         |         |         |         |         |
+        ! |--------------------------------------------------
+        ! |         |         |         |         |         |
+        ! | -2x,-1y | -1x,-1y | +0x,-1y | +1x,-1y | +2x,-1y |
+        ! |         |         |         |         |         |
+        ! |--------------------------------------------------
+        ! |         |         |         |         |         |
+        ! | -2x,-2y | -1x,-2y | +0x,-2y | +1x,-2y | +2x,-2y |
+        ! |         |         |         |         |         |
+        ! |--------------------------------------------------
+      do v = -1*Num_per, Num_per, 1 ! x
+        do u = -1*Num_per, Num_per, 1 ! y
 
-      ! Calculate the Coulomb force
-      ! F = (r_1 - r_2) / |r_1 - r_2|^3
-      ! F = (diff / r) * 1/r^2
-      ! (diff / r) is a unit vector
-      force_c = diff / r**3
-      !force_c = diff / (r*r*r)
+          ! Shift the position
+          pos_2_per(1) = pos_2(1) + v*(box_dim(1) + per_padding)
+          pos_2_per(2) = pos_2(2) + u*(box_dim(2) + per_padding)
+          pos_2_per(3) = pos_2(3)
 
-      ! Image charge effect
-      force_ic = ptr_Image_Charge_effect(pos_1, pos_2)
+          ! Calculate the distance between the two particles
+          diff = pos_1 - pos_2_per
+          r = sqrt( sum(diff**2) ) + length_scale**3
+          !r = sqrt( dot_product(diff, diff) ) + length_scale**3
+          !r = NORM2(diff) + length_scale**3 ! distance + Prevent singularity
 
-      ! The total force
-      force_tot = force_tot + pre_fac_c * force_c + pre_fac_c * force_ic
+          ! Calculate the Coulomb force
+          ! F = (r_1 - r_2) / |r_1 - r_2|^3
+          ! F = (diff / r) * 1/r^2
+          ! (diff / r) is a unit vector
+          force_c = diff / r**3
+          !force_c = diff / (r*r*r)
+
+          ! Image charge effect
+          force_ic = ptr_Image_Charge_effect(pos_1, pos_2_per)
+
+          ! The total force
+          force_tot = force_tot + pre_fac_c * force_c + pre_fac_c * force_ic
+        end do
+      end do
     end do
     !$OMP END PARALLEL DO
 
@@ -407,150 +631,119 @@ contains
   subroutine Set_Voltage(step)
     integer, intent(in) :: step
     integer             :: IFAIL
-    double precision    :: V_R = 0.0d0, V_C = 0.0d0
+    ! !double precision    :: V_R, V_C
+    ! !double precision    :: ramo_cur
 
-    !V_R = Voltage_Resistor()
-    !V_C = Voltage_Capacitor()
-    !V_d = V_s + V_R + V_C
+    ! ! Calculate the total ramo current
+    ! !ramo_cur = sum(ramo_current)
+    ! !I_prev = I_cur
+    ! !I_cur = ramo_cur
 
-    !V_C = Voltage_Parallel_Capacitor(step)
-    !V_d = V_C
+    ! !I = Get_Current_Const(step)
+    ! I_prev = I_cur
+    ! I_cur = sum(ramo_current)
+
+    ! !V_R = Voltage_Resistor()
+    ! !V_C = Voltage_Capacitor()
+    ! !V_C = 0.0d0
+    ! !V_d = V_s + V_R + V_C
+    
+    ! ! if (step == 1) then
+    ! !   print *, step
+    ! !   print *, V_rf
+    ! ! end if
+
+    ! if (step == 0) then
+    !   I_prev = 0.0d0
+    !   V_rf_prev = 0.0d0
+    !   V_rf = V_s
+    ! end if
+    
+    ! V_rf_next = Parallel_RLC_FD(step, I_cur, I_prev, V_rf, V_rf_prev)
+    ! V_rf_prev = V_rf
+    ! V_rf = V_rf_next
+
+    ! V_d = V_s + V_rf ! DC voltage + RF voltage
+    ! !V_d = V_s
+
+    ! !V_C = Voltage_Parallel_Capacitor(step)
+    ! !V_d = V_C
+
+    ! !V_d = V_s
+
+    ! E_z = -1.0d0*V_d/d
+    ! !E_zunit = -1.0d0*sign(1.0d0, V)/d
 
     V_d = V_s
-
+    V_rf = 0.0d0
     E_z = -1.0d0*V_d/d
-    !E_zunit = -1.0d0*sign(1.0d0, V)/d
 
-    write (ud_volt, "(ES12.4, tr2, i8, tr2, ES12.4, tr2, ES12.4, tr2, ES12.4)", iostat=IFAIL) cur_time, step, V_d, V_R, V_C
+    write (ud_volt, "(ES12.4, tr2, i8, tr2, ES18.8, tr2, ES18.8)", iostat=IFAIL) &
+          & cur_time, step, V_d, V_rf
   end subroutine Set_Voltage
 
   double precision pure function Voltage_Resistor()
-    double precision, parameter :: R = 5.0d5 ! Ohm
     double precision            :: ramo_cur
 
     ! Calculate the total ramo current
     ramo_cur = sum(ramo_current)
 
     ! Calculate the voltage drop over the resistor
-    Voltage_Resistor = -1.0d0*R*ramo_cur
+    Voltage_Resistor = -1.0d0*R_s*ramo_cur
   end function Voltage_Resistor
 
-  double precision function Voltage_Capacitor()
-    double precision, parameter :: C = 10.0E-18 ! Farad (Atto Farads?)
-    double precision            :: ramo_cur
+  ! double precision function Get_Current_Const(step)
+  !   integer, intent(in) :: step
+  !   Get_Current_Const = 10.0E-3 ! Amper
+  ! end function Get_Current_Const
 
-    ! Calculate the total ramo current
-    ramo_cur = sum(ramo_current)
+  double precision function Parallel_RLC_FD(step, I_cur, I_prev, V_cur, V_prev)
+    integer, intent(in) :: step
+    double precision, intent(in) :: V_cur, V_prev ! Current V(t) and previous V(t-Δt) values of the voltage
+    double precision, intent(in) :: I_cur, I_prev ! Current I(t) and previous I(t-Δt) values of the current
 
-    ! Colculate the voltage drop over the capacitor
-    ramo_integral = ramo_integral + time_step * (ramo_cur_prev + ramo_cur) * 0.5d0
-    ramo_cur_prev = ramo_cur
-    Voltage_Capacitor = -1.0d0/C * ramo_integral
-  end function Voltage_Capacitor
+    !double precision, parameter  :: R = 2.0d0   ! Ohm
+    !double precision, parameter  :: L = 1.0d-7  ! Henry
+    !double precision, parameter  :: C = 1.0d-22 ! Farad
 
-  double precision function Voltage_Parallel_Capacitor_Resistor()
-    double precision, parameter :: C   = 10.0d-18 ! Farad
-    double precision, parameter :: R_C = 0.5d6 ! Ohm
-    double precision, parameter :: R   = 0.5d6 ! Ohm
-    double precision, parameter :: ib   = 1.0d0/(C*(R+R_C))
-    double precision            :: ramo_cur
+    !double precision, parameter  :: R_p = 7500.0d0 ! Ohm
+    !double precision, parameter  :: L_p = 1.04d-9  ! Henry
+    !double precision, parameter  :: C_p = 0.53d-17 ! Farad
 
-    ! Calculate the total ramo current
-    ramo_cur = sum(ramo_current)
+    double precision :: RC
+    double precision :: LC
 
-    ! Caclulate the voltage over the diode
-    ramo_integral = ramo_integral + time_step * (ramo_cur_prev*exp(-1.0d0*time_step*ib) + ramo_cur) * 0.5d0
-    ramo_cur_prev = ramo_cur
+    !double precision, parameter :: R = 13.5d0
+    !double precision, parameter :: omega_0 = 2.0d0*pi*3.1d9 ! rad/s [omega_0 = 1/sqrt(LC)]
+    !double precision, parameter :: Q = 150.0d0 ! Dimensionless [Q = R*sqrt(C/L)]
+    
+    double precision :: V_next ! Next value of the voltage V(t+Δt)
 
-    Voltage_Parallel_Capacitor_Resistor = (R**2)/(C*(R+R_C)**2) * ramo_integral - R*R_C/(R+R_C)*ramo_cur
-  end function Voltage_Parallel_Capacitor_Resistor
+    RC = R_p*C_p
+    LC = L_p*C_p
 
-  double precision function Voltage_Parallel_Capacitor(step)
-    integer, intent(in)         :: step
-    double precision, parameter :: C = 1.0E-15 ! Farad
-    double precision, parameter :: R = 1.0d3 ! Ohm
-    double precision, parameter :: RC = R*C
-    double precision, parameter :: iRC = 1.0d0/RC
-    double precision            :: ramo_cur, cur_time_s
+    V_next = time_step/C_p * I_cur + V_cur * (2.0d0 + time_step/RC - time_step2/LC) &
+         & - V_prev - time_step/C_p * I_prev
+    V_next = V_next / (1.0d0 + time_step/RC)
 
-    ! Calculate the total ramo current
-    ramo_cur = sum(ramo_current)
+    !V_next = time_step*R*omega_0/Q * I_cur + V_cur * (2.0d0 + time_step*omega_0/Q - time_step2*omega_0**2) &
+    !     & - V_prev - time_step*R*omega_0/Q * I_prev
+    !V_next = V_next / (1.0d0 + time_step*omega_0/Q)
 
-    ! Current time in seconds
-    cur_time_s = time_step * step
+    Parallel_RLC_FD = V_next
 
-    ! Caclulate the voltage over the diode
-    ramo_integral = ramo_integral + time_step * (ramo_cur_prev*exp(-1.0d0*time_step*iRC) + ramo_cur) * 0.5d0
-    ramo_cur_prev = ramo_cur
+    ! if (step < 2) then
+    !   print *, 'Parallel_RLC_FD'
+    !   print *, I_cur
+    !   print *, I_prev
+    !   print *, V_cur
+    !   print *, V_prev
+    !   print *, time_step
 
-    Voltage_Parallel_Capacitor = V_s*exp(-1.0d0*cur_time_s*iRC)*( RC*(exp(cur_time_s*iRC) - 1.0d0) + 0.0d0 ) &
-                               - 1.0d0/C * ramo_integral
-  end function Voltage_Parallel_Capacitor
-
-  double precision function Parallel_Capacitor_MNA(step, I_D)
-    integer, intent(in)          :: step
-    double precision, intent(in) :: I_D
-    double precision, parameter  :: C = 10.0d-18 ! Farad
-    double precision, parameter  :: R_D = 1.0d6  ! Ohm
-    double precision, parameter  :: R_S = 1.0d6  ! Ohm
-    double precision, parameter  :: R_C = 1.0d6  ! Ohm
-
-    double precision, dimension(1:5, 1:5) :: A, A_inv
-    double precision, dimension(1:5)      :: b
-    logical                               :: OK_FLAG
-
-    A = 0.0d0
-    A_inv = 0.0d0
-    b = 0.0d0
-
-    A(1, 1) = 1.0d0/R_D + 1.0d0/R_C
-    A(1, 2) = -1.0d0/R_D
-    A(1, 3) = -1.0d0/R_C
-    A(1, 4) = 1.0d0/R_S
-    b(1)    = 0.0
-
-    A(2, 1) = 1.0d0
-    A(2, 4) = -1.0d0
-    b(2)    = V_S
-
-    A(3, 1) = -1.0d0
-    A(3, 2) = 1.0d0
-    b(3)    = -1.0d0*I_D*R_D
-
-    A(4, 3) = 2.0d0*C/time_step
-    A(4, 5) = -1.0d0
-    b(4)    = V_prev(4) + 2.0d0*C/time_step*V_prev(2)
-
-    A(5, 4) = 1.0d0/R_S
-    A(5, 5) = 1.0d0
-    b(5)    = -I_D
-
-    ! Store previous values of the voltages
-    V_prev = V_cur
-
-    ! Solve the system of equations Ax=b or x=A^-1*b
-    ! Find the inverse of A
-    call M55INV(A, A_inv, OK_FLAG)
-
-    ! x = A^-1*b
-    V_cur = matmul(A_inv, b)
-
-    ! Calculate voltages
-    !V_D(step) = V_cur(1)             ! Voltage over the diode
-    !V_C(step) = V_cur(2)             ! Voltage of the capacitor
-    !V_SC(step) = V_cur(0) - V_cur(3) ! Source voltage (Should be equal to V_S)
-
-    ! Calculate currents from voltages over resistors
-    !I_T(step)  = ( -1.0d0*V_cur(3) / R_S ) / 1.0d-6          ! Total current
-    !!I_C(step)  = ( (V_cur(0) - V_cur(2)) / R_C ) / 1.0d-6  ! Capacitor current
-    !I_C(step)  = V_cur(4) / 1.0d-6                         ! Capacitor current
-    !I_DC(step) = ( (V_cur(0) - V_cur(1)) / R_D ) / 1.0d-6  ! Diode current
-
-    !I_D = Current_Diode_Child(V_D(step), step)
-    !I_D = Current_Diode(V_D[step], step)
-
-    ! Store the current time
-    !time = step*time_step / time_scale
-  end function Parallel_Capacitor_MNA
+    !   print *, time_step/C
+    !   print *, (2.0d0 + time_step/(R*C) - time_step2/(L*C))
+    !   print *, (1.0d0 + time_step/(R*C))
+    ! end if
+  end function Parallel_RLC_FD
 
 end module mod_verlet

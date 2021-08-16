@@ -46,6 +46,7 @@ contains
         if (opt_sec > MAX_SECTIONS) then
           sec = MAX_SECTIONS
           print '(a)', 'Vacuum: WARNING MAX_SECTIONS REACHED. INCREASE MAX_SECTIONS'
+          print *, opt_sec
         else
           sec = opt_sec
         end if
@@ -75,7 +76,7 @@ contains
         nrElec = nrElec + 1
         ! Write out the x and y position of the emitted particle
         ! along with which emitter and section it came from.
-        !if (abs(par_pos(3)) < 1.0E-3*length_scale) then
+        !if (abs(par_pos(3) - 1.0d0*length_scale) < 1.0E-3) then
           write(unit=ud_density_emit) (par_pos(1) / length_scale), (par_pos(2) / length_scale), emit, sec
         !end if
       else ! N_2^+ Ion
@@ -374,14 +375,15 @@ contains
   subroutine Write_Ramo_Current(step)
     integer, intent(in) :: step
     integer             :: IFAIL, i
-    double precision    :: ramo_cur = 0.0d0
+    double precision    :: ramo_cur
     double precision    :: avg_speed
 
     avg_speed = sqrt(avg_vel(1)**2 + avg_vel(2)**2 + avg_vel(3)**2)
 
     ! Write out the current for each emitter and section
     if (write_ramo_sec .eqv. .true.) then
-      write(unit=ud_ramo_sec, asynchronous='YES') ramo_current_emit
+      !write(unit=ud_ramo_sec, asynchronous='YES') ramo_current_emit
+      write(unit=ud_ramo_sec) ramo_current_emit
     end if
 
     ! Write the total current along with other data
@@ -400,21 +402,22 @@ contains
     integer                          :: i
     double precision, dimension(1:3) :: par_pos
 
-    if (step == 1) then
-      ! Write at the start of the file the total number of time steps
-      write(unit=ud_pos) steps
+    if (write_position_file .eqv. .True.) then
+      if (step == 1) then
+        ! Write at the start of the file the total number of time steps
+        write(unit=ud_pos) steps
+      end if
+
+      ! Write out what time step we are on and the current number of particles
+      write(unit=ud_pos) step, nrPart
+
+      do i = 1, nrPart
+        par_pos(:) = particles_cur_pos(:, i) ! Position of the particle
+
+        ! Write out x, y, z and which emitter the particle came from
+        write(unit=ud_pos) par_pos(1), par_pos(2), par_pos(3), particles_emitter(i), particles_section(i)
+      end do
     end if
-
-    ! Write out what time step we are on and the current number of particles
-    write(unit=ud_pos) step, nrPart
-
-    do i = 1, nrPart
-      par_pos(:) = particles_cur_pos(:, i) ! Position of the particle
-
-      ! Write out x, y, z and which emitter the particle came from
-      write(unit=ud_pos) par_pos(1), par_pos(2), par_pos(3), particles_emitter(i), particles_section(i)
-    end do
-
   end subroutine Write_Position
 
   !-----------------------------------------------------------------------------

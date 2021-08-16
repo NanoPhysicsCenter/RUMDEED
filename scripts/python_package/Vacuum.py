@@ -102,13 +102,16 @@ def Calc_Entropy(Mat, x_len, y_len, w_1, w_2, r_mean):
 # theta is the rotation of the ellipse [deg]
 # See http://uspas.fnal.gov/materials/10MIT/Emittance.pdf
 # or J. Buon, "Beam phase space and emittance".
-def Calc_Emittance(df_emitt):
-    sigma_x = df_emitt['x'].std(ddof=0) # \sigma_x, ddof=0 means use N as normalization
-    sigma_xp = df_emitt["x'"].std(ddof=0) # \sigma_{x^\prime}
-    cov_xxp = df_emitt.cov()['x']["x'"] # \sigma_x\sigma_{x^\prime}
-    N = df_emitt['x'].count()
+# See also USPAS notes Barletta, Spentzouris, Harms
+# https://uspas.fnal.gov/materials/10MIT/MIT-Fund.shtml
+# https://uspas.fnal.gov/materials/10MIT/Emittance.pdf
+def Calc_Emittance(df_emitt, x, xp):
+    sigma_x = df_emitt[x].std(ddof=0) # \sigma_x, ddof=0 means use N as normalization
+    sigma_xp = df_emitt[xp].std(ddof=0) # \sigma_{x^\prime}
+    cov_xxp = df_emitt.cov()[x][xp] # \sigma_x\sigma_{x^\prime}
+    N = df_emitt[x].count()
     con_xxp = cov_xxp*(N-1)/N # Use N as normalization, Pandas uses N-1
-    r = df_emitt.corr(method='pearson')['x']["x'"]
+    r = df_emitt.corr(method='pearson')[x][xp]
     
     #emittance = sigma_x*sigma_xp*np.sqrt(1.0-r**2)
     emittance = np.sqrt(sigma_x**2*sigma_xp**2 - cov_xxp**2)
