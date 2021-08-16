@@ -8,7 +8,7 @@
   See manual folder
 
 ## Notes
-  See [notes.pdf](doc/notes.pdf)
+  See [notes.pdf](notes/notes.pdf)
 
 ## Acknowledgments
 

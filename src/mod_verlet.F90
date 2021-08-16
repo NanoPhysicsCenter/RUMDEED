@@ -26,8 +26,8 @@ contains
 
 
   ! ----------------------------------------------------------------------------
-  ! Velocity Verlet
   subroutine Velocity_Verlet(step)
+    ! Velocity Verlet
     integer, intent(in) :: step
 
     ! Update the current time
@@ -79,8 +79,8 @@ contains
    end subroutine Read_Cross_Section_Data
 
   ! ----------------------------------------------------------------------------
-  ! Update the position of particles in the verlet integration
   subroutine Update_ElecHole_Position(step)
+    ! Update the position of particles in the verlet integration
     integer, intent(in) :: step
     integer             :: i
 
@@ -210,8 +210,8 @@ contains
   end subroutine Check_Boundary_ElecHole_Periodic
 
   ! ----------------------------------------------------------------------------
-  ! Update the velocity in the verlet integration
   subroutine Update_Velocity(step)
+    ! Update the velocity in the verlet integration
     integer, intent(in)              :: step
     integer                          :: i, k, emit, sec
     double precision                 :: q
