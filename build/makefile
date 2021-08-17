@@ -125,7 +125,7 @@ mod_unit_tests.mod mod_unit_tests.o: ../src/mod_unit_tests.f90 mod_global.mod mo
 		$(FC) -c $(FFLAGS) ../src/mod_unit_tests.f90
 
 mod_photo_emission.mod mod_photo_emission.o: ../src/mod_photo_emission.f90 mod_global.mod mod_verlet.mod mod_pair.mod mod_velocity.mod
-		$(FCOMPILER) -c $(FFLAGS) ../src/mod_photo_emission.f90
+		$(FC) -c $(FFLAGS) ../src/mod_photo_emission.f90
 
 mod_field_emission.mod mod_field_emission.o: ../src/mod_field_emission.f90 mod_global.mod mod_verlet.mod mod_pair.mod mod_velocity.mod
 		$(FC) -c $(FFLAGS) ../src/mod_field_emission.f90
@@ -140,7 +140,7 @@ mod_kevin_rjgtf.mod mod_kevin_rjgtf.o: ../src/mod_kevin_rjgtf.F90
 		$(FC) -c $(FFLAGS) ../src/mod_kevin_rjgtf.F90
 
 mod_field_emission_2D.mod mod_field_emission_2D.o: ../src/mod_field_emission_2D.f90 mod_global.mod mod_verlet.mod mod_pair.mod mod_velocity.mod
-			$(FC) -c $(FFLAGS) ../src/mod_field_emission_2D.f90
+		$(FC) -c $(FFLAGS) ../src/mod_field_emission_2D.f90
 
 mod_emission_tip.mod mod_emission_tip.o: ../src/mod_emission_tip.f90 mod_global.mod mod_verlet.mod mod_pair.mod mod_hyperboloid_tip.mod mod_ic.mod mod_velocity.mod
 		$(FC) -c $(FFLAGS) ../src/mod_emission_tip.f90
@@ -181,8 +181,8 @@ clean:
 		rm -f *.smod
 		rm -f $(PROJECT_NAME).out
 		rm -f $(CUBA_LIB)
-		rm -f ../cuba/4.2/libcuba.a
-		cd ../cuba/4.2/ && make clean
+		rm -f ../cuba/4.2.1/libcuba.a
+		cd ../cuba/4.2.1/ && make clean
 
 install:
 		cp $(PROJECT_NAME).out ../data/
