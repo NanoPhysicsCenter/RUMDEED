@@ -1,0 +1,377 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" />
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  
+  <title>3. Input files and running the code &mdash; Vacuum-MD ba9f53789dbe0c61d99f2fcf2f0162a448808121
+ documentation</title>
+  
+
+  
+  <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="_static/css/custom.css" type="text/css" />
+
+  
+  
+
+  
+  
+
+  
+
+  
+  <!--[if lt IE 9]>
+    <script src="_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+        <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
+        <script src="_static/jquery.js"></script>
+        <script src="_static/underscore.js"></script>
+        <script src="_static/doctools.js"></script>
+    
+    <script type="text/javascript" src="_static/js/theme.js"></script>
+
+    
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="4. Output and data files" href="output.html" />
+    <link rel="prev" title="2. Building the code" href="build.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="manual.html" class="icon icon-home"> Vacuum-MD
+          
+
+          
+          </a>
+
+          
+            
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="intro.html">1. Introduction</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="intro.html#features">1.1. Features</a></li>
+<li class="toctree-l2"><a class="reference internal" href="intro.html#acknowledgments">1.2. Acknowledgments</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="build.html">2. Building the code</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">3. Input files and running the code</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#input-files">3.1. Input files</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#input-file">3.1.1. Input file</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#work-function">3.1.2. Work function</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#collisions">3.1.3. Collisions</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#running-the-code">3.2. Running the code</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#definition-lists">3.3. Definition Lists</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="output.html">4. Output and data files</a></li>
+<li class="toctree-l1"><a class="reference internal" href="data.html">5. Data analysis examples</a></li>
+<li class="toctree-l1"><a class="reference internal" href="code.html">6. Code description</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="code.html#verlet">6.1. Verlet</a></li>
+<li class="toctree-l2"><a class="reference internal" href="code.html#photo-emission">6.2. Photo emission</a></li>
+<li class="toctree-l2"><a class="reference internal" href="code.html#field-emission">6.3. Field emission</a></li>
+<li class="toctree-l2"><a class="reference internal" href="code.html#thermal-field-emission">6.4. Thermal-field emission</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="bib.html">7. Bibliography</a></li>
+</ul>
+
+            
+          
+        </div>
+        
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="manual.html">Vacuum-MD</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content style-external-links">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="manual.html" class="icon icon-home"></a> &raquo;</li>
+        
+      <li><span class="section-number">3. </span>Input files and running the code</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <div class="rst-breadcrumbs-buttons" role="navigation" aria-label="breadcrumb navigation">
+      
+        <a href="output.html" class="btn btn-neutral float-right" title="4. Output and data files" accesskey="n">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+      
+      
+        <a href="build.html" class="btn btn-neutral float-left" title="2. Building the code" accesskey="p"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+      
+  </div>
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="input-files-and-running-the-code">
+<h1><span class="section-number">3. </span>Input files and running the code<a class="headerlink" href="#input-files-and-running-the-code" title="Permalink to this headline">¶</a></h1>
+<p>To do run the code</p>
+<div class="section" id="input-files">
+<h2><span class="section-number">3.1. </span>Input files<a class="headerlink" href="#input-files" title="Permalink to this headline">¶</a></h2>
+<p>input, w_theta, collisions</p>
+<div class="section" id="input-file">
+<h3><span class="section-number">3.1.1. </span>Input file<a class="headerlink" href="#input-file" title="Permalink to this headline">¶</a></h3>
+<p>The program will read a file called <strong>input</strong> when it starts. This file defines the simulation parameters to be used. The parameters are described
+in the table below.</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 10%" />
+<col style="width: 3%" />
+<col style="width: 88%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Variable</p></th>
+<th class="head"><p>Units</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>V_S</p></td>
+<td><p>V</p></td>
+<td><p>Voltage from the source.</p></td>
+</tr>
+<tr class="row-odd"><td><p>BOX_DIM(1:3)</p></td>
+<td><p>nm</p></td>
+<td><p>Dimensions of the simulations box. Should specify x, y and z. For now only the z value is used.</p></td>
+</tr>
+<tr class="row-even"><td><p>TIME_STEP</p></td>
+<td><p>ps</p></td>
+<td><p>The size of the timestep Δt in the simulation.</p></td>
+</tr>
+<tr class="row-odd"><td><p>STEPS</p></td>
+<td><p>#</p></td>
+<td><p>Number of timesteps to do in the simulations.</p></td>
+</tr>
+<tr class="row-even"><td><p>EMISSION_MODE</p></td>
+<td><p>#</p></td>
+<td><p>The emission mode. Can take on the values of 1 for photo emission, 3 for field emission from a hyperboloid tip, 10 for planar field emission and 10 for thermal-field emission.</p></td>
+</tr>
+<tr class="row-odd"><td><p>NREMIT</p></td>
+<td><p>#</p></td>
+<td><p>Number of emitters in the system.</p></td>
+</tr>
+<tr class="row-even"><td><p>EMITTERS_DIM(1:3,:)</p></td>
+<td><p>nm</p></td>
+<td><p>Dimensions of the emitter.</p></td>
+</tr>
+<tr class="row-odd"><td><p>EMITTERS_POS(1:3,:)</p></td>
+<td><p>nm</p></td>
+<td><p>Position of the emitter.</p></td>
+</tr>
+<tr class="row-even"><td><p>EMITTERS_TYPE(:)</p></td>
+<td><p>#</p></td>
+<td><p>Geometry of the emitter.</p></td>
+</tr>
+<tr class="row-odd"><td><p>EMITTERS_DELAY(:)</p></td>
+<td><p>#</p></td>
+<td><p>The timestep the emitter should become active and start emitting.</p></td>
+</tr>
+</tbody>
+</table>
+<dl class="field-list simple">
+<dt class="field-odd">V_s</dt>
+<dd class="field-odd"><p>Voltage from the source.</p>
+</dd>
+<dt class="field-even">BOX_DIM(1:3)</dt>
+<dd class="field-even"><p>Dimensions of the simulations box. Should specify x, y and z. For now only the z value is used.</p>
+</dd>
+</dl>
+<p>Example input file:</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>&amp;INPUT
+  V_S = 1.0d3,
+  BOX_DIM = 0.0d0, 0.0d0, 1000.0d0,
+  TIME_STEP = 0.25d-3,
+  STEPS = 20000,
+  EMISSION_MODE = 1,
+  NREMIT = 1,
+
+  EMITTERS_DIM(1:3, 1) 1000.0d0, 1000.0d0, 1000.0d0,
+  EMITTERS_POS(1:3, 1) = -500.0d0, -500.0d0, 0.0d0,
+  EMITTERS_TYPE(1) = 1,
+  EMITTERS_DELAY(1) = 0,
+/
+</pre></div>
+</div>
+</div>
+<div class="section" id="work-function">
+<h3><span class="section-number">3.1.2. </span>Work function<a class="headerlink" href="#work-function" title="Permalink to this headline">¶</a></h3>
+<p>work function</p>
+<p>Example work function file:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="mi">1</span> <span class="mi">1</span>
+<span class="mi">1</span>
+<span class="mf">2.5</span><span class="n">d0</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="collisions">
+<h3><span class="section-number">3.1.3. </span>Collisions<a class="headerlink" href="#collisions" title="Permalink to this headline">¶</a></h3>
+<p>N<sub>2</sub> files</p>
+</div>
+</div>
+<div class="section" id="running-the-code">
+<h2><span class="section-number">3.2. </span>Running the code<a class="headerlink" href="#running-the-code" title="Permalink to this headline">¶</a></h2>
+<p>To do</p>
+</div>
+<div class="section" id="definition-lists">
+<h2><span class="section-number">3.3. </span>Definition Lists<a class="headerlink" href="#definition-lists" title="Permalink to this headline">¶</a></h2>
+<dl>
+<dt>Term</dt><dd><p>Definition</p>
+</dd>
+<dt>Term<span class="classifier">classifier</span></dt><dd><p>Definition paragraph 1.</p>
+<p>Definition paragraph 2.</p>
+</dd>
+<dt>Term</dt><dd><p>Definition</p>
+</dd>
+</dl>
+<p>I have no clue why the definition list below is classified as a different style
+of definition list than the one above.</p>
+<dl class="simple">
+<dt>Is it the spaces in the term?</dt><dd><p>Maybe it was the multiple line paragraph
+in the line below that caused this?</p>
+</dd>
+<dt>Is it the paragraph above the list maybe?</dt><dd><p>I guess a lot of these lists don’t have leading paragraphs?</p>
+</dd>
+<dt>Is it everything all at once?</dt><dd><p>Who knows?!</p>
+</dd>
+</dl>
+<span class="target" id="index-0"></span></div>
+</div>
+
+
+           </div>
+           
+          </div>
+          <footer>
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+        <a href="output.html" class="btn btn-neutral float-right" title="4. Output and data files" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="build.html" class="btn btn-neutral float-left" title="2. Building the code" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &#169; Copyright 2021, Kristinn Torfason.
+
+    </p>
+  </div>
+    
+    
+    
+    Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    
+    provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+
+  
+  
+    
+   
+
+</body>
+</html>
