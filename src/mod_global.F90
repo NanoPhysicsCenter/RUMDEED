@@ -139,6 +139,7 @@ module mod_global
   integer          :: steps      ! Number of time steps in the simulation
 
   logical          :: collisions = .false. ! Do ion colissions or not
+  integer          :: ion_life_time = 100000000 ! Lifetime of ions
 
   double precision :: T_temp = T_ntp ! Temperature in Kelvin
   double precision :: P_abs = P_ntp  ! Pressure as fraction of P_std
@@ -303,7 +304,7 @@ module mod_global
                    emitters_type, emitters_delay, EMISSION_MODE, &
                    image_charge, N_ic_max, collisions, T_temp, P_abs, &
                    write_ramo_sec, write_position_file, R_s, &
-                   R_p, L_p, C_p, Num_per
+                   R_p, L_p, C_p, Num_per, ion_life_time
 
   ! ----------------------------------------------------------------------------
   ! Prodecure interfaces and pointers
