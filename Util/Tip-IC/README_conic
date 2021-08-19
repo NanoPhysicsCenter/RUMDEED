@@ -1,0 +1,219 @@
+PURPOSE:
+=========
+
+The purpose of this package is the computation of 
+the Conical functions P^m_{-1/2+i*tau}(x),
+R^m_{-1/2+i*tau}(x) (a real-valued numerically
+satisfactory companion of P^m_{-1/2+i*tau}(x)
+for x>1), and their first order derivatives.
+
+x, tau are real variables and m has integer positive
+values.
+
+THIS PACKAGE CONTAINS THE FOLLOWING FILES: 
+==========================================
+ 
+1.  cons.f90        Includes the module Someconstants for internal 
+                    global parameters
+
+2.  constants       Data file for the module Someconstants 
+
+3.  auxil.f90       Includes auxiliary routines, used in conicpr.f90
+
+4.  gammaCHI.f90    Includes the module GammaCHI which computes
+                    the gamma and related functions. This module
+		    is used in conicpr.f90
+
+5.  bessel.f90      Includes the module BesselJY which computes
+                    the Bessel functions J, Y and their first order
+		    derivatives. This module is used in conicpr.f90
+
+6.  air.f90         Includes the module AiryFunction which computes
+                    the Airy functions. This module is used in
+		    the module BesselJY.
+
+7.  conicpr.f90     Includes the module Conical for the computation 
+                    of the conical functions  P^m_{-1/2+i*tau}(x),
+		    R^m_{-1/2+i*tau}(x) and their first order derivatives.
+
+8.  testcon.f90     Test program for the module Conical
+
+Here is an example set of compiler/linker commands for building
+the programs using the GNU Fortran compiler g95. 
+Options: -c compile to object code -- don't make executable
+
+g95 -c cons.f90
+g95 -c auxil.f90
+g95 -c gammaCHI.f90
+g95 -c air.f90
+g95 -c bessel.f90
+g95 -c conicpr.f90
+g95 -c testcon.f90
+g95 cons.o auxil.o air.o gammaCHI.o bessel.o conicpr.o testcon.o -o testcon.exe
+
+where testcon is the name of the executable file.
+Basically the first files are compiled as object code libraries, and
+then a program using conic (testcon) is compiled and linked to those libraries.
+
+
+DESCRIPTION OF THE MODULE CONICAL
+===================================
+
+The public routines of the module Conical are:
+
+1) conicp, which computes the function P^m_{-1/2+i*tau}(x)
+   for x>-1.
+2) conicr,  which computes the function R^m_{-1/2+i*tau}(x)
+   for x>1.
+3) conicpr,  which computes the functions P^m_{-1/2+i*tau}(x),
+   R^m_{-1/2+i*tau}(x) and their first order derivatives
+   for x>1. This routine provides a pair of numerically
+   satisfactory solutions of the differential equation for
+   conical functions for x>1 and their first order derivatives.
+
+
+ CALLING SEQUENCES
+ ------------------
+
+ 1) The calling sequence for the routine conicp is the following
+
+ SUBROUTINE conicp(x,mu,tau,pmtau,ierr)
+ REAL(r8), INTENT(IN) :: x
+ INTEGER, INTENT(IN) :: mu
+ REAL(r8), INTENT(IN) :: tau
+ REAL(r8), INTENT(OUT) :: pmtau   
+ INTEGER,  INTENT(OUT) :: ierr
+ 
+ where r8 represents the available double precision 
+ arithmetics.
+
+  Inputs and outputs
+  ------------------
+  
+   INPUTS: 
+      
+           x   -->  argument of the function,  x>-1
+           mu  -->  parameter of the function, m=0,1,2,...
+           tau -->  parameter of the function, tau>0
+
+   OUTPUTS:  
+       
+
+           pmtau     --> function P^m_{-1/2+itau}(x).
+           ierr      --> error flag. 
+                     + If ierr=0, the computation was
+                       successful. 
+                     + If ierr=1, the computation presented
+                       overflow/underflow problems.
+                     + If ierr=2, any of the arguments of the function is 
+                       out of range. In this case the function 
+                       value is set to zero.
+
+
+2) The calling sequence for the routine conicr is the following
+
+ SUBROUTINE conicr(x,mu,tau,rm,ierr)
+ REAL(r8), INTENT(IN) :: x
+ INTEGER, INTENT(IN) :: mu
+ REAL(r8), INTENT(IN) :: tau
+ REAL(r8), INTENT(OUT) :: rm   
+ INTEGER,  INTENT(OUT) :: ierr
+ 
+ where r8 represents the available double precision 
+ arithmetics.
+
+  Inputs and outputs
+  ------------------
+  
+   INPUTS: 
+      
+           x   -->  argument of the function,  x>1
+           mu  -->  parameter of the function, m=0,1,2,...
+           tau -->  parameter of the function, tau>0
+
+   OUTPUTS:  
+       
+
+           pmtau     --> function R^m_{-1/2+itau}(x).
+           ierr      --> error flag. 
+                     + If ierr=0, the computation was
+                       successful. 
+                     + If ierr=1, the computation presented
+                       overflow/underflow problems.
+                     + If ierr=2, any of the arguments of the function is 
+                       out of range. In this case the function 
+                       value is set to zero.
+
+3)  The calling sequence for the routine conicpr is the following
+
+ SUBROUTINE conicpr(x,mu,tau,pm,pmd,rm,rmd,ierr)
+ REAL(r8), INTENT(IN) :: x
+ INTEGER, INTENT(IN) :: mu
+ REAL(r8), INTENT(IN) :: tau
+ REAL(r8), INTENT(OUT) :: pm
+ REAL(r8), INTENT(OUT) :: pmd
+ REAL(r8), INTENT(OUT) :: rm
+ REAL(r8), INTENT(OUT) :: rmd
+ INTEGER,  INTENT(OUT) :: ierr
+
+  where r8 represents the available double precision 
+ arithmetics.
+
+  Inputs and outputs
+  ------------------
+  
+   INPUTS: 
+
+       x   -->   argument of the functions (real value greater than -1)
+       mu  -->   function parameter (integer positive value)
+       tau -->   function parameter (real positive value)
+    
+    OUTPUTS:
+    
+       pm   --> function P^(mu)_(-1/2+i*tau)(x)
+       pmd  --> function d(P^(mu)_(-1/2+i*tau)(x))/dx
+       rm   --> function R^(mu)_(-1/2+i*tau)(x)
+       rmd  --> function d(R^(mu)_(-1/2+i*tau)(x))/dx 
+       ierr --> error flag
+                ierr=0, computation succesful. 
+                ierr=1, an error occurred during computation.
+                      The function values and the derivatives
+                      are set to 0. 
+
+RANGE OF COMPUTATION
+====================
+
+  In order to avoid, overflow/underflow problems in IEEE double
+  precision arithmetic, the admissible parameter ranges 
+  for the computation of the function P^m_{-1/2+itau}(x) in the routine
+  conicp are:
+  
+            -1<x<1,   0<tau<=100, 0<=m<=40
+            1<=x<=100, 0<tau<=100, 0<=m<=100
+
+  When using the routines conicr and conicpr, the admissible parameter
+  ranges for computing the functions are
+
+         1<=x<=100, 0<tau<=100, 0<=m<=100
+
+
+ 
+ACCURACY OF THE COMPUTED FUNCTION VALUES
+=======================================
+
+ The aimed relative accuracy for IEEE standard double precision arithmetic
+ in the computation of the conical functions is better than 1.e-12 in
+ a large part of the parameter ranges. Exceptions to this accuracy are the evaluation
+ of the function near their zeros. 
+
+ 
+METHODS OF COMPUTATION
+====================== 
+
+The present module uses different methods of computation
+depending on the function under consideration (P^(mu)_(-1/2+i*tau)(x)
+or R^(mu)_(-1/2+i*tau)(x)) and the values of x, tau and m: numerical
+quadrature, asymptotic expansions in terms of elementary functions,
+asymptotic expansions in terms of Bessel functions,
+asymptotic expansions for tau large and backward/forward recursion
+of three-term recurrence relations.
