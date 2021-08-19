@@ -3,14 +3,14 @@
 # 02.07.14
 
 # Compiler to use
-FCOMPILER=ifort
-#FCOMPILER=gfortran
+#FCOMPILER=ifort
+FCOMPILER=gfortran
 
 # Compile flags
 #FFLAGS=-O2 -parallel -xHost -openmp -mcmodel=large -shared-intel
 #FFLAGS=-O3 -xHost -qopenmp -ip -ipo -par-affinity=granularity=core,scatter
-FFLAGS=-check all -g -traceback -warn all
-#FFLAGS=-O3 -m64 -fopenmp -flto -march=native
+#FFLAGS=-check all -g -traceback -warn all
+FFLAGS=-O3 -m64 -fopenmp -flto -march=native
 
 # Name of the output file
 PROJECT_NAME=IC
