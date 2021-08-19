@@ -5,7 +5,7 @@
   See Examples folder
 
 ## Manual
-  See manual folder
+  See [https://nanophysicscenter.github.io/Vacuum-MD](https://nanophysicscenter.github.io/Vacuum-MD/) or docs folder.
 
 ## Notes
   See [notes.pdf](notes/notes.pdf)
