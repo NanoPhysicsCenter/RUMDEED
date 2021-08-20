@@ -7,7 +7,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   
-  <title>3. Input files and running the code &mdash; Vacuum-MD ba9f53789dbe0c61d99f2fcf2f0162a448808121
+  <title>3. Input files and running the code &mdash; Vacuum-MD 640e26d53a2c755bb82925f924cd7d31eea1a9e9
  documentation</title>
   
 
@@ -200,69 +200,32 @@
 <p>input, w_theta, collisions</p>
 <div class="section" id="input-file">
 <h3><span class="section-number">3.1.1. </span>Input file<a class="headerlink" href="#input-file" title="Permalink to this headline">¶</a></h3>
-<p>The program will read a file called <strong>input</strong> when it starts. This file defines the simulation parameters to be used. The parameters are described
-in the table below.</p>
-<table class="docutils align-default">
-<colgroup>
-<col style="width: 10%" />
-<col style="width: 3%" />
-<col style="width: 88%" />
-</colgroup>
-<thead>
-<tr class="row-odd"><th class="head"><p>Variable</p></th>
-<th class="head"><p>Units</p></th>
-<th class="head"><p>Description</p></th>
-</tr>
-</thead>
-<tbody>
-<tr class="row-even"><td><p>V_S</p></td>
-<td><p>V</p></td>
-<td><p>Voltage from the source.</p></td>
-</tr>
-<tr class="row-odd"><td><p>BOX_DIM(1:3)</p></td>
-<td><p>nm</p></td>
-<td><p>Dimensions of the simulations box. Should specify x, y and z. For now only the z value is used.</p></td>
-</tr>
-<tr class="row-even"><td><p>TIME_STEP</p></td>
-<td><p>ps</p></td>
-<td><p>The size of the timestep Δt in the simulation.</p></td>
-</tr>
-<tr class="row-odd"><td><p>STEPS</p></td>
-<td><p>#</p></td>
-<td><p>Number of timesteps to do in the simulations.</p></td>
-</tr>
-<tr class="row-even"><td><p>EMISSION_MODE</p></td>
-<td><p>#</p></td>
-<td><p>The emission mode. Can take on the values of 1 for photo emission, 3 for field emission from a hyperboloid tip, 10 for planar field emission and 10 for thermal-field emission.</p></td>
-</tr>
-<tr class="row-odd"><td><p>NREMIT</p></td>
-<td><p>#</p></td>
-<td><p>Number of emitters in the system.</p></td>
-</tr>
-<tr class="row-even"><td><p>EMITTERS_DIM(1:3,:)</p></td>
-<td><p>nm</p></td>
-<td><p>Dimensions of the emitter.</p></td>
-</tr>
-<tr class="row-odd"><td><p>EMITTERS_POS(1:3,:)</p></td>
-<td><p>nm</p></td>
-<td><p>Position of the emitter.</p></td>
-</tr>
-<tr class="row-even"><td><p>EMITTERS_TYPE(:)</p></td>
-<td><p>#</p></td>
-<td><p>Geometry of the emitter.</p></td>
-</tr>
-<tr class="row-odd"><td><p>EMITTERS_DELAY(:)</p></td>
-<td><p>#</p></td>
-<td><p>The timestep the emitter should become active and start emitting.</p></td>
-</tr>
-</tbody>
-</table>
-<dl class="field-list simple">
-<dt class="field-odd">V_s</dt>
-<dd class="field-odd"><p>Voltage from the source.</p>
+<p>The program will read a file called <strong>input</strong> when it starts. This file defines the simulation parameters to be used and is a Fortran namelist file.
+The parameters are described below, with an example given at the end.</p>
+<dl>
+<dt>V_s</dt><dd><p>A number in units of Volts [V] that specifies the voltage from the source.</p>
 </dd>
-<dt class="field-even">BOX_DIM(1:3)</dt>
-<dd class="field-even"><p>Dimensions of the simulations box. Should specify x, y and z. For now only the z value is used.</p>
+<dt>BOX_DIM(1:3)</dt><dd><p>Dimensions of the simulations box given as three numbers in nano-meters [nm]. Should specify x, y and z. For now only the z value is used.</p>
+</dd>
+<dt>TIME_STEP</dt><dd><p>The size of the timestep Δt in the simulation given in pico-seconds [ps].</p>
+</dd>
+<dt>STEPS</dt><dd><p>Number of timesteps to do in the simulations. Should be an integer number large than zero.</p>
+</dd>
+<dt>EMISSION_MODE</dt><dd><p>The emission mode is given as one of the following integer numbers:</p>
+<p>1: Photo emission.</p>
+<p>3: Field emission from a hyperboloid tip.</p>
+<p>10: Planar field emission.</p>
+<p>10: Thermal-field emission.</p>
+</dd>
+<dt>NREMIT</dt><dd><p>Number of emitters in the system. Should be an integer larger than zero.</p>
+</dd>
+<dt>EMITTERS_DIM(1:3,:)</dt><dd><p>Dimensions of the emitter.</p>
+</dd>
+<dt>EMITTERS_POS(1:3,:)</dt><dd><p>Position of the emitter.</p>
+</dd>
+<dt>EMITTERS_TYPE(:)</dt><dd><p>Geometry of the emitter.</p>
+</dd>
+<dt>EMITTERS_DELAY(:)</dt><dd><p>The timestep the emitter should become active and start emitting.</p>
 </dd>
 </dl>
 <p>Example input file:</p>

@@ -8,7 +8,7 @@ You will need to have **git** installed and then you can clone the repository us
 
 .. code-block:: console
 
-   git clone -b master https://github.com/NanoPhysicsCenter/Vacuum-MD.git Vacuum-MD
+   git clone -b main https://github.com/NanoPhysicsCenter/Vacuum-MD.git Vacuum-MD
 
 Where the last "Vacuum-MD" is the name of the directory you want to create and store the code in.
 Once you have to code you will need the GNU Compiler Collection (**gfortran** and **gcc**) and **make** to
@@ -37,4 +37,4 @@ This documentation can also be generate using the make file with:
 This will produce html and pdf files in the docs/build directory. You must have **Python** installed to generate the documentation.
 To make the pdf file **xelatex** and **xindy** must be installed.
 
-.. index:: build, make, git, compiler, gfortran, github, Intel
+.. index:: build, make, git, compiler, gfortran, github, Intel, ifort
