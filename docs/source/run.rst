@@ -9,28 +9,37 @@ input, w_theta, collisions
 
 Input file
 ++++++++++
-The program will read a file called **input** when it starts. This file defines the simulation parameters to be used. The parameters are described
-in the table below.
+The program will read a file called **input** when it starts. This file defines the simulation parameters to be used and is a Fortran namelist file.
+The parameters are described below, with an example given at the end.
 
-===================  =====  ===========
-Variable             Units  Description
-===================  =====  ===========
-V_S                  V      Voltage from the source.
-BOX_DIM(1:3)         nm     Dimensions of the simulations box. Should specify x, y and z. For now only the z value is used.
-TIME_STEP            ps     The size of the timestep Δt in the simulation.
-STEPS                #      Number of timesteps to do in the simulations.
-EMISSION_MODE        #      The emission mode. Can take on the values of 1 for photo emission, 3 for field emission from a hyperboloid tip, 10 for planar field emission and 10 for thermal-field emission. 
-NREMIT               #      Number of emitters in the system.
-EMITTERS_DIM(1:3,:)  nm     Dimensions of the emitter.
-EMITTERS_POS(1:3,:)  nm     Position of the emitter.
-EMITTERS_TYPE(:)     #      Geometry of the emitter.
-EMITTERS_DELAY(:)    #      The timestep the emitter should become active and start emitting.
-===================  =====  ===========
+V_s
+    A number in units of Volts [V] that specifies the voltage from the source.
+BOX_DIM(1:3)
+    Dimensions of the simulations box given as three numbers in nano-meters [nm]. Should specify x, y and z. For now only the z value is used.
+TIME_STEP
+    The size of the timestep Δt in the simulation given in pico-seconds [ps].
+STEPS
+    Number of timesteps to do in the simulations. Should be an integer number large than zero.
+EMISSION_MODE
+    The emission mode is given as one of the following integer numbers:
+    
+    1: Photo emission.
 
-.. bibliographic fields (which also require a transform):
+    3: Field emission from a hyperboloid tip.
 
-:V_s: Voltage from the source.
-:BOX_DIM(1:3): Dimensions of the simulations box. Should specify x, y and z. For now only the z value is used.
+    10: Planar field emission.
+
+    10: Thermal-field emission.
+NREMIT
+    Number of emitters in the system. Should be an integer larger than zero.
+EMITTERS_DIM(1:3,:)
+    Dimensions of the emitter.
+EMITTERS_POS(1:3,:)
+    Position of the emitter.
+EMITTERS_TYPE(:)
+    Geometry of the emitter.
+EMITTERS_DELAY(:)
+    The timestep the emitter should become active and start emitting.
 
 Example input file:
 
