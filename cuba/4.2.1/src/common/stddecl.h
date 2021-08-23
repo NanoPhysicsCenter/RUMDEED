@@ -1,7 +1,7 @@
 /*
 	stddecl.h
 		declarations common to all Cuba routines
-		last modified 30 Oct 20 th
+		last modified 28 Jun 21 th
 */
 
 
@@ -540,6 +540,10 @@ static inline real Weight(creal sum, creal sqsum, cnumber n) {
 
 
 #ifdef MLVERSION
+
+#ifndef MLCONST
+#define MLCONST
+#endif
 
 static inline void Print(MLCONST char *s)
 {
