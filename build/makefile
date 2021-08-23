@@ -40,7 +40,7 @@ endif
 # ifeq ($(FC),gfortran)
 ifneq (,$(findstring gfortran,$(FC)))
 $(info Using GNU Fortran)
-FFLAGS=-O3 -ffast-math -march=native -fomit-frame-pointer -flto -fwhole-program
+FFLAGS=-O3 -march=native -flto
 #FFLAGS=-g -fcheck=all -Wall -fbacktrace -ffpe-trap=invalid,zero,overflow,underflow
 ifdef OPENMP
 FFLAGS+=-fopenmp
