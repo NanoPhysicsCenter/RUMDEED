@@ -516,7 +516,7 @@ contains
 
     Gauss_Emission_int = IDNINT(  A * exp( -1.0d0*b*(step - mu)**2 )  )
 
-    write (ud_gauss, "(i6, tr2, i6)", iostat=IFAIL) step, Gauss_Emission
+    write (ud_gauss, "(i6, tr2, i6)", iostat=IFAIL) step, Gauss_Emission_int
   end function Gauss_Emission_int
 
   double precision function Gauss_Emission(step)
