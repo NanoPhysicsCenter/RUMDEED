@@ -120,7 +120,8 @@ program VacuumMD
     ! Update the position of all particles
     !print *, 'Update position'
     call Update_Position(i)
-    call Write_Position(i)
+    !call Write_Position(i)
+    call Write_Position_XYZ_Step(i)
 
     ! Remove particles from the system
     !print *, 'Remove particles'

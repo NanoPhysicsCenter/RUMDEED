@@ -421,6 +421,53 @@ contains
   end subroutine Write_Position
 
   !-----------------------------------------------------------------------------
+  ! Write the current position of all particles to a files.
+  ! The files will be in XYZ format an each timestep is written to a seperate file.
+  ! The file name format is position.xyz.? where ? is the timestep.
+  ! Datastructure in each file is x, y, z, species, vel_x, vel_y, vel_z, speed
+  subroutine Write_Position_XYZ_Step(step)
+    integer, intent(in)              :: step
+    integer                          :: i, par_species
+    integer                          :: IFAIL, ud_pos_data
+    integer, parameter               :: N_steps = 100
+    double precision, dimension(1:3) :: par_pos, par_vel
+    double precision                 :: par_speed
+    character(len=128)               :: filename
+
+    ! Check if we are writing a position file
+    if (write_position_file .eqv. .True.) then
+
+      ! Write position out every N_steps
+      if (mod(step, N_steps) == 0) then
+        ! Generate the file name posotion.xyz.? and open the file for writing
+        write(filename, '(a12, i0)') 'out/pos.xyz.', step
+        open(newunit=ud_pos_data, iostat=IFAIL, file=filename, status='REPLACE', action='write')
+        if (IFAIL /= 0) then
+          print *, 'Vacuum: Failed to open the file to write position data'
+          return
+        end if
+
+        ! Loop over all particles
+        do i = 1, nrPart
+          ! Get particle position and scale to nm
+          par_pos = particles_cur_pos(:, i) / length_scale
+          ! Ger particle velocity and calulate speed
+          par_vel = particles_cur_vel(:, i)
+          par_speed = sqrt(par_vel(1)**2 + par_vel(2)**2 + par_vel(3)**2)
+          ! Get particle species, i.e. electron, ion, hole, ...
+          par_species = particles_species(i)
+
+          write(unit=ud_pos_data, fmt="(F6.2, F6.2, F6.2, i2, ES12.4, ES12.4, ES12.4, ES12.4)", iostat=IFAIL) &
+            par_pos(1), par_pos(2), par_pos(3), par_species, par_vel(1), par_vel(2), par_vel(3), par_speed
+        end do
+
+        ! Close the file
+        close(unit=ud_pos_data, iostat=IFAIL, status='keep')
+      end if
+    end if
+  end subroutine
+
+  !-----------------------------------------------------------------------------
   ! Write out the positions
   ! Keyword arguments:
   ! step -- The current time step
