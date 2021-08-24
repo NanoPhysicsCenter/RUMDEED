@@ -32,7 +32,7 @@ def get_git_commit():
 project = 'Vacuum-MD'
 copyright = '{}, Kristinn Torfason'.format(date.today().year)
 author = 'Kristinn Torfason'
-release = get_git_commit()
+version = get_git_commit()
 
 
 # -- General configuration ---------------------------------------------------
@@ -70,6 +70,7 @@ html_theme_options = {
     'collapse_navigation': False,
     'prev_next_buttons_location': 'both',
     'style_external_links': True,
+    'display_version': False,
 }
 
 html_show_sourcelink = False

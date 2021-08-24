@@ -6,7 +6,9 @@
 Vacuum-MD's documentation!
 =====================================
 
-Check out the :doc:`build` section for further information how to compile the code.
+| 
+| Version: |version|
+| https://github.com/NanoPhysicsCenter/Vacuum-MD
 
 .. toctree::
    :maxdepth: 2
@@ -26,5 +28,3 @@ Indices and tables
 
 * :ref:`genindex`
 * :ref:`search`
-
-Release: |release|
