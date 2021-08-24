@@ -7,8 +7,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   
-  <title>3. Input files and running the code &mdash; Vacuum-MD 640e26d53a2c755bb82925f924cd7d31eea1a9e9
- documentation</title>
+  <title>3. Input files and running the code &mdash; Vacuum-MD  documentation</title>
   
 
   
@@ -65,9 +64,6 @@
           </a>
 
           
-            
-            
-          
 
           
 <div role="search">
@@ -105,7 +101,7 @@
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="#running-the-code">3.2. Running the code</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#definition-lists">3.3. Definition Lists</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#exmaples">3.3. Exmaples</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="output.html">4. Output and data files</a></li>
@@ -203,7 +199,7 @@
 <p>The program will read a file called <strong>input</strong> when it starts. This file defines the simulation parameters to be used and is a Fortran namelist file.
 The parameters are described below, with an example given at the end.</p>
 <dl>
-<dt>V_s</dt><dd><p>A number in units of Volts [V] that specifies the voltage from the source.</p>
+<dt>V_S</dt><dd><p>A number in units of Volts [V] that specifies the voltage from the source.</p>
 </dd>
 <dt>BOX_DIM(1:3)</dt><dd><p>Dimensions of the simulations box given as three numbers in nano-meters [nm]. Should specify x, y and z. For now only the z value is used.</p>
 </dd>
@@ -211,30 +207,41 @@ The parameters are described below, with an example given at the end.</p>
 </dd>
 <dt>STEPS</dt><dd><p>Number of timesteps to do in the simulations. Should be an integer number large than zero.</p>
 </dd>
-<dt>EMISSION_MODE</dt><dd><p>The emission mode is given as one of the following integer numbers:</p>
-<p>1: Photo emission.</p>
-<p>3: Field emission from a hyperboloid tip.</p>
-<p>10: Planar field emission.</p>
-<p>10: Thermal-field emission.</p>
+<dt>EMISSION_MODE</dt><dd><p>The emission mode controls the type of emission from the cathode. It should given as one of the following integer numbers:</p>
+<p>1: <a class="reference internal" href="code.html#photo"><span class="std std-ref">Photo emission</span></a>.</p>
+<p>3: <a class="reference internal" href="code.html#field-tip"><span class="std std-ref">Field emission from a hyperboloid tip</span></a>.</p>
+<p>9: <a class="reference internal" href="code.html#thermal-field"><span class="std std-ref">Thermal-field emission</span></a>.</p>
+<p>10: <a class="reference internal" href="code.html#field"><span class="std std-ref">Planar field emission</span></a>.</p>
 </dd>
-<dt>NREMIT</dt><dd><p>Number of emitters in the system. Should be an integer larger than zero.</p>
+<dt>NREMIT</dt><dd><p>Number of emitters in the system. Should be an integer larger than zero. Note that not all emission modes support multiple emitters.</p>
 </dd>
-<dt>EMITTERS_DIM(1:3,:)</dt><dd><p>Dimensions of the emitter.</p>
+<dt>EMITTERS_DIM(1:3, &lt;EMITTER NUMBER&gt;)</dt><dd><p>Dimensions of the emitter given as three numbers in nano-meters [nm].
+If the emitter is a circle only the first number is relevant and is interpreted as the radius of the emitter.
+For a rectangular emitter the first two numbers represent the length in the x and y directions respectively.
+Is the emitter is a hyperboloid tip the first number distance from the peak of the tip to the anode. The second number is the base radius of the tip
+and the last number is the height of the tip. See <a class="reference internal" href="code.html#field-tip"><span class="std std-ref">Field emission from a hyperboloid tip</span></a> in the code description for more details.
+Here <strong>&lt;EMITTER NUMBER&gt;</strong> should be replaced by the number of the emitter.
+This line should be given for all emitters in the system.</p>
 </dd>
-<dt>EMITTERS_POS(1:3,:)</dt><dd><p>Position of the emitter.</p>
+<dt>EMITTERS_POS(1:3, &lt;EMITTER NUMBER&gt;)</dt><dd><p>Position of the emitter given as three numbers in nano-meters [nm]. Here <strong>&lt;EMITTER NUMBER&gt;</strong> should be replaced by the number of the emitter.
+This line should be given for all emitters in the system.</p>
 </dd>
-<dt>EMITTERS_TYPE(:)</dt><dd><p>Geometry of the emitter.</p>
+<dt>EMITTERS_TYPE(&lt;EMITTER NUMBER&gt;)</dt><dd><p>Geometry of the emitter given as an integer. It should be given as one of the following integer numbers:</p>
+<p>1: Circular emitter. The dimensions <strong>to do</strong></p>
+<p>2: Rectangle. The dimensions … <strong>to do</strong></p>
+<p>Here <strong>&lt;EMITTER NUMBER&gt;</strong> should be replaced by the number of the emitter. This line should be given for all emitters in the system.</p>
 </dd>
-<dt>EMITTERS_DELAY(:)</dt><dd><p>The timestep the emitter should become active and start emitting.</p>
+<dt>EMITTERS_DELAY(&lt;EMITTER NUMBER&gt;)</dt><dd><p>The timestep the emitter should become active and start emitting. Here <strong>&lt;EMITTER NUMBER&gt;</strong> should be replaced by the number of the emitter.
+This line should be given for all emitters in the system.</p>
 </dd>
 </dl>
-<p>Example input file:</p>
+<p>Example input file with one emitter doing planar field emission:</p>
 <div class="highlight-text notranslate"><div class="highlight"><pre><span></span>&amp;INPUT
   V_S = 1.0d3,
   BOX_DIM = 0.0d0, 0.0d0, 1000.0d0,
   TIME_STEP = 0.25d-3,
   STEPS = 20000,
-  EMISSION_MODE = 1,
+  EMISSION_MODE = 10,
   NREMIT = 1,
 
   EMITTERS_DIM(1:3, 1) 1000.0d0, 1000.0d0, 1000.0d0,
@@ -264,28 +271,9 @@ The parameters are described below, with an example given at the end.</p>
 <h2><span class="section-number">3.2. </span>Running the code<a class="headerlink" href="#running-the-code" title="Permalink to this headline">¶</a></h2>
 <p>To do</p>
 </div>
-<div class="section" id="definition-lists">
-<h2><span class="section-number">3.3. </span>Definition Lists<a class="headerlink" href="#definition-lists" title="Permalink to this headline">¶</a></h2>
-<dl>
-<dt>Term</dt><dd><p>Definition</p>
-</dd>
-<dt>Term<span class="classifier">classifier</span></dt><dd><p>Definition paragraph 1.</p>
-<p>Definition paragraph 2.</p>
-</dd>
-<dt>Term</dt><dd><p>Definition</p>
-</dd>
-</dl>
-<p>I have no clue why the definition list below is classified as a different style
-of definition list than the one above.</p>
-<dl class="simple">
-<dt>Is it the spaces in the term?</dt><dd><p>Maybe it was the multiple line paragraph
-in the line below that caused this?</p>
-</dd>
-<dt>Is it the paragraph above the list maybe?</dt><dd><p>I guess a lot of these lists don’t have leading paragraphs?</p>
-</dd>
-<dt>Is it everything all at once?</dt><dd><p>Who knows?!</p>
-</dd>
-</dl>
+<div class="section" id="exmaples">
+<h2><span class="section-number">3.3. </span>Exmaples<a class="headerlink" href="#exmaples" title="Permalink to this headline">¶</a></h2>
+<p>Describe examples in the Exmaples/ folder and make new ones. To do…</p>
 <span class="target" id="index-0"></span></div>
 </div>
 
