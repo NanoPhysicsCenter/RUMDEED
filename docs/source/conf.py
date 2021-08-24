@@ -22,7 +22,7 @@ from datetime import date
 def get_git_commit():
     import subprocess, time
     try:
-        commit = subprocess.run(['git', 'rev-parse', 'HEAD'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        commit = subprocess.run(['git', 'rev-parse', '--short', 'HEAD'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         if commit.returncode == 0:
             return commit.stdout.decode()
     except:
@@ -104,5 +104,6 @@ latex_elements = {
     'papersize': 'a4paper',
     'fncychap': r'\usepackage[Bjornstrup]{fncychap}',
     'printindex': r'\footnotesize\raggedright\printindex',
+    'releasename': '',
 }
 latex_show_urls = 'footnote'
