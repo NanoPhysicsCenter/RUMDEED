@@ -6,7 +6,6 @@
 Vacuum-MD's documentation!
 =====================================
 
-| 
 | Version: |version|
 | https://github.com/NanoPhysicsCenter/Vacuum-MD
 
