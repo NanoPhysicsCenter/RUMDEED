@@ -5,792 +5,805 @@
 !-------------------------------------------!
 
 module mod_global
-   implicit none
- 
-   !integer, parameter :: CHUNK_SIZE = 1000
- 
-   ! ----------------------------------------------------------------------------
-   ! Define material parameters
-   !
-   character(len=*), parameter :: material = 'Vacuum' ! Material used
-   double precision, parameter :: epsilon_r = 1.0d0 ! Relative permittivity
-   double precision, parameter :: m_eeff = 1.0d0 ! Effective mass for electrons
-   double precision, parameter :: m_heff = 1.0d0 ! Effective mass for holes
- 
- 
-   ! ----------------------------------------------------------------------------
-   ! Define physical constants
-   ! See http://physics.nist.gov/cuu/Constants/index.html
-   double precision, parameter :: pi = 3.14159265358979324d0 ! Pi
-   double precision, parameter :: h = 6.626070040d-34 ! Planck's constant, h (Js)
-   double precision, parameter :: k_b = 1.38064852d-23 ! Boltzmann constant (J/K)
-   double precision, parameter :: c = 299792458.0d0 ! Speed of light (m/s)
-   double precision, parameter :: mu_0 = 4.0d0*pi * 1.0d-7 ! Vacuum permeability (H/m)
-   double precision, parameter :: epsilon_0 = 1.0d0/(mu_0 * c**2) ! Vacuum permittivity (F/m)
-   !double precision, parameter :: epsilon_0 = 8.854187817d-12 ! Farads / meters
-   double precision, parameter :: epsilon = epsilon_r * epsilon_0 ! Permittivity
-   double precision, parameter :: m_u = 1.660539040d-27 ! Atomic mass unit (kg)
-   double precision, parameter :: h_bar = 1.054571726d-34 ! Planck's constant, h/(2*pi) (Js)
- 
-   double precision, parameter :: m_0 = 9.10938356d-31 ! Free electron mass (kg)
-   !double precision, parameter :: m_e = m_eeff * m_0 ! m_e* Effective electron mass (kg)
-   !double precision, parameter :: m_h = m_heff * m_0! m_h* Effective hole mass (kg)
- 
-   double precision, parameter :: m_N2p = 14.0067d0*m_u - m_0 ! Mass of N_2^+
- 
-   double precision, parameter :: q_0 = 1.6021766208d-19 ! Elementary charge (C)
-   double precision, parameter :: q_02 = q_0**2 ! Elementary charge squared (C)
- 
-   double precision, parameter :: T_ntp = 293.15d0 ! Normal temperature in Kelvin (NIST)
-   double precision, parameter :: P_ntp = 101325.0d0 ! Normal pressure in Pa (NIST)
- 
-   ! ----------------------------------------------------------------------------
-   ! Define scales used when reading and writing data
-   double precision, parameter :: length_scale = 1.0d-9 ! Length scale (1 nanometer)
-   double precision, parameter :: time_scale = 1.0d-12 ! Time scale (1 ps)
-   double precision, parameter :: vel_scale = length_scale / time_scale ! Velocity scale (1 nm / 1 ps)
-   double precision, parameter :: cur_scale = 1.0d0 ! Current scale (1 A)
- 
- 
-   ! ----------------------------------------------------------------------------
-   ! Define maximum size constants.
-   ! These can be increased if needed.
-   integer, parameter :: MAX_PARTICLES = 500000 ! Maximum number of particles allowed in the system
-   integer, parameter :: MAX_EMITTERS  = 1      ! Maximum number of emitters in the system
-   integer, parameter :: MAX_SECTIONS  = 96*96    ! Maximum number of sections an emitter can have
- 
- 
-   !! ----------------------------------------------------------------------------
-   !! Define the charge of the electrons and holes
-   !integer, parameter :: charge_elec = -1
-   !integer, parameter :: charge_hole = +1
- 
-   ! ----------------------------------------------------------------------------
-   ! Define the particle species
-   integer, parameter :: species_unkown   = 0 ! Unknown particle
-   integer, parameter :: species_elec     = 1 ! Electron
-   integer, parameter :: species_hole     = 2 ! Hole
-   integer, parameter :: nrSpecies        = 2 ! 2 = Elec, Hole
- 
- 
-   ! ----------------------------------------------------------------------------
-   ! Particle removal flags
-   integer, parameter :: remove_unknown = 0
-   integer, parameter :: remove_top     = 1
-   integer, parameter :: remove_bot     = 2
- 
-   ! ----------------------------------------------------------------------------
-   ! Define storage arrays for particles
-   ! Position and velocity of particles. Fyrst dimension is x,y,z, second one is the number of the particle
-   double precision, dimension(:, :), allocatable :: particles_cur_pos    ! Current position (1:3, 1:MAX_PARTICLES)
-   double precision, dimension(:, :), allocatable :: particles_prev_pos   ! Previous position
-   double precision, dimension(:, :), allocatable :: particles_last_col_pos ! Position of last collision
-   double precision, dimension(:, :), allocatable :: particles_cur_vel    ! Current velocity
-   double precision, dimension(:, :), allocatable :: particles_cur_accel  ! Current acceleration
-   double precision, dimension(:, :), allocatable :: particles_prev_accel ! Previous acceleration
-   double precision, dimension(:, :), allocatable :: particles_prev2_accel ! Previous acceleration
- 
-   ! Other information about particles, the dimension is the number of particles
-   double precision, dimension(:)   , allocatable :: particles_charge     ! Charge
-   integer         , dimension(:)   , allocatable :: particles_species    ! Type of particle
-   double precision, dimension(:)   , allocatable :: particles_mass       ! Mass
-   integer         , dimension(:)   , allocatable :: particles_step       ! Time step when the particle was created
-   integer         , dimension(:)   , allocatable :: particles_emitter    ! The emitter the particle came from
-   integer         , dimension(:)   , allocatable :: particles_section    ! The section of the emitter the particles came from
-   integer         , dimension(:)   , allocatable :: particles_life       ! The time step when the particle should be removed from the system
-   logical         , dimension(:)   , allocatable :: particles_mask       ! Mask array used to indicate which particles should be removed
-                                                                          ! .true. means that the particle is active,
-                                                                          ! .false. means it is inactive and should be removed
- 
-   ! Cross Sections
-   double precision, allocatable, target, dimension(:, :) :: N2_tot_cross ! Total cross section of N2
-   double precision, allocatable, target, dimension(:, :) :: N2_ion_cross ! Ioniaztion cross section of N2
- 
- 
-   ! ----------------------------------------------------------------------------
-   ! Define storage arrays for emitters
-   ! Fyrst dimension is x,y,z, second one is the number of the emitter
-   double precision, dimension(:, :), allocatable :: emitters_pos         ! Position of the emitters (1:3, 1:MAX_EMITTERS)
-   double precision, dimension(:, :), allocatable :: emitters_dim         ! Dimensions of the emitters
-   ! Dimension is the number of emitters
-   integer,          dimension(:),    allocatable :: emitters_Type        ! The type of emitter
-   integer,          dimension(:),    allocatable :: emitters_delay       ! The time step the emitters become active
- 
-   ! Density map
-   integer, dimension(:, :), allocatable :: density_map_elec
-   integer, dimension(:, :), allocatable :: density_map_hole
-   integer, parameter                    :: N_x_densmap = 100, N_y_densmap = 100
-   !double precision                      :: dens_x_d, dens_y_d
- 
- 
-   ! ----------------------------------------------------------------------------
-   ! Define input parameters
-   double precision :: V_d     ! Voltage over the gap
-   double precision :: V_s     ! Voltage from the source
-   double precision :: d       ! Gap spacing
-   double precision :: E_z     ! Electric field in the y-direction (E_z = -V/d)
-   double precision :: E_zunit ! Unit electric field (E_zunit = -1/d) (See Ramo Current)
- 
-   double precision, dimension(1:3) :: box_dim ! Dimensions of the cell
- 
-   double precision :: time_step  ! Size of the time_step
-   double precision :: time_step2 ! time_step squared
- 
-   integer          :: steps      ! Number of time steps in the simulation
- 
-   logical          :: collisions = .false. ! Do ion colissions or not
- 
-   double precision :: T_temp = T_ntp ! Temperature in Kelvin
-   double precision :: P_abs = P_ntp  ! Pressure as fraction of P_std
-   double precision :: n_d = P_ntp/(k_b*T_ntp) ! Density of N2
- 
-   double precision :: R_s = 0.0d0 ! Series resistor
- 
- 
-   ! ----------------------------------------------------------------------------
-   ! Define run time variables
-   integer :: nrPart ! Number of particles in the system (nrPart = nrElec + nrHole + nrFixedPart)
-   integer :: nrElec ! Number of electrons in the system
-   integer :: nrHole ! Number of holes in the system
-   integer :: nrElecHole
-   integer :: nrEmit ! Number of emitters in the system
- 
-   integer :: nrPart_remove_top
-   integer :: nrPart_remove_bot
- 
-   integer :: nrElec_remove_top
-   integer :: nrElec_remove_bot
- 
-   integer :: nrHole_remove_top
-   integer :: nrHole_remove_bot
- 
-   integer :: nrPart_remove ! Number of particles to be removed
-   integer :: nrElec_remove ! Number of electrons to be removed
-   integer :: nrHole_remove ! Number of holes to be removed
- 
-   !integer :: startElecHoles
-   !integer :: endElecHoles
- 
-   integer, dimension(:), allocatable :: nrElec_remove_top_emit
- 
- 
-   ! ----------------------------------------------------------------------------
-   ! Emitter types
-   integer, parameter :: EMIT_UNKNOWN   = 0
-   integer, parameter :: EMIT_CIRCLE    = 1
-   integer, parameter :: EMIT_RECTANGLE = 2
- 
- 
-   double precision, dimension(:), allocatable :: ramo_current
-   double precision, dimension(:, :), allocatable :: ramo_current_emit
-   double precision :: ramo_cur_prev
-   double precision :: ramo_integral
- 
-   double precision                 :: avg_mob ! Average mobility
-   double precision, dimension(1:3) :: avg_vel ! Average speed
- 
-   double precision :: cur_time ! This is updated in the main loop, given in ps
-   integer, parameter :: MAX_LIFE_TIME = 1000
-   integer, dimension(:, :), allocatable :: life_time
- 
-   ! ----------------------------------------------------------------------------
-   ! Emission models
-   integer, parameter :: EMISSION_UNIT_TEST         = 0 ! Units test
-   integer, parameter :: EMISSION_PHOTO             = 1 ! Planar photo emission
-   integer, parameter :: EMISSION_FIELD             = 2 ! Planar field emission
-   integer, parameter :: EMISSION_FIELD_TIP         = 3 ! Field emission from a hyperboloid tip
-   integer, parameter :: EMISSION_THERMIONIC        = 4 ! Thermionic emission
-   integer, parameter :: EMISSION_FIELD_2D_2DEG_C   = 5 ! Field emission from 2D material
-   integer, parameter :: EMISSION_FIELD_2D_2DEG_NC  = 6 ! Field emission from 2D material
-   integer, parameter :: EMISSION_FIELD_2D_DIRAC_C  = 7 ! Field emission from 2D material
-   integer, parameter :: EMISSION_FIELD_2D_DIRAC_NC = 8 ! Field emission from 2D material
-   integer, parameter :: EMISSION_FIELD_THERMO      = 9 ! Planar Field + Thermionic emission
-   integer, parameter :: EMISSION_MANUAL            = 999 ! Manual placement of electrons for testing/debuging
-   integer, parameter :: EMISSION_TEST              = 99 ! Development emission
- 
-   integer            :: EMISSION_MODE           ! Parameter that defines the emission mode
- 
-   ! ----------------------------------------------------------------------------
-   ! Parameters for image charge
-   ! image_charge: Use image Charge or not.
-   !               It is checked in mod_verlet in Force_Image_Charge_v2 to decide if
-   !               to include image charge partners or not.
-   !               It is also checked in mod_field_emission to check if to use the
-   !               image charge approximations for the Fowler-Nordheim equation
-   ! N_ic_max: How many image charge partners to use in the calulations.
-   !           N_ic_max = 0 means use 1 image charge partners.
-   !           N_ic_max = 1 means use 5 image charge partners.
-   !           See the function Force_Image_Charge_v2 in mod_verlet for details.
-   logical           :: image_charge = .true.
-   integer           :: N_ic_max = 0
- 
-   ! ----------------------------------------------------------------------------
-   ! Periodic boundary conditions
-   ! Num_per = 0, means don't use periodic boundary conditions
-   double precision, parameter :: per_padding = 0.0d0 ! Padding between periodic systems
-   integer                     :: Num_per = 0 
- 
-   ! ----------------------------------------------------------------------------
-   ! Define constants
-   ! The constant in front of Coulomb's law, often called k
-   double precision, parameter :: div_fac_c = 1.0d0/(4.0d0*pi*epsilon_0*epsilon_r) ! 1/(4*pi*epsilon_0*epsilon_r)
- 
- 
-   ! ----------------------------------------------------------------------------
-   ! Parameters for random number generators
-   !integer                                            :: SEED = 2815
-   integer, allocatable :: my_seed(:)
- 
-   ! ----------------------------------------------------------------------------
-   ! Other stuff
-   logical            :: write_ramo_sec = .False. ! Write out the ramo current for each section.
-   logical            :: write_position_file = .False. ! Write ot the particle position information.
- 
- 
-   ! ----------------------------------------------------------------------------
-   ! unit descriptors for data files (text files)
-   integer :: ud_pos ! Position file
-   integer :: ud_emit ! File for emitted electrons and holes
-   integer :: ud_absorb ! File for absorbed electrons and holes
-   integer :: ud_absorb_top ! File for absorbed electrons and holes
-   integer :: ud_absorb_bot ! File for absorbed electrons and holes
-   integer :: ud_ramo ! File for the Ramo current
-   integer :: ud_volt ! Voltage in the system
-   integer :: ud_debug ! File for debuging and testing
-   integer :: ud_field ! File for surface field
-   integer :: ud_coll ! Collisions
-   integer :: ud_integrand ! Information about the surface integration
-   integer :: ud_mh ! Information about MH
- 
-   ! unit descriptors for data files (binary files)
-   integer :: ud_ramo_sec ! File for the ramo current broken down into emitters and sections
- 
-   ! Emission density (binary files)
-   integer :: ud_density_emit
-   integer :: ud_density_ion
- 
-   ! Absorption density (binary files)
-   integer :: ud_density_absorb_top
-   integer :: ud_density_absorb_bot
- 
-   !-----------------------------------------------------------------------------
-   ! Nodal Analysis
-   double precision, dimension(1:5) :: V_cur, V_prev ! Voltage and branch currents for the nodal analysis
- 
-   !-----------------------------------------------------------------------------
-   ! Other
-   logical            :: cought_stop_signal = .false. ! If true we stop the main loop
-   integer, parameter :: SIGINT = 2 ! Interrupt signal (Ctrl+C)
- 
- 
-   ! ----------------------------------------------------------------------------
-   ! Define namelist for the input file
-   ! These variables are read for the input file.
-   namelist /input/ V_s, box_dim, time_step, steps, &
-                    nrEmit, emitters_pos, emitters_dim, &
-                    emitters_type, emitters_delay, EMISSION_MODE, &
-                    image_charge, N_ic_max, collisions, T_temp, P_abs, &
-                    write_ramo_sec, write_position_file, R_s, Num_per
- 
-   ! ----------------------------------------------------------------------------
-   ! Prodecure interfaces and pointers
-   ! These are subroutines/functions that change depending on the type of
-   ! emission / geometry used.
-   interface
-     subroutine Check_Boundary(i)
-       integer, intent(in) :: i
-     end subroutine Check_Boundary
- 
-     pure function Electric_Field(pos) result(field_E)
-       double precision, dimension(1:3), intent(in) :: pos
-       double precision, dimension(1:3)             :: field_E
-     end function Electric_Field
- 
-     subroutine Do_Emission(step)
-       integer, intent(in) :: step
-     end subroutine Do_Emission
- 
-     function Image_Charge_effect(pos_1, pos_2)
-       double precision, dimension(1:3)             :: Image_Charge_effect
-       double precision, dimension(1:3), intent(in) :: pos_1, pos_2
-    end function Image_Charge_effect
- 
-    function Get_Emission_Velocity()
-       double precision, dimension(1:3) :: Get_Emission_Velocity
-    end function Get_Emission_Velocity
-   end interface
- 
-   ! Pointers
-   procedure(Check_Boundary), pointer        :: ptr_Check_Boundary => null()
-   procedure(Electric_Field), pointer        :: ptr_field_E => null()
-   procedure(Do_Emission), pointer           :: ptr_Do_Emission => null()
-   procedure(Image_Charge_effect), pointer   :: ptr_Image_Charge_effect => null()
-   procedure(Get_Emission_Velocity), pointer :: ptr_Get_Emission_Velocity => null()
- contains
- 
-   ! Flush all files to disk
-   subroutine Flush_Data()
-    flush(ud_pos)
-    flush(ud_emit)
-    flush(ud_absorb)
-    flush(ud_absorb_top)
-    flush(ud_absorb_bot)
-    flush(ud_ramo)
-    flush(ud_volt)
-    flush(ud_debug)
-    flush(ud_field)
-    flush(ud_coll)
-    flush(ud_integrand)
-    flush(ud_mh)
- 
-    flush(ud_ramo_sec)
- 
-    flush(ud_density_emit)
-    flush(ud_density_ion)
- 
-    flush(ud_density_absorb_top)
-    flush(ud_density_absorb_bot)
-   end subroutine Flush_Data
- 
-   ! Check if a number is infinit.
-   logical function isinf(a)
-     double precision, intent(in) :: a
- 
-     ! if the number is infinity then the results is always infinity,
-     ! .i.e inf - 1 = inf
-     if ((a-1.0d0) == a) then
-       isinf = .true.
-     else
-       isinf = .false.
-     end if
-   end
- 
- ! PGI compiler does not have is isnan function
- !#if defined(__PGI)
- !  logical function isnan(x)
- !    use ieee_arithmetic
- !    double precision, intent(in) :: x
- !
- !    isnan = ieee_is_nan(x)
- !  end function isnan
- !#endif
- 
- ! So far the PGI compiler (v. 18.4) has not implemented the NORM2 function
- ! from the Fortran 2008 Standard
- !#if defined(__PGI)
- !  pure double precision function norm2(a)
- !    double precision, dimension(:), intent(in) :: a
-     ! integer                                    :: i
- 
- !    norm2 = sqrt(sum(a**2))
- 
-     ! norm2 = 0.0d0
-     ! do i = lbound(a, dim=1), ubound(a, dim=1)
-     !   norm2 = norm2 + a(i)**2
-     ! end do
-     ! norm2 = sqrt(norm2)
- !  end function norm2
- !#endif
- 
- ! "The Box–Muller transform, by George Edward Pelham Box and Mervin Edgar Muller,
- ! is a pseudo-random number sampling method for generating pairs of independent,
- ! standard, normally distributed (zero expectation, unit variance) random numbers,
- ! given a source of uniformly distributed random numbers."
- ! See https://en.wikipedia.org/wiki/Box%E2%80%93Muller_transform
- ! We use the polar form version here see:
- ! https://en.wikipedia.org/wiki/Marsaglia_polar_method
- function box_muller(mean, std)
-   double precision, dimension(1:2)             :: box_muller
-   double precision, dimension(1:2), intent(in) :: mean, std
-   double precision                             :: w
-   double precision, dimension(1:2)             :: x, y
- 
+  implicit none
+
+  !integer, parameter :: CHUNK_SIZE = 1000
+
+  ! ----------------------------------------------------------------------------
+  ! Define material parameters
+  !
+  character(len=*), parameter :: material = 'Vacuum' ! Material used
+  double precision, parameter :: epsilon_r = 1.0d0 ! Relative permittivity
+  double precision, parameter :: m_eeff = 1.0d0 ! Effective mass for electrons
+  double precision, parameter :: m_heff = 1.0d0 ! Effective mass for holes
+
+
+  ! ----------------------------------------------------------------------------
+  ! Define physical constants
+  ! See http://physics.nist.gov/cuu/Constants/index.html
+  double precision, parameter :: pi = 3.14159265358979324d0 ! Pi
+  double precision, parameter :: h = 6.626070040d-34 ! Planck's constant, h (Js)
+  double precision, parameter :: k_b = 1.38064852d-23 ! Boltzmann constant (J/K)
+  double precision, parameter :: c = 299792458.0d0 ! Speed of light (m/s)
+  double precision, parameter :: mu_0 = 4.0d0*pi * 1.0d-7 ! Vacuum permeability (H/m)
+  double precision, parameter :: epsilon_0 = 1.0d0/(mu_0 * c**2) ! Vacuum permittivity (F/m)
+  !double precision, parameter :: epsilon_0 = 8.854187817d-12 ! Farads / meters
+  double precision, parameter :: epsilon = epsilon_r * epsilon_0 ! Permittivity
+  double precision, parameter :: m_u = 1.660539040d-27 ! Atomic mass unit (kg)
+  double precision, parameter :: h_bar = 1.054571726d-34 ! Planck's constant, h/(2*pi) (Js)
+
+  double precision, parameter :: m_0 = 9.10938356d-31 ! Free electron mass (kg)
+  !double precision, parameter :: m_e = m_eeff * m_0 ! m_e* Effective electron mass (kg)
+  !double precision, parameter :: m_h = m_heff * m_0! m_h* Effective hole mass (kg)
+
+  double precision, parameter :: m_N2p = 14.0067d0*m_u - m_0 ! Mass of N_2^+
+
+  double precision, parameter :: q_0 = 1.6021766208d-19 ! Elementary charge (C)
+  double precision, parameter :: q_02 = q_0**2 ! Elementary charge squared (C)
+
+  double precision, parameter :: T_ntp = 293.15d0 ! Normal temperature in Kelvin (NIST)
+  double precision, parameter :: P_ntp = 101325.0d0 ! Normal pressure in Pa (NIST)
+
+  ! ----------------------------------------------------------------------------
+  ! Define scales used when reading and writing data
+  double precision, parameter :: length_scale = 1.0d-9 ! Length scale (1 nanometer)
+  double precision, parameter :: time_scale = 1.0d-12 ! Time scale (1 ps)
+  double precision, parameter :: vel_scale = length_scale / time_scale ! Velocity scale (1 nm / 1 ps)
+  double precision, parameter :: cur_scale = 1.0d0 ! Current scale (1 A)
+
+
+  ! ----------------------------------------------------------------------------
+  ! Define maximum size constants.
+  ! These can be increased if needed.
+  integer, parameter :: MAX_PARTICLES = 500000 ! Maximum number of particles allowed in the system
+  integer, parameter :: MAX_EMITTERS  = 1      ! Maximum number of emitters in the system
+  integer, parameter :: MAX_SECTIONS  = 96*96    ! Maximum number of sections an emitter can have
+
+
+  !! ----------------------------------------------------------------------------
+  !! Define the charge of the electrons and holes
+  !integer, parameter :: charge_elec = -1
+  !integer, parameter :: charge_hole = +1
+
+  ! ----------------------------------------------------------------------------
+  ! Define the particle species
+  integer, parameter :: species_unkown   = 0 ! Unknown particle
+  integer, parameter :: species_elec     = 1 ! Electron
+  integer, parameter :: species_hole     = 2 ! Hole
+  integer, parameter :: nrSpecies        = 2 ! 2 = Elec, Hole
+
+
+  ! ----------------------------------------------------------------------------
+  ! Particle removal flags
+  integer, parameter :: remove_unknown = 0
+  integer, parameter :: remove_top     = 1
+  integer, parameter :: remove_bot     = 2
+
+  ! ----------------------------------------------------------------------------
+  ! Define storage arrays for particles
+  ! Position and velocity of particles. Fyrst dimension is x,y,z, second one is the number of the particle
+  double precision, dimension(:, :), allocatable :: particles_cur_pos    ! Current position (1:3, 1:MAX_PARTICLES)
+  double precision, dimension(:, :), allocatable :: particles_prev_pos   ! Previous position
+  double precision, dimension(:, :), allocatable :: particles_last_col_pos ! Position of last collision
+  double precision, dimension(:, :), allocatable :: particles_cur_vel    ! Current velocity
+  double precision, dimension(:, :), allocatable :: particles_cur_accel  ! Current acceleration
+  double precision, dimension(:, :), allocatable :: particles_prev_accel ! Previous acceleration
+  double precision, dimension(:, :), allocatable :: particles_prev2_accel ! Previous acceleration
+
+  ! Other information about particles, the dimension is the number of particles
+  double precision, dimension(:)   , allocatable :: particles_charge     ! Charge
+  integer         , dimension(:)   , allocatable :: particles_species    ! Type of particle
+  double precision, dimension(:)   , allocatable :: particles_mass       ! Mass
+  integer         , dimension(:)   , allocatable :: particles_step       ! Time step when the particle was created
+  integer         , dimension(:)   , allocatable :: particles_emitter    ! The emitter the particle came from
+  integer         , dimension(:)   , allocatable :: particles_section    ! The section of the emitter the particles came from
+  integer         , dimension(:)   , allocatable :: particles_life       ! The time step when the particle should be removed from the system
+  logical         , dimension(:)   , allocatable :: particles_mask       ! Mask array used to indicate which particles should be removed
+                                                                         ! .true. means that the particle is active,
+                                                                         ! .false. means it is inactive and should be removed
+
+  ! Cross Sections
+  double precision, allocatable, target, dimension(:, :) :: N2_tot_cross ! Total cross section of N2
+  double precision, allocatable, target, dimension(:, :) :: N2_ion_cross ! Ioniaztion cross section of N2
+
+
+  ! ----------------------------------------------------------------------------
+  ! Define storage arrays for emitters
+  ! Fyrst dimension is x,y,z, second one is the number of the emitter
+  double precision, dimension(:, :), allocatable :: emitters_pos         ! Position of the emitters (1:3, 1:MAX_EMITTERS)
+  double precision, dimension(:, :), allocatable :: emitters_dim         ! Dimensions of the emitters
+  ! Dimension is the number of emitters
+  integer,          dimension(:),    allocatable :: emitters_Type        ! The type of emitter
+  integer,          dimension(:),    allocatable :: emitters_delay       ! The time step the emitters become active
+
+  ! Density map
+  integer, dimension(:, :), allocatable :: density_map_elec
+  integer, dimension(:, :), allocatable :: density_map_hole
+  integer, parameter                    :: N_x_densmap = 100, N_y_densmap = 100
+  !double precision                      :: dens_x_d, dens_y_d
+
+
+  ! ----------------------------------------------------------------------------
+  ! Define input parameters
+  double precision :: V_d     ! Voltage over the gap
+  double precision :: V_s     ! Voltage from the source
+  double precision :: d       ! Gap spacing
+  double precision :: E_z     ! Electric field in the y-direction (E_z = -V/d)
+  double precision :: E_zunit ! Unit electric field (E_zunit = -1/d) (See Ramo Current)
+
+  double precision, dimension(1:3) :: box_dim ! Dimensions of the cell
+
+  double precision :: time_step  ! Size of the time_step
+  double precision :: time_step2 ! time_step squared
+
+  integer          :: steps      ! Number of time steps in the simulation
+
+  logical          :: collisions = .false. ! Do ion colissions or not
+
+  double precision :: T_temp = T_ntp ! Temperature in Kelvin
+  double precision :: P_abs = P_ntp  ! Pressure as fraction of P_std
+  double precision :: n_d = P_ntp/(k_b*T_ntp) ! Density of N2
+
+  double precision :: R_s = 0.0d0 ! Series resistor
+
+  ! Parallel
+  double precision :: R_p = 7500.0d0 ! Ohm, parallel resistor
+  double precision :: L_p = 1.04d-9  ! Henry, parallel inductor
+  double precision :: C_p = 0.53d-17 ! Farad, parallel capacitor
+
+
+  ! ----------------------------------------------------------------------------
+  ! Define run time variables
+  integer :: nrPart ! Number of particles in the system (nrPart = nrElec + nrHole + nrFixedPart)
+  integer :: nrElec ! Number of electrons in the system
+  integer :: nrHole ! Number of holes in the system
+  integer :: nrElecHole
+  integer :: nrEmit ! Number of emitters in the system
+
+  integer :: nrPart_remove_top
+  integer :: nrPart_remove_bot
+
+  integer :: nrElec_remove_top
+  integer :: nrElec_remove_bot
+
+  integer :: nrHole_remove_top
+  integer :: nrHole_remove_bot
+
+  integer :: nrPart_remove ! Number of particles to be removed
+  integer :: nrElec_remove ! Number of electrons to be removed
+  integer :: nrHole_remove ! Number of holes to be removed
+
+  !integer :: startElecHoles
+  !integer :: endElecHoles
+
+  integer, dimension(:), allocatable :: nrElec_remove_top_emit
+
+
+  ! ----------------------------------------------------------------------------
+  ! Emitter types
+  integer, parameter :: EMIT_UNKNOWN         = 0
+  integer, parameter :: EMIT_CIRCLE          = 1
+  integer, parameter :: EMIT_RECTANGLE       = 2
+  integer, parameter :: EMIT_RECTANGLE_SPOTS = 3
+
+
+  double precision, dimension(:), allocatable :: ramo_current
+  double precision, dimension(:, :), allocatable :: ramo_current_emit
+
+  double precision                 :: avg_mob ! Average mobility
+  double precision, dimension(1:3) :: avg_vel ! Average speed
+
+  double precision :: cur_time ! This is updated in the main loop, given in ps
+  integer, parameter :: MAX_LIFE_TIME = 1000
+  integer, dimension(:, :), allocatable :: life_time
+
+  ! ----------------------------------------------------------------------------
+  ! Emission models
+  integer, parameter :: EMISSION_UNIT_TEST         = 0 ! Units test
+  integer, parameter :: EMISSION_PHOTO             = 1 ! Planar photo emission
+  integer, parameter :: EMISSION_FIELD             = 2 ! Planar field emission
+  integer, parameter :: EMISSION_TIP               = 3 ! Field emission from a hyperboloid tip
+  integer, parameter :: EMISSION_THERMIONIC        = 4 ! Thermionic emission
+  integer, parameter :: EMISSION_FIELD_2D_2DEG_C   = 5 ! Field emission from 2D material
+  integer, parameter :: EMISSION_FIELD_2D_2DEG_NC  = 6 ! Field emission from 2D material
+  integer, parameter :: EMISSION_FIELD_2D_DIRAC_C  = 7 ! Field emission from 2D material
+  integer, parameter :: EMISSION_FIELD_2D_DIRAC_NC = 8 ! Field emission from 2D material
+  integer, parameter :: EMISSION_FIELD_THERMO      = 9 ! Planar Field + Thermionic emission
+  integer, parameter :: EMISSION_MANUAL            = 999 ! Manual placement of electrons for testing/debuging
+  integer, parameter :: EMISSION_FIELD_V2          = 10 ! Development emission
+
+  integer            :: EMISSION_MODE           ! Parameter that defines the emission mode
+
+  ! ----------------------------------------------------------------------------
+  ! Parameters for image charge
+  ! image_charge: Use image Charge or not.
+  !               It is checked in mod_verlet in Force_Image_Charge_v2 to decide if
+  !               to include image charge partners or not.
+  !               It is also checked in mod_field_emission to check if to use the
+  !               image charge approximations for the Fowler-Nordheim equation
+  ! N_ic_max: How many image charge partners to use in the calulations.
+  !           N_ic_max = 0 means use 1 image charge partners.
+  !           N_ic_max = 1 means use 5 image charge partners.
+  !           See the function Force_Image_Charge_v2 in mod_verlet for details.
+  logical           :: image_charge = .true.
+  integer           :: N_ic_max = 0
+
+  ! ----------------------------------------------------------------------------
+  ! Periodic boundary conditions
+  ! Num_per = 0, means don't use periodic boundary conditions
+  double precision, parameter :: per_padding = 0.0d0 ! Padding between periodic systems
+  integer                     :: Num_per = 0
+
+  ! ----------------------------------------------------------------------------
+  ! Define constants
+  ! The constant in front of Coulomb's law, often called k
+  double precision, parameter :: div_fac_c = 1.0d0/(4.0d0*pi*epsilon_0*epsilon_r) ! 1/(4*pi*epsilon_0*epsilon_r)
+
+  ! ----------------------------------------------------------------------------
+  ! Planes where to record information about particles when they pass through
+  integer, parameter                                 :: planes_N = 6
+  double precision, dimension(1:planes_N), parameter :: planes_z = &
+                    & (/ 5.0d0, 10.0d0, 25.0d0, 50.0d0, 100.0d0, 500.0d0 /) * length_scale
+  integer, dimension(1:planes_N)                     :: planes_ud
+
+
+  ! ----------------------------------------------------------------------------
+  ! Parameters for random number generators
+  !integer                                            :: SEED = 2815
+  integer, allocatable :: my_seed(:)
+
+  ! ----------------------------------------------------------------------------
+  ! Other stuff
+  logical            :: write_ramo_sec = .False. ! Write out the ramo current for each section.
+  logical            :: write_position_file = .False. ! Write ot the particle position information.
+
+
+  ! ----------------------------------------------------------------------------
+  ! unit descriptors for data files (text files)
+  integer :: ud_pos ! Position file
+  integer :: ud_emit ! File for emitted electrons and holes
+  integer :: ud_absorb ! File for absorbed electrons and holes
+  integer :: ud_absorb_top ! File for absorbed electrons and holes
+  integer :: ud_absorb_bot ! File for absorbed electrons and holes
+  integer :: ud_ramo ! File for the Ramo current
+  integer :: ud_volt ! Voltage in the system
+  integer :: ud_debug ! File for debuging and testing
+  integer :: ud_field ! File for surface field
+  integer :: ud_coll ! Collisions
+  integer :: ud_integrand ! Information about the surface integration
+  integer :: ud_mh ! Information about MH
+  integer :: ud_gauss
+
+  ! unit descriptors for data files (binary files)
+  integer :: ud_ramo_sec ! File for the ramo current broken down into emitters and sections
+
+  ! Emission density (binary files)
+  integer :: ud_density_emit
+  integer :: ud_density_ion
+
+  ! Absorption density (binary files)
+  integer :: ud_density_absorb_top
+  integer :: ud_density_absorb_bot
+
+  !-----------------------------------------------------------------------------
+  ! Nodal Analysis
+  !!double precision, dimension(1:5) :: V_cur, V_prev ! Voltage and branch currents for the nodal analysis
+
+  !-----------------------------------------------------------------------------
+  ! Other
+  logical            :: cought_stop_signal = .false. ! If true we stop the main loop
+  integer, parameter :: SIGINT = 2 ! Interrupt signal (Ctrl+C)
+
+
+  ! ----------------------------------------------------------------------------
+  ! Define namelist for the input file
+  ! These variables are read for the input file.
+  namelist /input/ V_s, box_dim, time_step, steps, &
+                   nrEmit, emitters_pos, emitters_dim, &
+                   emitters_type, emitters_delay, EMISSION_MODE, &
+                   image_charge, N_ic_max, collisions, T_temp, P_abs, &
+                   write_ramo_sec, write_position_file, R_s, &
+                   R_p, L_p, C_p, Num_per
+
+  ! ----------------------------------------------------------------------------
+  ! Prodecure interfaces and pointers
+  ! These are subroutines/functions that change depending on the type of
+  ! emission / geometry used.
+  interface
+    subroutine Check_Boundary(i)
+      integer, intent(in) :: i
+    end subroutine Check_Boundary
+
+    pure function Electric_Field(pos) result(field_E)
+      double precision, dimension(1:3), intent(in) :: pos
+      double precision, dimension(1:3)             :: field_E
+    end function Electric_Field
+
+    subroutine Do_Emission(step)
+      integer, intent(in) :: step
+    end subroutine Do_Emission
+
+    function Image_Charge_effect(pos_1, pos_2)
+      double precision, dimension(1:3)             :: Image_Charge_effect
+      double precision, dimension(1:3), intent(in) :: pos_1, pos_2
+   end function Image_Charge_effect
+
+   function Get_Emission_Velocity()
+      double precision, dimension(1:3) :: Get_Emission_Velocity
+   end function Get_Emission_Velocity
+  end interface
+
+  ! Pointers
+  procedure(Check_Boundary), pointer        :: ptr_Check_Boundary => null()
+  procedure(Electric_Field), pointer        :: ptr_field_E => null()
+  procedure(Do_Emission), pointer           :: ptr_Do_Emission => null()
+  procedure(Image_Charge_effect), pointer   :: ptr_Image_Charge_effect => null()
+  procedure(Get_Emission_Velocity), pointer :: ptr_Get_Emission_Velocity => null()
+contains
+
+  ! Flush all files to disk
+  subroutine Flush_Data()
+   flush(ud_pos)
+   flush(ud_emit)
+   flush(ud_absorb)
+   flush(ud_absorb_top)
+   flush(ud_absorb_bot)
+   flush(ud_ramo)
+   flush(ud_volt)
+   flush(ud_debug)
+   flush(ud_field)
+   flush(ud_coll)
+   flush(ud_integrand)
+   flush(ud_mh)
+
+   flush(ud_ramo_sec)
+
+   flush(ud_density_emit)
+   flush(ud_density_ion)
+
+   flush(ud_density_absorb_top)
+   flush(ud_density_absorb_bot)
+  end subroutine Flush_Data
+
+  ! Check if a number is infinit.
+  logical function isinf(a)
+    double precision, intent(in) :: a
+
+    ! if the number is infinity then the results is always infinity,
+    ! .i.e inf - 1 = inf
+    if ((a-1.0d0) == a) then
+      isinf = .true.
+    else
+      isinf = .false.
+    end if
+  end
+
+! PGI compiler does not have is isnan function
+#if defined(__PGI)
+  logical function isnan(x)
+    use ieee_arithmetic
+    double precision, intent(in) :: x
+
+    isnan = ieee_is_nan(x)
+  end function isnan
+#endif
+
+! So far the PGI compiler (v. 18.4) has not implemented the NORM2 function
+! from the Fortran 2008 Standard
+#if defined(__PGI)
+  pure double precision function norm2(a)
+    double precision, dimension(:), intent(in) :: a
+    ! integer                                    :: i
+
+    norm2 = sqrt(sum(a**2))
+
+    ! norm2 = 0.0d0
+    ! do i = lbound(a, dim=1), ubound(a, dim=1)
+    !   norm2 = norm2 + a(i)**2
+    ! end do
+    ! norm2 = sqrt(norm2)
+  end function norm2
+#endif
+
+! "The Box–Muller transform, by George Edward Pelham Box and Mervin Edgar Muller,
+! is a pseudo-random number sampling method for generating pairs of independent,
+! standard, normally distributed (zero expectation, unit variance) random numbers,
+! given a source of uniformly distributed random numbers."
+! See https://en.wikipedia.org/wiki/Box%E2%80%93Muller_transform
+! We use the polar form version here see:
+! https://en.wikipedia.org/wiki/Marsaglia_polar_method
+function box_muller(mean, std)
+  double precision, dimension(1:2)             :: box_muller
+  double precision, dimension(1:2), intent(in) :: mean, std
+  double precision                             :: w
+  double precision, dimension(1:2)             :: x, y
+
+  do
+    call random_number(x)
+
+    x = 2.0d0*x - 1.0d0
+    w = x(1)**2 + x(2)**2
+
+    if (w < 1.0d0) exit
+  end do
+
+  y = x*sqrt( (-2.0d0 * log( w ) ) / w )
+  box_muller = y*std + mean
+end function box_muller
+
+! Random poission variable with mean lambda.
+! See
+! https://en.wikipedia.org/wiki/Poisson_distribution#Generating_Poisson-distributed_random_variables
+integer function Rand_Poission(lambda)
+double precision, intent(in) :: lambda
+double precision             :: lambda_left, p, u
+integer                      :: k
+double precision, parameter  :: Poisson_Step = 500.0d0
+
+lambda_left = lambda
+k = 0
+p = 1
+
+do while (p >= 1)
+  k = k + 1
+  call random_number(u)
+  p = p*u
+  do while ((p < 1) .and. (lambda_left > 0))
+   if (lambda_left > Poisson_Step) then
+     p = p * exp(Poisson_Step)
+     lambda_left = lambda_left - Poisson_Step
+   else
+      p = p * exp(lambda_left)
+      lambda_left = 0.0d0
+    end if
+  end do
+end do
+
+Rand_Poission = k - 1
+
+! From Wikipedia
+! algorithm poisson random number (Junhao, based on Knuth):
+!   init:
+!        Let λLeft ← λ, k ← 0 and p ← 1.
+!   do:
+!        k ← k + 1.
+!        Generate uniform random number u in (0,1) and let p ← p × u.
+!        while p < 1 and λLeft > 0:
+!             if λLeft > STEP:
+!                  p ← p × exp(STEP)
+!                  λLeft ← λLeft - STEP
+!             else:
+!                  p ← p × exp(λLeft)
+!                  λLeft ← 0
+!   while p > 1.
+!   return k − 1.
+end function Rand_Poission
+
+    ! ----------------------------------------------------------------------------
+    ! A function that does a binary search of the list for the value.
+    ! It will return the index to the nearest value. The optional arguments
+    ! i1 and i2 will be the two elements that the value falls between in the list.
+integer function BinarySearch(list, value, i1, i2)
+   double precision, dimension(:), target, intent(in) :: list(:)
+   double precision, intent(in)               :: value
+   integer, intent(out), optional             :: i1, i2
+   integer                                    :: first, last, mid
+
+   ! Get the upper and lower bounds of the list
+   first = lbound(list, 1)
+   last = ubound(list, 1)
+
    do
-     call random_number(x)
- 
-     x = 2.0d0*x - 1.0d0
-     w = x(1)**2 + x(2)**2
- 
-     if (w < 1.0d0) exit
+   ! Check if we have narrowed down our list to two elements
+   if ((last - first) == 1) then
+      ! We found the two elements that our value is between
+      exit
+   end if
+
+   ! Search the list by cutting it in half
+   mid = (first + last) / 2
+   if (list(mid) > value) then
+      last = mid
+   else
+      first = mid
+   end if
    end do
- 
-   y = x*sqrt( (-2.0d0 * log( w ) ) / w )
-   box_muller = y*std + mean
- end function box_muller
- 
- ! Random poission variable with mean lambda.
- ! See
- ! https://en.wikipedia.org/wiki/Poisson_distribution#Generating_Poisson-distributed_random_variables
- integer function Rand_Poission(lambda)
- double precision, intent(in) :: lambda
- double precision             :: lambda_left, p, u
- integer                      :: k
- double precision, parameter  :: Poisson_Step = 500.0d0
- 
- lambda_left = lambda
- k = 0
- p = 1
- 
- do while (p >= 1)
-   k = k + 1
-   call random_number(u)
-   p = p*u
-   do while ((p < 1) .and. (lambda_left > 0))
-    if (lambda_left > Poisson_Step) then
-      p = p * exp(Poisson_Step)
-      lambda_left = lambda_left - Poisson_Step
-    else
-       p = p * exp(lambda_left)
-       lambda_left = 0.0d0
-     end if
-   end do
- end do
- 
- Rand_Poission = k - 1
- 
- ! From Wikipedia
- ! algorithm poisson random number (Junhao, based on Knuth):
- !   init:
- !        Let λLeft ← λ, k ← 0 and p ← 1.
- !   do:
- !        k ← k + 1.
- !        Generate uniform random number u in (0,1) and let p ← p × u.
- !        while p < 1 and λLeft > 0:
- !             if λLeft > STEP:
- !                  p ← p × exp(STEP)
- !                  λLeft ← λLeft - STEP
- !             else:
- !                  p ← p × exp(λLeft)
- !                  λLeft ← 0
- !   while p > 1.
- !   return k − 1.
- end function Rand_Poission
- 
-     ! ----------------------------------------------------------------------------
-     ! A function that does a binary search of the list for the value.
-     ! It will return the index to the nearest value. The optional arguments
-     ! i1 and i2 will be the two elements that the value falls between in the list.
- integer function BinarySearch(list, value, i1, i2)
-    double precision, dimension(:), target, intent(in) :: list(:)
-    double precision, intent(in)               :: value
-    integer, intent(out), optional             :: i1, i2
-    integer                                    :: first, last, mid
- 
-    ! Get the upper and lower bounds of the list
-    first = lbound(list, 1)
-    last = ubound(list, 1)
- 
-    do
-    ! Check if we have narrowed down our list to two elements
-    if ((last - first) == 1) then
-       ! We found the two elements that our value is between
-       exit
-    end if
- 
-    ! Search the list by cutting it in half
-    mid = (first + last) / 2
-    if (list(mid) > value) then
-       last = mid
-    else
-       first = mid
-    end if
-    end do
- 
-    if (present(i1)) i1 = first
-    if (present(i2)) i2 = last
- 
-    ! Return the index that is nearest to the value
-    if (abs(list(first) - value) < abs(list(last) - value)) then
-    BinarySearch = first
-    else
-    BinarySearch = last
-    end if
- 
- end function BinarySearch
- 
- 
- !***********************************************************************************************************************************
- !  M55INV  -  Compute the inverse of a 5x5 matrix.
- !
- !  A       = input 5x5 matrix to be inverted
- !  AINV    = output 5x5 inverse of matrix A
- !  OK_FLAG = (output) .TRUE. if the input matrix could be inverted, and .FALSE. if the input matrix is singular.
- ! http://www.davidgsimpson.com/software.html
- !***********************************************************************************************************************************
- 
-       SUBROUTINE M55INV (A, AINV, OK_FLAG)
- 
-       IMPLICIT NONE
- 
-       DOUBLE PRECISION, DIMENSION(5,5), INTENT(IN)  :: A
-       DOUBLE PRECISION, DIMENSION(5,5), INTENT(OUT) :: AINV
-       LOGICAL, INTENT(OUT) :: OK_FLAG
- 
-       DOUBLE PRECISION, PARAMETER :: EPS = 1.0D-10
-       DOUBLE PRECISION :: DET, A11, A12, A13, A14, A15, A21, A22, A23, A24, &
-          A25, A31, A32, A33, A34, A35, A41, A42, A43, A44, A45,   &
-          A51, A52, A53, A54, A55
-       DOUBLE PRECISION, DIMENSION(5,5) :: COFACTOR
- 
- 
-       A11=A(1,1); A12=A(1,2); A13=A(1,3); A14=A(1,4); A15=A(1,5)
-       A21=A(2,1); A22=A(2,2); A23=A(2,3); A24=A(2,4); A25=A(2,5)
-       A31=A(3,1); A32=A(3,2); A33=A(3,3); A34=A(3,4); A35=A(3,5)
-       A41=A(4,1); A42=A(4,2); A43=A(4,3); A44=A(4,4); A45=A(4,5)
-       A51=A(5,1); A52=A(5,2); A53=A(5,3); A54=A(5,4); A55=A(5,5)
- 
-       DET = A15*A24*A33*A42*A51-A14*A25*A33*A42*A51-A15*A23*A34*A42*A51+    &
-          A13*A25*A34*A42*A51+A14*A23*A35*A42*A51-A13*A24*A35*A42*A51-       &
-          A15*A24*A32*A43*A51+A14*A25*A32*A43*A51+A15*A22*A34*A43*A51-       &
-          A12*A25*A34*A43*A51-A14*A22*A35*A43*A51+A12*A24*A35*A43*A51+       &
-          A15*A23*A32*A44*A51-A13*A25*A32*A44*A51-A15*A22*A33*A44*A51+       &
-          A12*A25*A33*A44*A51+A13*A22*A35*A44*A51-A12*A23*A35*A44*A51-       &
-          A14*A23*A32*A45*A51+A13*A24*A32*A45*A51+A14*A22*A33*A45*A51-       &
-          A12*A24*A33*A45*A51-A13*A22*A34*A45*A51+A12*A23*A34*A45*A51-       &
-          A15*A24*A33*A41*A52+A14*A25*A33*A41*A52+A15*A23*A34*A41*A52-       &
-          A13*A25*A34*A41*A52-A14*A23*A35*A41*A52+A13*A24*A35*A41*A52+       &
-          A15*A24*A31*A43*A52-A14*A25*A31*A43*A52-A15*A21*A34*A43*A52+       &
-          A11*A25*A34*A43*A52+A14*A21*A35*A43*A52-A11*A24*A35*A43*A52-       &
-          A15*A23*A31*A44*A52+A13*A25*A31*A44*A52+A15*A21*A33*A44*A52-       &
-          A11*A25*A33*A44*A52-A13*A21*A35*A44*A52+A11*A23*A35*A44*A52+       &
-          A14*A23*A31*A45*A52-A13*A24*A31*A45*A52-A14*A21*A33*A45*A52+       &
-          A11*A24*A33*A45*A52+A13*A21*A34*A45*A52-A11*A23*A34*A45*A52+       &
-          A15*A24*A32*A41*A53-A14*A25*A32*A41*A53-A15*A22*A34*A41*A53+       &
-          A12*A25*A34*A41*A53+A14*A22*A35*A41*A53-A12*A24*A35*A41*A53-       &
-          A15*A24*A31*A42*A53+A14*A25*A31*A42*A53+A15*A21*A34*A42*A53-       &
-          A11*A25*A34*A42*A53-A14*A21*A35*A42*A53+A11*A24*A35*A42*A53+       &
-          A15*A22*A31*A44*A53-A12*A25*A31*A44*A53-A15*A21*A32*A44*A53+       &
-          A11*A25*A32*A44*A53+A12*A21*A35*A44*A53-A11*A22*A35*A44*A53-       &
-          A14*A22*A31*A45*A53+A12*A24*A31*A45*A53+A14*A21*A32*A45*A53-       &
-          A11*A24*A32*A45*A53-A12*A21*A34*A45*A53+A11*A22*A34*A45*A53-       &
-          A15*A23*A32*A41*A54+A13*A25*A32*A41*A54+A15*A22*A33*A41*A54-       &
-          A12*A25*A33*A41*A54-A13*A22*A35*A41*A54+A12*A23*A35*A41*A54+       &
-          A15*A23*A31*A42*A54-A13*A25*A31*A42*A54-A15*A21*A33*A42*A54+       &
-          A11*A25*A33*A42*A54+A13*A21*A35*A42*A54-A11*A23*A35*A42*A54-       &
-          A15*A22*A31*A43*A54+A12*A25*A31*A43*A54+A15*A21*A32*A43*A54-       &
-          A11*A25*A32*A43*A54-A12*A21*A35*A43*A54+A11*A22*A35*A43*A54+       &
-          A13*A22*A31*A45*A54-A12*A23*A31*A45*A54-A13*A21*A32*A45*A54+       &
-          A11*A23*A32*A45*A54+A12*A21*A33*A45*A54-A11*A22*A33*A45*A54+       &
-          A14*A23*A32*A41*A55-A13*A24*A32*A41*A55-A14*A22*A33*A41*A55+       &
-          A12*A24*A33*A41*A55+A13*A22*A34*A41*A55-A12*A23*A34*A41*A55-       &
-          A14*A23*A31*A42*A55+A13*A24*A31*A42*A55+A14*A21*A33*A42*A55-       &
-          A11*A24*A33*A42*A55-A13*A21*A34*A42*A55+A11*A23*A34*A42*A55+       &
-          A14*A22*A31*A43*A55-A12*A24*A31*A43*A55-A14*A21*A32*A43*A55+       &
-          A11*A24*A32*A43*A55+A12*A21*A34*A43*A55-A11*A22*A34*A43*A55-       &
-          A13*A22*A31*A44*A55+A12*A23*A31*A44*A55+A13*A21*A32*A44*A55-       &
-          A11*A23*A32*A44*A55-A12*A21*A33*A44*A55+A11*A22*A33*A44*A55
- 
-       IF (ABS(DET) .LE. EPS) THEN
-          AINV = 0.0D0
-          OK_FLAG = .FALSE.
-          RETURN
-       END IF
- 
-       COFACTOR(1,1) = A25*A34*A43*A52-A24*A35*A43*A52-A25*A33*A44*A52+      &
-          A23*A35*A44*A52+A24*A33*A45*A52-A23*A34*A45*A52-A25*A34*A42*A53+   &
-          A24*A35*A42*A53+A25*A32*A44*A53-A22*A35*A44*A53-A24*A32*A45*A53+   &
-          A22*A34*A45*A53+A25*A33*A42*A54-A23*A35*A42*A54-A25*A32*A43*A54+   &
-          A22*A35*A43*A54+A23*A32*A45*A54-A22*A33*A45*A54-A24*A33*A42*A55+   &
-          A23*A34*A42*A55+A24*A32*A43*A55-A22*A34*A43*A55-A23*A32*A44*A55+   &
-          A22*A33*A44*A55
- 
-       COFACTOR(2,1) = -A15*A34*A43*A52+A14*A35*A43*A52+A15*A33*A44*A52-     &
-          A13*A35*A44*A52-A14*A33*A45*A52+A13*A34*A45*A52+A15*A34*A42*A53-   &
-          A14*A35*A42*A53-A15*A32*A44*A53+A12*A35*A44*A53+A14*A32*A45*A53-   &
-          A12*A34*A45*A53-A15*A33*A42*A54+A13*A35*A42*A54+A15*A32*A43*A54-   &
-          A12*A35*A43*A54-A13*A32*A45*A54+A12*A33*A45*A54+A14*A33*A42*A55-   &
-          A13*A34*A42*A55-A14*A32*A43*A55+A12*A34*A43*A55+A13*A32*A44*A55-   &
-          A12*A33*A44*A55
- 
-       COFACTOR(3,1) = A15*A24*A43*A52-A14*A25*A43*A52-A15*A23*A44*A52+      &
-          A13*A25*A44*A52+A14*A23*A45*A52-A13*A24*A45*A52-A15*A24*A42*A53+   &
-          A14*A25*A42*A53+A15*A22*A44*A53-A12*A25*A44*A53-A14*A22*A45*A53+   &
-          A12*A24*A45*A53+A15*A23*A42*A54-A13*A25*A42*A54-A15*A22*A43*A54+   &
-          A12*A25*A43*A54+A13*A22*A45*A54-A12*A23*A45*A54-A14*A23*A42*A55+   &
-          A13*A24*A42*A55+A14*A22*A43*A55-A12*A24*A43*A55-A13*A22*A44*A55+   &
-          A12*A23*A44*A55
- 
-       COFACTOR(4,1) = -A15*A24*A33*A52+A14*A25*A33*A52+A15*A23*A34*A52-     &
-          A13*A25*A34*A52-A14*A23*A35*A52+A13*A24*A35*A52+A15*A24*A32*A53-   &
-          A14*A25*A32*A53-A15*A22*A34*A53+A12*A25*A34*A53+A14*A22*A35*A53-   &
-          A12*A24*A35*A53-A15*A23*A32*A54+A13*A25*A32*A54+A15*A22*A33*A54-   &
-          A12*A25*A33*A54-A13*A22*A35*A54+A12*A23*A35*A54+A14*A23*A32*A55-   &
-          A13*A24*A32*A55-A14*A22*A33*A55+A12*A24*A33*A55+A13*A22*A34*A55-   &
-          A12*A23*A34*A55
- 
-       COFACTOR(5,1) = A15*A24*A33*A42-A14*A25*A33*A42-A15*A23*A34*A42+      &
-          A13*A25*A34*A42+A14*A23*A35*A42-A13*A24*A35*A42-A15*A24*A32*A43+   &
-          A14*A25*A32*A43+A15*A22*A34*A43-A12*A25*A34*A43-A14*A22*A35*A43+   &
-          A12*A24*A35*A43+A15*A23*A32*A44-A13*A25*A32*A44-A15*A22*A33*A44+   &
-          A12*A25*A33*A44+A13*A22*A35*A44-A12*A23*A35*A44-A14*A23*A32*A45+   &
-          A13*A24*A32*A45+A14*A22*A33*A45-A12*A24*A33*A45-A13*A22*A34*A45+   &
-          A12*A23*A34*A45
- 
-       COFACTOR(1,2) = -A25*A34*A43*A51+A24*A35*A43*A51+A25*A33*A44*A51-     &
-          A23*A35*A44*A51-A24*A33*A45*A51+A23*A34*A45*A51+A25*A34*A41*A53-   &
-          A24*A35*A41*A53-A25*A31*A44*A53+A21*A35*A44*A53+A24*A31*A45*A53-   &
-          A21*A34*A45*A53-A25*A33*A41*A54+A23*A35*A41*A54+A25*A31*A43*A54-   &
-          A21*A35*A43*A54-A23*A31*A45*A54+A21*A33*A45*A54+A24*A33*A41*A55-   &
-          A23*A34*A41*A55-A24*A31*A43*A55+A21*A34*A43*A55+A23*A31*A44*A55-   &
-          A21*A33*A44*A55
- 
-       COFACTOR(2,2) = A15*A34*A43*A51-A14*A35*A43*A51-A15*A33*A44*A51+      &
-          A13*A35*A44*A51+A14*A33*A45*A51-A13*A34*A45*A51-A15*A34*A41*A53+   &
-          A14*A35*A41*A53+A15*A31*A44*A53-A11*A35*A44*A53-A14*A31*A45*A53+   &
-          A11*A34*A45*A53+A15*A33*A41*A54-A13*A35*A41*A54-A15*A31*A43*A54+   &
-          A11*A35*A43*A54+A13*A31*A45*A54-A11*A33*A45*A54-A14*A33*A41*A55+   &
-          A13*A34*A41*A55+A14*A31*A43*A55-A11*A34*A43*A55-A13*A31*A44*A55+   &
-          A11*A33*A44*A55
- 
-       COFACTOR(3,2) = -A15*A24*A43*A51+A14*A25*A43*A51+A15*A23*A44*A51-     &
-          A13*A25*A44*A51-A14*A23*A45*A51+A13*A24*A45*A51+A15*A24*A41*A53-   &
-          A14*A25*A41*A53-A15*A21*A44*A53+A11*A25*A44*A53+A14*A21*A45*A53-   &
-          A11*A24*A45*A53-A15*A23*A41*A54+A13*A25*A41*A54+A15*A21*A43*A54-   &
-          A11*A25*A43*A54-A13*A21*A45*A54+A11*A23*A45*A54+A14*A23*A41*A55-   &
-          A13*A24*A41*A55-A14*A21*A43*A55+A11*A24*A43*A55+A13*A21*A44*A55-   &
-          A11*A23*A44*A55
- 
-       COFACTOR(4,2) = A15*A24*A33*A51-A14*A25*A33*A51-A15*A23*A34*A51+      &
-          A13*A25*A34*A51+A14*A23*A35*A51-A13*A24*A35*A51-A15*A24*A31*A53+   &
-          A14*A25*A31*A53+A15*A21*A34*A53-A11*A25*A34*A53-A14*A21*A35*A53+   &
-          A11*A24*A35*A53+A15*A23*A31*A54-A13*A25*A31*A54-A15*A21*A33*A54+   &
-          A11*A25*A33*A54+A13*A21*A35*A54-A11*A23*A35*A54-A14*A23*A31*A55+   &
-          A13*A24*A31*A55+A14*A21*A33*A55-A11*A24*A33*A55-A13*A21*A34*A55+   &
-          A11*A23*A34*A55
- 
-       COFACTOR(5,2) = -A15*A24*A33*A41+A14*A25*A33*A41+A15*A23*A34*A41-     &
-          A13*A25*A34*A41-A14*A23*A35*A41+A13*A24*A35*A41+A15*A24*A31*A43-   &
-          A14*A25*A31*A43-A15*A21*A34*A43+A11*A25*A34*A43+A14*A21*A35*A43-   &
-          A11*A24*A35*A43-A15*A23*A31*A44+A13*A25*A31*A44+A15*A21*A33*A44-   &
-          A11*A25*A33*A44-A13*A21*A35*A44+A11*A23*A35*A44+A14*A23*A31*A45-   &
-          A13*A24*A31*A45-A14*A21*A33*A45+A11*A24*A33*A45+A13*A21*A34*A45-   &
-          A11*A23*A34*A45
- 
-       COFACTOR(1,3) = A25*A34*A42*A51-A24*A35*A42*A51-A25*A32*A44*A51+      &
-          A22*A35*A44*A51+A24*A32*A45*A51-A22*A34*A45*A51-A25*A34*A41*A52+   &
-          A24*A35*A41*A52+A25*A31*A44*A52-A21*A35*A44*A52-A24*A31*A45*A52+   &
-          A21*A34*A45*A52+A25*A32*A41*A54-A22*A35*A41*A54-A25*A31*A42*A54+   &
-          A21*A35*A42*A54+A22*A31*A45*A54-A21*A32*A45*A54-A24*A32*A41*A55+   &
-          A22*A34*A41*A55+A24*A31*A42*A55-A21*A34*A42*A55-A22*A31*A44*A55+   &
-          A21*A32*A44*A55
- 
-       COFACTOR(2,3) = -A15*A34*A42*A51+A14*A35*A42*A51+A15*A32*A44*A51-     &
-          A12*A35*A44*A51-A14*A32*A45*A51+A12*A34*A45*A51+A15*A34*A41*A52-   &
-          A14*A35*A41*A52-A15*A31*A44*A52+A11*A35*A44*A52+A14*A31*A45*A52-   &
-          A11*A34*A45*A52-A15*A32*A41*A54+A12*A35*A41*A54+A15*A31*A42*A54-   &
-          A11*A35*A42*A54-A12*A31*A45*A54+A11*A32*A45*A54+A14*A32*A41*A55-   &
-          A12*A34*A41*A55-A14*A31*A42*A55+A11*A34*A42*A55+A12*A31*A44*A55-   &
-          A11*A32*A44*A55
- 
-       COFACTOR(3,3) = A15*A24*A42*A51-A14*A25*A42*A51-A15*A22*A44*A51+      &
-          A12*A25*A44*A51+A14*A22*A45*A51-A12*A24*A45*A51-A15*A24*A41*A52+   &
-          A14*A25*A41*A52+A15*A21*A44*A52-A11*A25*A44*A52-A14*A21*A45*A52+   &
-          A11*A24*A45*A52+A15*A22*A41*A54-A12*A25*A41*A54-A15*A21*A42*A54+   &
-          A11*A25*A42*A54+A12*A21*A45*A54-A11*A22*A45*A54-A14*A22*A41*A55+   &
-          A12*A24*A41*A55+A14*A21*A42*A55-A11*A24*A42*A55-A12*A21*A44*A55+   &
-          A11*A22*A44*A55
- 
-       COFACTOR(4,3) = -A15*A24*A32*A51+A14*A25*A32*A51+A15*A22*A34*A51-     &
-          A12*A25*A34*A51-A14*A22*A35*A51+A12*A24*A35*A51+A15*A24*A31*A52-   &
-          A14*A25*A31*A52-A15*A21*A34*A52+A11*A25*A34*A52+A14*A21*A35*A52-   &
-          A11*A24*A35*A52-A15*A22*A31*A54+A12*A25*A31*A54+A15*A21*A32*A54-   &
-          A11*A25*A32*A54-A12*A21*A35*A54+A11*A22*A35*A54+A14*A22*A31*A55-   &
-          A12*A24*A31*A55-A14*A21*A32*A55+A11*A24*A32*A55+A12*A21*A34*A55-   &
-          A11*A22*A34*A55
- 
-       COFACTOR(5,3) = A15*A24*A32*A41-A14*A25*A32*A41-A15*A22*A34*A41+      &
-          A12*A25*A34*A41+A14*A22*A35*A41-A12*A24*A35*A41-A15*A24*A31*A42+   &
-          A14*A25*A31*A42+A15*A21*A34*A42-A11*A25*A34*A42-A14*A21*A35*A42+   &
-          A11*A24*A35*A42+A15*A22*A31*A44-A12*A25*A31*A44-A15*A21*A32*A44+   &
-          A11*A25*A32*A44+A12*A21*A35*A44-A11*A22*A35*A44-A14*A22*A31*A45+   &
-          A12*A24*A31*A45+A14*A21*A32*A45-A11*A24*A32*A45-A12*A21*A34*A45+   &
-          A11*A22*A34*A45
- 
-       COFACTOR(1,4) = -A25*A33*A42*A51+A23*A35*A42*A51+A25*A32*A43*A51-     &
-          A22*A35*A43*A51-A23*A32*A45*A51+A22*A33*A45*A51+A25*A33*A41*A52-   &
-          A23*A35*A41*A52-A25*A31*A43*A52+A21*A35*A43*A52+A23*A31*A45*A52-   &
-          A21*A33*A45*A52-A25*A32*A41*A53+A22*A35*A41*A53+A25*A31*A42*A53-   &
-          A21*A35*A42*A53-A22*A31*A45*A53+A21*A32*A45*A53+A23*A32*A41*A55-   &
-          A22*A33*A41*A55-A23*A31*A42*A55+A21*A33*A42*A55+A22*A31*A43*A55-   &
-          A21*A32*A43*A55
- 
-       COFACTOR(2,4) = A15*A33*A42*A51-A13*A35*A42*A51-A15*A32*A43*A51+      &
-          A12*A35*A43*A51+A13*A32*A45*A51-A12*A33*A45*A51-A15*A33*A41*A52+   &
-          A13*A35*A41*A52+A15*A31*A43*A52-A11*A35*A43*A52-A13*A31*A45*A52+   &
-          A11*A33*A45*A52+A15*A32*A41*A53-A12*A35*A41*A53-A15*A31*A42*A53+   &
-          A11*A35*A42*A53+A12*A31*A45*A53-A11*A32*A45*A53-A13*A32*A41*A55+   &
-          A12*A33*A41*A55+A13*A31*A42*A55-A11*A33*A42*A55-A12*A31*A43*A55+   &
-          A11*A32*A43*A55
- 
-       COFACTOR(3,4) = -A15*A23*A42*A51+A13*A25*A42*A51+A15*A22*A43*A51-     &
-          A12*A25*A43*A51-A13*A22*A45*A51+A12*A23*A45*A51+A15*A23*A41*A52-   &
-          A13*A25*A41*A52-A15*A21*A43*A52+A11*A25*A43*A52+A13*A21*A45*A52-   &
-          A11*A23*A45*A52-A15*A22*A41*A53+A12*A25*A41*A53+A15*A21*A42*A53-   &
-          A11*A25*A42*A53-A12*A21*A45*A53+A11*A22*A45*A53+A13*A22*A41*A55-   &
-          A12*A23*A41*A55-A13*A21*A42*A55+A11*A23*A42*A55+A12*A21*A43*A55-   &
-          A11*A22*A43*A55
- 
-       COFACTOR(4,4) = A15*A23*A32*A51-A13*A25*A32*A51-A15*A22*A33*A51+      &
-          A12*A25*A33*A51+A13*A22*A35*A51-A12*A23*A35*A51-A15*A23*A31*A52+   &
-          A13*A25*A31*A52+A15*A21*A33*A52-A11*A25*A33*A52-A13*A21*A35*A52+   &
-          A11*A23*A35*A52+A15*A22*A31*A53-A12*A25*A31*A53-A15*A21*A32*A53+   &
-          A11*A25*A32*A53+A12*A21*A35*A53-A11*A22*A35*A53-A13*A22*A31*A55+   &
-          A12*A23*A31*A55+A13*A21*A32*A55-A11*A23*A32*A55-A12*A21*A33*A55+   &
-          A11*A22*A33*A55
- 
-       COFACTOR(5,4) = -A15*A23*A32*A41+A13*A25*A32*A41+A15*A22*A33*A41-     &
-          A12*A25*A33*A41-A13*A22*A35*A41+A12*A23*A35*A41+A15*A23*A31*A42-   &
-          A13*A25*A31*A42-A15*A21*A33*A42+A11*A25*A33*A42+A13*A21*A35*A42-   &
-          A11*A23*A35*A42-A15*A22*A31*A43+A12*A25*A31*A43+A15*A21*A32*A43-   &
-          A11*A25*A32*A43-A12*A21*A35*A43+A11*A22*A35*A43+A13*A22*A31*A45-   &
-          A12*A23*A31*A45-A13*A21*A32*A45+A11*A23*A32*A45+A12*A21*A33*A45-   &
-          A11*A22*A33*A45
- 
-       COFACTOR(1,5) = A24*A33*A42*A51-A23*A34*A42*A51-A24*A32*A43*A51+      &
-          A22*A34*A43*A51+A23*A32*A44*A51-A22*A33*A44*A51-A24*A33*A41*A52+   &
-          A23*A34*A41*A52+A24*A31*A43*A52-A21*A34*A43*A52-A23*A31*A44*A52+   &
-          A21*A33*A44*A52+A24*A32*A41*A53-A22*A34*A41*A53-A24*A31*A42*A53+   &
-          A21*A34*A42*A53+A22*A31*A44*A53-A21*A32*A44*A53-A23*A32*A41*A54+   &
-          A22*A33*A41*A54+A23*A31*A42*A54-A21*A33*A42*A54-A22*A31*A43*A54+   &
-          A21*A32*A43*A54
- 
-       COFACTOR(2,5) = -A14*A33*A42*A51+A13*A34*A42*A51+A14*A32*A43*A51-     &
-          A12*A34*A43*A51-A13*A32*A44*A51+A12*A33*A44*A51+A14*A33*A41*A52-   &
-          A13*A34*A41*A52-A14*A31*A43*A52+A11*A34*A43*A52+A13*A31*A44*A52-   &
-          A11*A33*A44*A52-A14*A32*A41*A53+A12*A34*A41*A53+A14*A31*A42*A53-   &
-          A11*A34*A42*A53-A12*A31*A44*A53+A11*A32*A44*A53+A13*A32*A41*A54-   &
-          A12*A33*A41*A54-A13*A31*A42*A54+A11*A33*A42*A54+A12*A31*A43*A54-   &
-          A11*A32*A43*A54
- 
-       COFACTOR(3,5) = A14*A23*A42*A51-A13*A24*A42*A51-A14*A22*A43*A51+      &
-          A12*A24*A43*A51+A13*A22*A44*A51-A12*A23*A44*A51-A14*A23*A41*A52+   &
-          A13*A24*A41*A52+A14*A21*A43*A52-A11*A24*A43*A52-A13*A21*A44*A52+   &
-          A11*A23*A44*A52+A14*A22*A41*A53-A12*A24*A41*A53-A14*A21*A42*A53+   &
-          A11*A24*A42*A53+A12*A21*A44*A53-A11*A22*A44*A53-A13*A22*A41*A54+   &
-          A12*A23*A41*A54+A13*A21*A42*A54-A11*A23*A42*A54-A12*A21*A43*A54+   &
-          A11*A22*A43*A54
- 
-       COFACTOR(4,5) = -A14*A23*A32*A51+A13*A24*A32*A51+A14*A22*A33*A51-     &
-          A12*A24*A33*A51-A13*A22*A34*A51+A12*A23*A34*A51+A14*A23*A31*A52-   &
-          A13*A24*A31*A52-A14*A21*A33*A52+A11*A24*A33*A52+A13*A21*A34*A52-   &
-          A11*A23*A34*A52-A14*A22*A31*A53+A12*A24*A31*A53+A14*A21*A32*A53-   &
-          A11*A24*A32*A53-A12*A21*A34*A53+A11*A22*A34*A53+A13*A22*A31*A54-   &
-          A12*A23*A31*A54-A13*A21*A32*A54+A11*A23*A32*A54+A12*A21*A33*A54-   &
-          A11*A22*A33*A54
- 
-       COFACTOR(5,5) = A14*A23*A32*A41-A13*A24*A32*A41-A14*A22*A33*A41+      &
-          A12*A24*A33*A41+A13*A22*A34*A41-A12*A23*A34*A41-A14*A23*A31*A42+   &
-          A13*A24*A31*A42+A14*A21*A33*A42-A11*A24*A33*A42-A13*A21*A34*A42+   &
-          A11*A23*A34*A42+A14*A22*A31*A43-A12*A24*A31*A43-A14*A21*A32*A43+   &
-          A11*A24*A32*A43+A12*A21*A34*A43-A11*A22*A34*A43-A13*A22*A31*A44+   &
-          A12*A23*A31*A44+A13*A21*A32*A44-A11*A23*A32*A44-A12*A21*A33*A44+   &
-          A11*A22*A33*A44
- 
-       AINV = TRANSPOSE(COFACTOR) / DET
- 
-       OK_FLAG = .TRUE.
- 
-       RETURN
- 
-       END SUBROUTINE M55INV
- end module mod_global
+
+   if (present(i1)) i1 = first
+   if (present(i2)) i2 = last
+
+   ! Return the index that is nearest to the value
+   if (abs(list(first) - value) < abs(list(last) - value)) then
+   BinarySearch = first
+   else
+   BinarySearch = last
+   end if
+
+end function BinarySearch
+
+
+!***********************************************************************************************************************************
+!  M55INV  -  Compute the inverse of a 5x5 matrix.
+!
+!  A       = input 5x5 matrix to be inverted
+!  AINV    = output 5x5 inverse of matrix A
+!  OK_FLAG = (output) .TRUE. if the input matrix could be inverted, and .FALSE. if the input matrix is singular.
+! http://www.davidgsimpson.com/software.html
+!***********************************************************************************************************************************
+
+      SUBROUTINE M55INV (A, AINV, OK_FLAG)
+
+      IMPLICIT NONE
+
+      DOUBLE PRECISION, DIMENSION(5,5), INTENT(IN)  :: A
+      DOUBLE PRECISION, DIMENSION(5,5), INTENT(OUT) :: AINV
+      LOGICAL, INTENT(OUT) :: OK_FLAG
+
+      DOUBLE PRECISION, PARAMETER :: EPS = 1.0D-10
+      DOUBLE PRECISION :: DET, A11, A12, A13, A14, A15, A21, A22, A23, A24, &
+         A25, A31, A32, A33, A34, A35, A41, A42, A43, A44, A45,   &
+         A51, A52, A53, A54, A55
+      DOUBLE PRECISION, DIMENSION(5,5) :: COFACTOR
+
+
+      A11=A(1,1); A12=A(1,2); A13=A(1,3); A14=A(1,4); A15=A(1,5)
+      A21=A(2,1); A22=A(2,2); A23=A(2,3); A24=A(2,4); A25=A(2,5)
+      A31=A(3,1); A32=A(3,2); A33=A(3,3); A34=A(3,4); A35=A(3,5)
+      A41=A(4,1); A42=A(4,2); A43=A(4,3); A44=A(4,4); A45=A(4,5)
+      A51=A(5,1); A52=A(5,2); A53=A(5,3); A54=A(5,4); A55=A(5,5)
+
+      DET = A15*A24*A33*A42*A51-A14*A25*A33*A42*A51-A15*A23*A34*A42*A51+    &
+         A13*A25*A34*A42*A51+A14*A23*A35*A42*A51-A13*A24*A35*A42*A51-       &
+         A15*A24*A32*A43*A51+A14*A25*A32*A43*A51+A15*A22*A34*A43*A51-       &
+         A12*A25*A34*A43*A51-A14*A22*A35*A43*A51+A12*A24*A35*A43*A51+       &
+         A15*A23*A32*A44*A51-A13*A25*A32*A44*A51-A15*A22*A33*A44*A51+       &
+         A12*A25*A33*A44*A51+A13*A22*A35*A44*A51-A12*A23*A35*A44*A51-       &
+         A14*A23*A32*A45*A51+A13*A24*A32*A45*A51+A14*A22*A33*A45*A51-       &
+         A12*A24*A33*A45*A51-A13*A22*A34*A45*A51+A12*A23*A34*A45*A51-       &
+         A15*A24*A33*A41*A52+A14*A25*A33*A41*A52+A15*A23*A34*A41*A52-       &
+         A13*A25*A34*A41*A52-A14*A23*A35*A41*A52+A13*A24*A35*A41*A52+       &
+         A15*A24*A31*A43*A52-A14*A25*A31*A43*A52-A15*A21*A34*A43*A52+       &
+         A11*A25*A34*A43*A52+A14*A21*A35*A43*A52-A11*A24*A35*A43*A52-       &
+         A15*A23*A31*A44*A52+A13*A25*A31*A44*A52+A15*A21*A33*A44*A52-       &
+         A11*A25*A33*A44*A52-A13*A21*A35*A44*A52+A11*A23*A35*A44*A52+       &
+         A14*A23*A31*A45*A52-A13*A24*A31*A45*A52-A14*A21*A33*A45*A52+       &
+         A11*A24*A33*A45*A52+A13*A21*A34*A45*A52-A11*A23*A34*A45*A52+       &
+         A15*A24*A32*A41*A53-A14*A25*A32*A41*A53-A15*A22*A34*A41*A53+       &
+         A12*A25*A34*A41*A53+A14*A22*A35*A41*A53-A12*A24*A35*A41*A53-       &
+         A15*A24*A31*A42*A53+A14*A25*A31*A42*A53+A15*A21*A34*A42*A53-       &
+         A11*A25*A34*A42*A53-A14*A21*A35*A42*A53+A11*A24*A35*A42*A53+       &
+         A15*A22*A31*A44*A53-A12*A25*A31*A44*A53-A15*A21*A32*A44*A53+       &
+         A11*A25*A32*A44*A53+A12*A21*A35*A44*A53-A11*A22*A35*A44*A53-       &
+         A14*A22*A31*A45*A53+A12*A24*A31*A45*A53+A14*A21*A32*A45*A53-       &
+         A11*A24*A32*A45*A53-A12*A21*A34*A45*A53+A11*A22*A34*A45*A53-       &
+         A15*A23*A32*A41*A54+A13*A25*A32*A41*A54+A15*A22*A33*A41*A54-       &
+         A12*A25*A33*A41*A54-A13*A22*A35*A41*A54+A12*A23*A35*A41*A54+       &
+         A15*A23*A31*A42*A54-A13*A25*A31*A42*A54-A15*A21*A33*A42*A54+       &
+         A11*A25*A33*A42*A54+A13*A21*A35*A42*A54-A11*A23*A35*A42*A54-       &
+         A15*A22*A31*A43*A54+A12*A25*A31*A43*A54+A15*A21*A32*A43*A54-       &
+         A11*A25*A32*A43*A54-A12*A21*A35*A43*A54+A11*A22*A35*A43*A54+       &
+         A13*A22*A31*A45*A54-A12*A23*A31*A45*A54-A13*A21*A32*A45*A54+       &
+         A11*A23*A32*A45*A54+A12*A21*A33*A45*A54-A11*A22*A33*A45*A54+       &
+         A14*A23*A32*A41*A55-A13*A24*A32*A41*A55-A14*A22*A33*A41*A55+       &
+         A12*A24*A33*A41*A55+A13*A22*A34*A41*A55-A12*A23*A34*A41*A55-       &
+         A14*A23*A31*A42*A55+A13*A24*A31*A42*A55+A14*A21*A33*A42*A55-       &
+         A11*A24*A33*A42*A55-A13*A21*A34*A42*A55+A11*A23*A34*A42*A55+       &
+         A14*A22*A31*A43*A55-A12*A24*A31*A43*A55-A14*A21*A32*A43*A55+       &
+         A11*A24*A32*A43*A55+A12*A21*A34*A43*A55-A11*A22*A34*A43*A55-       &
+         A13*A22*A31*A44*A55+A12*A23*A31*A44*A55+A13*A21*A32*A44*A55-       &
+         A11*A23*A32*A44*A55-A12*A21*A33*A44*A55+A11*A22*A33*A44*A55
+
+      IF (ABS(DET) .LE. EPS) THEN
+         AINV = 0.0D0
+         OK_FLAG = .FALSE.
+         RETURN
+      END IF
+
+      COFACTOR(1,1) = A25*A34*A43*A52-A24*A35*A43*A52-A25*A33*A44*A52+      &
+         A23*A35*A44*A52+A24*A33*A45*A52-A23*A34*A45*A52-A25*A34*A42*A53+   &
+         A24*A35*A42*A53+A25*A32*A44*A53-A22*A35*A44*A53-A24*A32*A45*A53+   &
+         A22*A34*A45*A53+A25*A33*A42*A54-A23*A35*A42*A54-A25*A32*A43*A54+   &
+         A22*A35*A43*A54+A23*A32*A45*A54-A22*A33*A45*A54-A24*A33*A42*A55+   &
+         A23*A34*A42*A55+A24*A32*A43*A55-A22*A34*A43*A55-A23*A32*A44*A55+   &
+         A22*A33*A44*A55
+
+      COFACTOR(2,1) = -A15*A34*A43*A52+A14*A35*A43*A52+A15*A33*A44*A52-     &
+         A13*A35*A44*A52-A14*A33*A45*A52+A13*A34*A45*A52+A15*A34*A42*A53-   &
+         A14*A35*A42*A53-A15*A32*A44*A53+A12*A35*A44*A53+A14*A32*A45*A53-   &
+         A12*A34*A45*A53-A15*A33*A42*A54+A13*A35*A42*A54+A15*A32*A43*A54-   &
+         A12*A35*A43*A54-A13*A32*A45*A54+A12*A33*A45*A54+A14*A33*A42*A55-   &
+         A13*A34*A42*A55-A14*A32*A43*A55+A12*A34*A43*A55+A13*A32*A44*A55-   &
+         A12*A33*A44*A55
+
+      COFACTOR(3,1) = A15*A24*A43*A52-A14*A25*A43*A52-A15*A23*A44*A52+      &
+         A13*A25*A44*A52+A14*A23*A45*A52-A13*A24*A45*A52-A15*A24*A42*A53+   &
+         A14*A25*A42*A53+A15*A22*A44*A53-A12*A25*A44*A53-A14*A22*A45*A53+   &
+         A12*A24*A45*A53+A15*A23*A42*A54-A13*A25*A42*A54-A15*A22*A43*A54+   &
+         A12*A25*A43*A54+A13*A22*A45*A54-A12*A23*A45*A54-A14*A23*A42*A55+   &
+         A13*A24*A42*A55+A14*A22*A43*A55-A12*A24*A43*A55-A13*A22*A44*A55+   &
+         A12*A23*A44*A55
+
+      COFACTOR(4,1) = -A15*A24*A33*A52+A14*A25*A33*A52+A15*A23*A34*A52-     &
+         A13*A25*A34*A52-A14*A23*A35*A52+A13*A24*A35*A52+A15*A24*A32*A53-   &
+         A14*A25*A32*A53-A15*A22*A34*A53+A12*A25*A34*A53+A14*A22*A35*A53-   &
+         A12*A24*A35*A53-A15*A23*A32*A54+A13*A25*A32*A54+A15*A22*A33*A54-   &
+         A12*A25*A33*A54-A13*A22*A35*A54+A12*A23*A35*A54+A14*A23*A32*A55-   &
+         A13*A24*A32*A55-A14*A22*A33*A55+A12*A24*A33*A55+A13*A22*A34*A55-   &
+         A12*A23*A34*A55
+
+      COFACTOR(5,1) = A15*A24*A33*A42-A14*A25*A33*A42-A15*A23*A34*A42+      &
+         A13*A25*A34*A42+A14*A23*A35*A42-A13*A24*A35*A42-A15*A24*A32*A43+   &
+         A14*A25*A32*A43+A15*A22*A34*A43-A12*A25*A34*A43-A14*A22*A35*A43+   &
+         A12*A24*A35*A43+A15*A23*A32*A44-A13*A25*A32*A44-A15*A22*A33*A44+   &
+         A12*A25*A33*A44+A13*A22*A35*A44-A12*A23*A35*A44-A14*A23*A32*A45+   &
+         A13*A24*A32*A45+A14*A22*A33*A45-A12*A24*A33*A45-A13*A22*A34*A45+   &
+         A12*A23*A34*A45
+
+      COFACTOR(1,2) = -A25*A34*A43*A51+A24*A35*A43*A51+A25*A33*A44*A51-     &
+         A23*A35*A44*A51-A24*A33*A45*A51+A23*A34*A45*A51+A25*A34*A41*A53-   &
+         A24*A35*A41*A53-A25*A31*A44*A53+A21*A35*A44*A53+A24*A31*A45*A53-   &
+         A21*A34*A45*A53-A25*A33*A41*A54+A23*A35*A41*A54+A25*A31*A43*A54-   &
+         A21*A35*A43*A54-A23*A31*A45*A54+A21*A33*A45*A54+A24*A33*A41*A55-   &
+         A23*A34*A41*A55-A24*A31*A43*A55+A21*A34*A43*A55+A23*A31*A44*A55-   &
+         A21*A33*A44*A55
+
+      COFACTOR(2,2) = A15*A34*A43*A51-A14*A35*A43*A51-A15*A33*A44*A51+      &
+         A13*A35*A44*A51+A14*A33*A45*A51-A13*A34*A45*A51-A15*A34*A41*A53+   &
+         A14*A35*A41*A53+A15*A31*A44*A53-A11*A35*A44*A53-A14*A31*A45*A53+   &
+         A11*A34*A45*A53+A15*A33*A41*A54-A13*A35*A41*A54-A15*A31*A43*A54+   &
+         A11*A35*A43*A54+A13*A31*A45*A54-A11*A33*A45*A54-A14*A33*A41*A55+   &
+         A13*A34*A41*A55+A14*A31*A43*A55-A11*A34*A43*A55-A13*A31*A44*A55+   &
+         A11*A33*A44*A55
+
+      COFACTOR(3,2) = -A15*A24*A43*A51+A14*A25*A43*A51+A15*A23*A44*A51-     &
+         A13*A25*A44*A51-A14*A23*A45*A51+A13*A24*A45*A51+A15*A24*A41*A53-   &
+         A14*A25*A41*A53-A15*A21*A44*A53+A11*A25*A44*A53+A14*A21*A45*A53-   &
+         A11*A24*A45*A53-A15*A23*A41*A54+A13*A25*A41*A54+A15*A21*A43*A54-   &
+         A11*A25*A43*A54-A13*A21*A45*A54+A11*A23*A45*A54+A14*A23*A41*A55-   &
+         A13*A24*A41*A55-A14*A21*A43*A55+A11*A24*A43*A55+A13*A21*A44*A55-   &
+         A11*A23*A44*A55
+
+      COFACTOR(4,2) = A15*A24*A33*A51-A14*A25*A33*A51-A15*A23*A34*A51+      &
+         A13*A25*A34*A51+A14*A23*A35*A51-A13*A24*A35*A51-A15*A24*A31*A53+   &
+         A14*A25*A31*A53+A15*A21*A34*A53-A11*A25*A34*A53-A14*A21*A35*A53+   &
+         A11*A24*A35*A53+A15*A23*A31*A54-A13*A25*A31*A54-A15*A21*A33*A54+   &
+         A11*A25*A33*A54+A13*A21*A35*A54-A11*A23*A35*A54-A14*A23*A31*A55+   &
+         A13*A24*A31*A55+A14*A21*A33*A55-A11*A24*A33*A55-A13*A21*A34*A55+   &
+         A11*A23*A34*A55
+
+      COFACTOR(5,2) = -A15*A24*A33*A41+A14*A25*A33*A41+A15*A23*A34*A41-     &
+         A13*A25*A34*A41-A14*A23*A35*A41+A13*A24*A35*A41+A15*A24*A31*A43-   &
+         A14*A25*A31*A43-A15*A21*A34*A43+A11*A25*A34*A43+A14*A21*A35*A43-   &
+         A11*A24*A35*A43-A15*A23*A31*A44+A13*A25*A31*A44+A15*A21*A33*A44-   &
+         A11*A25*A33*A44-A13*A21*A35*A44+A11*A23*A35*A44+A14*A23*A31*A45-   &
+         A13*A24*A31*A45-A14*A21*A33*A45+A11*A24*A33*A45+A13*A21*A34*A45-   &
+         A11*A23*A34*A45
+
+      COFACTOR(1,3) = A25*A34*A42*A51-A24*A35*A42*A51-A25*A32*A44*A51+      &
+         A22*A35*A44*A51+A24*A32*A45*A51-A22*A34*A45*A51-A25*A34*A41*A52+   &
+         A24*A35*A41*A52+A25*A31*A44*A52-A21*A35*A44*A52-A24*A31*A45*A52+   &
+         A21*A34*A45*A52+A25*A32*A41*A54-A22*A35*A41*A54-A25*A31*A42*A54+   &
+         A21*A35*A42*A54+A22*A31*A45*A54-A21*A32*A45*A54-A24*A32*A41*A55+   &
+         A22*A34*A41*A55+A24*A31*A42*A55-A21*A34*A42*A55-A22*A31*A44*A55+   &
+         A21*A32*A44*A55
+
+      COFACTOR(2,3) = -A15*A34*A42*A51+A14*A35*A42*A51+A15*A32*A44*A51-     &
+         A12*A35*A44*A51-A14*A32*A45*A51+A12*A34*A45*A51+A15*A34*A41*A52-   &
+         A14*A35*A41*A52-A15*A31*A44*A52+A11*A35*A44*A52+A14*A31*A45*A52-   &
+         A11*A34*A45*A52-A15*A32*A41*A54+A12*A35*A41*A54+A15*A31*A42*A54-   &
+         A11*A35*A42*A54-A12*A31*A45*A54+A11*A32*A45*A54+A14*A32*A41*A55-   &
+         A12*A34*A41*A55-A14*A31*A42*A55+A11*A34*A42*A55+A12*A31*A44*A55-   &
+         A11*A32*A44*A55
+
+      COFACTOR(3,3) = A15*A24*A42*A51-A14*A25*A42*A51-A15*A22*A44*A51+      &
+         A12*A25*A44*A51+A14*A22*A45*A51-A12*A24*A45*A51-A15*A24*A41*A52+   &
+         A14*A25*A41*A52+A15*A21*A44*A52-A11*A25*A44*A52-A14*A21*A45*A52+   &
+         A11*A24*A45*A52+A15*A22*A41*A54-A12*A25*A41*A54-A15*A21*A42*A54+   &
+         A11*A25*A42*A54+A12*A21*A45*A54-A11*A22*A45*A54-A14*A22*A41*A55+   &
+         A12*A24*A41*A55+A14*A21*A42*A55-A11*A24*A42*A55-A12*A21*A44*A55+   &
+         A11*A22*A44*A55
+
+      COFACTOR(4,3) = -A15*A24*A32*A51+A14*A25*A32*A51+A15*A22*A34*A51-     &
+         A12*A25*A34*A51-A14*A22*A35*A51+A12*A24*A35*A51+A15*A24*A31*A52-   &
+         A14*A25*A31*A52-A15*A21*A34*A52+A11*A25*A34*A52+A14*A21*A35*A52-   &
+         A11*A24*A35*A52-A15*A22*A31*A54+A12*A25*A31*A54+A15*A21*A32*A54-   &
+         A11*A25*A32*A54-A12*A21*A35*A54+A11*A22*A35*A54+A14*A22*A31*A55-   &
+         A12*A24*A31*A55-A14*A21*A32*A55+A11*A24*A32*A55+A12*A21*A34*A55-   &
+         A11*A22*A34*A55
+
+      COFACTOR(5,3) = A15*A24*A32*A41-A14*A25*A32*A41-A15*A22*A34*A41+      &
+         A12*A25*A34*A41+A14*A22*A35*A41-A12*A24*A35*A41-A15*A24*A31*A42+   &
+         A14*A25*A31*A42+A15*A21*A34*A42-A11*A25*A34*A42-A14*A21*A35*A42+   &
+         A11*A24*A35*A42+A15*A22*A31*A44-A12*A25*A31*A44-A15*A21*A32*A44+   &
+         A11*A25*A32*A44+A12*A21*A35*A44-A11*A22*A35*A44-A14*A22*A31*A45+   &
+         A12*A24*A31*A45+A14*A21*A32*A45-A11*A24*A32*A45-A12*A21*A34*A45+   &
+         A11*A22*A34*A45
+
+      COFACTOR(1,4) = -A25*A33*A42*A51+A23*A35*A42*A51+A25*A32*A43*A51-     &
+         A22*A35*A43*A51-A23*A32*A45*A51+A22*A33*A45*A51+A25*A33*A41*A52-   &
+         A23*A35*A41*A52-A25*A31*A43*A52+A21*A35*A43*A52+A23*A31*A45*A52-   &
+         A21*A33*A45*A52-A25*A32*A41*A53+A22*A35*A41*A53+A25*A31*A42*A53-   &
+         A21*A35*A42*A53-A22*A31*A45*A53+A21*A32*A45*A53+A23*A32*A41*A55-   &
+         A22*A33*A41*A55-A23*A31*A42*A55+A21*A33*A42*A55+A22*A31*A43*A55-   &
+         A21*A32*A43*A55
+
+      COFACTOR(2,4) = A15*A33*A42*A51-A13*A35*A42*A51-A15*A32*A43*A51+      &
+         A12*A35*A43*A51+A13*A32*A45*A51-A12*A33*A45*A51-A15*A33*A41*A52+   &
+         A13*A35*A41*A52+A15*A31*A43*A52-A11*A35*A43*A52-A13*A31*A45*A52+   &
+         A11*A33*A45*A52+A15*A32*A41*A53-A12*A35*A41*A53-A15*A31*A42*A53+   &
+         A11*A35*A42*A53+A12*A31*A45*A53-A11*A32*A45*A53-A13*A32*A41*A55+   &
+         A12*A33*A41*A55+A13*A31*A42*A55-A11*A33*A42*A55-A12*A31*A43*A55+   &
+         A11*A32*A43*A55
+
+      COFACTOR(3,4) = -A15*A23*A42*A51+A13*A25*A42*A51+A15*A22*A43*A51-     &
+         A12*A25*A43*A51-A13*A22*A45*A51+A12*A23*A45*A51+A15*A23*A41*A52-   &
+         A13*A25*A41*A52-A15*A21*A43*A52+A11*A25*A43*A52+A13*A21*A45*A52-   &
+         A11*A23*A45*A52-A15*A22*A41*A53+A12*A25*A41*A53+A15*A21*A42*A53-   &
+         A11*A25*A42*A53-A12*A21*A45*A53+A11*A22*A45*A53+A13*A22*A41*A55-   &
+         A12*A23*A41*A55-A13*A21*A42*A55+A11*A23*A42*A55+A12*A21*A43*A55-   &
+         A11*A22*A43*A55
+
+      COFACTOR(4,4) = A15*A23*A32*A51-A13*A25*A32*A51-A15*A22*A33*A51+      &
+         A12*A25*A33*A51+A13*A22*A35*A51-A12*A23*A35*A51-A15*A23*A31*A52+   &
+         A13*A25*A31*A52+A15*A21*A33*A52-A11*A25*A33*A52-A13*A21*A35*A52+   &
+         A11*A23*A35*A52+A15*A22*A31*A53-A12*A25*A31*A53-A15*A21*A32*A53+   &
+         A11*A25*A32*A53+A12*A21*A35*A53-A11*A22*A35*A53-A13*A22*A31*A55+   &
+         A12*A23*A31*A55+A13*A21*A32*A55-A11*A23*A32*A55-A12*A21*A33*A55+   &
+         A11*A22*A33*A55
+
+      COFACTOR(5,4) = -A15*A23*A32*A41+A13*A25*A32*A41+A15*A22*A33*A41-     &
+         A12*A25*A33*A41-A13*A22*A35*A41+A12*A23*A35*A41+A15*A23*A31*A42-   &
+         A13*A25*A31*A42-A15*A21*A33*A42+A11*A25*A33*A42+A13*A21*A35*A42-   &
+         A11*A23*A35*A42-A15*A22*A31*A43+A12*A25*A31*A43+A15*A21*A32*A43-   &
+         A11*A25*A32*A43-A12*A21*A35*A43+A11*A22*A35*A43+A13*A22*A31*A45-   &
+         A12*A23*A31*A45-A13*A21*A32*A45+A11*A23*A32*A45+A12*A21*A33*A45-   &
+         A11*A22*A33*A45
+
+      COFACTOR(1,5) = A24*A33*A42*A51-A23*A34*A42*A51-A24*A32*A43*A51+      &
+         A22*A34*A43*A51+A23*A32*A44*A51-A22*A33*A44*A51-A24*A33*A41*A52+   &
+         A23*A34*A41*A52+A24*A31*A43*A52-A21*A34*A43*A52-A23*A31*A44*A52+   &
+         A21*A33*A44*A52+A24*A32*A41*A53-A22*A34*A41*A53-A24*A31*A42*A53+   &
+         A21*A34*A42*A53+A22*A31*A44*A53-A21*A32*A44*A53-A23*A32*A41*A54+   &
+         A22*A33*A41*A54+A23*A31*A42*A54-A21*A33*A42*A54-A22*A31*A43*A54+   &
+         A21*A32*A43*A54
+
+      COFACTOR(2,5) = -A14*A33*A42*A51+A13*A34*A42*A51+A14*A32*A43*A51-     &
+         A12*A34*A43*A51-A13*A32*A44*A51+A12*A33*A44*A51+A14*A33*A41*A52-   &
+         A13*A34*A41*A52-A14*A31*A43*A52+A11*A34*A43*A52+A13*A31*A44*A52-   &
+         A11*A33*A44*A52-A14*A32*A41*A53+A12*A34*A41*A53+A14*A31*A42*A53-   &
+         A11*A34*A42*A53-A12*A31*A44*A53+A11*A32*A44*A53+A13*A32*A41*A54-   &
+         A12*A33*A41*A54-A13*A31*A42*A54+A11*A33*A42*A54+A12*A31*A43*A54-   &
+         A11*A32*A43*A54
+
+      COFACTOR(3,5) = A14*A23*A42*A51-A13*A24*A42*A51-A14*A22*A43*A51+      &
+         A12*A24*A43*A51+A13*A22*A44*A51-A12*A23*A44*A51-A14*A23*A41*A52+   &
+         A13*A24*A41*A52+A14*A21*A43*A52-A11*A24*A43*A52-A13*A21*A44*A52+   &
+         A11*A23*A44*A52+A14*A22*A41*A53-A12*A24*A41*A53-A14*A21*A42*A53+   &
+         A11*A24*A42*A53+A12*A21*A44*A53-A11*A22*A44*A53-A13*A22*A41*A54+   &
+         A12*A23*A41*A54+A13*A21*A42*A54-A11*A23*A42*A54-A12*A21*A43*A54+   &
+         A11*A22*A43*A54
+
+      COFACTOR(4,5) = -A14*A23*A32*A51+A13*A24*A32*A51+A14*A22*A33*A51-     &
+         A12*A24*A33*A51-A13*A22*A34*A51+A12*A23*A34*A51+A14*A23*A31*A52-   &
+         A13*A24*A31*A52-A14*A21*A33*A52+A11*A24*A33*A52+A13*A21*A34*A52-   &
+         A11*A23*A34*A52-A14*A22*A31*A53+A12*A24*A31*A53+A14*A21*A32*A53-   &
+         A11*A24*A32*A53-A12*A21*A34*A53+A11*A22*A34*A53+A13*A22*A31*A54-   &
+         A12*A23*A31*A54-A13*A21*A32*A54+A11*A23*A32*A54+A12*A21*A33*A54-   &
+         A11*A22*A33*A54
+
+      COFACTOR(5,5) = A14*A23*A32*A41-A13*A24*A32*A41-A14*A22*A33*A41+      &
+         A12*A24*A33*A41+A13*A22*A34*A41-A12*A23*A34*A41-A14*A23*A31*A42+   &
+         A13*A24*A31*A42+A14*A21*A33*A42-A11*A24*A33*A42-A13*A21*A34*A42+   &
+         A11*A23*A34*A42+A14*A22*A31*A43-A12*A24*A31*A43-A14*A21*A32*A43+   &
+         A11*A24*A32*A43+A12*A21*A34*A43-A11*A22*A34*A43-A13*A22*A31*A44+   &
+         A12*A23*A31*A44+A13*A21*A32*A44-A11*A23*A32*A44-A12*A21*A33*A44+   &
+         A11*A22*A33*A44
+
+      AINV = TRANSPOSE(COFACTOR) / DET
+
+      OK_FLAG = .TRUE.
+
+      RETURN
+
+      END SUBROUTINE M55INV
+end module mod_global

@@ -12,13 +12,13 @@ program VacuumMD
   use mod_photo_emission
   use mod_field_emission
   use mod_field_emission_v2
-  use mod_field_emission_tip
+  use mod_emission_tip
   use mod_field_emission_2D
-  !use mod_field_thermo_emission
-  !use mod_therminoic_emission
+  use mod_field_thermo_emission
+  use mod_therminoic_emission
   use mod_pair
   use mod_unit_tests
-  !use mod_manual_emission
+  use mod_manual_emission
 #if defined(__INTEL_COMPILER)
   use IFPORT ! Needed for getpid()
 #endif
@@ -61,16 +61,16 @@ program VacuumMD
   SELECT CASE (EMISSION_MODE)
   case(EMISSION_UNIT_TEST)
     print '(a)', 'Vacuum: **** UNIT TESTING IS ACTIVE ****'
-    call Init_Unit_Test()
+    !call Init_Unit_Test()
   case(EMISSION_PHOTO)
     print '(a)', 'Vacuum: Doing Photo emission'
     call Init_Photo_Emission()
   case(EMISSION_FIELD)
     print '(a)', 'Vacuum: Doing Field emission'
     call Init_Field_Emission()
-  case(EMISSION_FIELD_TIP)
-    print '(a)', 'Vacuum: Doing Field emission from a tip'
-    call Init_Field_Emission_Tip()
+  case(EMISSION_TIP)
+    print '(a)', 'Vacuum: Doing Emission from a tip'
+    call Init_Emission_Tip()
   case(EMISSION_FIELD_2D_2DEG_C, EMISSION_FIELD_2D_2DEG_NC, EMISSION_FIELD_2D_DIRAC_C, EMISSION_FIELD_2D_DIRAC_NC)
     print '(a)', 'Vacuum: Doing Field emission from 2D material'
     call Init_Field_Emission_2D()
@@ -80,7 +80,7 @@ program VacuumMD
   case(EMISSION_FIELD_THERMO)
     print '(a)', 'Vacuum: Doing General Field+Thermionic emission'
     call Init_Field_Thermo_Emission()
-  case(EMISSION_TEST)
+  case(EMISSION_FIELD_V2)
     print '(a)', 'Vacuum: Doing Field emission DEV V2'
     call Init_Field_Emission_v2()
   case(EMISSION_MANUAL)
@@ -183,20 +183,20 @@ program VacuumMD
   print '(a)', 'Vacuum: Emission clean up'
   SELECT CASE (EMISSION_MODE)
   case(EMISSION_UNIT_TEST)
-    call Clean_Up_Unit_Test()
+    !call Clean_Up_Unit_Test()
   case(EMISSION_PHOTO)
     call Clean_Up_Photo_Emission()
   case(EMISSION_FIELD)
     call Clean_Up_Field_Emission()
-  case(EMISSION_FIELD_TIP)
-    call Clean_Up_Field_Emission_Tip()
+  case(EMISSION_TIP)
+    call Clean_Up_Emission_Tip()
   case(EMISSION_FIELD_2D_2DEG_C, EMISSION_FIELD_2D_2DEG_NC, EMISSION_FIELD_2D_DIRAC_C, EMISSION_FIELD_2D_DIRAC_NC)
     call Clean_Up_Field_Emission_2D()
   !case(EMISSION_THERMIONIC)
     !call Clean_Up_Thermionic_Emission()
   case(EMISSION_FIELD_THERMO)
     call Clean_Up_Field_Thermo_Emission()
-  case(EMISSION_TEST)
+  case(EMISSION_FIELD_V2)
     call Clean_Up_Field_Emission_v2()
   case(EMISSION_MANUAL)
     call Clean_Up_Manual()
@@ -357,15 +357,13 @@ contains
 
     ramo_current = 0.0d0
     ramo_current_emit(1:MAX_SECTIONS, 1:MAX_EMITTERS) = 0.0d0
-    ramo_cur_prev = 0.0d0
-    ramo_integral = 0.0d0
     life_time = 0
 
     density_map_elec = 0
     density_map_hole = 0
 
-    V_cur = 0.0d0
-    V_prev = 0.0d0
+    !V_cur = 0.0d0
+    !V_prev = 0.0d0
 
     ! Start with an empty system
     nrPart      = 0
@@ -419,7 +417,7 @@ contains
     call execute_command_line ('mkdir -p out/')
 #endif
 
-    ! Set the number of cores Cuba should use to 1.
+    ! Set the number of cores Cuba should use to 0, i.e. no parallelization in cuba.
     call cubacores(1, 1000)
 
 
@@ -494,6 +492,12 @@ contains
     open(newunit=ud_integrand, iostat=IFAIL, file='out/integration.dt', status='replace', action='write')
     if (IFAIL /= 0) then
       print '(a)', 'Vacuum: ERROR UNABLE TO OPEN file integration.dt'
+      stop
+    end if
+
+    open(newunit=ud_gauss, iostat=IFAIL, file='out/gauss.dt', status='replace', action='write')
+    if (IFAIL /= 0) then
+      print '(a)', 'Vacuum: ERROR UNABLE TO OPEN file gauss.dt'
       stop
     end if
 
@@ -716,6 +720,7 @@ contains
     close(unit=ud_field,status='keep')
     close(unit=ud_coll,status='keep')
     close(unit=ud_integrand, status='keep')
+    close(unit=ud_gauss, status='keep')
     close(unit=ud_debug, status='keep')
 
     close(unit=ud_density_emit, status='keep')

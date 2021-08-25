@@ -72,7 +72,7 @@ contains
       print '(a)', 'Vacuum: Doing collisions reading in data'
       call Read_Cross_Section()
     end if
-   end subroutine Read_Cross_Section_Data
+  end subroutine Read_Cross_Section_Data
 
   ! ----------------------------------------------------------------------------
   ! Update the position of particles in the verlet integration

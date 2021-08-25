@@ -9,11 +9,12 @@ module mod_velocity
     use mod_global
     implicit none
     
-    integer, parameter :: VELOCITY_ZERO = 1
-    integer, parameter :: VELOCITY_MB   = 2
+    integer, parameter :: VELOCITY_ZERO  = 1
+    integer, parameter :: VELOCITY_MB    = 2
+    integer, parameter :: VELOCITY_PHOTO = 3
     
     PRIVATE
-    PUBLIC Init_Emission_Velocity, VELOCITY_ZERO, VELOCITY_MB
+    PUBLIC Init_Emission_Velocity, VELOCITY_ZERO, VELOCITY_MB, VELOCITY_PHOTO
     
     contains
     
@@ -26,6 +27,9 @@ module mod_velocity
         case(VELOCITY_MB)
             ptr_Get_Emission_Velocity => Get_MB_Velocity
             print '(a)', 'Vacuum: Using Maxwell-Boltzman velocity distribution'
+        case(VELOCITY_PHOTO)
+            ptr_Get_Emission_Velocity => Get_Photo_Velocity
+            print '(a)', 'Vacuum: Using Maxwell-Boltzman velocity distribution for Photons'
         case DEFAULT
             print '(a)', 'Vacuum: ERROR UNKNOWN VELOCITY MODEL'
             print *, VELOCITY_MODE
@@ -64,6 +68,31 @@ module mod_velocity
         !Get_MB_Velocity(:, 1) = 0.0d0
         !Get_MB_Velocity(:, 2) = 0.0d0
         Get_MB_Velocity(3) = abs(Get_MB_Velocity(3)) ! Positive velocity in the z-direction
-      end function Get_MB_Velocity
+    end function Get_MB_Velocity
+
+    ! ----------------------------------------------------------------------------
+    ! Generate velocity from a Maxwell-Boltzmann distribution.
+    ! https://en.wikipedia.org/wiki/Maxwell%E2%80%93Boltzmann_distribution#Distribution_for_the_velocity_vector
+    ! 
+    ! Maxwell-Boltzmann velocity distribution is basically a normal distribution for each velocity component with
+    ! zero mean and standard deviation \sqrt{k_b T / m}.
+    function Get_Photo_Velocity()
+        double precision, dimension(1:3) :: Get_Photo_Velocity
+        double precision, dimension(1:2) :: std
+        double precision, dimension(1:2) :: mean
+        double precision                 :: laser_energy, laser_variation
+        mean = laser_energy
+        std = laser_variation ! Standard deviation of the Maxwell-Boltzmann distribution
+        !mean = 4.7d0
+        !std = 0.1d0 ! Standard deviation of the Maxwell-Boltzmann distribution
     
-    end module mod_velocity
+        ! Get normal distributed numbers.
+        ! The Box Muller method gives two numbers.
+        ! We overwrite the second element in the array.
+        Get_Photo_Velocity(1:2) = box_muller(mean, std)
+        Get_Photo_Velocity(2:3) = box_muller(mean, std)
+    
+        Get_Photo_Velocity(3) = abs(Get_Photo_Velocity(3)) ! Positive velocity in the z-direction
+    end function Get_Photo_Velocity
+    
+end module mod_velocity

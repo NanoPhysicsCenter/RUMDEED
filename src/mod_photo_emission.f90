@@ -10,17 +10,19 @@
 Module mod_photo_emission
   use mod_global
   use mod_verlet
+  use mod_velocity
   use mod_pair
+  use mod_work_function
   implicit none
 
   ! ----------------------------------------------------------------------------
   ! Variables
   integer, dimension(:), allocatable          :: nrEmitted_emitters
   integer                                     :: posInit
-  logical                                     :: EmitGauss = .false.
+  logical                                     :: EmitGauss = .TRUE.
   integer                                     :: maxElecEmit = -1
   integer                                     :: nrEmitted
-  integer                                     :: ud_gauss
+  !integer                                     :: ud_gauss
 
   ! ----------------------------------------------------------------------------
   ! Parameters
@@ -42,10 +44,17 @@ contains
 
     ! The function to do image charge effects
     ptr_Image_Charge_effect => Force_Image_charges_v2
+
+    call Init_Emission_Velocity(VELOCITY_PHOTO)
+
+    call Read_work_function()
+    
   end subroutine Init_Photo_Emission
 
   subroutine Clean_Up_Photo_Emission()
     deallocate(nrEmitted_emitters)
+
+    call Work_fun_cleanup()
   end subroutine Clean_Up_Photo_Emission
 
   subroutine Do_Photo_Emission(step)
@@ -63,9 +72,9 @@ contains
     ! Check if we are doing a Gaussian distributed emission
     ! and set the max number of electrons allowed to be emitted if we are
     if (EmitGauss .eqv. .TRUE.) then
-      maxElecEmit = Gauss_Emission(step)
+      maxElecEmit = Rand_Poission( Gauss_Emission(step) )
     end if
-
+    
     !i = 1
 
     ! Loop through all of the emitters
@@ -167,8 +176,14 @@ contains
   subroutine Do_Photo_Emission_Rectangle(step, emit)
     integer, intent(in)              :: step, emit
     integer                          :: nrElecEmit, nrTry
-    double precision, dimension(1:3) :: par_pos, par_vel, field
+    double precision, dimension(1:3) :: par_pos, par_vel, field, photon_energy
+    double precision                 :: p_eV
 
+    ! Get emission velocity profile from mod_velocity 
+    !(technically not velocity but energy distribution of the photons)
+    photon_energy = ptr_Get_Emission_Velocity() 
+    ! Take only the z-component of the velocity profile
+    p_eV = photon_energy(3)
     par_pos = 0.0d0
     nrTry = 0
     nrElecEmit = 0
@@ -197,26 +212,39 @@ contains
       par_pos(3) = 0.0d0 * length_scale !Check in plane
       field = Calc_Field_at(par_pos)
 
-      if (field(3) < 0.0d0) then
-        par_pos(3) = 1.0d0 * length_scale !Above plane
-        field = Calc_Field_at(par_pos)
+      ! Test if workfunction and photon energy functions are working
+      !if (w_theta_xy(par_pos, emit) >= p_eV) then
+      !  print *, 'Workfunction higher then photon energy!'
+      !endif
+
+      if (w_theta_xy(par_pos, emit) <= p_eV) then   ! Check if work function at position is lower then photon energy
 
         if (field(3) < 0.0d0) then
+          par_pos(3) = 1.0d0 * length_scale ! Above plane
+          field = Calc_Field_at(par_pos)
 
-          par_pos(3) = 1.0d0 * length_scale ! Place above plane
-          par_vel = 0.0d0
-          call Add_Particle(par_pos, par_vel, species_elec, step, emit, -1)
+          if (field(3) < 0.0d0) then
 
-          !print *, 'field = ', field
-          !pause
-          !call Add_Plane_Graph_emitt(par_pos, par_vel)
+            par_pos(3) = 1.0d0 * length_scale ! Place above plane
+            !par_vel = 0.0d0 ! Need to modify this to K = h (v - v_0) for excess energy
+            par_vel(3) = sqrt((2 * ((p_eV - w_theta_xy(par_pos, emit))*q_0))/m_0) ! <-- Newtonian
+            !print *, par_vel
+            call Add_Particle(par_pos, par_vel, species_elec, step, emit, -1)
 
-          nrElecEmit = nrElecEmit + 1
-          nrEmitted_emitters(emit) = nrEmitted_emitters(emit) + 1
-          nrTry = 0
+            !print *, 'field = ', field
+            !pause
+            !call Add_Plane_Graph_emitt(par_pos, par_vel)
+
+            nrElecEmit = nrElecEmit + 1
+            nrEmitted_emitters(emit) = nrEmitted_emitters(emit) + 1
+            nrTry = 0
+
+          end if
 
         end if
-      end if
+
+      endif
+
     end do
 
     posInit = posInit + nrElecEmit
@@ -280,19 +308,47 @@ contains
   !   end do
   ! end subroutine Write_Plane_Graph_emitt
 
-  ! Gives a gaussian emission curve
+  ! Gives a Gaussian emission curve
   ! where step is the current time step
   ! returns the number of electrons allowed to be emitted in that time step
-  integer function Gauss_Emission(step)
+  double precision function Gauss_Emission(step)
     integer, intent(in)         :: step ! Current time step
     integer                     :: IFAIL
     double precision, parameter :: sigma = 1000.0d0 ! Width / standard deviation
-    double precision, parameter :: mu = 0.0d0 ! Center
-    double precision, parameter :: A = 6.0d0 ! Height
-    double precision, parameter :: b = 1.0d0/(2.0d0*pi*sigma**2)
+    double precision, parameter :: mu = 10000.0d0 ! Center
+    !double precision, parameter :: mu2 = 30000.0d0 ! Center
+    double precision, parameter :: A = 5.0d0 ! Height
+    double precision, parameter :: b = 1.0d0 / ( 2.0d0 * pi * sigma**2 )
+    
+    !if (step <= 15000) then
+      Gauss_Emission = A * exp( -1.0d0 * b * (step - mu)**2 )
+    !else
+    !  Gauss_Emission = A * exp( -1.0d0 * b * (step - mu2)**2 )
+    !end if
+    ! Gauss emission with integer outcome, change to this if Poisson distribution is discarded.
+    ! Gauss_Emission = IDNINT(  A * exp( -1.0d0*b*(step - mu)**2 )  )
 
-    Gauss_Emission = IDNINT(  A * exp( -1.0d0*b*(step - mu)**2 )  )
-
-    write (ud_gauss, "(i6, tr2, i6)", iostat=IFAIL) step, Gauss_Emission
+    !write (ud_gauss, "(i6, tr2, i6)", iostat=IFAIL) step, Gauss_Emissions
   end function Gauss_Emission
+  
+  !------------------------------------------!
+  ! Photon velocity distribution function    !
+  ! WIP                                      !
+  ! Hákon Örn Árnason - 21.6.2021            !
+  !------------------------------------------!
+  ! Current version outputs Poisson distribution of velocity
+  ! Very slow at low electron count
+  !double precision function Photon_Emission(photon_energy, freq_var)
+  !  double precision, intent(in):: photon_energy, freq_var
+  !  double precision :: rand_photon, photon_rand, Photon_power, Freq, Photo_pois
+  !  
+  !  Photon_power = photon_energy*10000
+  !  Freq = freq_var*10000
+  !  call random_number(rand_photon)
+  !  photon_rand = (Photon_power-Freq) + FLOOR(((Photon_power+Freq)-(Photon_power-Freq))*rand_photon)
+  !  Photo_pois = Rand_Poission(photon_rand)
+  !  Photon_Emission = Photo_pois/10000
+
+  !end function Photon_Emission
+
 end module mod_photo_emission
