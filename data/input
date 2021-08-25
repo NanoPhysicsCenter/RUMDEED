@@ -1,5 +1,5 @@
 &INPUT
-  V_S = 10.0d0,
+  V_S = 1.0d1,
   BOX_DIM = 0.0d0, 0.0d0, 2500.0d0,
   TIME_STEP = 0.25d-3,
   STEPS = 30000,
