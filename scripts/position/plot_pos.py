@@ -1,12 +1,13 @@
 # Plot the position file
 # Kristinn Torfason
 # 05.06.2018
+# Mod. Hákon Örn 05.06.2021
 
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 
-with open("../../data/Test-Tip/out/position.bin", 'rb') as f:
+with open("/home/hakon/Documents/Code/md-photoemission-phd/data/out/position.bin", 'rb') as f:
     max_steps = np.fromfile(file=f, count=1, dtype=np.int32)
     max_steps = max_steps[0]
     print('max_steps')
@@ -39,22 +40,27 @@ with open("../../data/Test-Tip/out/position.bin", 'rb') as f:
     fig = plt.figure()
 
     # Make x and y subplot
-    pad = 0
-    ax1 = fig.add_subplot(121, aspect='equal', autoscale_on=False, xlim=(-100-pad, 100+pad), ylim=(-100-pad, 100+pad))
+    pad = 500
+    #ax1 = fig.add_subplot(121, aspect='equal', autoscale_on=True, xlim=(-500, 500+pad), ylim=(-500, 500+pad))
+    # Emission tip plot
+    ax1 = fig.add_subplot(121, aspect='equal', autoscale_on=True, xlim=(-1000, 1000), ylim=(-1000, 1000))
     plt.xlabel('x [nm]')
     plt.ylabel('y [nm]')
 
     # Make r and z subplot
-    ax2 = fig.add_subplot(122, autoscale_on=False, xlim=(0, 500+pad), ylim=(-100, 1500))
-    plt.xlabel('r [nm]')
+    #ax2 = fig.add_subplot(122, autoscale_on=True, xlim=(-500, 500+pad), ylim=(-1, 2501))
+    # Plot for emission tip
+    ax2 = fig.add_subplot(122, autoscale_on=True, xlim=(-1000, 1000), ylim=(-1, 500))
+    
+    plt.xlabel('x [nm]')
     plt.ylabel('z [nm]')
 
     # Set the layout to tight
     fig.tight_layout()
 
     # particles1 and 2 hold the positions of the particles in (x, y) and (r, z) respectively
-    particles1, = ax1.plot([], [], 'ko', ms=6) # x and y
-    particles2, = ax2.plot([], [], 'ko', ms=6) # r and z
+    particles1, = ax1.plot([], [], 'ko', ms=1) # x and y
+    particles2, = ax2.plot([], [], 'ko', ms=1) # r and z
 
     # Draw the cylinders
     #rect    = plt.Rectangle((0, 1), 2, 3, fc='none')
@@ -69,6 +75,7 @@ with open("../../data/Test-Tip/out/position.bin", 'rb') as f:
     def init():
         particles1.set_data([], [])
         particles2.set_data([], [])
+        #return particles2 #, circle1, circle2, rect
         return particles1, particles2 #, circle1, circle2, rect
 
     # Read in data for time step i
@@ -78,30 +85,32 @@ with open("../../data/Test-Tip/out/position.bin", 'rb') as f:
         x = np.zeros(nrPart)
         y = np.zeros(nrPart)
         z = np.zeros(nrPart)
-        r = np.zeros(nrPart)
+        #r = np.zeros(nrPart)
 
         for j in range(nrPart):
             x[j], y[j], z[j] = np.fromfile(file=f, count=3, dtype=np.float64)
             emit = np.fromfile(file=f, count=1, dtype=np.int32)
+            sec = np.fromfile(file=f, count=1, dtype=np.int32)
 
         # Scale to nm
         x = x / 1.0E-9
         y = y / 1.0E-9
         z = z / 1.0E-9
 
-        r = np.sqrt(np.square(x) + np.square(y))
+        #r = np.sqrt(np.square(x) + np.square(y))
         particles1.set_data(x, y)
-        particles2.set_data(r, z)
+        particles2.set_data(x, z)
+        #return particles2 #, circle1, circle2, rect
         return particles1, particles2 #, circle1, circle2, rect
 
     # Create the animation
     anim = animation.FuncAnimation(fig, animate, frames=max_steps, interval=1, blit=True, repeat=False, init_func=init)
 
     # Show the animation
-    #plt.show()
+    plt.show()
 
     # Set up formatting for the movie files
     Writer = animation.writers['ffmpeg']
-    writer = Writer(fps=100, metadata=dict(artist='Me'), bitrate=1800)
+    writer = Writer(fps=100, metadata=dict(artist='Me')) #bitrate=1800)
 
-    anim.save('vid.mp4', writer=writer)
+    anim.save('vid.mp4', writer=writer, dpi=100)

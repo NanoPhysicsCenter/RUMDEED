@@ -1,10 +1,3 @@
-!-------------------------------------------!
-! Submodule for photo emission              !
-! Laser variables                           !
-! Hákon Örn Árnason                         !
-! 20.08.21                                  !
-!-------------------------------------------!
-
 submodule (mod_photo_emission) smod_laser
   use mod_global
   use mod_velocity
