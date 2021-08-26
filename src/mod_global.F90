@@ -273,6 +273,7 @@ module mod_global
   integer :: ud_integrand ! Information about the surface integration
   integer :: ud_mh ! Information about MH
   integer :: ud_gauss
+  integer :: ud_laser ! Laser and pulse information
 
   ! unit descriptors for data files (binary files)
   integer :: ud_ramo_sec ! File for the ramo current broken down into emitters and sections
@@ -331,6 +332,10 @@ module mod_global
    function Get_Emission_Velocity()
       double precision, dimension(1:3) :: Get_Emission_Velocity
    end function Get_Emission_Velocity
+
+   function Get_Photon_Velocity()
+      double precision, dimension(1:3) :: Get_Photon_Velocity
+   end function Get_Photon_Velocity
   end interface
 
   ! Pointers
@@ -339,6 +344,7 @@ module mod_global
   procedure(Do_Emission), pointer           :: ptr_Do_Emission => null()
   procedure(Image_Charge_effect), pointer   :: ptr_Image_Charge_effect => null()
   procedure(Get_Emission_Velocity), pointer :: ptr_Get_Emission_Velocity => null()
+  procedure(Get_Photon_Velocity), pointer   :: ptr_Get_Photon_Velocity => null()
 contains
 
   ! Flush all files to disk
@@ -355,7 +361,7 @@ contains
    flush(ud_coll)
    flush(ud_integrand)
    flush(ud_mh)
-
+   flush(ud_laser)
    flush(ud_ramo_sec)
 
    flush(ud_density_emit)

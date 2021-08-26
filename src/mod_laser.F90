@@ -15,7 +15,7 @@ Module mod_laser
 
   ! Photon energy parameters
   double precision, allocatable, dimension(:, :)          :: w_theta_arr ! 1:y_num, 1:x_num
-  double precision                                        :: laser_energy, wavelength, intensity
+  double precision                                        :: laser_energy, laser_variation, intensity
 
   ! Gaussians
   integer                                     :: num_gauss ! Number of Gaussian points
@@ -29,6 +29,14 @@ Module mod_laser
   ! Type of laser input
   integer, parameter :: LASER_GAUSS      = 1
   integer, parameter :: LASER_SQUARE     = 2  
+
+  ! Type of photon velocity
+  integer, parameter :: PHOTON_ZERO  = 1
+  integer, parameter :: PHOTON_MB    = 2
+  
+  PRIVATE
+  PUBLIC Init_Photon_Velocity, PHOTON_ZERO, PHOTON_MB
+    
 
   interface
     double precision function Laser_fun(pos, emit, sec)
@@ -61,11 +69,13 @@ contains
       SELECT CASE (LASER_TYPE)
       case (LASER_GAUSS)
         ! Gaussian Pulse
-        print '(a)', 'Vacuum: Using Gaussian emission model'
-
+        print '(a)', 'Vacuum: Using Gaussian pulse model'
+      case (LASER_SQUARE)
+        ! Square Pulse
+        print '(a)', 'Vacuum: Using Square pulse model'
       case DEFAULT
         print '(a)', 'Vacuum: ERROR UNKNOWN WORK FUNCTION TYPE'
-        print *, WORK_TYPE
+        print *, LASER_TYPE
         stop
       END SELECT
 
@@ -74,4 +84,54 @@ contains
 
     !double precision function laser_parameters(laser_energy, wavelength, intensity)
     !end function laser_parameters
+
+  
+    subroutine Init_Photon_Velocity(PHOTON_MODE)
+        integer, intent(in) :: PHOTON_MODE
+        SELECT CASE (PHOTON_MODE)
+        case(PHOTON_ZERO)
+            ptr_Get_Photon_Velocity => Get_Zero_Photon_Velocity
+            print '(a)', 'Vacuum: Using zero inital velocity'
+        case(PHOTON_MB)
+            ptr_Get_Photon_Velocity => Get_Photon_Energy
+            print '(a)', 'Vacuum: Using Maxwell-Boltzman energy distribution for Photons'
+        case DEFAULT
+            print '(a)', 'Vacuum: ERROR UNKNOWN'
+            print *, PHOTON_MODE
+            stop
+        END SELECT
+    end subroutine Init_Photon_Velocity
+    
+    ! ----------------------------------------------------------------------------
+    ! Just give zero initial velocity
+    function Get_Zero_Photon_Velocity()
+        double precision, dimension(1:3) :: Get_Zero_Photon_Velocity
+    
+        Get_Zero_Photon_Velocity = 0.0d0
+    end function Get_Zero_Photon_Velocity
+
+    ! ----------------------------------------------------------------------------
+    ! Generate velocity from a Maxwell-Boltzmann distribution.
+    ! https://en.wikipedia.org/wiki/Maxwell%E2%80%93Boltzmann_distribution#Distribution_for_the_velocity_vector
+    ! 
+    ! Maxwell-Boltzmann velocity distribution is basically a normal distribution for each velocity component with
+    ! zero mean and standard deviation \sqrt{k_b T / m}.
+    function Get_Photon_Energy()
+        double precision, dimension(1:3) :: Get_Photon_Energy
+        double precision, dimension(1:2) :: std
+        double precision, dimension(1:2) :: mean
+        mean = laser_energy
+        std = laser_variation ! Standard deviation of the Maxwell-Boltzmann distribution
+        !mean = 4.7d0
+        !std = 0.1d0 ! Standard deviation of the Maxwell-Boltzmann distribution
+    
+        ! Get normal distributed numbers.
+        ! The Box Muller method gives two numbers.
+        ! We overwrite the second element in the array.
+        Get_Photon_Energy(1:2) = box_muller(mean, std)
+        Get_Photon_Energy(2:3) = box_muller(mean, std)
+    
+        Get_Photon_Energy(3) = abs(Get_Photon_Energy(3)) ! Positive velocity in the z-direction
+    end function Get_Photon_Energy
+    
   end Module mod_laser
