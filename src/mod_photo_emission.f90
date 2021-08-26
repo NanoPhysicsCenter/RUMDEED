@@ -13,6 +13,7 @@ Module mod_photo_emission
   use mod_velocity
   use mod_pair
   use mod_work_function
+  !use mod_laser
   implicit none
 
   ! ----------------------------------------------------------------------------

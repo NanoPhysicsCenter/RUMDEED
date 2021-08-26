@@ -249,94 +249,94 @@ contains
   end function w_theta_gaussian
 
   double precision function Check_in_circles(pos, x_s, y_s, sec)
-  double precision, dimension(1:3), intent(in) :: pos
-  double precision, intent(in)                 :: x_s, y_s
-  integer, intent(out)                         :: sec
-  double precision                             :: r, x, y
-  double precision, parameter                  :: r_c = 150.0d0, r_o = 250.0d0
+    double precision, dimension(1:3), intent(in) :: pos
+    double precision, intent(in)                 :: x_s, y_s
+    integer, intent(out)                         :: sec
+    double precision                             :: r, x, y
+    double precision, parameter                  :: r_c = 150.0d0, r_o = 250.0d0
 
-  x = pos(1)/length_scale - x_s
-  y = pos(2)/length_scale - y_s
+    x = pos(1)/length_scale - x_s
+    y = pos(2)/length_scale - y_s
 
-  r = sqrt(x**2 + y**2)
+    r = sqrt(x**2 + y**2)
 
-  if (r <= r_c) then
-    Check_in_circles = 2.00d0
-    sec = 1
-  else if (r <= r_o) then
-    Check_in_circles = 1.60d0
-    sec = 2
-  else
+    if (r <= r_c) then
+      Check_in_circles = 2.00d0
+      sec = 1
+    else if (r <= r_o) then
+      Check_in_circles = 1.60d0
+      sec = 2
+    else
     Check_in_circles = 2.50d0
     sec = 3
-  end if
+    end if
 
   end function Check_in_circles
 
   double precision function w_theta_circle(pos, emit, sec)
-  double precision, intent(in), dimension(1:3) :: pos
-  integer, intent(in)                          :: emit
-  integer, intent(out), optional               :: sec
+    double precision, intent(in), dimension(1:3) :: pos
+    integer, intent(in)                          :: emit
+    integer, intent(out), optional               :: sec
 
-  integer                                      :: sec_
-  double precision                             :: r, x, y
-  !double precision, parameter                  :: r_1 = 150.0d0, r_2 = 333.0d0, r_3 = 600.0d0
-  !double precision, parameter                  :: r_c = 150.0d0, r_o = 250.0d0
-  double precision                             :: x_s, y_s
+    integer                                      :: sec_
+    double precision                             :: r, x, y
+    !double precision, parameter                  :: r_1 = 150.0d0, r_2 = 333.0d0, r_3 = 600.0d0
+    !double precision, parameter                  :: r_c = 150.0d0, r_o = 250.0d0
+    double precision                             :: x_s, y_s
 
-  ! Middle
-  x_s = 0.0d0
-  y_s = 0.0d0
-  w_theta_circle = Check_in_circles(pos, x_s, y_s, sec_)
-
-  ! Left
-  if (sec_ == 3) then
-    x_s = -600.0d0
+    ! Middle
+    x_s = 0.0d0
     y_s = 0.0d0
     w_theta_circle = Check_in_circles(pos, x_s, y_s, sec_)
-  end if
 
-  ! Right
-  if (sec_ == 3) then
-    x_s = 600.0d0
-    y_s = 0.0d0
-    w_theta_circle = Check_in_circles(pos, x_s, y_s, sec_)
-  end if
+    ! Left
+    if (sec_ == 3) then
+      x_s = -600.0d0
+      y_s = 0.0d0
+      w_theta_circle = Check_in_circles(pos, x_s, y_s, sec_)
+    end if
 
-  ! Top
-  if (sec_ == 3) then
-    x_s = 0.0d0
-    y_s = 600.0d0
-    w_theta_circle = Check_in_circles(pos, x_s, y_s, sec_)
-  end if
+    ! Right
+    if (sec_ == 3) then
+      x_s = 600.0d0
+      y_s = 0.0d0
+      w_theta_circle = Check_in_circles(pos, x_s, y_s, sec_)
+    end if
 
-  ! Bottom
-  if (sec_ == 3) then
-    x_s = 0.0d0
-    y_s = -600.0d0
-    w_theta_circle = Check_in_circles(pos, x_s, y_s, sec_)
-  end if
+    ! Top
+    if (sec_ == 3) then
+      x_s = 0.0d0
+      y_s = 600.0d0
+      w_theta_circle = Check_in_circles(pos, x_s, y_s, sec_)
+    end if
+
+    ! Bottom
+    if (sec_ == 3) then
+      x_s = 0.0d0
+      y_s = -600.0d0
+      w_theta_circle = Check_in_circles(pos, x_s, y_s, sec_)
+    end if
 
 
-  ! r = sqrt(pos(1)**2 + pos(2)**2) / length_scale
+    ! r = sqrt(pos(1)**2 + pos(2)**2) / length_scale
 
-  ! if (r <= r_1) then
-  !   w_theta_circle = 2.20d0
-  !   sec_ = 1
-  ! else if (r <= r_2) then
-  !   w_theta_circle = 1.60d0
-  !   sec_ = 2
-  ! else if (r <= r_3) then
-  !   w_theta_circle = 2.20d0
-  !   sec_ = 3
-  ! else
-  !   w_theta_circle = 2.50d0
-  !   sec_ = 4
-  ! end if
+    ! if (r <= r_1) then
+    !   w_theta_circle = 2.20d0
+    !   sec_ = 1
+    ! else if (r <= r_2) then
+    !   w_theta_circle = 1.60d0
+    !   sec_ = 2
+    ! else if (r <= r_3) then
+    !   w_theta_circle = 2.20d0
+    !   sec_ = 3
+    ! else
+    !   w_theta_circle = 2.50d0
+    !   sec_ = 4
+    ! end if
 
-  if (present(sec) .eqv. .true.) then
-    sec = sec_
-  end if
+    if (present(sec) .eqv. .true.) then
+      sec = sec_
+    end if
   end function w_theta_circle
 
   ! ----------------------------------------------------------------------------
