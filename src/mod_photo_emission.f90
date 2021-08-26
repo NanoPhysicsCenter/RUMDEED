@@ -331,25 +331,5 @@ contains
 
     !write (ud_gauss, "(i6, tr2, i6)", iostat=IFAIL) step, Gauss_Emissions
   end function Gauss_Emission
-  
-  !------------------------------------------!
-  ! Photon velocity distribution function    !
-  ! WIP                                      !
-  ! Hákon Örn Árnason - 21.6.2021            !
-  !------------------------------------------!
-  ! Current version outputs Poisson distribution of velocity
-  ! Very slow at low electron count
-  !double precision function Photon_Emission(photon_energy, freq_var)
-  !  double precision, intent(in):: photon_energy, freq_var
-  !  double precision :: rand_photon, photon_rand, Photon_power, Freq, Photo_pois
-  !  
-  !  Photon_power = photon_energy*10000
-  !  Freq = freq_var*10000
-  !  call random_number(rand_photon)
-  !  photon_rand = (Photon_power-Freq) + FLOOR(((Photon_power+Freq)-(Photon_power-Freq))*rand_photon)
-  !  Photo_pois = Rand_Poission(photon_rand)
-  !  Photon_Emission = Photo_pois/10000
-
-  !end function Photon_Emission
 
 end module mod_photo_emission

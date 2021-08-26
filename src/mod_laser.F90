@@ -11,20 +11,14 @@ Module mod_laser
   use mod_photo_emission
 
   implicit none
-  integer                                                 :: LASER_TYPE
+  integer            :: LASER_TYPE, PHOTON_MODE
+  double precision   :: laser_energy, laser_variation ! Laser energy
+  double precision   :: mu, sigma, A ! Gauss pulse parameters
 
-  ! Photon energy parameters
-  double precision, allocatable, dimension(:, :)          :: w_theta_arr ! 1:y_num, 1:x_num
-  double precision                                        :: laser_energy, laser_variation, intensity
+  ! Photon energy parameters of photon energy
 
-  ! Gaussians
-  integer                                     :: num_gauss ! Number of Gaussian points
-  double precision                            :: w_theta_base
-  double precision, allocatable, dimension(:) :: w_gaussians_A     ! Amplitude
-  double precision, allocatable, dimension(:) :: w_gaussians_x     ! x - center
-  double precision, allocatable, dimension(:) :: w_gaussians_y     ! y - center
-  double precision, allocatable, dimension(:) :: w_gaussians_std_x ! standard deviation / spread in x
-  double precision, allocatable, dimension(:) :: w_gaussians_std_y ! standard deviation / spread in y
+  ! Gauss emission
+  logical, parameter :: Gauss_Emission = .FALSE.
 
   ! Type of laser input
   integer, parameter :: LASER_GAUSS      = 1
@@ -34,8 +28,8 @@ Module mod_laser
   integer, parameter :: PHOTON_ZERO  = 1
   integer, parameter :: PHOTON_MB    = 2
   
-  PRIVATE
-  PUBLIC Init_Photon_Velocity, PHOTON_ZERO, PHOTON_MB
+!  PRIVATE
+!  PUBLIC Init_Photon_Velocity, PHOTON_ZERO, PHOTON_MB
     
 
   interface
@@ -49,7 +43,7 @@ Module mod_laser
 
 contains
 
-  subroutine Read_laser_function()
+  subroutine Read_laser_parameters()
       integer :: ud_laser, IFAIL, i, j
       character(256) :: iomsg
 
@@ -63,44 +57,106 @@ contains
         stop
       end if
 
-      ! Read the type of laser function to use
-      read(unit=ud_laser, FMT=*) LASER_TYPE
+      ! Read the type of laser pulse to use
+      read(unit=ud_laser, FMT=*) LASER_TYPE, PHOTON_MODE
 
       SELECT CASE (LASER_TYPE)
-      case (LASER_GAUSS)
-        ! Gaussian Pulse
-        print '(a)', 'Vacuum: Using Gaussian pulse model'
-      case (LASER_SQUARE)
-        ! Square Pulse
-        print '(a)', 'Vacuum: Using Square pulse model'
-      case DEFAULT
-        print '(a)', 'Vacuum: ERROR UNKNOWN WORK FUNCTION TYPE'
-        print *, LASER_TYPE
-        stop
+        case (LASER_GAUSS)
+          ! Gaussian Pulse
+          print '(a)', 'Vacuum: Using Gaussian pulse model'
+          ! Add function to change Gauss_emission to .TRUE. 
+          ! in mod_photo_emission.f90 check Image charge for ref.
+          ptr_Laser_fun => laser
+          SELECT CASE (PHOTON_MODE)
+            case (PHOTON_ZERO)    
+              ptr_Get_Photon_Velocity => Get_Zero_Photon_Velocity
+              print '(a)', 'Vacuum: Using zero inital velocity' 
+              ! Read mean and std photon energy from the file
+              read(unit=ud_laser, FMT=*) laser_energy, laser_variation
+              ! Read Gaussian parameters from the file (mu, std and Amplitude) 
+              read(unit=ud_laser, FMT=*) mu, sigma, A
+              ! These parameters should go to the Gauss_Emission
+              ! in mod_photo_emission.f90
+
+            case (PHOTON_MB)
+              ptr_Get_Photon_Velocity => Get_Photon_Energy
+              print '(a)', 'Vacuum: Using Maxwell-Boltzman energy distribution for Photons'
+              ! Read mean and std photon energy from the file
+              read(unit=ud_laser, FMT=*) laser_energy, laser_variation
+              ! Read Gaussian parameters from the file (mu, std and Amplitude) 
+              read(unit=ud_laser, FMT=*) mu, sigma, A
+              ! These parameters should go to the Gauss_Emission
+              ! in mod_photo_emission.f90
+            case DEFAULT
+              print '(a)', 'Vacuum: ERROR UNKNOWN PHOTON MODE'
+              print *, PHOTON_MODE
+              stop
+          END SELECT  
+
+
+        case (LASER_SQUARE)
+          ! Square Pulse
+          print '(a)', 'Vacuum: Using Square pulse model'
+          ptr_Laser_fun => laser
+          SELECT CASE (PHOTON_MODE)
+            case (PHOTON_ZERO)
+              ptr_Get_Photon_Velocity => Get_Zero_Photon_Velocity
+              print '(a)', 'Vacuum: Using zero inital velocity'    
+              ! Read mean and std photon energy from the file
+              read(unit=ud_laser, FMT=*) laser_energy, laser_variation
+
+            case (PHOTON_MB)
+              ptr_Get_Photon_Velocity => Get_Photon_Energy
+              print '(a)', 'Vacuum: Using Maxwell-Boltzman energy distribution for Photons'
+              ! Read mean and std photon energy from the file
+              read(unit=ud_laser, FMT=*) laser_energy, laser_variation
+            case DEFAULT
+              print '(a)', 'Vacuum: ERROR UNKNOWN PHOTON MODE'
+              print *, PHOTON_MODE
+              stop
+          END SELECT
+        case DEFAULT
+          print '(a)', 'Vacuum: ERROR UNKNOWN LASER TYPE AND/OR PHOTON MODE'
+          print *, LASER_TYPE, PHOTON_MODE
+          stop
       END SELECT
 
       close(unit=ud_laser)
-    end subroutine Read_laser_function
+    end subroutine Read_laser_parameters
+
+    ! Clean up routine
+    subroutine Laser_cleanup()
+      if (LASER_TYPE == LASER_GAUSS) then
+        deallocate()
+        deallocate()
+      endif
+
+
+      if (LASER_TYPE == LASER_SQUARE) then
+        deallocate()
+        deallocate()
+      endif
+    end subroutine Laser_cleanup
 
     !double precision function laser_parameters(laser_energy, wavelength, intensity)
     !end function laser_parameters
 
   
-    subroutine Init_Photon_Velocity(PHOTON_MODE)
-        integer, intent(in) :: PHOTON_MODE
-        SELECT CASE (PHOTON_MODE)
-        case(PHOTON_ZERO)
-            ptr_Get_Photon_Velocity => Get_Zero_Photon_Velocity
-            print '(a)', 'Vacuum: Using zero inital velocity'
-        case(PHOTON_MB)
-            ptr_Get_Photon_Velocity => Get_Photon_Energy
-            print '(a)', 'Vacuum: Using Maxwell-Boltzman energy distribution for Photons'
-        case DEFAULT
-            print '(a)', 'Vacuum: ERROR UNKNOWN'
-            print *, PHOTON_MODE
-            stop
-        END SELECT
-    end subroutine Init_Photon_Velocity
+    ! subroutine Init_Photon_Velocity(PHOTON_MODE)
+    !     integer, intent(in) :: PHOTON_MODE
+    !     SELECT CASE (PHOTON_MODE)
+    !     case(PHOTON_ZERO)
+    !         ptr_Get_Photon_Velocity => Get_Zero_Photon_Velocity
+    !         print '(a)', 'Vacuum: Using zero inital velocity'
+    !     case(PHOTON_MB)
+    !         ptr_Get_Photon_Velocity => Get_Photon_Energy
+    !         print '(a)', 'Vacuum: Using Maxwell-Boltzman energy distribution for Photons'
+    !     case DEFAULT
+    !         print '(a)', 'Vacuum: ERROR UNKNOWN PHOTON MODE'
+    !         print *, PHOTON_MODE
+    !         stop
+    !     END SELECT
+    ! end subroutine Init_Photon_Velocity
     
     ! ----------------------------------------------------------------------------
     ! Just give zero initial velocity
