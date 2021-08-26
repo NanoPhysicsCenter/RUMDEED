@@ -61,10 +61,10 @@ endif
 # NV FORTRAN
 ifeq ($(FC),nvfortran)
 $(info Using NVidia Fortran)
-FFLAGS=-O3 -fastsse -Mipa=fast,inline -Munroll
-FFLAGS=-O3 -fast
+#FFLAGS=-O3 -fastsse -Mipa=fast,inline -Munroll
+FFLAGS=-O3 -fastsse
 ifdef OPENMP
-FFLAGS+=-mp=multicore
+FFLAGS+=-mp
 endif
 endif
 
