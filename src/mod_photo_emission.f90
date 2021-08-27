@@ -20,16 +20,109 @@ Module mod_photo_emission
   ! Variables
   integer, dimension(:), allocatable          :: nrEmitted_emitters
   integer                                     :: posInit
-  logical                                     :: EmitGauss = .TRUE.
+  logical                                     :: EmitGauss = .FALSE.
   integer                                     :: maxElecEmit = -1
   integer                                     :: nrEmitted
+  integer            :: LASER_TYPE, PHOTON_MODE
+  double precision   :: laser_energy, laser_variation ! Laser energy
+  double precision   :: mu, sigma, A ! Gauss pulse parameters
   !integer                                     :: ud_gauss
 
   ! ----------------------------------------------------------------------------
   ! Parameters
   integer, parameter                          :: MAX_EMISSION_TRY = 100
+  ! Type of laser input
+  integer, parameter :: LASER_GAUSS      = 1
+  integer, parameter :: LASER_SQUARE     = 2  
+
+  ! Type of photon velocity
+  integer, parameter :: PHOTON_ZERO  = 1
+  integer, parameter :: PHOTON_MB    = 2
 
 contains
+
+subroutine Read_laser_parameters()
+  integer :: ud_laser, IFAIL
+  character(256) :: iomsg
+
+  ! Open the file that contains information about the work function
+  open(newunit=ud_laser, iostat=IFAIL, iomsg=iomsg, file='laser', &
+    & status='OLD', form='FORMATTED', access='SEQUENTIAL', action='READ')
+  if (IFAIL /= 0) then
+    print *, 'Vacuum: Failed to open file laser. ABORTING'
+    print *, IFAIL
+    print *, iomsg
+    stop
+  end if
+
+  ! Read the type of laser pulse to use
+  read(unit=ud_laser, FMT=*) LASER_TYPE, PHOTON_MODE
+
+  SELECT CASE (LASER_TYPE)
+    case (LASER_GAUSS)
+      ! Gaussian Pulse
+      print '(a)', 'Vacuum: Using Gaussian pulse model'
+      ! Add function to change Gauss_emission to .TRUE. 
+      EmitGauss = .TRUE.
+      ! in mod_photo_emission.f90 check Image charge for ref.
+      ! ptr_Laser_fun => gauss_pulse_parameters
+      SELECT CASE (PHOTON_MODE)
+        case (PHOTON_ZERO)    
+          ptr_Get_Emission_Velocity => Get_Zero_Photon_Velocity
+          print '(a)', 'Vacuum: Using zero inital velocity' 
+          ! Read mean and std photon energy from the file
+          read(unit=ud_laser, FMT=*) laser_energy, laser_variation
+          ! Read Gaussian parameters from the file (mu, std and Amplitude) 
+          read(unit=ud_laser, FMT=*) mu, sigma, A
+          ! These parameters should go to the Gauss_Emission
+          ! in mod_photo_emission.f90
+
+        case (PHOTON_MB)
+          ptr_Get_Emission_Velocity => Get_Photon_Energy
+          print '(a)', 'Vacuum: Using Maxwell-Boltzman energy distribution for Photons'
+          ! Read mean and std photon energy from the file
+          read(unit=ud_laser, FMT=*) laser_energy, laser_variation
+          ! Read Gaussian parameters from the file (mu, std and Amplitude) 
+          read(unit=ud_laser, FMT=*) mu, sigma, A
+          ! These parameters should go to the Gauss_Emission
+          ! in mod_photo_emission.f90
+        case DEFAULT
+          print '(a)', 'Vacuum: ERROR UNKNOWN PHOTON MODE'
+          print *, PHOTON_MODE
+          stop
+      END SELECT  
+
+
+    case (LASER_SQUARE)
+      ! Square Pulse
+      print '(a)', 'Vacuum: Using Square pulse model'
+      !ptr_Laser_fun => laser
+      SELECT CASE (PHOTON_MODE)
+        case (PHOTON_ZERO)
+          ptr_Get_Emission_Velocity => Get_Zero_Photon_Velocity
+          print '(a)', 'Vacuum: Using zero inital velocity'    
+          ! Read mean and std photon energy from the file
+          read(unit=ud_laser, FMT=*) laser_energy, laser_variation
+
+        case (PHOTON_MB)
+          ptr_Get_Emission_Velocity => Get_Photon_Energy
+          print '(a)', 'Vacuum: Using Maxwell-Boltzman energy distribution for Photons'
+          ! Read mean and std photon energy from the file
+          read(unit=ud_laser, FMT=*) laser_energy, laser_variation
+        case DEFAULT
+          print '(a)', 'Vacuum: ERROR UNKNOWN PHOTON MODE'
+          print *, PHOTON_MODE
+          stop
+      END SELECT
+    case DEFAULT
+      print '(a)', 'Vacuum: ERROR UNKNOWN LASER TYPE'
+      print *, LASER_TYPE
+      stop
+  END SELECT
+
+  close(unit=ud_laser)
+end subroutine Read_laser_parameters
+
   subroutine Init_Photo_Emission()
     ! Allocate the number of emitters
     allocate(nrEmitted_emitters(1:nrEmit))
@@ -46,9 +139,11 @@ contains
     ! The function to do image charge effects
     ptr_Image_Charge_effect => Force_Image_charges_v2
 
-    call Init_Emission_Velocity(VELOCITY_PHOTO)
+    !call Init_Emission_Velocity(VELOCITY_PHOTO)
 
     call Read_work_function()
+
+    call Read_laser_parameters()
     
   end subroutine Init_Photo_Emission
 
@@ -309,27 +404,83 @@ contains
   !   end do
   ! end subroutine Write_Plane_Graph_emitt
 
-  ! Gives a Gaussian emission curve
-  ! where step is the current time step
-  ! returns the number of electrons allowed to be emitted in that time step
-  double precision function Gauss_Emission(step)
-    integer, intent(in)         :: step ! Current time step
-    integer                     :: IFAIL
-    double precision, parameter :: sigma = 1000.0d0 ! Width / standard deviation
-    double precision, parameter :: mu = 10000.0d0 ! Center
-    !double precision, parameter :: mu2 = 30000.0d0 ! Center
-    double precision, parameter :: A = 5.0d0 ! Height
-    double precision, parameter :: b = 1.0d0 / ( 2.0d0 * pi * sigma**2 )
     
-    !if (step <= 15000) then
-      Gauss_Emission = A * exp( -1.0d0 * b * (step - mu)**2 )
-    !else
-    !  Gauss_Emission = A * exp( -1.0d0 * b * (step - mu2)**2 )
-    !end if
-    ! Gauss emission with integer outcome, change to this if Poisson distribution is discarded.
-    ! Gauss_Emission = IDNINT(  A * exp( -1.0d0*b*(step - mu)**2 )  )
+  ! Gives a Gaussian emission curve
+    ! where step is the current time step
+    ! returns the number of electrons allowed to be emitted in that time step
+    double precision function Gauss_Emission(step)
+      integer, intent(in)          :: step ! Current time step
+      integer                      :: IFAIL
+      double precision             :: b 
+      
+      b = 1.0d0 / ( 2.0d0 * pi * sigma**2 )
 
-    !write (ud_gauss, "(i6, tr2, i6)", iostat=IFAIL) step, Gauss_Emissions
-  end function Gauss_Emission
+      !if (step <= 15000) then
+        Gauss_Emission = A * exp( -1.0d0 * b * (step - mu)**2 )
+      !else
+      !  Gauss_Emission = A * exp( -1.0d0 * b * (step - mu2)**2 )
+      !end if
+      ! Gauss emission with integer outcome, change to this if Poisson distribution is discarded.
+      ! Gauss_Emission = IDNINT(  A * exp( -1.0d0*b*(step - mu)**2 )  )
+
+      !write (ud_gauss, "(i6, tr2, i6)", iostat=IFAIL) step, Gauss_Emissions
+    end function Gauss_Emission
+
+  ! ! Gives a Gaussian emission curve
+  ! ! where step is the current time step
+  ! ! returns the number of electrons allowed to be emitted in that time step
+  ! double precision function Gauss_Emission(step)
+  !   integer, intent(in)         :: step ! Current time step
+  !   integer                     :: IFAIL
+  !   double precision, parameter :: sigma = 1000.0d0 ! Width / standard deviation
+  !   double precision, parameter :: mu = 10000.0d0 ! Center
+  !   !double precision, parameter :: mu2 = 30000.0d0 ! Center
+  !   double precision, parameter :: A = 5.0d0 ! Height
+  !   double precision, parameter :: b = 1.0d0 / ( 2.0d0 * pi * sigma**2 )
+    
+  !   !if (step <= 15000) then
+  !     Gauss_Emission = A * exp( -1.0d0 * b * (step - mu)**2 )
+  !   !else
+  !   !  Gauss_Emission = A * exp( -1.0d0 * b * (step - mu2)**2 )
+  !   !end if
+  !   ! Gauss emission with integer outcome, change to this if Poisson distribution is discarded.
+  !   ! Gauss_Emission = IDNINT(  A * exp( -1.0d0*b*(step - mu)**2 )  )
+
+  !   !write (ud_gauss, "(i6, tr2, i6)", iostat=IFAIL) step, Gauss_Emissions
+  ! end function Gauss_Emission
+
+
+    ! ----------------------------------------------------------------------------
+    ! Just give zero initial velocity
+    function Get_Zero_Photon_Velocity()
+      double precision, dimension(1:3) :: Get_Zero_Photon_Velocity
+  
+      Get_Zero_Photon_Velocity = 0.0d0
+    end function Get_Zero_Photon_Velocity
+
+  ! ----------------------------------------------------------------------------
+  ! Generate velocity from a Maxwell-Boltzmann distribution.
+  ! https://en.wikipedia.org/wiki/Maxwell%E2%80%93Boltzmann_distribution#Distribution_for_the_velocity_vector
+  ! 
+  ! Maxwell-Boltzmann velocity distribution is basically a normal distribution for each velocity component with
+  ! zero mean and standard deviation \sqrt{k_b T / m}.
+  function Get_Photon_Energy() ! (laser_energy, laser_variation)
+    !double precision, intent(in)     :: laser_energy, laser_variation
+    double precision, dimension(1:3) :: Get_Photon_Energy
+    double precision, dimension(1:2) :: std
+    double precision, dimension(1:2) :: mean
+    mean = laser_energy
+    std = laser_variation ! Standard deviation of the Maxwell-Boltzmann distribution
+    !mean = 4.7d0
+    !std = 0.1d0 ! Standard deviation of the Maxwell-Boltzmann distribution
+
+    ! Get normal distributed numbers.
+    ! The Box Muller method gives two numbers.
+    ! We overwrite the second element in the array.
+    Get_Photon_Energy(1:2) = box_muller(mean, std)
+    Get_Photon_Energy(2:3) = box_muller(mean, std)
+
+    Get_Photon_Energy(3) = abs(Get_Photon_Energy(3)) ! Positive velocity in the z-direction
+  end function Get_Photon_Energy
 
 end module mod_photo_emission

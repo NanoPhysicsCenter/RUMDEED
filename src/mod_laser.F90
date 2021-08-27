@@ -32,14 +32,14 @@ Module mod_laser
 !  PUBLIC Init_Photon_Velocity, PHOTON_ZERO, PHOTON_MB
     
 
-  interface
-    double precision function Laser_fun(pos, emit, sec)
-      double precision, dimension(1:3), intent(in) :: pos
-      integer, intent(in)                          :: emit
-      integer, intent(out), optional               :: sec
-    end function Laser_fun
-  end interface
-  procedure(Laser_fun), pointer :: ptr_Laser_fun => null()
+  ! interface
+  !   double precision function Laser_fun(pos, emit, sec)
+  !     double precision, dimension(1:3), intent(in) :: pos
+  !     integer, intent(in)                          :: emit
+  !     integer, intent(out), optional               :: sec
+  !   end function Laser_fun
+  ! end interface
+  ! procedure(Laser_fun), pointer :: ptr_Laser_fun => null()
 
 contains
 
@@ -66,7 +66,7 @@ contains
           print '(a)', 'Vacuum: Using Gaussian pulse model'
           ! Add function to change Gauss_emission to .TRUE. 
           ! in mod_photo_emission.f90 check Image charge for ref.
-          ptr_Laser_fun => laser
+          ! ptr_Laser_fun => gauss_pulse_parameters
           SELECT CASE (PHOTON_MODE)
             case (PHOTON_ZERO)    
               ptr_Get_Photon_Velocity => Get_Zero_Photon_Velocity
@@ -124,19 +124,19 @@ contains
       close(unit=ud_laser)
     end subroutine Read_laser_parameters
 
-    ! Clean up routine
-    subroutine Laser_cleanup()
-      if (LASER_TYPE == LASER_GAUSS) then
-        deallocate()
-        deallocate()
-      endif
+    ! ! Clean up routine
+    ! subroutine Laser_cleanup()
+    !   if (LASER_TYPE == LASER_GAUSS) then
+    !     deallocate()
+    !     deallocate()
+    !   endif
 
 
-      if (LASER_TYPE == LASER_SQUARE) then
-        deallocate()
-        deallocate()
-      endif
-    end subroutine Laser_cleanup
+    !   if (LASER_TYPE == LASER_SQUARE) then
+    !     deallocate()
+    !     deallocate()
+    !   endif
+    ! end subroutine Laser_cleanup
 
     !double precision function laser_parameters(laser_energy, wavelength, intensity)
     !end function laser_parameters
@@ -172,22 +172,23 @@ contains
     ! 
     ! Maxwell-Boltzmann velocity distribution is basically a normal distribution for each velocity component with
     ! zero mean and standard deviation \sqrt{k_b T / m}.
-    function Get_Photon_Energy()
-        double precision, dimension(1:3) :: Get_Photon_Energy
-        double precision, dimension(1:2) :: std
-        double precision, dimension(1:2) :: mean
-        mean = laser_energy
-        std = laser_variation ! Standard deviation of the Maxwell-Boltzmann distribution
-        !mean = 4.7d0
-        !std = 0.1d0 ! Standard deviation of the Maxwell-Boltzmann distribution
-    
-        ! Get normal distributed numbers.
-        ! The Box Muller method gives two numbers.
-        ! We overwrite the second element in the array.
-        Get_Photon_Energy(1:2) = box_muller(mean, std)
-        Get_Photon_Energy(2:3) = box_muller(mean, std)
-    
-        Get_Photon_Energy(3) = abs(Get_Photon_Energy(3)) ! Positive velocity in the z-direction
+    function Get_Photon_Energy() ! (laser_energy, laser_variation)
+      !double precision, intent(in)     :: laser_energy, laser_variation
+      double precision, dimension(1:3) :: Get_Photon_Energy
+      double precision, dimension(1:2) :: std
+      double precision, dimension(1:2) :: mean
+      mean = laser_energy
+      std = laser_variation ! Standard deviation of the Maxwell-Boltzmann distribution
+      !mean = 4.7d0
+      !std = 0.1d0 ! Standard deviation of the Maxwell-Boltzmann distribution
+  
+      ! Get normal distributed numbers.
+      ! The Box Muller method gives two numbers.
+      ! We overwrite the second element in the array.
+      Get_Photon_Energy(1:2) = box_muller(mean, std)
+      Get_Photon_Energy(2:3) = box_muller(mean, std)
+  
+      Get_Photon_Energy(3) = abs(Get_Photon_Energy(3)) ! Positive velocity in the z-direction
     end function Get_Photon_Energy
     
   end Module mod_laser
