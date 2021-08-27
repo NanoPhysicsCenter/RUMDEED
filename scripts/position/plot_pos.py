@@ -7,7 +7,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 
-with open("/home/hakon/Documents/Code/md-photoemission-phd/data/out/position.bin", 'rb') as f:
+with open("/home/hakon/Documents/Code/Vacuum-MD/data/out/position.bin", 'rb') as f:
     max_steps = np.fromfile(file=f, count=1, dtype=np.int32)
     max_steps = max_steps[0]
     print('max_steps')

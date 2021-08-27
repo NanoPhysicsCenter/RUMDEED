@@ -1,10 +1,10 @@
 #!/bin/bash
 
 installdir=$PWD
-cd 4.2
+cd 4.2.1
 ./configure --prefix="${installdir// /\\ }" CC=gcc FC=gfortran
 make clean
-make
+make lib -j8
 make install
 make clean
 #rm config.h
