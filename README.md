@@ -35,23 +35,28 @@ INPUT
 
 /
 ```
-### Input Warning
-  The Gauss_Emission needs to be enabled if such input/output is desired.
-  
-  The gaussian pulse is defined in the mod_photo_emission.f90 src file, this is done with output restriction of electrons according to normal distribution. This should in theory simulate the Quantum Efficiency and Intensity via amplitude modulation.
 
-  The input laser (photon) energy and variation is defined in mod_velocity, with mean controlling the energy level in electronVolts and std being wavelength variation (in eV's as well). 
+## laser file
+    1 2
+    4.7 0.02
+    10000 1000 5
+
+### Input Warning
+  The Gauss_Emission needs to be enabled if such input/output is desired, "1" in the laser file, "2" is instant start and continous.
+  The second number picks velocity profile, "1" being zero initial velocity while "2" will give inital velocity dependant on workfunction.
+  Second line is laser (photon) energy and variation, with mean controlling the energy level in electronVolts (eV) and std being standard deviation of the laser (in eV's as well). 
   This is normal distribution with Box-Muller method.
   This energy is compared to the work function with the excess making way for Newtonian inital velocity given to the electrons.
+  Third line is gauss pulse parameters, center (mu), width (sigma) and A(mplitude) of the pulse. 
+  
+  The gaussian pulse is simulated with output restriction of electrons according to normal distribution. This should in theory simulate the Quantum Efficiency and Intensity via amplitude modulation.
 
+  
+      
 
 ## Notes
   Needs fixing?
   See [notes.pdf](doc/notes.pdf)?
-
-## Photo-Emission
-    Photo
-      Add detail about function
 
 ## Acknowledgments
 
