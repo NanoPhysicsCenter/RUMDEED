@@ -1,9 +1,9 @@
 # Molecular Dynamics code
     
     Photoemission Branch
-    + Workfunction pattern
-      + checkerboard
-      + random generated pattern - WIP
+    + Photoemission based on Workfunction pattern - see mod_workfunction as well
+      + Checkerboard
+      + Random generated pattern - WIP
       + Emission tip
       + Circle - WIP
     + Velocity distibution is Gaussian
@@ -11,7 +11,10 @@
     + Output pulse can be Gaussian
       + Quantum efficiency is controlled by amplitude modulation
       + Pulse repetition is possible - WIP
-    + Input file for laser and pulse - WIP
+    + Input file for laser and pulse
+      + Input file is same as main
+      + laser file is photo_emission specific
+        + See parameters below
     
     See master branch for more info
 
@@ -50,8 +53,6 @@ INPUT
   Third line is gauss pulse parameters, center (mu), width (sigma) and A(mplitude) of the pulse. 
   
   The gaussian pulse is simulated with output restriction of electrons according to normal distribution. This should in theory simulate the Quantum Efficiency and Intensity via amplitude modulation.
-
-  
       
 
 ## Notes
