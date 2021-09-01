@@ -24,8 +24,7 @@ def write_w_theta(workfunction):
 # Gauss pulse parameters: mu (center); sigma (width); Amplitude
 def write_laser(laser):
     filename = 'laser'
-    np.savetxt(filename, laser, fmt='%2.3f', header='1 2\n4.7 0.02\n10000 1000 2', comments='')
-    #https://numpy.org/doc/stable/reference/generated/numpy.savetxt.html
+    np.savetxt(filename, laser , fmt='%2.3f', header='1 2', comments='')
     return None
 
 # Write Fortran input file
@@ -46,36 +45,47 @@ def Write_Input():
     
     return None
 
-
 # ----------------------------------------------------------------------------------------
-# #N = 12*12 + 1
-# N = 2 # Number of runs
-# folders = []
-# for i in range(N):
-#     folders.append(str(i))
+#N = 12*12 + 1
+N = 15 # Number of runs
+
+mu = 10000
+sigma = 1000
+amplitude = np.linspace(0.01, 1, N)
+photon_energy = 4.7
+photon_std = 0.02
+laser_input = []
+
+folders = []
+for i in range(N):
+    folders.append(str(i))
+
+for i in range(N):
+    laser_input.append(np.array([mu, sigma, amplitude[i], photon_energy, photon_std]))
+
 
 # Define work function matrix
 W = np.ones((1, 1))*4.70
-# for i in range(N):
-#     print('')
-#     print('Creating directory')
-#     print(folders[i])
-#     try:
-#         os.mkdir(folders[i])
-#     except:
-#         pass
-#     os.chdir(folders[i])
+for i in range(N):
+    print('')
+    print('Creating directory')
+    print(folders[i])
+    try:
+        os.mkdir(folders[i])
+    except:
+        pass
+    os.chdir(folders[i])
 
-#     print('Writing input file')
-#     Write_Input()
+    print('Writing input file')
+    Write_Input()
 
-#     print('Writing laser file')
-#     write_laser(laser_pulse)
+    print('Writing laser file')
+    write_laser(laser_input[i])
 
-#     print('Writing work function file')
-#     write_w_theta(flat_function)
+    print('Writing work function file')
+    write_w_theta(W)
 
-#     print('Running Vacuum-MD')
-#     shutil.copy2('../Vacuum-MD.out', '.')
-#     subprocess.run('./Vacuum-MD.out')
-#     os.chdir('..')
+    print('Running Vacuum-MD')
+    shutil.copy2('../Vacuum-MD.out', '.')
+    subprocess.run('./Vacuum-MD.out')
+    os.chdir('..')
