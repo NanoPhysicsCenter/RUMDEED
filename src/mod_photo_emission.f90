@@ -80,7 +80,7 @@ subroutine Read_laser_parameters()
           read(unit=ud_laser, FMT=*) laser_energy, laser_variation
           ! Read Gaussian parameters from the file (mu, std and Amplitude) 
           read(unit=ud_laser, FMT=*) Gauss_pulse_center, Gauss_pulse_width, Gauss_pulse_amplitude
-          
+          ! print *, Gauss_pulse_center, Gauss_pulse_width, Gauss_pulse_amplitude, laser_energy, laser_variation
         case DEFAULT
           print '(a)', 'Vacuum: ERROR UNKNOWN PHOTON MODE'
           print *, PHOTON_MODE

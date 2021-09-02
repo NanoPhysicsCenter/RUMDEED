@@ -29,7 +29,7 @@ def write_laser(laser):
 
 # Write Fortran input file
 def Write_Input():
-    nml = f90nml.Namelist({'input': {'v_s': 2500.0}})
+    nml = f90nml.Namelist({'input': {'v_s': 10.0}})
     nml['input']['box_dim'] = [0.0, 0.0, 0.0]
     nml['input']['time_step'] = 0.25E-3
     nml['input']['steps'] = 60000
@@ -47,7 +47,7 @@ def Write_Input():
 
 # ----------------------------------------------------------------------------------------
 #N = 12*12 + 1
-N = 15 # Number of runs
+N = 20 # Number of runs
 
 mu = 10000
 sigma = 1000
@@ -61,7 +61,7 @@ for i in range(N):
     folders.append(str(i))
 
 for i in range(N):
-    laser_input.append(np.array([mu, sigma, amplitude[i], photon_energy, photon_std]))
+    laser_input.append(np.array([photon_energy, photon_std, mu, sigma, amplitude[i]]))
 
 
 # Define work function matrix
