@@ -40,7 +40,7 @@ contains
 
     ! Function that checks the boundary conditions for the System
     ptr_Check_Boundary => Check_Boundary_ElecHole_Planar
-
+    
     ! Function for the electric field in the system
     ptr_field_E => field_E_planar
 
@@ -60,6 +60,7 @@ contains
           stop
         end if
 
+        print '(a)', 'Vacuum: Doing spot emission'
         call Read_Spots_File()
       end if
     end do
@@ -72,31 +73,47 @@ contains
   ! Read in the file for the spot emission
   ! Reads x and y coords in nm and radius in nm
   subroutine Read_Spots_File()
-    integer :: i
+    integer        :: i, IFAIL
+    integer        :: ud_spot
+    character(256) :: iomsg
+
+    open(newunit=ud_spot, iostat=IFAIL, iomsg=iomsg, file='w_spots', &
+       & status='OLD', form='FORMATTED', access='SEQUENTIAL', action='READ')
+    if (IFAIL /= 0) then
+      print *, 'Vacuum: Failed to open file w_spots. ABORTING'
+      print *, IFAIL
+      print *, iomsg
+      stop
+    end if
+
+    read(unit=ud_spot, FMT=*) num_spots
+    print '(a)', 'Vacuum: Reading spot file'
     
-    num_spots = 3
+    !num_spots = 3
 
     allocate(spot_pos(1:2, 1:num_spots))
     allocate(spot_radius_sq(1:num_spots))
 
-    !do i = 1, num_spots
-
-    !end do
+    do i = 1, num_spots
+      read(unit=ud_spot, FMT=*) spot_pos(1:2, i), spot_radius_sq(i)
+      spot_pos(1:2, i) = spot_pos(1:2, i) * length_scale
+      spot_radius_sq(i) = (spot_radius_sq(i) * length_scale)**2
+    end do
 
     ! 1
-    spot_pos(1, 1) = 30.0*length_scale
-    spot_pos(2, 1) = 20.0*length_scale
-    spot_radius_sq(1) = (5.0*length_scale)**2
+    !spot_pos(1, 1) = 30.0*length_scale
+    !spot_pos(2, 1) = 20.0*length_scale
+    !spot_radius_sq(1) = (5.0*length_scale)**2
 
     ! 2
-    spot_pos(1, 2) = 3.0*length_scale
-    spot_pos(2, 2) = 65.0*length_scale
-    spot_radius_sq(2) = (5.3*length_scale)**2
+    !spot_pos(1, 2) = 3.0*length_scale
+    !spot_pos(2, 2) = 65.0*length_scale
+    !spot_radius_sq(2) = (5.3*length_scale)**2
 
     ! 3
-    spot_pos(1, 3) = 60.0*length_scale
-    spot_pos(2, 3) = 90.0*length_scale
-    spot_radius_sq(3) = (10.0*length_scale)**2
+    !spot_pos(1, 3) = 60.0*length_scale
+    !spot_pos(2, 3) = 90.0*length_scale
+    !spot_radius_sq(3) = (10.0*length_scale)**2
 
   end subroutine Read_Spots_File
 
@@ -117,7 +134,6 @@ contains
       if ((nrElecEmit >= maxElecEmit) .and. (maxElecEmit /= -1)) then
         exit
       end if
-
 
       if (nrElec == MAX_PARTICLES-1) then
         print *, 'WARNING: Reached maximum number of electrons!!!'
@@ -147,10 +163,6 @@ contains
           par_pos(3) = 1.0d0 * length_scale ! Place above plane
           par_vel = 0.0d0
           call Add_Particle(par_pos, par_vel, species_elec, step, emit, -1)
-
-          !print *, 'field = ', field
-          !pause
-          !call Add_Plane_Graph_emitt(par_pos, par_vel)
 
           nrElecEmit = nrElecEmit + 1
           nrEmitted_emitters(emit) = nrEmitted_emitters(emit) + 1
@@ -186,6 +198,10 @@ contains
 
       if (r_sq <= spot_radius_sq(i)) then
         Emit_From_Spot = .true. ! We emit from this position
+        !print *, par_pos(1:3)/length_scale
+        !print *, spot_radius_sq(i)/length_scale**2
+        !print *, h/length_scale, k/length_scale
+        !pause
         exit ! We can exit the loop. No need to check other spots
       end if
     end do
@@ -218,13 +234,15 @@ contains
       if (emitters_delay(i) < step) then
         select case (emitters_type(i))
         case (EMIT_CIRCLE)
-          !print *, 'Doing Circle'
+          print *, 'Doing Circle'
           call Do_Photo_Emission_Circle(step, i)
         case (EMIT_RECTANGLE)
-          !print *, 'Doing Rectangle'
+          print *, 'Doing Rectangle'
           call Do_Photo_Emission_Rectangle(step, i)
         case (EMIT_RECTANGLE_SPOTS)
-          call Do_Photo_Emission_Rectangle_Spot(step, i)
+          !print *, 'Doing spots'
+          !call Do_Photo_Emission_Rectangle_Spot(step, i)
+          call Do_Photo_Emission_Spot(step, i)
         case default
           print *, 'Vacuum: ERROR unknown emitter type!!'
           stop
