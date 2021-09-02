@@ -30,6 +30,10 @@ module mod_work_function
   double precision, allocatable, dimension(:) :: vor_w_theta   ! Work function in cell
   integer,          allocatable, dimension(:) :: vor_sec       ! The number for the section of the cell
 
+  ! Circles
+  integer                                     :: num_circles ! Number of circles
+
+
   ! Type of work function models
   integer, parameter :: WORK_CHECKBOARD = 1
   integer, parameter :: WORK_GAUSS      = 2
@@ -116,6 +120,7 @@ contains
     case (WORK_CIRCLE)
       print '(a)', 'Vacuum: Using circle work function model'
       ptr_Work_fun => w_theta_circle
+      !read(unit=ud_work, FMT=*) num_circles
     case (WORK_VORONOI)
       print '(a)', 'Vacuum: Using Voronoi work function model'
       ptr_Work_fun => w_theta_voronoi
@@ -261,7 +266,7 @@ contains
   r = sqrt(x**2 + y**2)
 
   if (r <= r_c) then
-    Check_in_circles = 2.00d0
+    Check_in_circles = 2.0d0
     sec = 1
   else if (r <= r_o) then
     Check_in_circles = 1.60d0
