@@ -333,18 +333,18 @@ module mod_global
       double precision, dimension(1:3) :: Get_Emission_Velocity
    end function Get_Emission_Velocity
 
-   function Get_Photon_Velocity()
-      double precision, dimension(1:3) :: Get_Photon_Velocity
-   end function Get_Photon_Velocity
+   function Get_Photo_Emission_Energy()
+      double precision, dimension(1:3) :: Get_Photo_Emission_Energy
+   end function Get_Photo_Emission_Energy
   end interface
 
   ! Pointers
-  procedure(Check_Boundary), pointer        :: ptr_Check_Boundary => null()
-  procedure(Electric_Field), pointer        :: ptr_field_E => null()
-  procedure(Do_Emission), pointer           :: ptr_Do_Emission => null()
-  procedure(Image_Charge_effect), pointer   :: ptr_Image_Charge_effect => null()
-  procedure(Get_Emission_Velocity), pointer :: ptr_Get_Emission_Velocity => null()
-  procedure(Get_Photon_Velocity), pointer   :: ptr_Get_Photon_Velocity => null()
+  procedure(Check_Boundary), pointer            :: ptr_Check_Boundary => null()
+  procedure(Electric_Field), pointer            :: ptr_field_E => null()
+  procedure(Do_Emission), pointer               :: ptr_Do_Emission => null()
+  procedure(Image_Charge_effect), pointer       :: ptr_Image_Charge_effect => null()
+  procedure(Get_Emission_Velocity), pointer     :: ptr_Get_Emission_Velocity => null()
+  procedure(Get_Photo_Emission_Energy), pointer :: ptr_Get_Photo_Emission_Energy => null()
 contains
 
   ! Flush all files to disk

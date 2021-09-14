@@ -10,7 +10,7 @@
 module mod_photo_emission
   use mod_global
   use mod_verlet
-  use mod_velocity
+  !use mod_velocity
   use mod_pair
   use mod_work_function
   implicit none
@@ -42,81 +42,81 @@ module mod_photo_emission
 
 contains
 
-subroutine Read_laser_parameters()
-  integer :: ud_laser, IFAIL
-  character(256) :: iomsg
+  subroutine Read_laser_parameters()
+    integer :: ud_laser, IFAIL
+    character(256) :: iomsg
 
-  ! Open the file that contains information about the work function
-  open(newunit=ud_laser, iostat=IFAIL, iomsg=iomsg, file='laser', &
-    & status='OLD', form='FORMATTED', access='SEQUENTIAL', action='READ')
-  if (IFAIL /= 0) then
-    print *, 'Vacuum: Failed to open file laser. ABORTING'
-    print *, IFAIL
-    print *, iomsg
-    stop
-  end if
-
-  ! Read the type of laser pulse and photon velocity model to use
-  read(unit=ud_laser, FMT=*) LASER_TYPE, PHOTON_MODE
-
-  SELECT CASE (LASER_TYPE)
-    case (LASER_GAUSS)
-      ! Gaussian Pulse enabled
-      print '(a)', 'Vacuum: Using Gaussian pulse model'
-      EmitGauss = .TRUE.
-      SELECT CASE (PHOTON_MODE)
-        case (PHOTON_ZERO)    
-          ptr_Get_Emission_Velocity => Get_Zero_Photon_Velocity
-          print '(a)', 'Vacuum: Using zero inital velocity' 
-          ! Read mean and std photon energy from the file
-          read(unit=ud_laser, FMT=*) laser_energy, laser_variation
-          ! Read Gaussian parameters from the file (mu, std and Amplitude) 
-          read(unit=ud_laser, FMT=*) Gauss_pulse_center, Gauss_pulse_width, Gauss_pulse_amplitude
-
-        case (PHOTON_MB)
-          ptr_Get_Emission_Velocity => Get_Photon_Energy
-          print '(a)', 'Vacuum: Using normal energy distribution for photons'
-          ! Read mean and std photon energy from the file
-          read(unit=ud_laser, FMT=*) laser_energy, laser_variation
-          ! Read Gaussian parameters from the file (mu, std and Amplitude) 
-          read(unit=ud_laser, FMT=*) Gauss_pulse_center, Gauss_pulse_width, Gauss_pulse_amplitude
-          ! print *, Gauss_pulse_center, Gauss_pulse_width, Gauss_pulse_amplitude, laser_energy, laser_variation
-        case DEFAULT
-          print '(a)', 'Vacuum: ERROR UNKNOWN PHOTON MODE'
-          print *, PHOTON_MODE
-          stop
-      END SELECT  
-
-
-    case (LASER_SQUARE)
-      ! Square Pulse
-      print '(a)', 'Vacuum: Using standard emission model'
-      !ptr_Laser_fun => laser
-      SELECT CASE (PHOTON_MODE)
-        case (PHOTON_ZERO)
-          ptr_Get_Emission_Velocity => Get_Zero_Photon_Velocity
-          print '(a)', 'Vacuum: Using zero inital velocity'    
-          ! Read mean and std photon energy from the file
-          read(unit=ud_laser, FMT=*) laser_energy, laser_variation
-
-        case (PHOTON_MB)
-          ptr_Get_Emission_Velocity => Get_Photon_Energy
-          print '(a)', 'Vacuum: Using normal energy distribution for photons'
-          ! Read mean and std photon energy from the file
-          read(unit=ud_laser, FMT=*) laser_energy, laser_variation
-        case DEFAULT
-          print '(a)', 'Vacuum: ERROR UNKNOWN PHOTON MODE'
-          print *, PHOTON_MODE
-          stop
-      END SELECT
-    case DEFAULT
-      print '(a)', 'Vacuum: ERROR UNKNOWN LASER TYPE'
-      print *, LASER_TYPE
+    ! Open the file that contains information about the work function
+    open(newunit=ud_laser, iostat=IFAIL, iomsg=iomsg, file='laser', &
+      & status='OLD', form='FORMATTED', access='SEQUENTIAL', action='READ')
+    if (IFAIL /= 0) then
+      print *, 'Vacuum: Failed to open file laser. ABORTING'
+      print *, IFAIL
+      print *, iomsg
       stop
-  END SELECT
+    end if
 
-  close(unit=ud_laser)
-end subroutine Read_laser_parameters
+    ! Read the type of laser pulse and photon velocity model to use
+    read(unit=ud_laser, FMT=*) LASER_TYPE, PHOTON_MODE
+
+    SELECT CASE (LASER_TYPE)
+      case (LASER_GAUSS)
+        ! Gaussian Pulse enabled
+        print '(a)', 'Vacuum: Using Gaussian pulse model'
+        EmitGauss = .TRUE.
+        SELECT CASE (PHOTON_MODE)
+          case (PHOTON_ZERO)    
+            ptr_Get_Photo_Emission_Energy => Get_Zero_Photon_Velocity
+            print '(a)', 'Vacuum: Using zero inital velocity' 
+            ! Read mean and std photon energy from the file
+            read(unit=ud_laser, FMT=*) laser_energy, laser_variation
+            ! Read Gaussian parameters from the file (mu, std and Amplitude) 
+            read(unit=ud_laser, FMT=*) Gauss_pulse_center, Gauss_pulse_width, Gauss_pulse_amplitude
+
+          case (PHOTON_MB)
+            ptr_Get_Photo_Emission_Energy => Get_Laser_Energy
+            print '(a)', 'Vacuum: Using normal energy distribution for photons'
+            ! Read mean and std photon energy from the file
+            read(unit=ud_laser, FMT=*) laser_energy, laser_variation
+            ! Read Gaussian parameters from the file (mu, std and Amplitude) 
+            read(unit=ud_laser, FMT=*) Gauss_pulse_center, Gauss_pulse_width, Gauss_pulse_amplitude
+            ! print *, Gauss_pulse_center, Gauss_pulse_width, Gauss_pulse_amplitude, laser_energy, laser_variation
+          case DEFAULT
+            print '(a)', 'Vacuum: ERROR UNKNOWN PHOTON MODE'
+            print *, PHOTON_MODE
+            stop
+        END SELECT  
+
+
+      case (LASER_SQUARE)
+        ! Square Pulse
+        print '(a)', 'Vacuum: Using standard emission model'
+        !ptr_Laser_fun => laser
+        SELECT CASE (PHOTON_MODE)
+          case (PHOTON_ZERO)
+            ptr_Get_Photo_Emission_Energy => Get_Zero_Photon_Velocity
+            print '(a)', 'Vacuum: Using zero inital velocity'    
+            ! Read mean and std photon energy from the file
+            read(unit=ud_laser, FMT=*) laser_energy, laser_variation
+
+          case (PHOTON_MB)
+            ptr_Get_Photo_Emission_Energy => Get_Laser_Energy
+            print '(a)', 'Vacuum: Using normal energy distribution for photons'
+            ! Read mean and std photon energy from the file
+            read(unit=ud_laser, FMT=*) laser_energy, laser_variation
+          case DEFAULT
+            print '(a)', 'Vacuum: ERROR UNKNOWN PHOTON MODE'
+            print *, PHOTON_MODE
+            stop
+        END SELECT
+      case DEFAULT
+        print '(a)', 'Vacuum: ERROR UNKNOWN LASER TYPE'
+        print *, LASER_TYPE
+        stop
+    END SELECT
+
+    close(unit=ud_laser)
+  end subroutine Read_laser_parameters
 
   subroutine Init_Photo_Emission()
     ! Allocate the number of emitters
@@ -270,7 +270,7 @@ end subroutine Read_laser_parameters
 
     ! Get emission velocity profile from mod_velocity 
     !(technically not velocity but energy distribution of the photons)
-    photon_energy = ptr_Get_Emission_Velocity() 
+    photon_energy = ptr_Get_Photo_Emission_Energy()
     ! Take only the z-component of the velocity profile
     p_eV = photon_energy(3)
     par_pos = 0.0d0
@@ -405,10 +405,10 @@ end subroutine Read_laser_parameters
     integer, intent(in)          :: step ! Current time step
     integer                      :: IFAIL
     double precision             :: b 
-
+    
     b = 1.0d0 / ( 2.0d0 * pi * Gauss_pulse_width**2 )
     !if (step <= 15000) then
-      Gauss_Emission = Gauss_pulse_amplitude * exp( -1.0d0 * b * (step - Gauss_pulse_center)**2 )
+    Gauss_Emission = Gauss_pulse_amplitude * exp( -1.0d0 * b * (step - Gauss_pulse_center)**2 )
     !else
     !  Gauss_Emission = A * exp( -1.0d0 * b * (step - mu2)**2 )
     !end if
@@ -432,20 +432,21 @@ end subroutine Read_laser_parameters
   ! 
   ! Box-Muller method for normal distribution of photon energies
   ! Input is read from laser file with mean and standard deviation (std) in electronVolts (eV)
-  function Get_Photon_Energy()
-    double precision, dimension(1:3) :: Get_Photon_Energy
+  function Get_Laser_Energy()
+    double precision, dimension(1:3) :: Get_Laser_Energy
     double precision, dimension(1:2) :: std
     double precision, dimension(1:2) :: mean
+
     mean = laser_energy
     std = laser_variation ! Standard deviation of the Maxwell-Boltzmann distribution
     
     ! Get normal distributed numbers.
     ! The Box Muller method gives two numbers.
     ! We overwrite the second element in the array.
-    Get_Photon_Energy(1:2) = box_muller(mean, std)
-    Get_Photon_Energy(2:3) = box_muller(mean, std)
+    Get_Laser_Energy(1:2) = box_muller(mean, std)
+    Get_Laser_Energy(2:3) = box_muller(mean, std)
 
-    Get_Photon_Energy(3) = abs(Get_Photon_Energy(3)) ! Positive velocity in the z-direction
-  end function Get_Photon_Energy
+    Get_Laser_Energy(3) = abs(Get_Laser_Energy(3)) ! Positive velocity in the z-direction
+  end function Get_Laser_Energy
 
 end module mod_photo_emission
