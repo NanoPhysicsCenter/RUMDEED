@@ -47,13 +47,12 @@ def Write_Input():
 
 # ----------------------------------------------------------------------------------------
 #N = 12*12 + 1
-N = 40 # Number of runs
-
-mu = 20000
-sigma = 50
-amplitude = np.linspace(0.01, 4, N)
-photon_energy = 4.7
-photon_std = 0.02
+N = 20 # Number of runs
+mu = 20000 # Position of pulse in steps
+sigma = 50 # Pulse width
+amplitude = np.linspace(10, 1000, N) # Amplitudes
+photon_energy = 4.7 # Energy of input laser
+photon_std = 0.02 # Standard deviation of input laser energy
 laser_input = []
 
 folders = []
