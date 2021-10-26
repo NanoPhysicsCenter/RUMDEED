@@ -10,6 +10,7 @@ module mod_unit_tests
   use mod_global
   use mod_pair
   use mod_verlet
+  use mod_field_emission_v2
   implicit none
 
   PRIVATE
@@ -23,8 +24,6 @@ module mod_unit_tests
   ! Constant used in MC integration
   double precision :: time_step_div_q0
 
-  double precision, parameter :: tolerance_rel = 0.02d0 ! 2% relative error tolerance
-  double precision, parameter :: tolerance_abs = 1.0d-6 ! absolute error tolerance 
 contains
   !-----------------------------------------------------------------------------
   ! Initialize the Field Emission
@@ -128,6 +127,8 @@ end subroutine Do_Unit_Test_Emission
 
 
   subroutine Run_Unit_Tests()
+    call Test_Field_Emission_Module()
+
     call Test_Acceleration_Without_Image_Charge()
 
     call Test_Image_Charge()

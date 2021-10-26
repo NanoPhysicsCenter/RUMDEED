@@ -79,7 +79,17 @@ endif
 PROJECT_NAME=Vacuum-MD
 
 # makefile
-all: $(PROJECT_NAME).out
+all: $(PROJECT_NAME).out unit_test.out
+
+unit_test.out: $(PROJECT_NAME).out ../src/unit_tests.F90
+			$(FC) $(FFLAGS) -D_GIT_VERSION_=\"${GIT_VERSION}\" \
+			../src/unit_tests.F90 mod_global.o mod_verlet.o mod_pair.o \
+			mod_unit_tests.o mod_photo_emission.o mod_field_emission.o mod_field_emission_v2.o \
+			mod_field_thermo_emission.o mod_kevin_rjgtf.o \
+			mod_emission_tip.o mod_hyperboloid_tip.o mod_field_emission_2D.o \
+			mod_work_function.o mod_collisions.o \
+			mod_velocity.o mod_manual_emission.o \
+			$(CUBA_LIB) -lpthread -lm -ldl -o unit_test.out
 
 $(PROJECT_NAME).out: ../src/main.F90 ../cuba/lib/libcuba.a \
 			mod_global.mod mod_global.o \
@@ -121,7 +131,7 @@ mod_verlet.mod mod_verlet.o: ../src/mod_verlet.F90 mod_global.mod mod_pair.mod m
 mod_pair.mod mod_pair.o: ../src/mod_pair.F90 mod_global.mod
 		$(FC) -c $(FFLAGS) ../src/mod_pair.F90
 
-mod_unit_tests.mod mod_unit_tests.o: ../src/mod_unit_tests.f90 mod_global.mod mod_verlet.mod mod_pair.mod
+mod_unit_tests.mod mod_unit_tests.o: ../src/mod_unit_tests.f90 mod_global.mod mod_verlet.mod mod_pair.mod mod_field_emission_v2.mod
 		$(FC) -c $(FFLAGS) ../src/mod_unit_tests.f90
 
 mod_photo_emission.mod mod_photo_emission.o: ../src/mod_photo_emission.f90 mod_global.mod mod_verlet.mod mod_pair.mod mod_velocity.mod
@@ -180,6 +190,7 @@ clean:
 		rm -f *.mod
 		rm -f *.smod
 		rm -f $(PROJECT_NAME).out
+		rm -f unit_test.out
 		rm -f $(CUBA_LIB)
 		rm -f ../cuba/4.2.1/libcuba.a
 		cd ../cuba/4.2.1/ && make clean

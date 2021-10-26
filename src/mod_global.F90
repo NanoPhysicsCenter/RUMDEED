@@ -295,6 +295,10 @@ module mod_global
   logical            :: cought_stop_signal = .false. ! If true we stop the main loop
   integer, parameter :: SIGINT = 2 ! Interrupt signal (Ctrl+C)
 
+  ! Units tests
+  double precision, parameter :: tolerance_rel = 0.02d0 ! 2% relative error tolerance
+  double precision, parameter :: tolerance_abs = 1.0d-6 ! absolute error tolerance 
+
 
   ! ----------------------------------------------------------------------------
   ! Define namelist for the input file

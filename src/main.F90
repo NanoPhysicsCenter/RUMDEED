@@ -266,7 +266,7 @@ contains
     close(unit=ud_input, iostat=IFAIL, status='keep')
 
     ! box_dim: Dimensions of the system
-    ! d: Gap spacing
+    ! d: Gap spacingelse
     box_dim = box_dim * length_scale
     d = box_dim(3)
 

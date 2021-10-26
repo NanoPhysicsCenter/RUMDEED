@@ -13,7 +13,8 @@ Module mod_field_emission_v2
   implicit none
 
   PRIVATE
-  PUBLIC :: Init_Field_Emission_v2, Clean_Up_Field_Emission_v2, t_y, v_y, Escape_Prob, F_avg, Elec_Supply_V2
+  PUBLIC :: Init_Field_Emission_v2, Clean_Up_Field_Emission_v2, t_y, v_y, Escape_Prob, F_avg, Elec_Supply_V2, &
+            Test_Field_Emission_Module
 
   ! ----------------------------------------------------------------------------
   ! Variables
@@ -1309,5 +1310,42 @@ end function Escape_Prob_log
   !subroutine Adaptive_MH_log()
     
   !end subroutine
+
+  subroutine Test_Field_Emission_Module()
+    double precision :: results_scalar, F
+    double precision, dimension(1:3) :: pos
+    integer :: emit, sec
+    ! Test v_y
+    ! Test t_y
+    ! Test Escape_Prob
+    ! Test Elec_Supply_V2
+    ! Test check_limits_metro_rec
+
+    ! Set the work function
+    ptr_Work_fun => FE_Test_Work_fun
+
+    ! v_y(F, pos, emit)
+
+    ! Test 1 for v_y. Normal test
+    F = 2.0d3 / (1000.0d-9) ! V/d, 2 kV and 1000 nm
+    pos = (/ 0.0d0, 0.0d0, 0.0d0 /)
+    emit = 1
+    results_scalar = v_y(F, pos, emit)
+    if (abs(results_scalar - 0.8253581935658024) < tolerance_abs) then
+      print *, 'v_y PASSED'
+    else
+      print *, 'v_y FAILED'
+    end if
+
+  end subroutine Test_Field_Emission_Module
+
+  ! Set a constant work function for tests
+  double precision function FE_Test_Work_fun(pos, emit, sec)
+    double precision, dimension(1:3), intent(in) :: pos
+    integer, intent(in)                          :: emit
+    integer, intent(out), optional               :: sec
+
+    FE_Test_Work_fun = 4.7d0
+  end function FE_Test_Work_fun
 
 end Module mod_field_emission_v2

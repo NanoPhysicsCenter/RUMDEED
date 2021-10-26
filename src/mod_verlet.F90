@@ -678,7 +678,7 @@ contains
     V_rf = 0.0d0
     E_z = -1.0d0*V_d/d
 
-    T_temp = 300.0d0 + (1250.0d0 - 300.0d0) * step /steps
+    T_temp = 300.0d0 + (1250.0d0 - 300.0d0) * step / steps
 
     write (ud_volt, "(ES12.4, tr2, i8, tr2, ES18.8, tr2, ES18.8)", iostat=IFAIL) &
           & cur_time, step, V_d, V_rf, T_temp
