@@ -10,3 +10,4 @@ __genmod.f90
 *.out
 input
 run.sh
+Vacuum-MD.code-workspace
