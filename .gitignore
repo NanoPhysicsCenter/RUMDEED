@@ -8,6 +8,6 @@ __genmod.f90
 *.mp4
 *.swp
 *.out
+*.code-workspace
 input
 run.sh
-Vacuum-MD.code-workspace
