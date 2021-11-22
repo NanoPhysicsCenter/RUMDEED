@@ -10,4 +10,4 @@ __genmod.f90
 *.out
 *.code-workspace
 input
-run.sh
+Run.sh
