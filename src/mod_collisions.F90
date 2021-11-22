@@ -34,7 +34,7 @@ contains
     integer                          :: count_n
     double precision                 :: cross_tot, cross_ion
     double precision                 :: d ! The distance traveled
-    double precision                 :: rnd, alpha, ion_life_variable
+    double precision                 :: rnd, alpha
     double precision                 :: vel2             ! Squared velocity of the current particle
     double precision, parameter      :: e_max = 0.10d0    ! Max value of the coefficient of restitution
     integer                          :: i, nrColl, IFAIL, nrIon
@@ -168,8 +168,8 @@ contains
               !alpha = -0.13843690559395497E-12 / time_step
               !call random_number(rnd)
               !ion_life_time = NINT(alpha*log(1.0d0 - rnd))
-              call random_number(ion_life_variable)
-              ion_life_time = ion_life_variable*1000
+              call random_number(rnd)
+              ion_life_time = rnd*1000
               
 
               !$OMP CRITICAL
