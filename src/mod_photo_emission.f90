@@ -91,7 +91,7 @@ contains
       case (LASER_SQUARE)
         ! Square Pulse
         print '(a)', 'Vacuum: Using standard emission model'
-        !ptr_Laser_fun => laser
+        ! ptr_Laser_fun => laser
         SELECT CASE (PHOTON_MODE)
           case (PHOTON_ZERO)
             ptr_Get_Photo_Emission_Energy => Get_Zero_Photon_Velocity
@@ -401,9 +401,10 @@ contains
   ! Gives a Gaussian emission curve
   ! where step is the current time step
   ! returns the number of electrons allowed to be emitted in that time step
+  ! Needs rework from if to case for pulse series input - Hákon 15.12.21
   double precision function Gauss_Emission(step)
     integer, intent(in)          :: step ! Current time step
-    integer                      :: IFAIL
+    !integer                      :: IFAIL
     double precision             :: b 
     
     b = 1.0d0 / ( 2.0d0 * pi * Gauss_pulse_width**2 )
