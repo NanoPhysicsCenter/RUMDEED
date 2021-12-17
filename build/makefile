@@ -116,7 +116,13 @@ $(PROJECT_NAME).out: ../src/main.F90 ../cuba/lib/libcuba.a \
 			mod_velocity.o mod_manual_emission.o \
 			$(CUBA_LIB) -lpthread -lm -ldl -o $(PROJECT_NAME).out
 
-../cuba/lib/libcuba.a:
+../cuba/Cuba-4.2.1.tar.gz:
+		cd ../cuba/; wget http://www.feynarts.de/cuba/Cuba-4.2.1.tar.gz
+
+../cuba/Cuba-4.2.1/cuba.h: ../cuba/Cuba-4.2.1.tar.gz
+		cd ../cuba/; tar -xvzf Cuba-4.2.1.tar.gz
+
+../cuba/lib/libcuba.a: ../cuba/Cuba-4.2.1/cuba.h
 		cd ../cuba/; chmod +x ./install-cuba.sh; ./install-cuba.sh ${CC} ${FC}
 
 mod_global.mod mod_global.o: ../src/mod_global.F90

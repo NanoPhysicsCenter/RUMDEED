@@ -473,7 +473,7 @@ end function Escape_Prob_log
   double precision   :: epsabs = 0.25d0 ! Requested absolute error
   integer            :: flags = 0+4 ! Flags
   integer            :: seed = 0 ! Seed for the rng. Zero will use Sobol.
-  integer            :: mineval = 10000 ! Minimum number of integrand evaluations
+  integer            :: mineval = 75000 ! Minimum number of integrand evaluations
   integer            :: maxeval = 10000000 ! Maximum number of integrand evaluations
 
   ! Divonne specific
