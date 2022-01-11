@@ -8,6 +8,6 @@
 		"fortran.includePaths": [
 			"/home/kristor/Work/Vacuum-MD/build"
 		],
-		"jupyter.jupyterServerType": "remote"
+		"jupyter.jupyterServerType": "local"
 	}
 }
