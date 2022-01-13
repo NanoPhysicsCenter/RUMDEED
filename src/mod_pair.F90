@@ -31,7 +31,7 @@ contains
   ! step: The current time step, i.e. when the particle is emitted
   ! emit: The number of the emitter that the particle came from
   subroutine Add_Particle(par_pos, par_vel, par_species, step, emit, life, opt_sec)
-    double precision, dimension(1:3), intent(in) :: par_pos, par_vel
+    double precision, dimension(1:3), intent(in) :: par_pos,     par_vel
     integer, intent(in)                          :: par_species, step, emit, life
     integer, intent(in), optional                :: opt_sec
     integer                                      :: sec
@@ -55,19 +55,19 @@ contains
       end if
 
       ! Add the particle
-      particles_cur_pos(:, nrPart+1) = par_pos
-      particles_prev_pos(:, nrPart+1) = -1.0d0*length_scale
+      particles_cur_pos(:, nrPart+1)      = par_pos
+      particles_prev_pos(:, nrPart+1)     = -1.0d0*length_scale
       particles_last_col_pos(:, nrPart+1) = par_pos
-      particles_cur_accel(:, nrPart+1) = 0.0d0
-      particles_prev_accel(:, nrPart+1) = 0.0d0
-      particles_prev2_accel(:, nrPart+1) = 0.0d0
-      particles_cur_vel(:, nrPart+1) = par_vel
-      particles_step(nrPart+1) = step
-      particles_mask(nrPart+1) = .true.
-      particles_species(nrPart+1) = par_species
-      particles_emitter(nrPart+1) = emit
-      particles_section(nrPart+1) = sec
-      particles_life(nrPart+1) = life
+      particles_cur_accel(:, nrPart+1)    = 0.0d0
+      particles_prev_accel(:, nrPart+1)   = 0.0d0
+      particles_prev2_accel(:, nrPart+1)  = 0.0d0
+      particles_cur_vel(:, nrPart+1)      = par_vel
+      particles_step(nrPart+1)            = step
+      particles_mask(nrPart+1)            = .true.
+      particles_species(nrPart+1)         = par_species
+      particles_emitter(nrPart+1)         = emit
+      particles_section(nrPart+1)         = sec
+      particles_life(nrPart+1)            = life
 
       if (par_species == species_elec) then ! Electron
         particles_charge(nrPart+1) = -1.0d0*q_0

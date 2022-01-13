@@ -19,26 +19,26 @@ module mod_photo_emission
   ! Variables
   integer, dimension(:), allocatable          :: nrEmitted_emitters
   integer                                     :: posInit
-  logical                                     :: EmitGauss = .FALSE.
-  integer                                     :: maxElecEmit = -1
+  logical                                     :: EmitGauss                  = .FALSE.
+  integer                                     :: maxElecEmit                = -1
   integer                                     :: nrEmitted
   integer                                     :: LASER_TYPE, PHOTON_MODE
-  double precision                            :: laser_energy ! Photon energy in eV
-  double precision                            :: laser_variation ! std of photon energy in eV
-  double precision                            :: Gauss_pulse_center ! mu
-  double precision                            :: Gauss_pulse_width ! sigma
-  double precision                            :: Gauss_pulse_amplitude ! A
+  double precision                            :: laser_energy               ! Photon energy in eV
+  double precision                            :: laser_variation            ! Standard deviation of photon energy in eV
+  double precision                            :: Gauss_pulse_center         ! mu
+  double precision                            :: Gauss_pulse_width          ! sigma
+  double precision                            :: Gauss_pulse_amplitude      ! A
   !integer                                     :: ud_gauss
 
   ! ----------------------------------------------------------------------------
   ! Parameters
   integer, parameter                          :: MAX_EMISSION_TRY = 100
-  ! Type of laser input
+  ! Type of laser input pulse
   integer, parameter                          :: LASER_GAUSS      = 1
   integer, parameter                          :: LASER_SQUARE     = 2  
-  ! Type of photon initial velocity
-  integer, parameter                          :: PHOTON_ZERO  = 1
-  integer, parameter                          :: PHOTON_MB    = 2
+  ! Type of photon initial velocity distribution
+  integer, parameter                          :: PHOTON_ZERO      = 1
+  integer, parameter                          :: PHOTON_MB        = 2
 
 contains
 
@@ -49,11 +49,13 @@ contains
     ! Open the file that contains information about the work function
     open(newunit=ud_laser, iostat=IFAIL, iomsg=iomsg, file='laser', &
       & status='OLD', form='FORMATTED', access='SEQUENTIAL', action='READ')
+      
     if (IFAIL /= 0) then
       print *, 'Vacuum: Failed to open file laser. ABORTING'
       print *, IFAIL
       print *, iomsg
       stop
+
     end if
 
     ! Read the type of laser pulse and photon velocity model to use
@@ -61,9 +63,10 @@ contains
 
     SELECT CASE (LASER_TYPE)
       case (LASER_GAUSS)
-        ! Gaussian Pulse enabled
+        ! Gaussian pulse
         print '(a)', 'Vacuum: Using Gaussian pulse model'
         EmitGauss = .TRUE.
+
         SELECT CASE (PHOTON_MODE)
           case (PHOTON_ZERO)    
             ptr_Get_Photo_Emission_Energy => Get_Zero_Photon_Velocity
@@ -89,9 +92,10 @@ contains
 
 
       case (LASER_SQUARE)
-        ! Square Pulse
+        ! Square pulse
         print '(a)', 'Vacuum: Using standard emission model'
         ! ptr_Laser_fun => laser
+
         SELECT CASE (PHOTON_MODE)
           case (PHOTON_ZERO)
             ptr_Get_Photo_Emission_Energy => Get_Zero_Photon_Velocity
@@ -104,15 +108,19 @@ contains
             print '(a)', 'Vacuum: Using normal energy distribution for photons'
             ! Read mean and std photon energy from the file
             read(unit=ud_laser, FMT=*) laser_energy, laser_variation
+
           case DEFAULT
             print '(a)', 'Vacuum: ERROR UNKNOWN PHOTON MODE'
             print *, PHOTON_MODE
             stop
+
         END SELECT
+
       case DEFAULT
         print '(a)', 'Vacuum: ERROR UNKNOWN LASER TYPE'
         print *, LASER_TYPE
         stop
+
     END SELECT
 
     close(unit=ud_laser)
@@ -151,7 +159,7 @@ contains
     integer             :: i, IFAIL
     double precision    :: cur_time
 
-    posInit = 0
+    posInit            = 0
     nrEmitted_emitters = 0
 
     !if (step > 2) then
@@ -171,19 +179,26 @@ contains
 
       ! Check the type of the emitter CIRCLE / RECTANGLE
       if (emitters_delay(i) < step) then
+
         select case (emitters_type(i))
+
         case (EMIT_CIRCLE)
           !print *, 'Doing Circle'
           call Do_Photo_Emission_Circle(step, i)
+
         case (EMIT_RECTANGLE)
           !print *, 'Doing Rectangle'
           call Do_Photo_Emission_Rectangle(step, i)
+
         case default
           print *, 'Vacuum: ERROR unknown emitter type!!'
           stop
           print *, emitters_type(i)
+
         end select
+
       end if
+
     end do
 
     cur_time = time_step * step / time_scale ! Scaled in units of time_scale
@@ -193,10 +208,10 @@ contains
   end subroutine Do_Photo_Emission
 
   subroutine Do_Photo_Emission_Circle(step, emit)
-    integer, intent(in)              :: step, emit
+    integer, intent(in)              :: step,       emit
     integer                          :: nrElecEmit, nrTry
-    double precision, dimension(1:3) :: par_pos, par_vel, field
-    double precision                 :: r_e, theta_e
+    double precision, dimension(1:3) :: par_pos,    par_vel, field
+    double precision                 :: r_e,        theta_e
 
     par_pos = 0.0d0
     nrTry = 0
@@ -255,7 +270,9 @@ contains
         nrElecEmit = nrElecEmit + 1
         nrEmitted_emitters(emit) = nrEmitted_emitters(emit) + 1
         nrTry = 0
+
       end if
+
     end do
 
     posInit = posInit + nrElecEmit
@@ -263,9 +280,9 @@ contains
   end subroutine Do_Photo_Emission_Circle
 
   subroutine Do_Photo_Emission_Rectangle(step, emit)
-    integer, intent(in)              :: step, emit
+    integer, intent(in)              :: step,       emit
     integer                          :: nrElecEmit, nrTry
-    double precision, dimension(1:3) :: par_pos, par_vel, field, photon_energy
+    double precision, dimension(1:3) :: par_pos,    par_vel, field, photon_energy
     double precision                 :: p_eV
 
     ! Get emission velocity profile from mod_velocity 

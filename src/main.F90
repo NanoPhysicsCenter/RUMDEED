@@ -343,17 +343,17 @@ contains
     allocate(density_map_elec(1:N_x_densmap, 1:N_y_densmap))
     allocate(density_map_hole(1:N_x_densmap, 1:N_y_densmap))
 
-    particles_cur_pos = 0.0d0
-    particles_prev_pos = 0.0d0
-    particles_cur_vel = 0.0d0
-    particles_cur_accel = 0.0d0
-    particles_prev_accel = 0.0d0
+    particles_cur_pos     = 0.0d0
+    particles_prev_pos    = 0.0d0
+    particles_cur_vel     = 0.0d0
+    particles_cur_accel   = 0.0d0
+    particles_prev_accel  = 0.0d0
     particles_prev2_accel = 0.0d0
-    particles_charge = 0.0d0
-    particles_species = 0
-    particles_mass = 0.0d0
-    particles_step = 0
-    particles_mask = .true.
+    particles_charge      = 0.0d0
+    particles_species     = 0
+    particles_mass        = 0.0d0
+    particles_step        = 0
+    particles_mask        = .true.
 
     ramo_current = 0.0d0
     ramo_current_emit(1:MAX_SECTIONS, 1:MAX_EMITTERS) = 0.0d0

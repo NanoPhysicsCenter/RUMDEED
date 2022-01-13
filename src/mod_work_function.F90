@@ -15,8 +15,8 @@ module mod_work_function
   double precision                                        :: x_len, y_len
 
   ! Gaussians
-  integer                                     :: num_gauss ! Number of Gaussian points
-  double precision                            :: w_theta_base
+  integer                                     :: num_gauss         ! Number of Gaussian points
+  double precision                            :: w_theta_base      ! Base workfunction
   double precision, allocatable, dimension(:) :: w_gaussians_A     ! Amplitude
   double precision, allocatable, dimension(:) :: w_gaussians_x     ! x - center
   double precision, allocatable, dimension(:) :: w_gaussians_y     ! y - center
@@ -24,11 +24,11 @@ module mod_work_function
   double precision, allocatable, dimension(:) :: w_gaussians_std_y ! standard deviation / spread in y
 
   ! Voronoi
-  integer                                     :: num_vor_sites ! Number of sites/cells in the Voronoi pattern
-  double precision, allocatable, dimension(:) :: vor_sites_x   ! x-position of a site
-  double precision, allocatable, dimension(:) :: vor_sites_y   ! y-position of a site
-  double precision, allocatable, dimension(:) :: vor_w_theta   ! Work function in cell
-  integer,          allocatable, dimension(:) :: vor_sec       ! The number for the section of the cell
+  integer                                     :: num_vor_sites     ! Number of sites/cells in the Voronoi pattern
+  double precision, allocatable, dimension(:) :: vor_sites_x       ! x-position of a site
+  double precision, allocatable, dimension(:) :: vor_sites_y       ! y-position of a site
+  double precision, allocatable, dimension(:) :: vor_w_theta       ! Work function in cell
+  integer,          allocatable, dimension(:) :: vor_sec           ! The number for the section of the cell
 
   ! Type of work function models
   integer, parameter :: WORK_CHECKBOARD = 1
