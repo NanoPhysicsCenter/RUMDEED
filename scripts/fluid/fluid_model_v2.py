@@ -17,7 +17,7 @@ from scipy.integrate import nquad, quad
 V_0 = 1250.0 # Voltage
 d = 1000.0E-9 # Gap spaceing
 N_L = 2
-L = np.linspace(100, 526.9556272193591, N_L) * 1.0E-9 # Length of emitter
+L = np.linspace(100.0, 1000.0, N_L) * 1.0E-9 # Length of emitter
 
 # Mixing weight
 x = 0.15
@@ -26,7 +26,7 @@ x = 0.15
 a_FN = e**2/(16*pi**2*hbar)
 b_FN = -4/(3*hbar) * np.sqrt(2*m_e*e)
 l_const = e / (4*pi*epsilon_0)
-w_theta = 1.60
+w_theta = 2.00
 
 E_vac = V_0 / d
 F = 1.0 # F is scaled in E_vac

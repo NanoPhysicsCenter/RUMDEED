@@ -1,6 +1,6 @@
 FCOMPILER=gfortran-8
 #FFLAGS=-Ofast -flto -march=native
-FFLAGS=-O3
+FFLAGS=-O3 -fdefault-double-8 -march=native
 
 all: GenThermField.out
 GenThermField.out: GenThermField.f90

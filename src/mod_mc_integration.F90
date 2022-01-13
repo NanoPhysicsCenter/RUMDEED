@@ -90,10 +90,10 @@ contains
     double precision   :: epsabs = 1.0d-4 ! Requested absolute error
     integer            :: flags = 0+4 ! Flags
     integer            :: seed = 0 ! Seed for the rng. Zero will use Sobol.
-    integer            :: mineval = 10000 ! Minimum number of integrand evaluations
+    integer            :: mineval = 2000 ! Minimum number of integrand evaluations
     integer            :: maxeval = 5000000 ! Maximum number of integrand evaluations
-    integer            :: nnew = 2500 ! Number of integrand evaluations in each subdivision
-    integer            :: nmin = 1000 ! Minimum number of samples a former pass must contribute to a subregion to be considered in the region's compound integral value.
+    integer            :: nnew = 250 ! Number of integrand evaluations in each subdivision
+    integer            :: nmin = 100 ! Minimum number of samples a former pass must contribute to a subregion to be considered in the region's compound integral value.
     double precision   :: flatness = 5.0d0 ! Determine how prominently out-liers, i.e. samples with a large fluctuation, 
                                            ! figure in the total fluctuation, which in turn determines how a region is split up.
                                            ! As suggested by its name, flatness should be chosen large for 'flat" integrand and small for 'volatile' integrands

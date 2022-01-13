@@ -1,6 +1,0 @@
-[submodule "Util/Tip-IC"]
-	path = Util/Tip-IC
-	url = git@github.com:NanoPhysicsCenter/Tip-IC.git
-[submodule "manual"]
-	path = manual
-	url = git@github.com:NanoPhysicsCenter/Vacuum-Manual.git

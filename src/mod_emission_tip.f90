@@ -112,8 +112,6 @@ contains
     posInit = 0
     nrEmitted = 0
 
-    !print *, 'Emission from tip'
-    
     select case (emitters_type(1))
     case (1)
       ! Field emission
@@ -126,7 +124,6 @@ contains
     case (3)
       ! Photo emission
       call Do_Photo_Emission_Tip(step)
-      !print *, 'Photo'
 
     case default
       print *, 'Vacuum: ERROR unknown emitter type!!'
@@ -263,7 +260,7 @@ subroutine Do_Photo_Emission_Tip(step)
   double precision                 :: r_pos
   double precision                 :: xi, phi
   !double precision                 :: x, y, z
-  double precision, dimension(1:3) :: par_pos, par_vel, rnd_pos
+  double precision, dimension(1:3) :: par_pos, par_vel
   double precision, dimension(1:3) :: field, surf_norm
 
   emit = 1
@@ -290,13 +287,8 @@ subroutine Do_Photo_Emission_Tip(step)
       exit
     end if
 
-    !CALL RANDOM_NUMBER(par_pos(1:2)) ! Gives a random number [0,1]
+    CALL RANDOM_NUMBER(par_pos(1:2)) ! Gives a random number [0,1]
     ! Get random x and y coordinates
-    !par_pos(1:2) = par_pos(1:2)*R_base
-
-    CALL RANDOM_NUMBER(rnd_pos(1:2)) ! Gives a random number [-1,1]
-    ! Get random x and y coordinates
-    par_pos(1:2) = 2.0d0*rnd_pos(1:2)-1.0d0
     par_pos(1:2) = par_pos(1:2)*R_base
 
     ! Check if position is inside tip
@@ -323,7 +315,6 @@ subroutine Do_Photo_Emission_Tip(step)
 
         ! Place 1 nm above plane
         par_vel = 0.0d0
-        !par_vel(3) = sqrt((2 * ((p_eV - w_theta_xy(par_pos, emit))*q_0))/m_0) - Need to work out velocity
         call Add_Particle(par_pos, par_vel, species_elec, step, emit, -1)
 
         !print *, 'field = ', field
@@ -1349,5 +1340,4 @@ end function Elec_supply_tip
     Photon_Emission = Photo_pois/10000
 
   end function Photon_Emission
-  
 end module mod_emission_tip

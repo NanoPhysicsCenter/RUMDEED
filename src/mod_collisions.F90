@@ -40,7 +40,7 @@ contains
     integer                          :: i, nrColl, IFAIL, nrIon
     double precision                 :: KE ! Kinetic energy
     double precision                 :: cur_time
-    integer                          :: ion_life_time
+    integer                          :: life_time
 
     nrColl = 0
     nrIon = 0
@@ -52,9 +52,9 @@ contains
 
     !$OMP PARALLEL DO DEFAULT(NONE) &
     !$OMP& PRIVATE(i, cur_pos, prev_pos, d, alpha, rnd, par_vec, vel2, KE, mean_path, cross_tot, cross_ion) &
-    !$OMP& PRIVATE(old_vel, ion_life_time) &
+    !$OMP& PRIVATE(old_vel, life_time) &
     !$OMP& SHARED(nrPart, particles_species, particles_life, step, particles_cur_pos) &
-    !$OMP& SHARED(particles_prev_pos, particles_cur_vel, time_step, n_d) &
+    !$OMP& SHARED(particles_prev_pos, particles_cur_vel, time_step, n_d, ion_life_time) &
     !$OMP& REDUCTION(+:nrColl, count_n, mean_path_avg, nrIon)
     do i = 1, nrPart
       if (particles_species(i) /= species_elec) then
@@ -167,14 +167,12 @@ contains
               ! The half life is 0.13843690559395497 ps
               !alpha = -0.13843690559395497E-12 / time_step
               !call random_number(rnd)
-              !ion_life_time = NINT(alpha*log(1.0d0 - rnd))
-              call random_number(rnd)
-              ion_life_time = rnd*1000
-              
+              !life_time = NINT(alpha*log(1.0d0 - rnd))
+              life_time = ion_life_time
 
               !$OMP CRITICAL
               ! Add the new positively charged ion to the system
-              call Add_Particle(cur_pos, par_vec, species_hole, step, 1, step+ion_life_time) ! Ion
+              call Add_Particle(cur_pos, par_vec, species_hole, step, 1, step+life_time) ! Ion
               !$OMP END CRITICAL
 
               nrIon = nrIon + 1

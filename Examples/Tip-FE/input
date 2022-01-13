@@ -1,0 +1,18 @@
+&INPUT
+  V_S = 1.00d3,                      ! Voltage over the gap in volts
+  BOX_DIM = 0.0d0, 0.0d0, 1000.0d0,  ! N/A for tip
+  TIME_STEP = 0.25d-4,               ! Size of the time step in pico-seconds
+  STEPS = 50000,                     ! Number of steps to do in the simulation
+  EMISSION_MODE = 3,                 ! 3 = Field emission from prolate spheroidal tip
+  NREMIT = 1,                        ! Number of emitters in the system
+  IMAGE_CHARGE = .True.,             ! True means use image charge effects
+  N_IC_MAX = 1,                      ! N/A for tip
+  COLLISIONS = .False.,              ! Ion collisions with N2, still in development
+  T_temp = 293.15d0,                 ! Temperature for ion gas or cathode if thermal-field emission
+  P_abs = 1.0d0,                     ! Pressure for ion gas
+
+  EMITTERS_DIM(1:3, 1) = 1000.0d0, 250.0d0, 500.0d0, ! Dimensions of the emitter, for the Tip this is d_tip, R_base, h_tip
+  EMITTERS_POS(1:3, 1) = 0.0d0, 0.0d0, 0.0d0,        ! Ignored for tip
+  EMITTERS_TYPE(1) = 1,                              ! 1 = Normal tip, other number means reverse the voltage (not fully tested)
+  EMITTERS_DELAY(1) = 0,                             ! Ignored for tip
+/
