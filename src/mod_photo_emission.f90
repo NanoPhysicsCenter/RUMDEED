@@ -349,14 +349,12 @@ contains
         case (EMIT_RECTANGLE)
           print *, 'Doing Rectangle'
           call Do_Photo_Emission_Rectangle(step, i)
-<<<<<<< HEAD
 
-=======
         case (EMIT_RECTANGLE_SPOTS)
           !print *, 'Doing spots'
           !call Do_Photo_Emission_Rectangle_Spot(step, i)
           call Do_Photo_Emission_Spot(step, i)
->>>>>>> 3ed58614e99c68d86b02da9e172b47a20db3fafe
+          
         case default
           print *, 'Vacuum: ERROR unknown emitter type!!'
           stop
@@ -377,14 +375,9 @@ contains
   subroutine Do_Photo_Emission_Circle(step, emit)
     integer, intent(in)              :: step,       emit
     integer                          :: nrElecEmit, nrTry
-<<<<<<< HEAD
-    double precision, dimension(1:3) :: par_pos,    par_vel, field
-    double precision                 :: r_e,        theta_e
-=======
     double precision, dimension(1:3) :: par_pos, par_vel, field
-    !double precision                 :: r_e, theta_e
-    double precision                  :: r_e, r_e2, r2
->>>>>>> 3ed58614e99c68d86b02da9e172b47a20db3fafe
+    !double precision                :: r_e, theta_e
+    double precision                 :: r_e, r_e2, r2
 
     par_pos = 0.0d0
     nrTry = 0
