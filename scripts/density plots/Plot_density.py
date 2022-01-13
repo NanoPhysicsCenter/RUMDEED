@@ -9,7 +9,11 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 # Path to the folder with the density_emit.bin and density_absorb_top.bin files
+<<<<<<< HEAD
 filepath = '/home/hakon/Documents/FE Brynjar/input7/out/'
+=======
+filepath = './out/'
+>>>>>>> main
 
 # Full path with filename
 filename_emit = path.join(filepath, 'density_emit.bin') # density_emit.bin
@@ -42,6 +46,16 @@ g = g.plot_joint(sns.scatterplot)
 g = g.plot_joint(sns.kdeplot, cmap="Blues_d", alpha=0.75)
 g = g.plot_marginals(sns.kdeplot, shade=True)
 g.set_axis_labels('x [nm]', "y [nm]")
+g.fig.suptitle("Emission")
+plt.show()
+
+g = sns.jointplot(x=df_density_emit['x'], y=df_density_emit['y'], kind='hex')
+g.fig.suptitle("Emission")
+plt.show()
+
+g = sns.jointplot(x=df_density_emit['x'], y=df_density_emit['y'], kind='kde')
+g.set_axis_labels('x [nm]', 'y [nm]')
+g.fig.suptitle("Emission")
 plt.show()
 
 # Plot absorption data
@@ -50,4 +64,14 @@ g = g.plot_joint(sns.scatterplot)
 g = g.plot_joint(sns.kdeplot, cmap="Blues_d", alpha=0.75)
 g = g.plot_marginals(sns.kdeplot, shade=True)
 g.set_axis_labels('x [nm]', "y [nm]")
+g.fig.suptitle("Absorption")
+plt.show()
+
+g = sns.jointplot(x=df_density_abs['x'], y=df_density_abs['y'], kind='hex')
+g.fig.suptitle("Absorption")
+plt.show()
+
+g = sns.jointplot(x=df_density_abs['x'], y=df_density_abs['y'], kind='kde')
+g.set_axis_labels('x [nm]', 'y [nm]')
+g.fig.suptitle("Absorption")
 plt.show()

@@ -3,6 +3,7 @@
 ! Vacuum electronics molecular dynamics simulations
 !
 program VacuumMD
+! Vacuum
   use iso_fortran_env
 #if defined(_OPENMP)
   use omp_lib
@@ -15,7 +16,7 @@ program VacuumMD
   use mod_emission_tip
   use mod_field_emission_2D
   use mod_field_thermo_emission
-  use mod_therminoic_emission
+  !use mod_therminoic_emission
   use mod_pair
   use mod_unit_tests
   use mod_manual_emission
@@ -61,7 +62,7 @@ program VacuumMD
   SELECT CASE (EMISSION_MODE)
   case(EMISSION_UNIT_TEST)
     print '(a)', 'Vacuum: **** UNIT TESTING IS ACTIVE ****'
-    !call Init_Unit_Test()
+    call Init_Unit_Test()
   case(EMISSION_PHOTO)
     print '(a)', 'Vacuum: Doing Photo emission'
     call Init_Photo_Emission()
@@ -69,7 +70,7 @@ program VacuumMD
     print '(a)', 'Vacuum: Doing Field emission'
     call Init_Field_Emission()
   case(EMISSION_TIP)
-    print '(a)', 'Vacuum: Doing Emission from a tip'
+    print '(a)', 'Vacuum: Doing Field emission from a tip'
     call Init_Emission_Tip()
   case(EMISSION_FIELD_2D_2DEG_C, EMISSION_FIELD_2D_2DEG_NC, EMISSION_FIELD_2D_DIRAC_C, EMISSION_FIELD_2D_DIRAC_NC)
     print '(a)', 'Vacuum: Doing Field emission from 2D material'
@@ -81,7 +82,7 @@ program VacuumMD
     print '(a)', 'Vacuum: Doing General Field+Thermionic emission'
     call Init_Field_Thermo_Emission()
   case(EMISSION_FIELD_V2)
-    print '(a)', 'Vacuum: Doing Field emission DEV V2'
+    print '(a)', 'Vacuum: Doing Field emission V2'
     call Init_Field_Emission_v2()
   case(EMISSION_MANUAL)
     print '(a)', 'Vacuum: Doing manual emission'
@@ -119,7 +120,8 @@ program VacuumMD
     ! Update the position of all particles
     !print *, 'Update position'
     call Update_Position(i)
-    call Write_Position(i)
+    !call Write_Position(i)
+    call Write_Position_XYZ_Step(i)
 
     ! Remove particles from the system
     !print *, 'Remove particles'
@@ -183,7 +185,7 @@ program VacuumMD
   print '(a)', 'Vacuum: Emission clean up'
   SELECT CASE (EMISSION_MODE)
   case(EMISSION_UNIT_TEST)
-    !call Clean_Up_Unit_Test()
+    call Clean_Up_Unit_Test()
   case(EMISSION_PHOTO)
     call Clean_Up_Photo_Emission()
   case(EMISSION_FIELD)
@@ -264,7 +266,7 @@ contains
     close(unit=ud_input, iostat=IFAIL, status='keep')
 
     ! box_dim: Dimensions of the system
-    ! d: Gap spacing
+    ! d: Gap spacingelse
     box_dim = box_dim * length_scale
     d = box_dim(3)
 
@@ -317,6 +319,7 @@ contains
   ! allocate and initilize variables, open data files for writing, etc.
   subroutine Init()
     integer :: IFAIL
+    character(len=128)  :: filename
     !integer, dimension(:), allocatable :: my_seed
 
     ! Allocate arrays
@@ -418,7 +421,7 @@ contains
 #endif
 
     ! Set the number of cores Cuba should use to 0, i.e. no parallelization in cuba.
-    call cubacores(1, 1000)
+    call cubacores(0, 1000)
 
 
     ! Open data file for writing
@@ -539,6 +542,21 @@ contains
       print *, 'Vacuum: Failed to open file density_absorb_bin.dt. ABORTING'
       stop
     end if
+
+    !-------------------------------------------------------------------------------------
+    ! Files for planes
+    do i = 1, planes_N
+      if (planes_z(i) > 0.0d0) then
+        write(filename, '(a11, i0, a3)') 'out/planes-', i, '.dt'
+        open(newunit=planes_ud(i), iostat=IFAIL, file=filename, status='REPLACE', action='WRITE', access='STREAM')
+        if (IFAIL /= 0) then
+          print *, 'Vacuum: Failed to open file for planes. ABORTING'
+          stop
+        end if
+      else
+        planes_ud(i) = -1
+      end if
+    end do
 
   end subroutine Init
 
@@ -706,6 +724,7 @@ contains
   ! Clean up after the program
   ! Deallocate variables, close files, etc.
   subroutine Clean_up()
+    integer :: i
 
     ! Close file descriptors
     close(unit=ud_pos, status='keep')
@@ -727,6 +746,10 @@ contains
     close(unit=ud_density_ion, status='keep')
     close(unit=ud_density_absorb_top, status='keep')
     close(unit=ud_density_absorb_bot, status='keep')
+
+    do i = 1, planes_N
+      close(unit=planes_ud(i), status='keep')
+    end do
 
     ! Deallocate arrays
     deallocate(particles_cur_pos)

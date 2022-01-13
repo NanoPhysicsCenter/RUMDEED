@@ -139,6 +139,7 @@ module mod_global
   integer          :: steps      ! Number of time steps in the simulation
 
   logical          :: collisions = .false. ! Do ion colissions or not
+  integer          :: ion_life_time = 100000000 ! Lifetime of ions
 
   double precision :: T_temp = T_ntp ! Temperature in Kelvin
   double precision :: P_abs = P_ntp  ! Pressure as fraction of P_std
@@ -295,6 +296,10 @@ module mod_global
   logical            :: cought_stop_signal = .false. ! If true we stop the main loop
   integer, parameter :: SIGINT = 2 ! Interrupt signal (Ctrl+C)
 
+  ! Units tests
+  double precision, parameter :: tolerance_rel = 0.02d0 ! 2% relative error tolerance
+  double precision, parameter :: tolerance_abs = 1.0d-6 ! absolute error tolerance 
+
 
   ! ----------------------------------------------------------------------------
   ! Define namelist for the input file
@@ -304,7 +309,7 @@ module mod_global
                    emitters_type, emitters_delay, EMISSION_MODE, &
                    image_charge, N_ic_max, collisions, T_temp, P_abs, &
                    write_ramo_sec, write_position_file, R_s, &
-                   R_p, L_p, C_p, Num_per
+                   R_p, L_p, C_p, Num_per, ion_life_time
 
   ! ----------------------------------------------------------------------------
   ! Prodecure interfaces and pointers
@@ -345,6 +350,7 @@ module mod_global
   procedure(Image_Charge_effect), pointer       :: ptr_Image_Charge_effect => null()
   procedure(Get_Emission_Velocity), pointer     :: ptr_Get_Emission_Velocity => null()
   procedure(Get_Photo_Emission_Energy), pointer :: ptr_Get_Photo_Emission_Energy => null()
+
 contains
 
   ! Flush all files to disk

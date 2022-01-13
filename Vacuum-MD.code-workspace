@@ -8,7 +8,9 @@
 		}
 	],
 	"settings": {
-		"fortran.gfortranExecutable": "gfortran-8",
-		"fortran.includePaths": ["/home/kristor/Work/Vacuum-MD/build"]
+		"fortran.includePaths": [
+			"/home/kristor/Work/Vacuum-MD/build"
+		],
+		"jupyter.jupyterServerType": "local"
 	}
 }

@@ -13,6 +13,7 @@ module mod_photo_emission
   !use mod_velocity
   use mod_pair
   use mod_work_function
+  use mod_velocity
   implicit none
 
   ! ----------------------------------------------------------------------------
@@ -39,6 +40,12 @@ module mod_photo_emission
   ! Type of photon initial velocity
   integer, parameter                          :: PHOTON_ZERO  = 1
   integer, parameter                          :: PHOTON_MB    = 2
+
+  ! --
+  ! Spots
+  integer                                        :: num_spots
+  double precision, dimension(:, :), allocatable :: spot_pos ! Position of spots
+  double precision, dimension(:), allocatable    :: spot_radius_sq ! Radius squared of spots
 
 contains
 
@@ -119,12 +126,14 @@ contains
   end subroutine Read_laser_parameters
 
   subroutine Init_Photo_Emission()
+    integer :: i
+
     ! Allocate the number of emitters
     allocate(nrEmitted_emitters(1:nrEmit))
 
     ! Function that checks the boundary conditions for the System
     ptr_Check_Boundary => Check_Boundary_ElecHole_Planar
-
+    
     ! Function for the electric field in the system
     ptr_field_E => field_E_planar
 
@@ -138,6 +147,20 @@ contains
 
     call Read_laser_parameters()
     
+    ! Initial velocity
+    call Init_Emission_Velocity(VELOCITY_ZERO)
+
+    do i = 1, nrEmit
+      if (emitters_type(i) == EMIT_RECTANGLE_SPOTS) then
+        if (nrEmit > 1) then
+          print *, 'ERROR: nrEmit must be 1 when using EMIT_RECTANGLE_SPOTS'
+          stop
+        end if
+
+        print '(a)', 'Vacuum: Doing spot emission'
+        call Read_Spots_File()
+      end if
+    end do
   end subroutine Init_Photo_Emission
 
   subroutine Clean_Up_Photo_Emission()
@@ -145,6 +168,143 @@ contains
 
     call Work_fun_cleanup()
   end subroutine Clean_Up_Photo_Emission
+
+  ! Read in the file for the spot emission
+  ! Reads x and y coords in nm and radius in nm
+  subroutine Read_Spots_File()
+    integer        :: i, IFAIL
+    integer        :: ud_spot
+    character(256) :: iomsg
+
+    open(newunit=ud_spot, iostat=IFAIL, iomsg=iomsg, file='w_spots', &
+       & status='OLD', form='FORMATTED', access='SEQUENTIAL', action='READ')
+    if (IFAIL /= 0) then
+      print *, 'Vacuum: Failed to open file w_spots. ABORTING'
+      print *, IFAIL
+      print *, iomsg
+      stop
+    end if
+
+    read(unit=ud_spot, FMT=*) num_spots
+    print '(a)', 'Vacuum: Reading spot file'
+    
+    !num_spots = 3
+
+    allocate(spot_pos(1:2, 1:num_spots))
+    allocate(spot_radius_sq(1:num_spots))
+
+    do i = 1, num_spots
+      read(unit=ud_spot, FMT=*) spot_pos(1:2, i), spot_radius_sq(i)
+      spot_pos(1:2, i) = spot_pos(1:2, i) * length_scale
+      spot_radius_sq(i) = (spot_radius_sq(i) * length_scale)**2
+    end do
+
+    ! 1
+    !spot_pos(1, 1) = 30.0*length_scale
+    !spot_pos(2, 1) = 20.0*length_scale
+    !spot_radius_sq(1) = (5.0*length_scale)**2
+
+    ! 2
+    !spot_pos(1, 2) = 3.0*length_scale
+    !spot_pos(2, 2) = 65.0*length_scale
+    !spot_radius_sq(2) = (5.3*length_scale)**2
+
+    ! 3
+    !spot_pos(1, 3) = 60.0*length_scale
+    !spot_pos(2, 3) = 90.0*length_scale
+    !spot_radius_sq(3) = (10.0*length_scale)**2
+
+  end subroutine Read_Spots_File
+
+  subroutine Do_Photo_Emission_Spot(step, emit)
+    integer, intent(in)              :: step, emit
+    integer                          :: nrElecEmit, nrTry
+    double precision, dimension(1:3) :: par_pos, par_vel, field
+
+    par_pos = 0.0d0
+    nrTry = 0
+    nrElecEmit = 0
+    nrEmitted_emitters(emit) = 0
+
+    do while (nrTry <= MAX_EMISSION_TRY)
+
+      ! Check if we have reached the max number
+      ! of electrons to be emitted
+      if ((nrElecEmit >= maxElecEmit) .and. (maxElecEmit /= -1)) then
+        exit
+      end if
+
+      if (nrElec == MAX_PARTICLES-1) then
+        print *, 'WARNING: Reached maximum number of electrons!!!'
+        exit
+      end if
+
+      CALL RANDOM_NUMBER(par_pos(1:2)) ! Gives a random number [0,1]
+
+      par_pos(1:2) = emitters_pos(1:2, emit) + emitters_dim(1:2, emit)*par_pos(1:2)
+      !par_pos(2) = emitters_pos(2, emit) + emitters_dim(2, emit)*par_pos(2)
+
+      nrTry = nrTry + 1
+      par_pos(3) = 0.0d0 * length_scale !Check in plane
+
+      if (Emit_From_Spot(par_pos) .eqv. .false.) then
+        cycle ! We do not emit from this position
+      end if
+
+      field = Calc_Field_at(par_pos)
+
+      if (field(3) < 0.0d0) then
+        par_pos(3) = 1.0d0 * length_scale !Above plane
+        field = Calc_Field_at(par_pos)
+
+        if (field(3) < 0.0d0) then
+
+          par_pos(3) = 1.0d0 * length_scale ! Place above plane
+          par_vel = 0.0d0
+          call Add_Particle(par_pos, par_vel, species_elec, step, emit, -1)
+
+          nrElecEmit = nrElecEmit + 1
+          nrEmitted_emitters(emit) = nrEmitted_emitters(emit) + 1
+          nrTry = 0
+
+        end if
+      end if
+    end do
+
+    posInit = posInit + nrElecEmit
+    nrEmitted = nrEmitted + nrElecEmit
+  end subroutine Do_Photo_Emission_Spot
+
+  ! Return true if we are allowed to emit from this position
+  logical function Emit_From_Spot(par_pos)
+    double precision, dimension(1:3), intent(in) :: par_pos
+    integer                                      :: i
+    double precision                             :: r_sq, h, k, x, y
+
+    Emit_From_Spot = .false. ! Default to false
+
+    x = par_pos(1)
+    y = par_pos(2)
+
+    ! Loop through all spots
+    ! Equation for circle
+    ! (x-h)^2 + (y-k)^2 = r^2
+    do i = 1, num_spots
+      h = spot_pos(1, i)
+      k = spot_pos(2, i)
+
+      r_sq = (x - h)**2 + (y - k)**2
+
+      if (r_sq <= spot_radius_sq(i)) then
+        Emit_From_Spot = .true. ! We emit from this position
+        !print *, par_pos(1:3)/length_scale
+        !print *, spot_radius_sq(i)/length_scale**2
+        !print *, h/length_scale, k/length_scale
+        !pause
+        exit ! We can exit the loop. No need to check other spots
+      end if
+    end do
+  end function Emit_From_Spot
 
   subroutine Do_Photo_Emission(step)
     integer, intent(in) :: step
@@ -173,11 +333,15 @@ contains
       if (emitters_delay(i) < step) then
         select case (emitters_type(i))
         case (EMIT_CIRCLE)
-          !print *, 'Doing Circle'
+          print *, 'Doing Circle'
           call Do_Photo_Emission_Circle(step, i)
         case (EMIT_RECTANGLE)
-          !print *, 'Doing Rectangle'
+          print *, 'Doing Rectangle'
           call Do_Photo_Emission_Rectangle(step, i)
+        case (EMIT_RECTANGLE_SPOTS)
+          !print *, 'Doing spots'
+          !call Do_Photo_Emission_Rectangle_Spot(step, i)
+          call Do_Photo_Emission_Spot(step, i)
         case default
           print *, 'Vacuum: ERROR unknown emitter type!!'
           stop
@@ -196,31 +360,48 @@ contains
     integer, intent(in)              :: step, emit
     integer                          :: nrElecEmit, nrTry
     double precision, dimension(1:3) :: par_pos, par_vel, field
-    double precision                 :: r_e, theta_e
+    !double precision                 :: r_e, theta_e
+    double precision                  :: r_e, r_e2, r2
 
     par_pos = 0.0d0
     nrTry = 0
     nrElecEmit = 0
     nrEmitted_emitters(emit) = 0
 
-    do while ((nrTry <= MAX_EMISSION_TRY) .or. ((nrElecEmit >= maxElecEmit) .and. (maxElecEmit /= -1)))
-      ! Check if we have reached the max number
-      ! of electrons to be emitted
-      !if ((nrElecEmit >= maxElecEmit) .and. (maxElecEmit /= -1)) then
-      !  exit
-      !end if
+    do while (nrTry <= MAX_EMISSION_TRY)
+      ! Check if we have reached the max number of electrons to be emitted,
+      ! if we are using Gaussian limited emission.
+      if ((nrElecEmit >= maxElecEmit) .and. (EmitGauss .eqv. .True.)) then
+       exit
+      end if
 
-      !if (nrElec == MAX_PARTICLES-1) then
-      !  print *, 'WARNING: Reached maximum number of electrons!!!'
-      !  exit
-      !end if
+      ! Check if we have reached the maximum number of electrons.
+      ! If this happends then the parameter MAX_PARTICLES (in mod_gobal)
+      ! needs to be increased and the code recompiled.
+      if (nrElec == MAX_PARTICLES-1) then
+       print *, 'WARNING: Reached maximum number of electrons!!!'
+       exit
+      end if
 
-      CALL RANDOM_NUMBER(par_pos(1:2)) ! Gives a random number between 0 and 1
+      ! Find a random spot on the cathode.
+      r_e = emitters_dim(1, emit) ! Radius of emitter
+      r_e2 = r_e**2 ! Radius of emitter squared
+      r2 = r_e2 + 1.0d0 ! Must be larger then r_e2 for the do while loop to run
+      do while (r2 > r_e2)
+        CALL RANDOM_NUMBER(par_pos(1:2)) ! Gives a random number between 0 and 1
 
-      r_e = emitters_dim(1, emit) * par_pos(1)
-      theta_e = 2.0d0*pi * par_pos(2)
-      par_pos(1) = r_e * cos(theta_e) + emitters_pos(1, emit)
-      par_pos(2) = r_e * sin(theta_e) + emitters_pos(2, emit)
+        par_pos(1:2) = 2.0d0*(par_pos(1:2) - 0.5d0)*r_e ! Range is -r_e to +r_e
+        r2 = par_pos(1)**2 + par_pos(2)**2 ! Radius squared of our random point
+      end do
+
+
+      ! ! This does not give an equal distribution of random points on the circle
+      ! ! Rewrite to x and y random to accpect or reject if x^2+y^2<r^2
+      ! CALL RANDOM_NUMBER(par_pos(1:2)) ! Gives a random number between 0 and 1
+      ! r_e = emitters_dim(1, emit) * par_pos(1)
+      ! theta_e = 2.0d0*pi * par_pos(2)
+      ! par_pos(1) = r_e * cos(theta_e) + emitters_pos(1, emit)
+      ! par_pos(2) = r_e * sin(theta_e) + emitters_pos(2, emit)
 
       nrTry = nrTry + 1 ! Add one more try
       par_pos(3) = 0.0d0 * length_scale ! Check in plane
@@ -242,7 +423,8 @@ contains
         !CALL RANDOM_NUMBER(par_pos(3))
         !par_pos(3) = (par_pos(3) + 1.0d0)*0.5d0 * length_scale ! Place above plane
         par_pos(3) = 1.0d0*length_scale ! Place 1 nm above plane
-        par_vel = 0.0d0 ! Set the velocity
+        !par_vel = 0.0d0 ! Set the velocity
+        par_vel = ptr_Get_Emission_Velocity()
 
         ! Escape velocity from image charge partner
         !par_vel(3) = q_0 / sqrt(8.0d0*pi*epsilon_0*epsilon_r*m_0*par_pos(3)) 
@@ -339,6 +521,66 @@ contains
     posInit = posInit + nrElecEmit
     nrEmitted = nrEmitted + nrElecEmit
   end subroutine Do_Photo_Emission_Rectangle
+
+  ! Emission for a rectangular area with circular spots that are active.
+  subroutine Do_Photo_Emission_Rectangle_Spot(step, emit)
+    integer, intent(in)              :: step, emit
+    integer                          :: nrElecEmit, nrTry
+    double precision, dimension(1:3) :: par_pos, par_vel, field
+
+    par_pos = 0.0d0
+    nrTry = 0
+    nrElecEmit = 0
+    nrEmitted_emitters(emit) = 0
+
+    do while (nrTry <= MAX_EMISSION_TRY)
+
+      ! Check if we have reached the max number
+      ! of electrons to be emitted
+      if ((nrElecEmit >= maxElecEmit) .and. (maxElecEmit /= -1)) then
+        exit
+      end if
+
+
+      if (nrElec == MAX_PARTICLES-1) then
+        print *, 'WARNING: Reached maximum number of electrons!!!'
+        exit
+      end if
+
+      CALL RANDOM_NUMBER(par_pos(1:2)) ! Gives a random number [0,1]
+
+      par_pos(1:2) = emitters_pos(1:2, emit) + emitters_dim(1:2, emit)*par_pos(1:2)
+      !par_pos(2) = emitters_pos(2, emit) + emitters_dim(2, emit)*par_pos(2)
+
+      nrTry = nrTry + 1
+      par_pos(3) = 0.0d0 * length_scale !Check in plane
+      field = Calc_Field_at(par_pos)
+
+      if (field(3) < 0.0d0) then
+        par_pos(3) = 1.0d0 * length_scale !Above plane
+        field = Calc_Field_at(par_pos)
+
+        if (field(3) < 0.0d0) then
+
+          par_pos(3) = 1.0d0 * length_scale ! Place above plane
+          par_vel = 0.0d0
+          call Add_Particle(par_pos, par_vel, species_elec, step, emit, -1)
+
+          !print *, 'field = ', field
+          !pause
+          !call Add_Plane_Graph_emitt(par_pos, par_vel)
+
+          nrElecEmit = nrElecEmit + 1
+          nrEmitted_emitters(emit) = nrEmitted_emitters(emit) + 1
+          nrTry = 0
+
+        end if
+      end if
+    end do
+
+    posInit = posInit + nrElecEmit
+    nrEmitted = nrEmitted + nrElecEmit
+  end subroutine Do_Photo_Emission_Rectangle_Spot
 
   ! ! Add the absorption event to the absorption graph.
   ! ! This graph is a histogram.
@@ -450,4 +692,29 @@ contains
     Get_Laser_Energy(3) = abs(Get_Laser_Energy(3)) ! Positive velocity in the z-direction
   end function Get_Laser_Energy
 
+  integer function Gauss_Emission_int(step)
+    integer, intent(in)         :: step ! Current time step
+    integer                     :: IFAIL
+    double precision, parameter :: sigma = 1000.0d0 ! Width / standard deviation
+    double precision, parameter :: mu = 3000.0d0 ! Center
+    double precision, parameter :: A = 6.0d0 ! Height
+    double precision, parameter :: b = 1.0d0/(2.0d0*pi*sigma**2)
+
+    Gauss_Emission_int = IDNINT(  A * exp( -1.0d0*b*(step - mu)**2 )  )
+
+    write (ud_gauss, "(i6, tr2, i6)", iostat=IFAIL) step, Gauss_Emission_int
+  end function Gauss_Emission_int
+
+  !double precision function Gauss_Emission(step)
+  !  integer, intent(in)         :: step ! Current time step
+  !  integer                     :: IFAIL
+  !  double precision, parameter :: sigma = 1000.0d0 ! Width / standard deviation
+  !  double precision, parameter :: mu = 3000.0d0 ! Center
+  !  double precision, parameter :: A = 6.0d0 ! Height
+  !  double precision, parameter :: b = 1.0d0/(2.0d0*pi*sigma**2)
+
+  !  Gauss_Emission = A * exp( -1.0d0*b*(step - mu)**2 )
+
+  !  write (ud_gauss, "(i6, tr2, ES12.4)", iostat=IFAIL) step, Gauss_Emission
+  !end function Gauss_Emission
 end module mod_photo_emission

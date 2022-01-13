@@ -26,8 +26,8 @@ contains
 
 
   ! ----------------------------------------------------------------------------
-  ! Velocity Verlet
   subroutine Velocity_Verlet(step)
+    ! Velocity Verlet
     integer, intent(in) :: step
 
     ! Update the current time
@@ -79,8 +79,8 @@ contains
    end subroutine Read_Cross_Section_Data
 
   ! ----------------------------------------------------------------------------
-  ! Update the position of particles in the verlet integration
   subroutine Update_ElecHole_Position(step)
+    ! Update the position of particles in the verlet integration
     integer, intent(in) :: step
     integer             :: i
 
@@ -106,7 +106,7 @@ contains
       call ptr_Check_Boundary(i)
 
       ! Record information about particles when to pass trough certain planes
-      !call Check_Planes(i)
+      call Check_Planes(i)
     end do
     !$OMP END PARALLEL DO
   end subroutine Update_ElecHole_Position
@@ -210,8 +210,8 @@ contains
   end subroutine Check_Boundary_ElecHole_Periodic
 
   ! ----------------------------------------------------------------------------
-  ! Update the velocity in the verlet integration
   subroutine Update_Velocity(step)
+    ! Update the velocity in the verlet integration
     integer, intent(in)              :: step
     integer                          :: i, k, emit, sec
     double precision                 :: q
@@ -678,8 +678,10 @@ contains
     V_rf = 0.0d0
     E_z = -1.0d0*V_d/d
 
+    !T_temp = 300.0d0 + (1250.0d0 - 300.0d0) * step / steps
+
     write (ud_volt, "(ES12.4, tr2, i8, tr2, ES18.8, tr2, ES18.8)", iostat=IFAIL) &
-          & cur_time, step, V_d, V_rf
+          & cur_time, step, V_d, V_rf, T_temp
   end subroutine Set_Voltage
 
   double precision pure function Voltage_Resistor()

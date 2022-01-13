@@ -3,6 +3,7 @@
 import os
 import subprocess
 import time
+import shutil
 
 class bcolors:
     HEADER = '\033[95m'
@@ -15,21 +16,27 @@ class bcolors:
     UNDERLINE = '\033[4m'
 
 os.chdir('../build/')
-make_process = subprocess.Popen("make clean all install FCOMPILER=ifort UNIT_TEST=1", shell=True, stderr=subprocess.STDOUT)
+make_process = subprocess.Popen("make clean all install CC=gcc FC=ifort UNIT_TEST=1", shell=True, stderr=subprocess.STDOUT)
 if make_process.wait() != 0:
     print(bcolors.FAIL + 'Intel FAILED' + bcolors.ENDC)
 else:
     print(bcolors.OKGREEN + 'Intel OK' + bcolors.ENDC)
-    os.chdir('../data/')
+    os.chdir('../tests/')
+    shutil.rmtree('run_intel', ignore_errors=True)
+    os.mkdir('run_intel')
+    os.chdir('run_intel')
+    shutil.copy('../../build/Vacuum-MD.out', './Vacuum-MD.out')
+    shutil.copy('../input', './input')
     Vacuum_Process = subprocess.Popen("./Vacuum-MD.out", shell=True, stderr=subprocess.STDOUT)
     Vacuum_Process.wait()
+    os.chdir('../')
     time.sleep(5)
 
 #print('')
-
+exit()
 
 os.chdir('../build/')
-make_process = subprocess.Popen("make clean all install FCOMPILER=gfortran-8 UNIT_TEST=1", shell=True, stderr=subprocess.STDOUT)
+make_process = subprocess.Popen("make clean all install CC=gcc FC=gfortran UNIT_TEST=1", shell=True, stderr=subprocess.STDOUT)
 if make_process.wait() != 0:
     print(bcolors.FAIL + 'GNU FAILED' + bcolors.ENDC)
 else:
@@ -42,7 +49,7 @@ else:
 print('')
 
 os.chdir('../build/')
-make_process = subprocess.Popen("make clean all install FCOMPILER=pgfortran UNIT_TEST=1", shell=True, stderr=subprocess.STDOUT)
+make_process = subprocess.Popen("make clean all install CC=gcc FC=pgfortran UNIT_TEST=1", shell=True, stderr=subprocess.STDOUT)
 if make_process.wait() != 0:
     print(bcolors.FAIL + 'PGI FAILED' + bcolors.ENDC)
 else:
