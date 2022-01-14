@@ -29,10 +29,10 @@ def write_laser(laser):
 
 # Write Fortran input file
 def Write_Input():
-    nml = f90nml.Namelist({'input': {'v_s': 10.0}})
+    nml = f90nml.Namelist({'input': {'v_s': 100.0}})
     nml['input']['box_dim'] = [0.0, 0.0, 2500.0]
     nml['input']['time_step'] = 0.25E-3
-    nml['input']['steps'] = 60000
+    nml['input']['steps'] = 20000
     nml['input']['emission_mode'] = 1
     nml['input']['NrEmit'] = 1
     nml['input']['image_charge'] = True
@@ -47,12 +47,12 @@ def Write_Input():
 
 # ----------------------------------------------------------------------------------------
 #N = 12*12 + 1
-N = 20 # Number of runs
-mu = 20000 # Position of pulse in steps
-sigma = 50 # Pulse width
-amplitude = np.linspace(10, 1000, N) # Amplitudes
+N = 1 # Number of runs
+mu = 5000 # Center position of pulse in steps
+sigma = 500 # Pulse width
+amplitude = np.linspace(10, 10, N) # Amplitudes
 photon_energy = 4.7 # Energy of input laser
-photon_std = 0.02 # Standard deviation of input laser energy
+photon_std = 0.2 # Standard deviation of input laser energy
 laser_input = []
 
 folders = []

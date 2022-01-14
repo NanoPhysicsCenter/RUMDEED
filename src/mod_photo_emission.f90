@@ -41,10 +41,10 @@ module mod_photo_emission
   integer, parameter                          :: PHOTON_ZERO      = 1
   integer, parameter                          :: PHOTON_MB        = 2
 
-  ! --
+  ! ----------------------------------------------------------------------------
   ! Spots
   integer                                        :: num_spots
-  double precision, dimension(:, :), allocatable :: spot_pos ! Position of spots
+  double precision, dimension(:, :), allocatable :: spot_pos       ! Position of spots
   double precision, dimension(:), allocatable    :: spot_radius_sq ! Radius squared of spots
 
 contains
@@ -68,13 +68,13 @@ contains
     ! Read the type of laser pulse and photon velocity model to use
     read(unit=ud_laser, FMT=*) LASER_TYPE, PHOTON_MODE
 
-    SELECT CASE (LASER_TYPE)
+    select case (LASER_TYPE)
       case (LASER_GAUSS)
         ! Gaussian pulse
         print '(a)', 'Vacuum: Using Gaussian pulse model'
         EmitGauss = .TRUE.
 
-        SELECT CASE (PHOTON_MODE)
+        select case (PHOTON_MODE)
           case (PHOTON_ZERO)    
             ptr_Get_Photo_Emission_Energy => Get_Zero_Photon_Velocity
             print '(a)', 'Vacuum: Using zero inital velocity' 
@@ -91,11 +91,12 @@ contains
             ! Read Gaussian parameters from the file (mu, std and Amplitude) 
             read(unit=ud_laser, FMT=*) Gauss_pulse_center, Gauss_pulse_width, Gauss_pulse_amplitude
             ! print *, Gauss_pulse_center, Gauss_pulse_width, Gauss_pulse_amplitude, laser_energy, laser_variation
+
           case DEFAULT
             print '(a)', 'Vacuum: ERROR UNKNOWN PHOTON MODE'
             print *, PHOTON_MODE
             stop
-        END SELECT  
+        end select  
 
 
       case (LASER_SQUARE)
@@ -103,7 +104,7 @@ contains
         print '(a)', 'Vacuum: Using standard emission model'
         ! ptr_Laser_fun => laser
 
-        SELECT CASE (PHOTON_MODE)
+        select case (PHOTON_MODE)
           case (PHOTON_ZERO)
             ptr_Get_Photo_Emission_Energy => Get_Zero_Photon_Velocity
             print '(a)', 'Vacuum: Using zero inital velocity'    
@@ -120,15 +121,13 @@ contains
             print '(a)', 'Vacuum: ERROR UNKNOWN PHOTON MODE'
             print *, PHOTON_MODE
             stop
-
-        END SELECT
+        end select
 
       case DEFAULT
         print '(a)', 'Vacuum: ERROR UNKNOWN LASER TYPE'
         print *, LASER_TYPE
         stop
-
-    END SELECT
+    end select
 
     close(unit=ud_laser)
   end subroutine Read_laser_parameters
@@ -156,7 +155,7 @@ contains
     call Read_laser_parameters()
     
     ! Initial velocity
-    call Init_Emission_Velocity(VELOCITY_ZERO)
+    !call Init_Emission_Velocity(VELOCITY_ZERO)
 
     do i = 1, nrEmit
       if (emitters_type(i) == EMIT_RECTANGLE_SPOTS) then
@@ -253,7 +252,7 @@ contains
       !par_pos(2) = emitters_pos(2, emit) + emitters_dim(2, emit)*par_pos(2)
 
       nrTry = nrTry + 1
-      par_pos(3) = 0.0d0 * length_scale !Check in plane
+      par_pos(3) = 0.0d0 * length_scale ! Check in plane
 
       if (Emit_From_Spot(par_pos) .eqv. .false.) then
         cycle ! We do not emit from this position
@@ -262,7 +261,7 @@ contains
       field = Calc_Field_at(par_pos)
 
       if (field(3) < 0.0d0) then
-        par_pos(3) = 1.0d0 * length_scale !Above plane
+        par_pos(3) = 1.0d0 * length_scale ! Above plane
         field = Calc_Field_at(par_pos)
 
         if (field(3) < 0.0d0) then
@@ -279,7 +278,7 @@ contains
       end if
     end do
 
-    posInit = posInit + nrElecEmit
+    posInit   = posInit   + nrElecEmit
     nrEmitted = nrEmitted + nrElecEmit
   end subroutine Do_Photo_Emission_Spot
 
@@ -347,7 +346,7 @@ contains
           call Do_Photo_Emission_Circle(step, i)
 
         case (EMIT_RECTANGLE)
-          print *, 'Doing Rectangle'
+          !print *, 'Doing Rectangle'
           call Do_Photo_Emission_Rectangle(step, i)
 
         case (EMIT_RECTANGLE_SPOTS)
@@ -361,9 +360,7 @@ contains
           print *, emitters_type(i)
 
         end select
-
       end if
-
     end do
 
     cur_time = time_step * step / time_scale ! Scaled in units of time_scale
@@ -375,10 +372,15 @@ contains
   subroutine Do_Photo_Emission_Circle(step, emit)
     integer, intent(in)              :: step,       emit
     integer                          :: nrElecEmit, nrTry
-    double precision, dimension(1:3) :: par_pos, par_vel, field
+    double precision, dimension(1:3) :: par_pos, par_vel, field, photon_energy
     !double precision                :: r_e, theta_e
-    double precision                 :: r_e, r_e2, r2
+    double precision                 :: r_e, r_e2, r2, p_eV
 
+    ! Get emission velocity profile from mod_velocity 
+    ! (technically not velocity but energy distribution of the photons)
+    photon_energy = ptr_Get_Photo_Emission_Energy()
+    ! Take only the z-component of the velocity profile
+    p_eV = photon_energy(3)
     par_pos = 0.0d0
     nrTry = 0
     nrElecEmit = 0
@@ -404,7 +406,7 @@ contains
       r_e2 = r_e**2 ! Radius of emitter squared
       r2 = r_e2 + 1.0d0 ! Must be larger then r_e2 for the do while loop to run
       do while (r2 > r_e2)
-        CALL RANDOM_NUMBER(par_pos(1:2)) ! Gives a random number between 0 and 1
+        call random_number(par_pos(1:2)) ! Gives a random number [0,1]
 
         par_pos(1:2) = 2.0d0*(par_pos(1:2) - 0.5d0)*r_e ! Range is -r_e to +r_e
         r2 = par_pos(1)**2 + par_pos(2)**2 ! Radius squared of our random point
@@ -418,6 +420,18 @@ contains
       ! theta_e = 2.0d0*pi * par_pos(2)
       ! par_pos(1) = r_e * cos(theta_e) + emitters_pos(1, emit)
       ! par_pos(2) = r_e * sin(theta_e) + emitters_pos(2, emit)
+
+      ! Test if workfunction and photon energy functions are working
+      if (w_theta_xy(par_pos, emit) >= p_eV) then
+        print *, 'Workfunction higher then photon energy!'
+
+      elseif (w_theta_xy(par_pos, emit) <= p_eV) then
+        print *, 'Workfunction lower then photon energy!'
+
+      else
+        print *, 'Workfunction equal to photon energy?'
+
+      endif
 
       nrTry = nrTry + 1 ! Add one more try
       par_pos(3) = 0.0d0 * length_scale ! Check in plane
@@ -458,7 +472,7 @@ contains
 
     end do
 
-    posInit = posInit + nrElecEmit
+    posInit   = posInit   + nrElecEmit
     nrEmitted = nrEmitted + nrElecEmit
   end subroutine Do_Photo_Emission_Circle
 
@@ -469,7 +483,7 @@ contains
     double precision                 :: p_eV
 
     ! Get emission velocity profile from mod_velocity 
-    !(technically not velocity but energy distribution of the photons)
+    ! (technically not velocity but energy distribution of the photons)
     photon_energy = ptr_Get_Photo_Emission_Energy()
     ! Take only the z-component of the velocity profile
     p_eV = photon_energy(3)
@@ -492,19 +506,14 @@ contains
         exit
       end if
 
-      CALL RANDOM_NUMBER(par_pos(1:2)) ! Gives a random number [0,1]
+      call random_number(par_pos(1:2)) ! Gives a random number [0,1]
 
       par_pos(1:2) = emitters_pos(1:2, emit) + emitters_dim(1:2, emit)*par_pos(1:2)
       !par_pos(2) = emitters_pos(2, emit) + emitters_dim(2, emit)*par_pos(2)
 
       nrTry = nrTry + 1
-      par_pos(3) = 0.0d0 * length_scale !Check in plane
+      par_pos(3) = 0.0d0 * length_scale ! Check in plane
       field = Calc_Field_at(par_pos)
-
-      ! Test if workfunction and photon energy functions are working
-      !if (w_theta_xy(par_pos, emit) >= p_eV) then
-      !  print *, 'Workfunction higher then photon energy!'
-      !endif
 
       if (w_theta_xy(par_pos, emit) <= p_eV) then   ! Check if work function at position is lower then photon energy
 
@@ -529,11 +538,8 @@ contains
             nrTry = 0
 
           end if
-
         end if
-
-      endif
-
+      end if
     end do
 
     posInit = posInit + nrElecEmit
@@ -565,17 +571,17 @@ contains
         exit
       end if
 
-      CALL RANDOM_NUMBER(par_pos(1:2)) ! Gives a random number [0,1]
+      call random_number(par_pos(1:2)) ! Gives a random number [0,1]
 
       par_pos(1:2) = emitters_pos(1:2, emit) + emitters_dim(1:2, emit)*par_pos(1:2)
       !par_pos(2) = emitters_pos(2, emit) + emitters_dim(2, emit)*par_pos(2)
 
       nrTry = nrTry + 1
-      par_pos(3) = 0.0d0 * length_scale !Check in plane
+      par_pos(3) = 0.0d0 * length_scale ! Check in plane
       field = Calc_Field_at(par_pos)
 
       if (field(3) < 0.0d0) then
-        par_pos(3) = 1.0d0 * length_scale !Above plane
+        par_pos(3) = 1.0d0 * length_scale ! Above plane
         field = Calc_Field_at(par_pos)
 
         if (field(3) < 0.0d0) then
@@ -596,7 +602,7 @@ contains
       end if
     end do
 
-    posInit = posInit + nrElecEmit
+    posInit   = posInit   + nrElecEmit
     nrEmitted = nrEmitted + nrElecEmit
   end subroutine Do_Photo_Emission_Rectangle_Spot
 
@@ -657,26 +663,29 @@ contains
   !   end do
   ! end subroutine Write_Plane_Graph_emitt
 
-  !    
+  ! ----------------------------------------------------------------------------    
   ! Gives a Gaussian emission curve
   ! where step is the current time step
   ! returns the number of electrons allowed to be emitted in that time step
   ! Needs rework from if to case for pulse series input - Hákon 15.12.21
   double precision function Gauss_Emission(step)
     integer, intent(in)          :: step ! Current time step
-    !integer                      :: IFAIL
+    integer                      :: IFAIL
     double precision             :: b 
     
     b = 1.0d0 / ( 2.0d0 * pi * Gauss_pulse_width**2 )
+    ! For mutiple pulses - WIP
     !if (step <= 15000) then
     Gauss_Emission = Gauss_pulse_amplitude * exp( -1.0d0 * b * (step - Gauss_pulse_center)**2 )
     !else
     !  Gauss_Emission = A * exp( -1.0d0 * b * (step - mu2)**2 )
     !end if
+
+
     ! Gauss emission with integer outcome, change to this if Poisson distribution is discarded.
     ! Gauss_Emission = IDNINT(  A * exp( -1.0d0*b*(step - mu)**2 )  )
 
-    !write (ud_gauss, "(i6, tr2, i6)", iostat=IFAIL) step, Gauss_Emissions
+    write (ud_gauss, "(i6, tr2, i6)", iostat=IFAIL) step, Gauss_Emission
   end function Gauss_Emission
 
   ! ----------------------------------------------------------------------------
@@ -699,7 +708,7 @@ contains
     double precision, dimension(1:2) :: mean
 
     mean = laser_energy
-    std = laser_variation ! Standard deviation of the Maxwell-Boltzmann distribution
+    std  = laser_variation ! Standard deviation of the Maxwell-Boltzmann distribution
     
     ! Get normal distributed numbers.
     ! The Box Muller method gives two numbers.

@@ -10,4 +10,5 @@ __genmod.f90
 *.out
 *.code-workspace
 input
-Run.sh
+run.sh
+cuba/
