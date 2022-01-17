@@ -38,7 +38,7 @@ def Write_Input():
     nml['input']['image_charge'] = True
     nml['input']['emitters_dim'] = [[500.0, 500.0, 0.0]]
     nml['input']['emitters_pos'] = [[-250.0, -250.0, 0.0]]
-    nml['input']['emitters_type'] = [2]
+    nml['input']['emitters_type'] = [1] # 1 -> Circle; 2 -> Rectangle; 3 -> ???
     nml['input']['emitters_delay'] = [0]
 
     f90nml.write(nml, 'input', force=True)
@@ -57,7 +57,9 @@ laser_input = []
 
 folders = []
 for i in range(N):
-    folders.append(str(i))
+    #folders.append(str(i))
+    folders.append('Amp_' + str(amplitude[i]))
+
 
 for i in range(N):
     laser_input.append(np.array([photon_energy, photon_std, mu, sigma, amplitude[i]]))

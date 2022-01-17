@@ -342,7 +342,7 @@ contains
         select case (emitters_type(i))
 
         case (EMIT_CIRCLE)
-          print *, 'Doing Circle'
+          !print *, 'Doing Circle'
           call Do_Photo_Emission_Circle(step, i)
 
         case (EMIT_RECTANGLE)
