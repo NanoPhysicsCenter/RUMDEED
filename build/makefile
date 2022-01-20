@@ -198,8 +198,8 @@ clean:
 		rm -f $(PROJECT_NAME).out
 		rm -f unit_test.out
 		rm -f $(CUBA_LIB)
-		rm -f ../cuba/4.2.1/libcuba.a
-		cd ../cuba/4.2.1/ && make clean
+		rm -f ../cuba/Cuba-4.2.1/libcuba.a
+		cd ../cuba/Cuba-4.2.1/ && make clean
 
 install:
 		cp $(PROJECT_NAME).out ../data/
