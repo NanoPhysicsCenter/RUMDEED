@@ -438,7 +438,7 @@ end subroutine Do_Photo_Emission_Tip
     double precision, parameter :: pre_fac_a = m_0 / (-1.0d0*q_0) ! Acceleration prefactor
     double precision, dimension(1:3) :: par_pos, surf_norm, par_accel, par_vel
     !type(electron)                   :: par_elec
-
+    
     nr_phi = 50
     nr_xi = 50
     !len_phi = 2.0d0*pi / nr_phi
