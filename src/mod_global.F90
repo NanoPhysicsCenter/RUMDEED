@@ -339,7 +339,7 @@ module mod_global
    end function Get_Emission_Velocity
 
    function Get_Photo_Emission_Energy()
-      double precision, dimension(1:3) :: Get_Photo_Emission_Energy
+      double precision                 :: Get_Photo_Emission_Energy
    end function Get_Photo_Emission_Energy
   end interface
 

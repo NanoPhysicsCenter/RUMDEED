@@ -19,12 +19,14 @@ def write_w_theta(workfunction):
 
 # Write laser file
 # Format:
-# Gauss pulse = 1, Continous = 2, ; Initial velocity, zero = 1, norm dist work function dependant = 2
+# Gauss pulse; on = 1, off = 2
+# Laser energy; Fixed = 1, Possion = 2
+# Initial velocity; zero = 1, Work function dependant = 2 
 # Laser energy in eV ; std of laser
 # Gauss pulse parameters: mu (center); sigma (width); Amplitude
 def write_laser(laser):
     filename = 'laser'
-    np.savetxt(filename, laser , fmt='%2.3f', header='1 2', comments='')
+    np.savetxt(filename, laser , fmt='%2.3f', header='1 2 1', comments='')
     return None
 
 # Write Fortran input file
@@ -45,14 +47,19 @@ def Write_Input():
     
     return None
 
+# Rectangle emitter
+#nml['input']['emitters_dim'] = [[500.0, 500.0, 0.0]]
+# Circular emitter
+#nml['input']['emitters_dim'] = [[100.0]]
+
 # ----------------------------------------------------------------------------------------
 #N = 12*12 + 1
 N = 1 # Number of runs
 mu = 5000 # Center position of pulse in steps
 sigma = 500 # Pulse width
 amplitude = np.linspace(10, 10, N) # Amplitudes
-photon_energy = 4.7 # Energy of input laser
-photon_std = 0.2 # Standard deviation of input laser energy
+photon_energy = 4.60 # Energy of input laser
+photon_std = 0.02 # Standard deviation of input laser energy
 laser_input = []
 
 folders = []
