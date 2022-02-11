@@ -2,12 +2,17 @@
 ! Module for photo emission                 !
 ! Kristinn Torfason                         !
 ! 05.04.13                                  !
+! Modifications                             !
+! Hákon Örn Árnason                         !
+! 04.12.20                                  !
 !-------------------------------------------!
 
-Module mod_photo_emission
+module mod_photo_emission
   use mod_global
   use mod_verlet
+  !use mod_velocity
   use mod_pair
+  use mod_work_function
   use mod_velocity
   implicit none
 
@@ -15,23 +20,131 @@ Module mod_photo_emission
   ! Variables
   integer, dimension(:), allocatable          :: nrEmitted_emitters
   integer                                     :: posInit
-  logical                                     :: EmitGauss = .False.
-  integer                                     :: maxElecEmit = -1
+  logical                                     :: EmitGauss                  = .FALSE.
+  integer                                     :: maxElecEmit                = -1
   integer                                     :: nrEmitted
-
+  integer                                     :: LASER_MODE, PHOTON_MODE, GAUSS_MODE
+  double precision                            :: laser_energy               ! Photon energy in eV
+  double precision                            :: laser_variation            ! Standard deviation of photon energy in eV
+  double precision                            :: Gauss_pulse_center         ! mu
+  double precision                            :: Gauss_pulse_width          ! sigma
+  double precision                            :: Gauss_pulse_amplitude      ! A
   !integer                                     :: ud_gauss
 
   ! ----------------------------------------------------------------------------
   ! Parameters
   integer, parameter                          :: MAX_EMISSION_TRY = 100
+  ! Type of laser input pulse
+  integer, parameter                          :: LASER_FIXED      = 1  ! Fixed laser energy
+  integer, parameter                          :: LASER_POISSON    = 2  ! Poisson distributed laser energy
+  ! Type of photon initial velocity distribution
+  integer, parameter                          :: PHOTON_ZERO      = 1  ! Zero inital velocity
+  integer, parameter                          :: PHOTON_WFD       = 2  ! Workfunction dependant velocity
+  ! Gauss pulse 
+  integer, parameter                          :: GAUSS_ON         = 1  ! Gauss pulse on
+  integer, parameter                          :: GAUSS_OFF        = 2  ! Gauss pulse off
 
-  ! --
+  ! ----------------------------------------------------------------------------
   ! Spots
   integer                                        :: num_spots
-  double precision, dimension(:, :), allocatable :: spot_pos ! Position of spots
-  double precision, dimension(:), allocatable    :: spot_radius_sq ! Radius squared of spots
+  double precision, dimension(:, :), allocatable :: spot_pos       ! Position of spots
+  double precision, dimension(:),    allocatable :: spot_radius_sq ! Radius squared of spots
 
 contains
+
+  subroutine Read_laser_parameters()
+    integer :: ud_laser, IFAIL
+    character(256) :: iomsg
+
+    ! Open the file that contains information about the work function
+    open(newunit=ud_laser, iostat=IFAIL, iomsg=iomsg, file='laser', &
+      & status='OLD', form='FORMATTED', access='SEQUENTIAL', action='READ')
+      
+    if (IFAIL /= 0) then
+      print *, 'Vacuum: Failed to open file laser. ABORTING'
+      print *, IFAIL
+      print *, iomsg
+      stop
+
+    end if
+
+    ! Read the type of laser pulse and photon velocity model to use
+    read(unit=ud_laser, FMT=*) GAUSS_MODE, LASER_MODE, PHOTON_MODE
+
+    select case (GAUSS_MODE)
+      case (GAUSS_ON)
+        ! Gaussian pulse
+        print '(a)', 'Vacuum: Using Gaussian pulse model'
+        EmitGauss = .TRUE.
+
+        select case (LASER_MODE)
+          case (LASER_FIXED)    
+            ptr_Get_Photo_Emission_Energy => Get_Fixed_Laser_Energy
+            print '(a)', 'Vacuum: Using fixed photon energy' 
+            ! Read mean and std photon energy from the file
+            read(unit=ud_laser, FMT=*) laser_energy, laser_variation
+            ! Read Gaussian parameters from the file (mu, std and Amplitude) 
+            read(unit=ud_laser, FMT=*) Gauss_pulse_center, Gauss_pulse_width, Gauss_pulse_amplitude
+
+          case (LASER_POISSON)
+            ptr_Get_Photo_Emission_Energy => Get_Laser_Energy
+            print '(a)', 'Vacuum: Using poisson distributed photon energy'
+            ! Read mean and std photon energy from the file
+            read(unit=ud_laser, FMT=*) laser_energy, laser_variation
+            ! Read Gaussian parameters from the file (mu, std and Amplitude) 
+            read(unit=ud_laser, FMT=*) Gauss_pulse_center, Gauss_pulse_width, Gauss_pulse_amplitude
+            ! print *, Gauss_pulse_center, Gauss_pulse_width, Gauss_pulse_amplitude, laser_energy, laser_variation
+
+          case DEFAULT
+            print '(a)', 'Vacuum: ERROR UNKNOWN LASER MODE'
+            print *, LASER_MODE
+            stop
+        end select  
+
+
+      case (GAUSS_OFF)
+        ! Gauss Mode off
+        print '(a)', 'Vacuum: Using standard emission model'
+        !EmitGauss = .FALSE.
+
+        select case (LASER_MODE)
+          case (LASER_FIXED)
+            ptr_Get_Photo_Emission_Energy => Get_Fixed_Laser_Energy
+            print '(a)', 'Vacuum: Using fixed laser energy'    
+            ! Read mean and std photon energy from the file
+            read(unit=ud_laser, FMT=*) laser_energy, laser_variation
+
+          case (LASER_POISSON)
+            ptr_Get_Photo_Emission_Energy => Get_Laser_Energy
+            print '(a)', 'Vacuum: Using poisson distributed photon energy'
+            ! Read mean and std photon energy from the file
+            read(unit=ud_laser, FMT=*) laser_energy, laser_variation
+
+          case DEFAULT
+            print '(a)', 'Vacuum: ERROR UNKNOWN LASER MODE'
+            print *, LASER_MODE
+            stop
+        end select
+
+      case DEFAULT
+        print '(a)', 'Vacuum: ERROR UNKNOWN LASER TYPE'
+        print *, LASER_MODE
+        stop
+    end select
+
+    select case (PHOTON_MODE)
+      case (PHOTON_ZERO)
+        print '(a)', 'Vacuum: Using zero initial velocity'
+      case (PHOTON_WFD)
+        print '(a)', 'Vacuum: Using work function velocity'
+      case DEFAULT
+        print '(a)', 'Vacuum: ERROR UNKNOWN LASER MODE'
+        print *, PHOTON_MODE
+        stop
+    end select
+    close(unit=ud_laser)
+  end subroutine Read_laser_parameters
+
   subroutine Init_Photo_Emission()
     integer :: i
 
@@ -50,8 +163,12 @@ contains
     ! The function to do image charge effects
     ptr_Image_Charge_effect => Force_Image_charges_v2
 
+    call Read_work_function()
+
+    call Read_laser_parameters()
+    
     ! Initial velocity
-    call Init_Emission_Velocity(VELOCITY_ZERO)
+    !call Init_Emission_Velocity(VELOCITY_ZERO)
 
     do i = 1, nrEmit
       if (emitters_type(i) == EMIT_RECTANGLE_SPOTS) then
@@ -68,6 +185,8 @@ contains
 
   subroutine Clean_Up_Photo_Emission()
     deallocate(nrEmitted_emitters)
+
+    call Work_fun_cleanup()
   end subroutine Clean_Up_Photo_Emission
 
   ! Read in the file for the spot emission
@@ -121,6 +240,7 @@ contains
     integer, intent(in)              :: step, emit
     integer                          :: nrElecEmit, nrTry
     double precision, dimension(1:3) :: par_pos, par_vel, field
+    double precision                 :: p_eV
 
     par_pos = 0.0d0
     nrTry = 0
@@ -146,33 +266,43 @@ contains
       !par_pos(2) = emitters_pos(2, emit) + emitters_dim(2, emit)*par_pos(2)
 
       nrTry = nrTry + 1
-      par_pos(3) = 0.0d0 * length_scale !Check in plane
+      par_pos(3) = 0.0d0 * length_scale ! Check in plane
 
       if (Emit_From_Spot(par_pos) .eqv. .false.) then
         cycle ! We do not emit from this position
       end if
 
-      field = Calc_Field_at(par_pos)
+      ! Check if photon energy exceeds work function
+      if (w_theta_xy(par_pos, emit) <= p_eV) then
 
-      if (field(3) < 0.0d0) then
-        par_pos(3) = 1.0d0 * length_scale !Above plane
         field = Calc_Field_at(par_pos)
-
         if (field(3) < 0.0d0) then
+          par_pos(3) = 1.0d0 * length_scale ! Above plane
+          field = Calc_Field_at(par_pos)
 
-          par_pos(3) = 1.0d0 * length_scale ! Place above plane
-          par_vel = 0.0d0
-          call Add_Particle(par_pos, par_vel, species_elec, step, emit, -1)
+          if (field(3) < 0.0d0) then
+            par_pos(3) = 1.0d0 * length_scale ! Place above plane
+            
+            if (PHOTON_MODE == 1) then
+              par_vel = 0.0d0
+            else if (PHOTON_MODE == 2) then
+              !par_vel = 0.0d0 ! Need to modify this to K = h (v - v_0) for excess energy
+              par_vel(3) = sqrt((2 * ((p_eV - w_theta_xy(par_pos, emit))*q_0))/m_0) ! <-- Newtonian
+            else
+              print *, "WARNING: Unknown photon velocity mode!"
+            end if
 
-          nrElecEmit = nrElecEmit + 1
-          nrEmitted_emitters(emit) = nrEmitted_emitters(emit) + 1
-          nrTry = 0
+            call Add_Particle(par_pos, par_vel, species_elec, step, emit, -1)
 
+            nrElecEmit = nrElecEmit + 1
+            nrEmitted_emitters(emit) = nrEmitted_emitters(emit) + 1
+            nrTry = 0
+          end if
         end if
       end if
     end do
 
-    posInit = posInit + nrElecEmit
+    posInit   = posInit   + nrElecEmit
     nrEmitted = nrEmitted + nrElecEmit
   end subroutine Do_Photo_Emission_Spot
 
@@ -212,7 +342,7 @@ contains
     integer             :: i, IFAIL
     double precision    :: cur_time
 
-    posInit = 0
+    posInit            = 0
     nrEmitted_emitters = 0
 
     !if (step > 2) then
@@ -224,7 +354,7 @@ contains
     if (EmitGauss .eqv. .TRUE.) then
       maxElecEmit = Rand_Poission( Gauss_Emission(step) )
     end if
-
+    
     !i = 1
 
     ! Loop through all of the emitters
@@ -232,21 +362,27 @@ contains
 
       ! Check the type of the emitter CIRCLE / RECTANGLE
       if (emitters_delay(i) < step) then
+
         select case (emitters_type(i))
+
         case (EMIT_CIRCLE)
-          print *, 'Doing Circle'
+          !print *, 'Doing Circle'
           call Do_Photo_Emission_Circle(step, i)
+
         case (EMIT_RECTANGLE)
-          print *, 'Doing Rectangle'
+          !print *, 'Doing Rectangle'
           call Do_Photo_Emission_Rectangle(step, i)
+
         case (EMIT_RECTANGLE_SPOTS)
           !print *, 'Doing spots'
           !call Do_Photo_Emission_Rectangle_Spot(step, i)
           call Do_Photo_Emission_Spot(step, i)
+          
         case default
           print *, 'Vacuum: ERROR unknown emitter type!!'
           stop
           print *, emitters_type(i)
+
         end select
       end if
     end do
@@ -258,12 +394,14 @@ contains
   end subroutine Do_Photo_Emission
 
   subroutine Do_Photo_Emission_Circle(step, emit)
-    integer, intent(in)              :: step, emit
+    integer, intent(in)              :: step,       emit
     integer                          :: nrElecEmit, nrTry
     double precision, dimension(1:3) :: par_pos, par_vel, field
-    !double precision                 :: r_e, theta_e
-    double precision                  :: r_e, r_e2, r2
-
+    !double precision                :: r_e, theta_e
+    double precision                 :: r_e, r_e2, r2, p_eV
+    
+    ! Get Energy distribution of the photons
+    p_eV = ptr_Get_Photo_Emission_Energy()
     par_pos = 0.0d0
     nrTry = 0
     nrElecEmit = 0
@@ -289,7 +427,7 @@ contains
       r_e2 = r_e**2 ! Radius of emitter squared
       r2 = r_e2 + 1.0d0 ! Must be larger then r_e2 for the do while loop to run
       do while (r2 > r_e2)
-        CALL RANDOM_NUMBER(par_pos(1:2)) ! Gives a random number between 0 and 1
+        call random_number(par_pos(1:2)) ! Gives a random number [0,1]
 
         par_pos(1:2) = 2.0d0*(par_pos(1:2) - 0.5d0)*r_e ! Range is -r_e to +r_e
         r2 = par_pos(1)**2 + par_pos(2)**2 ! Radius squared of our random point
@@ -306,50 +444,55 @@ contains
 
       nrTry = nrTry + 1 ! Add one more try
       par_pos(3) = 0.0d0 * length_scale ! Check in plane
-      field = Calc_Field_at(par_pos)
+      
 
-      ! Check if the field is favourable at this point
-      if (field(3) < 0.0d0) then
+      if (w_theta_xy(par_pos, emit) <= p_eV) then
 
-        !par_vel(1:2) = box_muller((/1.0d0, 1.0d0/), (/0.25d0, 0.25d0/))
-        !if (par_vel(1) < 0.0d0) then
-        !  if (par_vel(2) < 0.0d0) then
-        !    par_pos(3) = 0.0d-6 * length_scale
-        !  else
-        !    par_pos(3) = par_vel(2) * length_scale
-        !  end if
-        !else
-        !  par_pos(3) = par_vel(1) * length_scale
-        !end if
-        !CALL RANDOM_NUMBER(par_pos(3))
-        !par_pos(3) = (par_pos(3) + 1.0d0)*0.5d0 * length_scale ! Place above plane
-        par_pos(3) = 1.0d0*length_scale ! Place 1 nm above plane
-        !par_vel = 0.0d0 ! Set the velocity
-        par_vel = ptr_Get_Emission_Velocity()
+        field = Calc_Field_at(par_pos)
+        if (field(3) < 0.0d0) then
+          par_pos(3) = 1.0d0 * length_scale ! Above plane
+          field = Calc_Field_at(par_pos)
 
-        ! Escape velocity from image charge partner
-        !par_vel(3) = q_0 / sqrt(8.0d0*pi*epsilon_0*epsilon_r*m_0*par_pos(3)) 
-        
-        ! Speed needed to reach over the gap spacing. Includes image charge partners behind the cathode and annode but not the electric field.
-        !par_vel(3) = q_0/(4.0d0*sqrt(pi*epsilon_0*epsilon_r*m_0))*(d-2.0d0*par_pos(3))/sqrt(d*par_pos(3)*(d-par_pos(3)))
-        
-        call Add_Particle(par_pos, par_vel, species_elec, step, emit, -1)
+          if (field(3) < 0.0d0) then
+            par_pos(3) = 1.0d0 * length_scale ! Place above plane
+                        
+            if (PHOTON_MODE == 1) then
+              par_vel = 0.0d0
+            else if (PHOTON_MODE == 2) then
+              par_vel(3) = sqrt((2 * ((p_eV - w_theta_xy(par_pos, emit))*q_0))/m_0) ! <-- Newtonian
+            else
+              print *, "WARNING: Unknown photon velocity mode!"
+            end if
 
-        nrElecEmit = nrElecEmit + 1
-        nrEmitted_emitters(emit) = nrEmitted_emitters(emit) + 1
-        nrTry = 0
+            ! Escape velocity from image charge partner
+            !par_vel(3) = q_0 / sqrt(8.0d0*pi*epsilon_0*epsilon_r*m_0*par_pos(3)) 
+            
+            ! Speed needed to reach over the gap spacing. Includes image charge partners behind the cathode and annode but not the electric field.
+            !par_vel(3) = q_0/(4.0d0*sqrt(pi*epsilon_0*epsilon_r*m_0))*(d-2.0d0*par_pos(3))/sqrt(d*par_pos(3)*(d-par_pos(3)))
+          
+            call Add_Particle(par_pos, par_vel, species_elec, step, emit, -1)
+
+            nrElecEmit = nrElecEmit + 1
+            nrEmitted_emitters(emit) = nrEmitted_emitters(emit) + 1
+            nrTry = 0
+          end if
+        end if
       end if
+    
     end do
 
-    posInit = posInit + nrElecEmit
+    posInit   = posInit   + nrElecEmit
     nrEmitted = nrEmitted + nrElecEmit
   end subroutine Do_Photo_Emission_Circle
 
   subroutine Do_Photo_Emission_Rectangle(step, emit)
-    integer, intent(in)              :: step, emit
+    integer, intent(in)              :: step,       emit
     integer                          :: nrElecEmit, nrTry
-    double precision, dimension(1:3) :: par_pos, par_vel, field
+    double precision, dimension(1:3) :: par_pos,    par_vel, field
+    double precision                 :: p_eV
 
+    ! Get Energy distribution of the photons
+    p_eV = ptr_Get_Photo_Emission_Energy()
     par_pos = 0.0d0
     nrTry = 0
     nrElecEmit = 0
@@ -369,33 +512,46 @@ contains
         exit
       end if
 
-      CALL RANDOM_NUMBER(par_pos(1:2)) ! Gives a random number [0,1]
+      call random_number(par_pos(1:2)) ! Gives a random number [0,1]
 
       par_pos(1:2) = emitters_pos(1:2, emit) + emitters_dim(1:2, emit)*par_pos(1:2)
       !par_pos(2) = emitters_pos(2, emit) + emitters_dim(2, emit)*par_pos(2)
 
       nrTry = nrTry + 1
-      par_pos(3) = 0.0d0 * length_scale !Check in plane
-      field = Calc_Field_at(par_pos)
+      par_pos(3) = 0.0d0 * length_scale ! Check in plane
+      
+      ! Check if work function at position is lower then photon energy
+      if (w_theta_xy(par_pos, emit) <= p_eV) then
 
-      if (field(3) < 0.0d0) then
-        par_pos(3) = 1.0d0 * length_scale !Above plane
         field = Calc_Field_at(par_pos)
-
         if (field(3) < 0.0d0) then
+          par_pos(3) = 1.0d0 * length_scale ! Above plane
+          field = Calc_Field_at(par_pos)
 
-          par_pos(3) = 1.0d0 * length_scale ! Place above plane
-          par_vel = 0.0d0
-          call Add_Particle(par_pos, par_vel, species_elec, step, emit, -1)
+          if (field(3) < 0.0d0) then
+            par_pos(3) = 1.0d0 * length_scale ! Place above plane
+            
 
-          !print *, 'field = ', field
-          !pause
-          !call Add_Plane_Graph_emitt(par_pos, par_vel)
+            if (PHOTON_MODE == 1) then
+              par_vel = 0.0d0
+            else if (PHOTON_MODE == 2) then
+              !par_vel = 0.0d0 ! Need to modify this to K = h (v - v_0) for excess energy
+              par_vel(3) = sqrt((2 * ((p_eV - w_theta_xy(par_pos, emit))*q_0))/m_0) ! <-- Newtonian
+            else
+              print *, "WARNING: Unknown photon velocity mode!"
+            end if
+            
+            !print *, par_vel
+            call Add_Particle(par_pos, par_vel, species_elec, step, emit, -1)
 
-          nrElecEmit = nrElecEmit + 1
-          nrEmitted_emitters(emit) = nrEmitted_emitters(emit) + 1
-          nrTry = 0
+            !print *, 'field = ', field
+            !pause
+            !call Add_Plane_Graph_emitt(par_pos, par_vel)
 
+            nrElecEmit = nrElecEmit + 1
+            nrEmitted_emitters(emit) = nrEmitted_emitters(emit) + 1
+            nrTry = 0
+          end if
         end if
       end if
     end do
@@ -409,7 +565,10 @@ contains
     integer, intent(in)              :: step, emit
     integer                          :: nrElecEmit, nrTry
     double precision, dimension(1:3) :: par_pos, par_vel, field
-
+    double precision                 :: p_eV
+    
+    ! Get Energy distribution of the photons
+    p_eV = ptr_Get_Photo_Emission_Energy()
     par_pos = 0.0d0
     nrTry = 0
     nrElecEmit = 0
@@ -429,38 +588,48 @@ contains
         exit
       end if
 
-      CALL RANDOM_NUMBER(par_pos(1:2)) ! Gives a random number [0,1]
+      call random_number(par_pos(1:2)) ! Gives a random number [0,1]
 
       par_pos(1:2) = emitters_pos(1:2, emit) + emitters_dim(1:2, emit)*par_pos(1:2)
       !par_pos(2) = emitters_pos(2, emit) + emitters_dim(2, emit)*par_pos(2)
 
       nrTry = nrTry + 1
-      par_pos(3) = 0.0d0 * length_scale !Check in plane
-      field = Calc_Field_at(par_pos)
+      par_pos(3) = 0.0d0 * length_scale ! Check in plane
+      
+      if (w_theta_xy(par_pos, emit) <= p_eV) then
 
-      if (field(3) < 0.0d0) then
-        par_pos(3) = 1.0d0 * length_scale !Above plane
         field = Calc_Field_at(par_pos)
-
         if (field(3) < 0.0d0) then
+          par_pos(3) = 1.0d0 * length_scale ! Above plane
+          field = Calc_Field_at(par_pos)
 
-          par_pos(3) = 1.0d0 * length_scale ! Place above plane
-          par_vel = 0.0d0
-          call Add_Particle(par_pos, par_vel, species_elec, step, emit, -1)
+          if (field(3) < 0.0d0) then
+            par_pos(3) = 1.0d0 * length_scale ! Place above plane
 
-          !print *, 'field = ', field
-          !pause
-          !call Add_Plane_Graph_emitt(par_pos, par_vel)
+            if (PHOTON_MODE == 1) then
+              par_vel = 0.0d0
+            else if (PHOTON_MODE == 2) then
+              par_vel(3) = sqrt((2 * ((p_eV - w_theta_xy(par_pos, emit))*q_0))/m_0) ! <-- Newtonian
+            else
+              print *, "WARNING: Unknown photon velocity mode!"
+            end if
+            
+            call Add_Particle(par_pos, par_vel, species_elec, step, emit, -1)
 
-          nrElecEmit = nrElecEmit + 1
-          nrEmitted_emitters(emit) = nrEmitted_emitters(emit) + 1
-          nrTry = 0
+            !print *, 'field = ', field
+            !pause
+            !call Add_Plane_Graph_emitt(par_pos, par_vel)
 
+            nrElecEmit = nrElecEmit + 1
+            nrEmitted_emitters(emit) = nrEmitted_emitters(emit) + 1
+            nrTry = 0
+
+          end if
         end if
       end if
     end do
 
-    posInit = posInit + nrElecEmit
+    posInit   = posInit   + nrElecEmit
     nrEmitted = nrEmitted + nrElecEmit
   end subroutine Do_Photo_Emission_Rectangle_Spot
 
@@ -521,9 +690,57 @@ contains
   !   end do
   ! end subroutine Write_Plane_Graph_emitt
 
-  ! Gives a gaussian emission curve
+  ! ----------------------------------------------------------------------------    
+  ! Gives a Gaussian emission curve
   ! where step is the current time step
   ! returns the number of electrons allowed to be emitted in that time step
+  ! Needs rework from if to case for pulse series input - Hákon 15.12.21
+  double precision function Gauss_Emission(step)
+    integer, intent(in)          :: step ! Current time step
+    integer                      :: IFAIL
+    double precision             :: b 
+    
+    b = 1.0d0 / ( 2.0d0 * pi * Gauss_pulse_width**2 )
+    ! For mutiple pulses - WIP
+    !if (step <= 15000) then
+    Gauss_Emission = Gauss_pulse_amplitude * exp( -1.0d0 * b * (step - Gauss_pulse_center)**2 )
+    !else
+    !  Gauss_Emission = A * exp( -1.0d0 * b * (step - mu2)**2 )
+    !end if
+    
+    write (ud_gauss, "(i6, tr2, i6)", iostat=IFAIL) step, Gauss_Emission
+  end function Gauss_Emission
+
+  ! ----------------------------------------------------------------------------
+  ! Repurposed Maxwell-Boltzmann distribution for velocity generation
+  ! https://en.wikipedia.org/wiki/Maxwell%E2%80%93Boltzmann_distribution#Distribution_for_the_velocity_vector
+  ! 
+  ! Box-Muller method for normal distribution of photon energies
+  ! Input is read from laser file with mean and standard deviation (std) in electronVolts (eV)
+  function Get_Laser_Energy()
+    double precision                 :: Get_Laser_Energy
+    double precision, dimension(1:2) :: std
+    double precision, dimension(1:2) :: mean
+    double precision, dimension(1:3) :: Set_Laser_Energy
+
+    mean = laser_energy
+    std  = laser_variation ! Standard deviation of the Maxwell-Boltzmann distribution
+    
+    ! Get normal distributed numbers.
+    ! The Box Muller method gives two numbers.
+    ! We overwrite the second element in the array.
+    Set_Laser_Energy(1:2) = box_muller(mean, std)
+    Set_Laser_Energy(2:3) = box_muller(mean, std)
+
+    Get_Laser_Energy = abs(Set_Laser_Energy(3)) ! Positive velocity in the z-direction
+  end function Get_Laser_Energy
+
+  function Get_Fixed_Laser_Energy()
+    double precision                 :: Get_Fixed_Laser_Energy
+
+    Get_Fixed_Laser_Energy = laser_energy
+  end function Get_Fixed_Laser_Energy
+
   integer function Gauss_Emission_int(step)
     integer, intent(in)         :: step ! Current time step
     integer                     :: IFAIL
@@ -537,16 +754,4 @@ contains
     write (ud_gauss, "(i6, tr2, i6)", iostat=IFAIL) step, Gauss_Emission_int
   end function Gauss_Emission_int
 
-  double precision function Gauss_Emission(step)
-  integer, intent(in)         :: step ! Current time step
-  integer                     :: IFAIL
-  double precision, parameter :: sigma = 1000.0d0 ! Width / standard deviation
-  double precision, parameter :: mu = 3000.0d0 ! Center
-  double precision, parameter :: A = 6.0d0 ! Height
-  double precision, parameter :: b = 1.0d0/(2.0d0*pi*sigma**2)
-
-  Gauss_Emission = A * exp( -1.0d0*b*(step - mu)**2 )
-
-  write (ud_gauss, "(i6, tr2, ES12.4)", iostat=IFAIL) step, Gauss_Emission
-end function Gauss_Emission
 end module mod_photo_emission

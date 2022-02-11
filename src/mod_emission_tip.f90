@@ -1318,13 +1318,26 @@ end function Elec_supply_tip
   double precision function Gauss_Emission(step)
     integer, intent(in)         :: step ! Current time step
     integer                     :: IFAIL
-    double precision, parameter :: sigma = 1000.0d0 ! Width / standard deviation
-    double precision, parameter :: mu = 3000.0d0 ! Center
-    double precision, parameter :: A = 6.0d0 ! Height
+    double precision, parameter :: sigma = 3000.0d0 ! Width / standard deviation
+    double precision, parameter :: mu = 20000.0d0 ! Center
+    double precision, parameter :: A = 1.0d0 ! Height
     double precision, parameter :: b = 1.0d0/(2.0d0*pi*sigma**2)
 
     Gauss_Emission = A * exp( -1.0d0*b*(step - mu)**2 )
 
-    write (ud_gauss, "(i6, tr2, ES12.4)", iostat=IFAIL) step, Gauss_Emission
+    write (ud_gauss, "(i6, tr2, i6)", iostat=IFAIL) step, Gauss_Emission
   end function Gauss_Emission
+
+  double precision function Photon_Emission(photon_energy, freq_var)
+    double precision, intent(in):: photon_energy, freq_var
+    double precision :: rand_photon, photon_rand, Photon_power, Freq, Photo_pois
+    
+    Photon_power = photon_energy*10000
+    Freq = freq_var*10000
+    call random_number(rand_photon)
+    photon_rand = (Photon_power-Freq) + FLOOR(((Photon_power+Freq)-(Photon_power-Freq))*rand_photon)
+    Photo_pois = Rand_Poission(photon_rand)
+    Photon_Emission = Photo_pois/10000
+
+  end function Photon_Emission
 end module mod_emission_tip

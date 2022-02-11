@@ -1,5 +1,5 @@
 !-------------------------------------------!
-! module for position dependent          !
+! Module for position dependent             !
 ! work function                             !
 ! Kristinn Torfason                         !
 ! 21.10.18                                  !
@@ -15,20 +15,20 @@ module mod_work_function
   double precision                                        :: x_len, y_len
 
   ! Gaussians
-  integer                                     :: num_gauss ! Number of Gaussian points
-  double precision                            :: w_theta_base
-  double precision, allocatable, dimension(:) :: w_gaussians_A ! Amplitude
-  double precision, allocatable, dimension(:) :: w_gaussians_x ! x - center
-  double precision, allocatable, dimension(:) :: w_gaussians_y ! y - center
+  integer                                     :: num_gauss         ! Number of Gaussian points
+  double precision                            :: w_theta_base      ! Base workfunction
+  double precision, allocatable, dimension(:) :: w_gaussians_A     ! Amplitude
+  double precision, allocatable, dimension(:) :: w_gaussians_x     ! x - center
+  double precision, allocatable, dimension(:) :: w_gaussians_y     ! y - center
   double precision, allocatable, dimension(:) :: w_gaussians_std_x ! standard deviation / spread in x
   double precision, allocatable, dimension(:) :: w_gaussians_std_y ! standard deviation / spread in y
 
   ! Voronoi
-  integer                                     :: num_vor_sites ! Number of sites/cells in the Voronoi pattern
-  double precision, allocatable, dimension(:) :: vor_sites_x   ! x-position of a site
-  double precision, allocatable, dimension(:) :: vor_sites_y   ! y-position of a site
-  double precision, allocatable, dimension(:) :: vor_w_theta   ! Work function in cell
-  integer,          allocatable, dimension(:) :: vor_sec       ! The number for the section of the cell
+  integer                                     :: num_vor_sites     ! Number of sites/cells in the Voronoi pattern
+  double precision, allocatable, dimension(:) :: vor_sites_x       ! x-position of a site
+  double precision, allocatable, dimension(:) :: vor_sites_y       ! y-position of a site
+  double precision, allocatable, dimension(:) :: vor_w_theta       ! Work function in cell
+  integer,          allocatable, dimension(:) :: vor_sec           ! The number for the section of the cell
 
   ! Circles
   integer                                     :: num_circles ! Number of circles
@@ -478,7 +478,7 @@ contains
     end if
 
   end function w_theta_checkerboard
-
+  
   double precision function w_theta_checkerboard_2x2(pos, sec)
     double precision, intent(in), dimension(1:3) :: pos
     integer, intent(out), optional               :: sec
@@ -607,5 +607,4 @@ contains
     deallocate(vor_w_theta)
     deallocate(vor_sec)
   end function unit_test_voronoi
-
 end module mod_work_function
