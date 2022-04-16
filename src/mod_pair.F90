@@ -407,23 +407,28 @@ contains
   subroutine Write_Position(step)
     integer, intent(in)              :: step
     integer                          :: i
+    integer, parameter               :: N_steps = 10
     double precision, dimension(1:3) :: par_pos
 
     if (write_position_file .eqv. .True.) then
       if (step == 1) then
         ! Write at the start of the file the total number of time steps
-        write(unit=ud_pos) steps
+        write(unit=ud_pos) steps, N_steps
       end if
 
-      ! Write out what time step we are on and the current number of particles
-      write(unit=ud_pos) step, nrPart
+      ! Write position out every N_steps
+      if (mod(step, N_steps) == 0) then
 
-      do i = 1, nrPart
-        par_pos(:) = particles_cur_pos(:, i) ! Position of the particle
+        ! Write out what time step we are on and the current number of particles
+        write(unit=ud_pos) step, nrPart
 
-        ! Write out x, y, z and which emitter the particle came from
-        write(unit=ud_pos) par_pos(1), par_pos(2), par_pos(3), particles_emitter(i), particles_section(i), particles_id(i)
-      end do
+        do i = 1, nrPart
+          par_pos(:) = particles_cur_pos(:, i) ! Position of the particle
+
+          ! Write out x, y, z and which emitter the particle came from
+          write(unit=ud_pos) par_pos(1), par_pos(2), par_pos(3), particles_emitter(i), particles_section(i), particles_id(i)
+        end do
+      end if
     end if
   end subroutine Write_Position
 

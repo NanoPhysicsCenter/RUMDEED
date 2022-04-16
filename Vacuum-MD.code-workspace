@@ -11,6 +11,8 @@
 		"fortran.includePaths": [
 			"/home/kristor/Work/Vacuum-MD/build"
 		],
-		"jupyter.jupyterServerType": "local"
+		"jupyter.jupyterServerType": "local",
+		"esbonio.server.enabled": true,
+		"esbonio.sphinx.confDir": "${workspaceFolder}/docs/source"
 	}
 }
