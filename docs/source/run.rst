@@ -5,7 +5,7 @@ To do run the code
 
 Input files
 -----------
-input, w_theta, collisions
+input, w_theta, collisions, laser
 
 Input file
 ++++++++++
@@ -32,6 +32,8 @@ EMISSION_MODE
     10: :ref:`Planar field emission <field>`.
 NREMIT
     Number of emitters in the system. Should be an integer larger than zero. Note that not all emission modes support multiple emitters.
+IMAGE_CHARGE
+    Boolean (.TRUE. / .FALSE.) if system should include image charge effects.
 EMITTERS_DIM(1:3, <EMITTER NUMBER>)
     Dimensions of the emitter given as three numbers in nano-meters [nm].
     If the emitter is a circle only the first number is relevant and is interpreted as the radius of the emitter.
@@ -66,6 +68,7 @@ Example input file with one emitter doing planar field emission:
     STEPS = 20000,
     EMISSION_MODE = 10,
     NREMIT = 1,
+    IMAGE_CHARGE = .TRUE.
 
     EMITTERS_DIM(1:3, 1) 1000.0d0, 1000.0d0, 1000.0d0,
     EMITTERS_POS(1:3, 1) = -500.0d0, -500.0d0, 0.0d0,
@@ -87,7 +90,33 @@ Collisions
 ++++++++++
 N\ :sub:`2` files
 
+Laser
++++++
 
+Laser file
+
+.. code-block:: console
+
+    1 2 2
+    4.7 0.02
+    10000 1000 5
+
+Photoemission Input Warning
++++++++++++++
+
+    The header/first line sets parameters;
+    The first number enables Gaussian electron emission pulse, 1 = on, 2 = off.
+    Second number selects type of laser input, 1 for fixed photon energy, 2 for Poisson distributed photon energy.
+    Third number picks velocity profile for electrons, 1 being zero initial velocity, 2 for work function dependant inital velocity.
+    
+    Second line is laser (photon) energy and variation, first being the laser 'mean' energy level in electronVolts (eV) and second being standard deviation of the laser (in eV's as well). 
+    This is normal distribution with Box-Muller method.
+    For work function dependant initial velocity the energy is compared to the work function with the excess making way for Newtonian velocity given to the electrons.
+
+    Third line is gauss pulse parameters, center (mu), width (sigma) and A(mplitude) of the pulse. 
+    The gaussian pulse is simulated with output restriction of electrons according to normal distribution.
+    This should in theory simulate the Quantum Efficiency and Intensity via amplitude modulation.
+    
 Running the code
 -----------------
 
