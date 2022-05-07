@@ -101,6 +101,7 @@ module mod_global
   logical         , dimension(:)   , allocatable :: particles_mask       ! Mask array used to indicate which particles should be removed
                                                                          ! .true. means that the particle is active,
                                                                          ! .false. means it is inactive and should be removed
+  integer         , dimension(:)   , allocatable :: particles_id         ! ID to track the particle
 
   ! Cross Sections
   double precision, allocatable, target, dimension(:, :) :: N2_tot_cross ! Total cross section of N2
@@ -160,6 +161,7 @@ module mod_global
   integer :: nrHole ! Number of holes in the system
   integer :: nrElecHole
   integer :: nrEmit ! Number of emitters in the system
+  integer :: nrID   ! Number for the current id
 
   integer :: nrPart_remove_top
   integer :: nrPart_remove_bot

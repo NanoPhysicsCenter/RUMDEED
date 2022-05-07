@@ -69,6 +69,7 @@ contains
       particles_emitter(nrPart+1)         = emit
       particles_section(nrPart+1)         = sec
       particles_life(nrPart+1)            = life
+      particles_id(nrPart+1)              = nrID ! ID is updated near the end
 
       if (par_species == species_elec) then ! Electron
         particles_charge(nrPart+1) = -1.0d0*q_0
@@ -77,19 +78,21 @@ contains
         ! Write out the x and y position of the emitted particle
         ! along with which emitter and section it came from.
         !if (abs(par_pos(3) - 1.0d0*length_scale) < 1.0E-3) then
-          write(unit=ud_density_emit) (par_pos(1) / length_scale), (par_pos(2) / length_scale), emit, sec
+          write(unit=ud_density_emit) (par_pos(1) / length_scale), (par_pos(2) / length_scale), emit, sec, nrID
         !end if
       else ! N_2^+ Ion
         particles_charge(nrPart+1) = +1.0d0*q_0
         particles_mass(nrPart+1) = m_N2p
         nrHole = nrHole + 1
-        write(unit=ud_density_ion) (par_pos(1) / length_scale), (par_pos(2) / length_scale), (par_pos(3) / length_scale)
+        write(unit=ud_density_ion) (par_pos(1) / length_scale), (par_pos(2) / length_scale), (par_pos(3) / length_scale), nrID
       end if
 
       ! Update the number of particles in the system
       nrElecHole = nrElec + nrHole
       nrPart = nrElecHole
       !endElecHoles = nrPart
+
+      nrID = nrID + 1
     end if
   end subroutine Add_Particle
 
@@ -142,7 +145,7 @@ contains
           !$OMP CRITICAL(DENSITY_ABSORB_TOP)
           write(unit=ud_density_absorb_top) particles_cur_pos(1, i)/length_scale, particles_cur_pos(2, i)/length_scale, &
                                           & particles_cur_vel(1, i), particles_cur_vel(2, i), particles_cur_vel(3, i), &
-                                          & particles_emitter(i), particles_section(i)
+                                          & particles_emitter(i), particles_section(i), particles_id(i)
           !$OMP END CRITICAL(DENSITY_ABSORB_TOP)
         CASE (remove_bot)
           !$OMP ATOMIC UPDATE
@@ -154,7 +157,7 @@ contains
           ! Write out the x and y position of the particle along with which emitter it came from.
           !$OMP CRITICAL(DENSITY_ABSORB_BOT)
           write(unit=ud_density_absorb_bot) particles_cur_pos(1, i)/length_scale, particles_cur_pos(2, i)/length_scale, &
-                                          & particles_emitter(i), particles_section(i)
+                                          & particles_emitter(i), particles_section(i), particles_id(i)
           !$OMP END CRITICAL(DENSITY_ABSORB_BOT)
         CASE DEFAULT
           print *, 'Error unkown remove case ', m
@@ -213,7 +216,7 @@ contains
         !$OMP& SHARED(particles_mask, particles_cur_pos, particles_prev_pos, particles_last_col_pos) &
         !$OMP& SHARED(particles_cur_vel, particles_cur_accel, particles_prev_accel, particles_prev2_accel) &
         !$OMP& SHARED(particles_step, particles_species, step, particles_mass, particles_charge) &
-        !$OMP& SHARED(particles_emitter, particles_section, particles_life, nrPart, life_time)
+        !$OMP& SHARED(particles_emitter, particles_section, particles_life, particles_id, nrPart, life_time)
         !$OMP SINGLE
 
         k = 1
@@ -271,6 +274,10 @@ contains
 
         !$OMP TASK FIRSTPRIVATE(k, m) SHARED(particles_life, particles_mask)
         call compact_array(particles_life, particles_mask, k, m)
+        !$OMP END TASK
+
+        !$OMP TASK FIRSTPRIVATE(k, m) SHARED(particles_id, particles_mask)
+        call compact_array(particles_id, particles_mask, k, m)
         !$OMP END TASK
 
         !$OMP END SINGLE NOWAIT
@@ -400,23 +407,28 @@ contains
   subroutine Write_Position(step)
     integer, intent(in)              :: step
     integer                          :: i
+    integer, parameter               :: N_steps = 10
     double precision, dimension(1:3) :: par_pos
 
     if (write_position_file .eqv. .True.) then
       if (step == 1) then
         ! Write at the start of the file the total number of time steps
-        write(unit=ud_pos) steps
+        write(unit=ud_pos) steps, N_steps
       end if
 
-      ! Write out what time step we are on and the current number of particles
-      write(unit=ud_pos) step, nrPart
+      ! Write position out every N_steps
+      if (mod(step, N_steps) == 0) then
 
-      do i = 1, nrPart
-        par_pos(:) = particles_cur_pos(:, i) ! Position of the particle
+        ! Write out what time step we are on and the current number of particles
+        write(unit=ud_pos) step, nrPart
 
-        ! Write out x, y, z and which emitter the particle came from
-        write(unit=ud_pos) par_pos(1), par_pos(2), par_pos(3), particles_emitter(i), particles_section(i)
-      end do
+        do i = 1, nrPart
+          par_pos(:) = particles_cur_pos(:, i) ! Position of the particle
+
+          ! Write out x, y, z and which emitter the particle came from
+          write(unit=ud_pos) par_pos(1), par_pos(2), par_pos(3), particles_emitter(i), particles_section(i), particles_id(i)
+        end do
+      end if
     end if
   end subroutine Write_Position
 

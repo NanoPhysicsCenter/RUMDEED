@@ -120,8 +120,8 @@ program VacuumMD
     ! Update the position of all particles
     !print *, 'Update position'
     call Update_Position(i)
-    !call Write_Position(i)
-    call Write_Position_XYZ_Step(i)
+    call Write_Position(i)
+    !call Write_Position_XYZ_Step(i)
 
     ! Remove particles from the system
     !print *, 'Remove particles'
@@ -339,6 +339,7 @@ contains
     allocate(particles_emitter(1:MAX_PARTICLES))
     allocate(particles_section(1:MAX_PARTICLES))
     allocate(particles_life(1:MAX_PARTICLES))
+    allocate(particles_id(1:MAX_PARTICLES))
 
     allocate(life_time(1:MAX_LIFE_TIME, 1:2))
     allocate(ramo_current(1:nrSpecies))
@@ -357,6 +358,7 @@ contains
     particles_mass        = 0.0d0
     particles_step        = 0
     particles_mask        = .true.
+    particles_id          = 0
 
     ramo_current = 0.0d0
     ramo_current_emit(1:MAX_SECTIONS, 1:MAX_EMITTERS) = 0.0d0
@@ -388,6 +390,9 @@ contains
     nrElec_remove_bot = 0
     nrHole_remove_top = 0
     nrHole_remove_bot = 0
+
+    ! ID starts with 0
+    nrID = 0
 
     !progress(10) = 1.0*steps
     progress(9) = nint(0.9d0*steps)
@@ -767,6 +772,7 @@ contains
     deallocate(particles_emitter)
     deallocate(particles_section)
     deallocate(particles_life)
+    deallocate(particles_id)
 
     deallocate(emitters_pos)
     deallocate(emitters_dim)
