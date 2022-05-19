@@ -102,7 +102,7 @@ Laser file
     10000 1000 5
 
 Photoemission Input Warning
-+++++++++++++
++++++++++++++++++++++++++++
 
     The header/first line sets parameters;
     The first number enables Gaussian electron emission pulse, 1 = on, 2 = off.
