@@ -24,10 +24,46 @@ update using:
 
 .. f:autosubroutine:: Update_Velocity
 
+.. _photo:
+
 Photo emission
 --------------
-Photo
+Photoemission Branch
+    
+* Photoemission based on Workfunction pattern - see mod_workfunction as well
 
+    * Checkerboard
+    * Random generated pattern - WIP
+    * Emission tip (Works but probably not as intended)
+    * Circle (Should work, exhaustive tests not done)
+
+* Velocity distibution is Gaussian
+    * Velocity has Newtonian calculations
+
+.. math::
+    v_z = \sqrt{ \frac{ 2( \hbar \omega - \phi ) * q_{0} }{ m_{0} }}
+
+* Output pulse can be Gaussian
+    * Quantum efficiency is controlled by amplitude modulation
+    * Pulse repetition is possible - WIP
+
+.. math::
+    b = \frac{1}{ 2 \pi \sigma^2}
+
+.. math::
+    f(step) = A exp{ - b  ( step - \mu )^2 }
+
+.. math::
+    QE \equiv \frac{\hbar \omega}{ q_0 } \frac{ J }{ I_{\omega } } \propto ( \hbar \omega - \Phi)^2
+
+Quantum efficiency and light intensity are both variables in the amplitude so care should be taken when interpeting the input A(mplitude) of the normal distibution.
+
+* Input file for laser and pulse
+
+    * Input file is same as main
+    * laser file is photoemission specific
+
+.. _field:
 
 Field emission
 --------------
@@ -52,6 +88,12 @@ If \(\phi\) is in eV and \(F\) in V/m then
 .. math::
   l = \frac{e}{4\pi\epsilon_0} \frac{F}{\phi^2}
 
+.. _field-tip:
+
+Tip stuff
+
+
+.. _thermal-field:
 
 Thermal-field emission
 ----------------------
