@@ -34,69 +34,34 @@ Photoemission Branch
 
     * Checkerboard
     * Random generated pattern - WIP
-    * Emission tip
-    * Circle - WIP
+    * Emission tip (Works but probably not as intended)
+    * Circle (Should work, exhaustive tests not done)
 
 * Velocity distibution is Gaussian
-
     * Velocity has Newtonian calculations
 
-* Output pulse can be Gaussian
+.. math::
+    v_z = \sqrt{ \frac{ 2( \hbar \omega - \phi ) * q_{0} }{ m_{0} }}
 
+* Output pulse can be Gaussian
     * Quantum efficiency is controlled by amplitude modulation
     * Pulse repetition is possible - WIP
+
+.. math::
+    b = \frac{1}{ 2 \pi \sigma^2}
+
+.. math::
+    f(step) = A exp{ - b  ( step - \mu )^2 }
+
+.. math::
+    QE \equiv \frac{\hbar \omega}{ q_0 } \frac{ J }{ I_{\omega } } \propto ( \hbar \omega - \Phi)^2
+
+Quantum efficiency and light intensity are both variables in the amplitude so care should be taken when interpeting the input A(mplitude) of the normal distibution.
 
 * Input file for laser and pulse
 
     * Input file is same as main
-    * laser file is photo_emission specific
-
-Input file
-
-.. code-block:: console
-
-    &
-    INPUT
-    V_S = 1.0d1,
-    BOX_DIM = 0.0d0, 0.0d0, 2500.0d0,
-    TIME_STEP = 0.25d-3,
-    STEPS = 60000,
-    EMISSION_MODE = 1,
-    NREMIT = 1,
-    IMAGE_CHARGE = .TRUE.,
-
-    EMITTERS_DIM(1:3, 1) = 500.0d0, 500.0d0, 0.0d0,
-    EMITTERS_POS(1:3, 1) = -250.0d0, -250.0d0, 0.0d0,
-    EMITTERS_TYPE(1) = 2,
-    EMITTERS_DELAY(1) = 0,
-
-    /
-
-
-Laser file
-
-.. code-block:: console
-
-    1 2 2
-    4.7 0.02
-    10000 1000 5
-
-Input Warning
-+++++++++++++
-
-    The header/first line sets parameters;
-    The first number enables Gaussian electron emission pulse, 1 = on, 2 = off.
-    Second number selects type of laser input, 1 for fixed photon energy, 2 for Poisson distributed photon energy.
-    Third number picks velocity profile for electrons, 1 being zero initial velocity, 2 for work function dependant inital velocity.
-    
-    Second line is laser (photon) energy and variation, first being the laser 'mean' energy level in electronVolts (eV) and second being standard deviation of the laser (in eV's as well). 
-    This is normal distribution with Box-Muller method.
-    For work function dependant initial velocity the energy is compared to the work function with the excess making way for Newtonian velocity given to the electrons.
-
-    Third line is gauss pulse parameters, center (mu), width (sigma) and A(mplitude) of the pulse. 
-    The gaussian pulse is simulated with output restriction of electrons according to normal distribution.
-    This should in theory simulate the Quantum Efficiency and Intensity via amplitude modulation.
-        
+    * laser file is photoemission specific
 
 .. _field:
 
