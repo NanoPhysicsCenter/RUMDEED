@@ -4,7 +4,8 @@
   <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>6. Code description &mdash; Vacuum-MD  documentation</title>
+  <title>6. Code description &mdash; Vacuum-MD 0a10c506c991fd6a860b65a05e622270dc47809e
+ documentation</title>
       <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
       <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
       <link rel="stylesheet" href="_static/css/custom.css" type="text/css" />
@@ -52,6 +53,8 @@
 <li class="toctree-l3"><a class="reference internal" href="run.html#input-file">3.1.1. Input file</a></li>
 <li class="toctree-l3"><a class="reference internal" href="run.html#work-function">3.1.2. Work function</a></li>
 <li class="toctree-l3"><a class="reference internal" href="run.html#collisions">3.1.3. Collisions</a></li>
+<li class="toctree-l3"><a class="reference internal" href="run.html#laser">3.1.4. Laser</a></li>
+<li class="toctree-l3"><a class="reference internal" href="run.html#photoemission-input-warning">3.1.5. Photoemission Input Warning</a></li>
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="run.html#running-the-code">3.2. Running the code</a></li>
@@ -65,10 +68,7 @@
 <li class="toctree-l1"><a class="reference internal" href="data.html">5. Data analysis examples</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">6. Code description</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="#verlet">6.1. Verlet</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#photo-emission">6.2. Photo emission</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="#input-warning">6.2.1. Input Warning</a></li>
-</ul>
-</li>
+<li class="toctree-l2"><a class="reference internal" href="#photo-emission">6.2. Photo emission</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#field-emission">6.3. Field emission</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#thermal-field-emission">6.4. Thermal-field emission</a></li>
 </ul>
@@ -108,13 +108,61 @@
 <section id="verlet">
 <h2><span class="section-number">6.1. </span>Verlet<a class="headerlink" href="#verlet" title="Permalink to this headline"></a></h2>
 <p>For particle advancement the code uses the Velocity Verlet algorithm. The code for it can be found in <strong>mod_verlet.F90</strong> and the main subroutine is:</p>
+<dl>
+<dt class="sig sig-object f" id="f/_/velocity_verlet">
+<em class="property"><span class="pre">subroutine</span>&#160; </em><span class="sig-name descname"><span class="pre">velocity_verlet</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="pre">step</span></em><span class="sig-paren">)</span><a class="headerlink" href="#f/_/velocity_verlet" title="Permalink to this definition"></a></dt>
+<dd><p>Velocity Verlet</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>step</strong><em> [</em><em>integer</em><em>,</em><em>in</em><em>]</em> :: Scaled in units of time_scale</p>
+</dd>
+<dt class="field-even">Called from</dt>
+<dd class="field-even"><p><code class="xref f f-func docutils literal notranslate"><span class="pre">update_position()</span></code></p>
+</dd>
+<dt class="field-odd">Call to</dt>
+<dd class="field-odd"><p><code class="xref f f-func docutils literal notranslate"><span class="pre">set_voltage()</span></code>, <a class="reference internal" href="#f/_/update_elechole_position" title="f/_/update_elechole_position"><code class="xref f f-func docutils literal notranslate"><span class="pre">update_elechole_position()</span></code></a>, <code class="xref f f-func docutils literal notranslate"><span class="pre">write_position_test()</span></code>, <code class="xref f f-func docutils literal notranslate"><span class="pre">calculate_acceleration_particles()</span></code>, <code class="xref f f-func docutils literal notranslate"><span class="pre">write_acceleration_test()</span></code>, <a class="reference internal" href="#f/_/update_velocity" title="f/_/update_velocity"><code class="xref f f-func docutils literal notranslate"><span class="pre">update_velocity()</span></code></a>, <code class="xref f f-func docutils literal notranslate"><span class="pre">write_ramo_current()</span></code></p>
+</dd>
+</dl>
+</dd></dl>
+
 <p>The updated positions are calculated with:</p>
 <div class="math notranslate nohighlight">
 \[x_{n+1} = x_n + v_n\Delta t + \frac{1}{2}a_n \Delta t^2\]</div>
+<dl>
+<dt class="sig sig-object f" id="f/_/update_elechole_position">
+<em class="property"><span class="pre">subroutine</span>&#160; </em><span class="sig-name descname"><span class="pre">update_elechole_position</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="pre">step</span></em><span class="sig-paren">)</span><a class="headerlink" href="#f/_/update_elechole_position" title="Permalink to this definition"></a></dt>
+<dd><p>Update the position of particles in the verlet integration</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>step</strong><em> [</em><em>integer</em><em>,</em><em>in</em><em>]</em></p>
+</dd>
+<dt class="field-even">Called from</dt>
+<dd class="field-even"><p><a class="reference internal" href="#f/_/velocity_verlet" title="f/_/velocity_verlet"><code class="xref f f-func docutils literal notranslate"><span class="pre">velocity_verlet()</span></code></a></p>
+</dd>
+<dt class="field-odd">Call to</dt>
+<dd class="field-odd"><p><code class="xref f f-func docutils literal notranslate"><span class="pre">check_planes()</span></code></p>
+</dd>
+</dl>
+</dd></dl>
+
 <p>Then the force on each particle is calculate using Coulomb’s law, after which the velocity is
 update using:</p>
 <div class="math notranslate nohighlight">
 \[v_{n+1} = v_n + \frac{a_n+a_{n+1}}{2} \Delta t^2\]</div>
+<dl>
+<dt class="sig sig-object f" id="f/_/update_velocity">
+<em class="property"><span class="pre">subroutine</span>&#160; </em><span class="sig-name descname"><span class="pre">update_velocity</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="pre">step</span></em><span class="sig-paren">)</span><a class="headerlink" href="#f/_/update_velocity" title="Permalink to this definition"></a></dt>
+<dd><p>Update the velocity in the verlet integration</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>step</strong><em> [</em><em>integer</em><em>,</em><em>in</em><em>]</em></p>
+</dd>
+<dt class="field-even">Called from</dt>
+<dd class="field-even"><p><a class="reference internal" href="#f/_/velocity_verlet" title="f/_/velocity_verlet"><code class="xref f f-func docutils literal notranslate"><span class="pre">velocity_verlet()</span></code></a></p>
+</dd>
+</dl>
+</dd></dl>
+
 </section>
 <section id="photo-emission">
 <span id="photo"></span><h2><span class="section-number">6.2. </span>Photo emission<a class="headerlink" href="#photo-emission" title="Permalink to this headline"></a></h2>
@@ -125,75 +173,48 @@ update using:</p>
 <div><ul class="simple">
 <li><p>Checkerboard</p></li>
 <li><p>Random generated pattern - WIP</p></li>
-<li><p>Emission tip</p></li>
-<li><p>Circle - WIP</p></li>
+<li><p>Emission tip (Works but probably not as intended)</p></li>
+<li><p>Circle (Should work, exhaustive tests not done)</p></li>
 </ul>
 </div></blockquote>
 </li>
-<li><p>Velocity distibution is Gaussian</p>
-<blockquote>
-<div><ul class="simple">
+<li><dl class="simple">
+<dt>Velocity distibution is Gaussian</dt><dd><ul class="simple">
 <li><p>Velocity has Newtonian calculations</p></li>
 </ul>
-</div></blockquote>
+</dd>
+</dl>
 </li>
-<li><p>Output pulse can be Gaussian</p>
-<blockquote>
-<div><ul class="simple">
+</ul>
+<div class="math notranslate nohighlight">
+\[v_z = \sqrt{ \frac{ 2( \hbar \omega - \phi ) * q_{0} }{ m_{0} }}\]</div>
+<ul class="simple">
+<li><dl class="simple">
+<dt>Output pulse can be Gaussian</dt><dd><ul>
 <li><p>Quantum efficiency is controlled by amplitude modulation</p></li>
 <li><p>Pulse repetition is possible - WIP</p></li>
 </ul>
-</div></blockquote>
+</dd>
+</dl>
 </li>
+</ul>
+<div class="math notranslate nohighlight">
+\[b = \frac{1}{ 2 \pi \sigma^2}\]</div>
+<div class="math notranslate nohighlight">
+\[f(step) = A exp{ - b  ( step - \mu )^2 }\]</div>
+<div class="math notranslate nohighlight">
+\[QE \equiv \frac{\hbar \omega}{ q_0 } \frac{ J }{ I_{\omega } } \propto ( \hbar \omega - \Phi)^2\]</div>
+<p>Quantum efficiency and light intensity are both variables in the amplitude so care should be taken when interpeting the input A(mplitude) of the normal distibution.</p>
+<ul>
 <li><p>Input file for laser and pulse</p>
 <blockquote>
 <div><ul class="simple">
 <li><p>Input file is same as main</p></li>
-<li><p>laser file is photo_emission specific</p></li>
+<li><p>laser file is photoemission specific</p></li>
 </ul>
 </div></blockquote>
 </li>
 </ul>
-<p>Input file</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">&amp;</span>
-<span class="go">INPUT</span>
-<span class="go">V_S = 1.0d1,</span>
-<span class="go">BOX_DIM = 0.0d0, 0.0d0, 2500.0d0,</span>
-<span class="go">TIME_STEP = 0.25d-3,</span>
-<span class="go">STEPS = 60000,</span>
-<span class="go">EMISSION_MODE = 1,</span>
-<span class="go">NREMIT = 1,</span>
-<span class="go">IMAGE_CHARGE = .TRUE.,</span>
-
-<span class="go">EMITTERS_DIM(1:3, 1) = 500.0d0, 500.0d0, 0.0d0,</span>
-<span class="go">EMITTERS_POS(1:3, 1) = -250.0d0, -250.0d0, 0.0d0,</span>
-<span class="go">EMITTERS_TYPE(1) = 2,</span>
-<span class="go">EMITTERS_DELAY(1) = 0,</span>
-
-<span class="go">/</span>
-</pre></div>
-</div>
-<p>Laser file</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">1 2 2</span>
-<span class="go">4.7 0.02</span>
-<span class="go">10000 1000 5</span>
-</pre></div>
-</div>
-<section id="input-warning">
-<h3><span class="section-number">6.2.1. </span>Input Warning<a class="headerlink" href="#input-warning" title="Permalink to this headline"></a></h3>
-<blockquote>
-<div><p>The header/first line sets parameters;
-The first number enables Gaussian electron emission pulse, 1 = on, 2 = off.
-Second number selects type of laser input, 1 for fixed photon energy, 2 for Poisson distributed photon energy.
-Third number picks velocity profile for electrons, 1 being zero initial velocity, 2 for work function dependant inital velocity.</p>
-<p>Second line is laser (photon) energy and variation, first being the laser ‘mean’ energy level in electronVolts (eV) and second being standard deviation of the laser (in eV’s as well).
-This is normal distribution with Box-Muller method.
-For work function dependant initial velocity the energy is compared to the work function with the excess making way for Newtonian velocity given to the electrons.</p>
-<p>Third line is gauss pulse parameters, center (mu), width (sigma) and A(mplitude) of the pulse.
-The gaussian pulse is simulated with output restriction of electrons according to normal distribution.
-This should in theory simulate the Quantum Efficiency and Intensity via amplitude modulation.</p>
-</div></blockquote>
-</section>
 </section>
 <section id="field-emission">
 <span id="field"></span><h2><span class="section-number">6.3. </span>Field emission<a class="headerlink" href="#field-emission" title="Permalink to this headline"></a></h2>
