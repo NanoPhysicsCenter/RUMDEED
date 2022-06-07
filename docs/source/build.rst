@@ -37,4 +37,14 @@ This documentation can also be generate using the make file with:
 This will produce html and pdf files in the docs/build directory. You must have **Python** installed to generate the documentation.
 To make the pdf file **xelatex** and **xindy** must be installed.
 
+Errors
+======
+If error 2 or others show up during make or when building Cuba the install-cuba.sh script needs to be modified.
+
+.. code-block:: console
+
+   ./configure --prefix="${installdir// /\\ }" CC=$1 FC=$2 && make clean && make lib -j 8 && make install && make clean
+
+   remove the "-j 8" from make lib part.
+
 .. index:: build, make, git, compiler, gfortran, github, Intel, ifort
