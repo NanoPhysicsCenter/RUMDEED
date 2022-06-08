@@ -9,11 +9,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 # Path to the folder with the density_emit.bin and density_absorb_top.bin files
-<<<<<<< HEAD
-filepath = '/home/hakon/Documents/FE Brynjar/input7/out/'
-=======
 filepath = './out/'
->>>>>>> main
 
 # Full path with filename
 filename_emit = path.join(filepath, 'density_emit.bin') # density_emit.bin
