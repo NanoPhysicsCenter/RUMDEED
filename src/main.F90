@@ -773,6 +773,7 @@ contains
     deallocate(particles_section)
     deallocate(particles_life)
     deallocate(particles_id)
+    deallocate(particles_step)
 
     deallocate(emitters_pos)
     deallocate(emitters_dim)

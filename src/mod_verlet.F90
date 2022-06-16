@@ -251,7 +251,8 @@ contains
       avg_vel(:) = avg_vel(:) + particles_cur_vel(:, i)
     end do
     !$OMP END PARALLEL DO
-
+    
+    avg_vel(:) = avg_vel(:) / nrPart
     avg_mob = sqrt(avg_vel(1)**2 + avg_vel(2)**2 + avg_vel(3)**2) / (-1.0d0*E_z)
   end subroutine Update_Velocity
 
