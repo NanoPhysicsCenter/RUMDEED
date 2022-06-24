@@ -248,11 +248,13 @@ contains
       !$OMP ATOMIC UPDATE
       ramo_current_emit(sec, emit) = ramo_current_emit(sec, emit) + q * E_zunit * particles_cur_vel(3, i)
 
-      avg_vel(:) = avg_vel(:) + particles_cur_vel(:, i)
+      avg_vel(:) = avg_vel(:) + particles_cur_vel(:, i) ! Calculate the sum for the average
     end do
     !$OMP END PARALLEL DO
-    
-    avg_vel(:) = avg_vel(:) / nrPart
+
+    if (nrPart /= 0) then ! Check that we don't divide by zero
+      avg_vel(:) = avg_vel(:) / nrPart ! Take the average
+    end if
     avg_mob = sqrt(avg_vel(1)**2 + avg_vel(2)**2 + avg_vel(3)**2) / (-1.0d0*E_z)
   end subroutine Update_Velocity
 

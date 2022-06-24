@@ -8,8 +8,8 @@
 		}
 	],
 	"settings": {
-		"fortran.includePaths": [
-			"/home/kristor/Work/Vacuum-MD/build"
+		"linter.includePaths": [
+			"./build"
 		],
 		"jupyter.jupyterServerType": "local",
 		"esbonio.server.enabled": true,

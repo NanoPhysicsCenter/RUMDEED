@@ -281,8 +281,7 @@ contains
     ! Emitters position and dimensions are given in length_scale (nm)
     emitters_dim = emitters_dim * length_scale
     emitters_pos = emitters_pos * length_scale
-
-    
+  
     !dens_x_d = box_dim(1) / (N_x_densmap-1)
     !dens_y_d = box_dim(2) / (N_y_densmap-1)
 
