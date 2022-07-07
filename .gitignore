@@ -11,4 +11,6 @@ __genmod.f90
 *.code-workspace
 input
 run.sh
+.vscode/
+docs/build/
 cuba/

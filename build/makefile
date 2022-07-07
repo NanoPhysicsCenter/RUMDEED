@@ -15,7 +15,7 @@ GIT_VERSION := $(shell git describe --dirty --always --tags)
 CUBA_LIB=../cuba/lib/libcuba.a
 
 #UNIT_TEST = 1
-OPENMP = 1 ! Comment out to disable | changing value does nothing
+OPENMP = 1 # Comment out to disable OpenMP | changing value does nothing
 
 # Compile flags
 # UNKNOWN COMPILERS

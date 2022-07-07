@@ -242,6 +242,8 @@ contains
     double precision, dimension(1:3) :: par_pos, par_vel, field
     double precision                 :: p_eV
 
+    ! Get Energy distribution of the photons
+    p_eV = ptr_Get_Photo_Emission_Energy()
     par_pos = 0.0d0
     nrTry = 0
     nrElecEmit = 0
@@ -310,7 +312,7 @@ contains
   logical function Emit_From_Spot(par_pos)
     double precision, dimension(1:3), intent(in) :: par_pos
     integer                                      :: i
-    double precision                             :: r_sq, h, k, x, y
+    double precision                             :: r_sq, k1, k2, x, y
 
     Emit_From_Spot = .false. ! Default to false
 
@@ -319,18 +321,18 @@ contains
 
     ! Loop through all spots
     ! Equation for circle
-    ! (x-h)^2 + (y-k)^2 = r^2
+    ! (x-k1)^2 + (y-k2)^2 = r^2
     do i = 1, num_spots
-      h = spot_pos(1, i)
-      k = spot_pos(2, i)
+      k1 = spot_pos(1, i)
+      k2 = spot_pos(2, i)
 
-      r_sq = (x - h)**2 + (y - k)**2
+      r_sq = (x - k1)**2 + (y - k2)**2
 
       if (r_sq <= spot_radius_sq(i)) then
         Emit_From_Spot = .true. ! We emit from this position
         !print *, par_pos(1:3)/length_scale
         !print *, spot_radius_sq(i)/length_scale**2
-        !print *, h/length_scale, k/length_scale
+        !print *, k1/length_scale, k2/length_scale
         !pause
         exit ! We can exit the loop. No need to check other spots
       end if
@@ -340,7 +342,7 @@ contains
   subroutine Do_Photo_Emission(step)
     integer, intent(in) :: step
     integer             :: i, IFAIL
-    double precision    :: cur_time
+    ! double precision    :: cur_time
 
     posInit            = 0
     nrEmitted_emitters = 0
@@ -699,7 +701,6 @@ contains
     integer, intent(in)          :: step ! Current time step
     integer                      :: IFAIL
     double precision             :: b, b1
-    
     b = 1.0d0 / ( 2.0d0 * pi * Gauss_pulse_width**2 )
     b1 =  -1.0d0 * b * (step - Gauss_pulse_center)**2 
     ! For mutiple pulses - WIP
@@ -712,7 +713,6 @@ contains
     !else
     !  Gauss_Emission = A * exp( -1.0d0 * b * (step - mu2)**2 )
     !end if
-    
     write (ud_gauss, "(i6, tr2, i6)", iostat=IFAIL) step, Gauss_Emission
   end function Gauss_Emission
 

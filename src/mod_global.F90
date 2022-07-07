@@ -276,7 +276,6 @@ module mod_global
   integer :: ud_integrand ! Information about the surface integration
   integer :: ud_mh ! Information about MH
   integer :: ud_gauss
-  integer :: ud_laser ! Laser and pulse information
 
   ! unit descriptors for data files (binary files)
   integer :: ud_ramo_sec ! File for the ramo current broken down into emitters and sections
@@ -369,7 +368,6 @@ contains
    flush(ud_coll)
    flush(ud_integrand)
    flush(ud_mh)
-   flush(ud_laser)
    flush(ud_ramo_sec)
 
    flush(ud_density_emit)
@@ -431,18 +429,18 @@ function box_muller(mean, std)
   double precision, dimension(1:2), intent(in) :: mean, std
   double precision                             :: w
   double precision, dimension(1:2)             :: x, y
-
+  
   do
-    call random_number(x)
+   call random_number(x)
 
-    x = 2.0d0*x - 1.0d0
-    w = x(1)**2 + x(2)**2
+   x = 2.0d0*x - 1.0d0
+   w = x(1)**2 + x(2)**2
 
-    if (w < 1.0d0) exit
+   if (w < 1.0d0) exit
   end do
-
+  
   y = x*sqrt( (-2.0d0 * log( w ) ) / w )
-  box_muller = y*std + mean
+  box_muller = y*std + mean 
 end function box_muller
 
 ! Random poission variable with mean lambda.
@@ -456,13 +454,13 @@ double precision, parameter  :: Poisson_Step = 500.0d0
 
 lambda_left = lambda
 k = 0
-p = 1
+p = 1.0d0
 
-do while (p >= 1)
+do while (p >= 1.0d0)
   k = k + 1
   call random_number(u)
   p = p*u
-  do while ((p < 1) .and. (lambda_left > 0))
+  do while ((p < 1.0d0) .and. (lambda_left > 0.0d0))
    if (lambda_left > Poisson_Step) then
      p = p * exp(Poisson_Step)
      lambda_left = lambda_left - Poisson_Step

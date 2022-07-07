@@ -41,8 +41,8 @@ version = get_git_commit()
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
 extensions = [
-        'sphinxfortran.fortran_domain',
-        'sphinxfortran.fortran_autodoc',
+        #'sphinxfortran.fortran_domain',
+        #'sphinxfortran.fortran_autodoc',
         'sphinxcontrib.bibtex',
 ]
 
