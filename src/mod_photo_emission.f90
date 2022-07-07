@@ -702,15 +702,13 @@ contains
     integer                      :: IFAIL
     double precision             :: b, b1
     b = 1.0d0 / ( 2.0d0 * pi * Gauss_pulse_width**2 )
+    b1 =  -1.0d0 * b * (step - Gauss_pulse_center)**2 
     ! For mutiple pulses - WIP
     !if (step <= 15000) then
-    
-    b1 = -1.0d0 * b * (step - Gauss_pulse_center)**2
-
-    if (b1 < -700) then
+    if (b1 < -500) then
       Gauss_Emission = 0.0d0
     else
-      Gauss_Emission = Gauss_pulse_amplitude * exp( b1 )
+      Gauss_Emission = Gauss_pulse_amplitude * exp(b1)
     end if
     !else
     !  Gauss_Emission = A * exp( -1.0d0 * b * (step - mu2)**2 )
