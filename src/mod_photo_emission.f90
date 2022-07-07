@@ -698,7 +698,7 @@ contains
   double precision function Gauss_Emission(step)
     integer, intent(in)          :: step ! Current time step
     integer                      :: IFAIL
-    double precision             :: b 
+    double precision             :: b
     
     b = 1.0d0 / ( 2.0d0 * pi * Gauss_pulse_width**2 )
     ! For mutiple pulses - WIP

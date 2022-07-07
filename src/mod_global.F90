@@ -456,13 +456,13 @@ double precision, parameter  :: Poisson_Step = 500.0d0
 
 lambda_left = lambda
 k = 0
-p = 1
+p = 1.0d0
 
-do while (p >= 1)
+do while (p >= 1.0d0)
   k = k + 1
   call random_number(u)
   p = p*u
-  do while ((p < 1) .and. (lambda_left > 0))
+  do while ((p < 1.0d0) .and. (lambda_left > 0.0d0))
    if (lambda_left > Poisson_Step) then
      p = p * exp(Poisson_Step)
      lambda_left = lambda_left - Poisson_Step
