@@ -40,6 +40,8 @@ EMITTERS_DIM(1:3, <EMITTER NUMBER>)
     For a rectangular emitter the first two numbers represent the length in the x and y directions respectively.
     Is the emitter is a hyperboloid tip the first number distance from the peak of the tip to the anode. The second number is the base radius of the tip
     and the last number is the height of the tip. See :ref:`Field emission from a hyperboloid tip <field-tip>` in the code description for more details.
+    Workfunction can also depend on this number, ex. circular emitter on wf checkerboard needs first and second number even though the emitter only 
+    needs the first.    
     Here **<EMITTER NUMBER>** should be replaced by the number of the emitter.
     This line should be given for all emitters in the system.
 EMITTERS_POS(1:3, <EMITTER NUMBER>)
@@ -51,6 +53,8 @@ EMITTERS_TYPE(<EMITTER NUMBER>)
     1: Circular emitter. The dimensions **to do**
 
     2: Rectangle. The dimensions ... **to do**
+    
+    3: Rectangle spots. The dimensions ... **to do**
     
     Here **<EMITTER NUMBER>** should be replaced by the number of the emitter. This line should be given for all emitters in the system.
 EMITTERS_DELAY(<EMITTER NUMBER>)
@@ -80,11 +84,15 @@ Work function
 +++++++++++++
 work function
 
-Example work function file::
+The checkerboard (square) work function takes size input from the first two dimentions of EMITTERS_DIM and divides it into equal sections depending
+on the given matrix size. Make sure that both numbers are given even if **circular** emitter is used to avoid one dimentional emission.
 
-  1 1
+Example checkerboard work function file::
+
   1
-  2.5d0
+  2 2
+  2.5d0 3.0d0
+  3.0d0 2.5d0  
 
 Collisions
 ++++++++++
