@@ -15,7 +15,7 @@ GIT_VERSION := $(shell git describe --dirty --always --tags)
 CUBA_LIB=../cuba/lib/libcuba.a
 
 #UNIT_TEST = 1
-OPENMP = 1
+OPENMP = 1 # Comment out to disable OpenMP | changing value does nothing
 
 # Compile flags
 # UNKNOWN COMPILERS
@@ -41,7 +41,7 @@ endif
 ifneq (,$(findstring gfortran,$(FC)))
 $(info Using GNU Fortran)
 FFLAGS=-O3 -march=native -flto
-#FFLAGS=-g -fcheck=all -Wall -fbacktrace -ffpe-trap=invalid,zero,overflow,underflow
+FFLAGS=-g -fcheck=all -Wall -fbacktrace -ffpe-trap=invalid,zero,overflow,underflow
 ifdef OPENMP
 FFLAGS+=-fopenmp
 endif
