@@ -91,6 +91,7 @@ with open("/home/hakon/Documents/PE Simulations/Aug10/10sigma/19 (1)/out/positio
             x[j], y[j], z[j] = np.fromfile(file=f, count=3, dtype=np.float64)
             emit = np.fromfile(file=f, count=1, dtype=np.int32)
             sec = np.fromfile(file=f, count=1, dtype=np.int32)
+            id = np.fromfile(file=f, count=1, dtype=np.int32)
 
         # Scale to nm
         x = x / 1.0E-9

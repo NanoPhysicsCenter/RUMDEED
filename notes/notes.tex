@@ -133,6 +133,9 @@ then updated acceleration and finally calculate the velocity
  v_{n+1} = v_n + \frac{1}{6}\left( 2a_{n+1} + 5a_n - a_{n-1} \right)\Delta t
 \end{equation}
 
+\section{Boris Integrator and magnetic field}
+For magnetic fields we could possibly use a Boris Integrator? It is often used in PIC codes see~\url{https://en.wikipedia.org/wiki/Particle-in-cell#The_particle_mover}.
+
 \clearpage
 \section{Field Emission}
 \subsection{Fowler-Nordheim equation}
@@ -621,6 +624,8 @@ or
 \end{equation}
 
 \subsection{Parallel Capacitor}
+Some thing to look at in the future~\parencite{VERBONCOEUR1993321}.
+
 \begin{figure}[!ht]
   \centering
   \begin{circuitikz} \draw
