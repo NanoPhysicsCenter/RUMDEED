@@ -41,7 +41,7 @@ endif
 ifneq (,$(findstring gfortran,$(FC)))
 $(info Using GNU Fortran)
 FFLAGS=-O3 -march=native -flto
-FFLAGS=-g -fcheck=all -Wall -fbacktrace -ffpe-trap=invalid,zero,overflow,underflow
+#FFLAGS=-g -fcheck=all -Wall -fbacktrace -ffpe-trap=invalid,zero,overflow,underflow
 ifdef OPENMP
 FFLAGS+=-fopenmp
 endif
