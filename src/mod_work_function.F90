@@ -429,7 +429,11 @@ contains
       !w_theta_arr(4, 1:4) = (/ 4.70d0, 4.70d0, 4.70d0, 4.70d0 /)
 
       ! Scale x, y to unit square
-      pos_scaled(1:2) = (pos(1:2) - emitters_pos(1:2, emit)) / emitters_dim(1:2, emit)
+      if (emitters_Type(emit) == 1) then ! Check if circle or rectange
+        pos_scaled(1:2) = (pos(1:2) - emitters_pos(1:2, emit)) / emitters_dim(1, emit) ! Circle
+      else
+        pos_scaled(1:2) = (pos(1:2) - emitters_pos(1:2, emit)) / emitters_dim(1:2, emit) ! Rectange
+      end if
 
       x = pos_scaled(1)
       y = pos_scaled(2)

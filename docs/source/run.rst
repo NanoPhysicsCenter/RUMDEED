@@ -1,11 +1,15 @@
+.. _run:
+
 Input files and running the code
 ================================
 
-To do run the code
+Once you have :ref:`downloaded the source code and build the executable <build>` you can run program using the instructions below.
 
 Input files
 -----------
-input, w_theta, collisions, laser
+The Vacuum-MD program is run from the command line and reads input parameters from several input files. These file are placed in the same
+directory as the Vacuum-MD executable file. The main input files is simply called **input** and is always required. Other input files such
+are only required when specific features of the program are used.
 
 Input file
 ++++++++++
@@ -40,21 +44,19 @@ EMITTERS_DIM(1:3, <EMITTER NUMBER>)
     For a rectangular emitter the first two numbers represent the length in the x and y directions respectively.
     Is the emitter is a hyperboloid tip the first number distance from the peak of the tip to the anode. The second number is the base radius of the tip
     and the last number is the height of the tip. See :ref:`Field emission from a hyperboloid tip <field-tip>` in the code description for more details.
-    Workfunction can also depend on this number, ex. circular emitter on wf checkerboard needs first and second number even though the emitter only 
-    needs the first.    
     Here **<EMITTER NUMBER>** should be replaced by the number of the emitter.
     This line should be given for all emitters in the system.
 EMITTERS_POS(1:3, <EMITTER NUMBER>)
     Position of the emitter given as three numbers in nano-meters [nm]. Here **<EMITTER NUMBER>** should be replaced by the number of the emitter.
     This line should be given for all emitters in the system.
 EMITTERS_TYPE(<EMITTER NUMBER>)
-    Geometry of the emitter given as an integer. It should be given as one of the following integer numbers:
+    Geometry of the emitter is given as an integer. It should be given as one of the following integer numbers:
     
-    1: Circular emitter. The dimensions **to do**
+    1: Circular emitter. Only photo emission supports circular emitters.
 
-    2: Rectangle. The dimensions ... **to do**
+    2: Rectangle.
     
-    3: Rectangle spots. The dimensions ... **to do**
+    3: Rectangle spots.
     
     Here **<EMITTER NUMBER>** should be replaced by the number of the emitter. This line should be given for all emitters in the system.
 EMITTERS_DELAY(<EMITTER NUMBER>)
@@ -82,12 +84,16 @@ Example input file with one emitter doing planar field emission:
 
 Work function
 +++++++++++++
-work function
+For field emission and thermal-field emission the work function on the emitter surface is specified using an input file called **w_theta**. This only applies to the planar cases,
+for the hyperboloid tip surface the work function needs to specified in the file **mod_emission_top.f90** using the **w_theta** variable.
 
-The checkerboard (square) work function takes size input from the first two dimentions of EMITTERS_DIM and divides it into equal sections depending
-on the given matrix size. Make sure that both numbers are given even if **circular** emitter is used to avoid one dimentional emission.
+The first line in the work function input file should be an integer number. Currently only the number 1 is supported which represents a checkerboard work function surface.
+The second line should have two integer number that indicate the number of rows and columns in the checkerboard. The rest of the file is a matrix of numbers that
+represent the work function values in the checkerboard. Note that the checkerboard is only supported for a single emitter.
 
-Example checkerboard work function file::
+Example checkerboard work function file:
+
+.. code-block:: text
 
   1
   2 2
@@ -112,19 +118,20 @@ Laser file
 Photoemission Input Warning
 +++++++++++++++++++++++++++
 
-    The header/first line sets parameters;
-    The first number enables Gaussian electron emission pulse, 1 = on, 2 = off.
-    Second number selects type of laser input, 1 for fixed photon energy, 2 for Poisson distributed photon energy.
-    Third number picks velocity profile for electrons, 1 being zero initial velocity, 2 for work function dependant inital velocity.
+The header/first line sets parameters;
+The first number enables Gaussian electron emission pulse, 1 = on, 2 = off.
+Second number selects type of laser input, 1 for fixed photon energy, 2 for Poisson distributed photon energy.
+Third number picks velocity profile for electrons, 1 being zero initial velocity, 2 for work function dependant inital velocity.
     
-    Second line is laser (photon) energy and variation, first being the laser 'mean' energy level in electronVolts (eV) and second being standard deviation of the laser (in eV's as well). 
-    This is normal distribution with Box-Muller method.
-    For work function dependant initial velocity the energy is compared to the work function with the excess making way for Newtonian velocity given to the electrons.
+Second line is laser (photon) energy and variation, first being the laser 'mean' energy level in electronVolts (eV) and second being standard deviation of the laser (in eV's as well). 
+This is normal distribution with Box-Muller method.
+For work function dependant initial velocity the energy is compared to the work function with the excess making way for Newtonian velocity given to the electrons.
 
-    Third line is gauss pulse parameters, center (mu), width (sigma) and A(mplitude) of the pulse. 
-    The gaussian pulse is simulated with output restriction of electrons according to normal distribution.
-    This should in theory simulate the Quantum Efficiency and Intensity via amplitude modulation.
-    
+Third line is gauss pulse parameters, center (mu), width (sigma) and A(mplitude) of the pulse. 
+The gaussian pulse is simulated with output restriction of electrons according to normal distribution.
+This should in theory simulate the Quantum Efficiency and Intensity via amplitude modulation.
+
+
 Running the code
 -----------------
 
