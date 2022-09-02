@@ -34,7 +34,7 @@ This documentation can also be generate using the make file with:
 
    make docs
 
-This will produce html and pdf files in the docs/build directory. You must have **Python** installed to generate the documentation.
+This will produce html and pdf files in the docs/build directory. You must have **Python** and **venv** installed to generate the HTML documentation.
 To make the pdf file **xelatex** and **xindy** must be installed.
 
 Errors
