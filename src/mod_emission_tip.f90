@@ -115,7 +115,7 @@ contains
     select case (emitters_type(1))
     case (1)
       ! Field emission
-      call Do_Field_Emission_Tip_Test(step)
+      call Do_Field_Emission_Tip(step)
 
     case (2)
       ! Reverse the voltage
@@ -168,7 +168,7 @@ subroutine Do_Field_Emission_Tip_2(step)
   nrEmitted = nrEmitted + nrElecEmit
 end subroutine Do_Field_Emission_Tip_2
 
-subroutine Do_Field_Emission_Tip_Test(step)
+subroutine Do_Field_Emission_Tip(step)
   integer, intent(in)               :: step
   integer                           :: ndim, N_round, nrElecEmit
   integer                           :: i, s
@@ -207,7 +207,7 @@ subroutine Do_Field_Emission_Tip_Test(step)
 
   nrElecEmit = 0
 
-  call Do_Cuba_Suave_FE_Tip_Test(1, N_sup)
+  call Do_Cuba_Suave_FE_Tip(1, N_sup)
 
   N_round = nint(N_sup + res_s)
   res_s = N_sup - N_round
@@ -250,7 +250,7 @@ subroutine Do_Field_Emission_Tip_Test(step)
 
   posInit = posInit + nrElecEmit
   nrEmitted = nrEmitted + nrElecEmit
-end subroutine Do_Field_Emission_Tip_Test
+end subroutine Do_Field_Emission_Tip
 
 !----------------------------------------------------------------------------------------
 
@@ -363,7 +363,7 @@ end subroutine Do_Photo_Emission_Tip
     !F_avg = 0.0d0
     !write (ud_debug, "(i8, tr2, E16.8)", iostat=IFAIL) step, F_avg
 
-    call Do_Cuba_Suave_FE_Tip(emit, N_sup)
+    call Do_Cuba_Suave_FE_Tip_old(emit, N_sup)
 
     n_r = nint(N_sup + res_s)
     res_s = N_sup - N_r
@@ -1165,7 +1165,7 @@ end function Elec_supply_tip
     integrand_cuba_fe_tip_test = 0 ! Return value to Cuba, 0 = success
   end function integrand_cuba_fe_tip_test
 
-  subroutine Do_Cuba_Suave_FE_Tip(emit, N_sup)
+  subroutine Do_Cuba_Suave_FE_Tip_old(emit, N_sup)
     ! Input / output variables
     integer, intent(in)           :: emit
     double precision, intent(out) :: N_sup
@@ -1231,9 +1231,9 @@ end function Elec_supply_tip
 
      ! Finish calculating the average field
      !F_avg = F_avg / neval
-  end subroutine Do_Cuba_Suave_FE_Tip
+  end subroutine Do_Cuba_Suave_FE_Tip_old
 
-  subroutine Do_Cuba_Suave_FE_Tip_Test(emit, N_sup)
+  subroutine Do_Cuba_Suave_FE_Tip(emit, N_sup)
     ! Input / output variables
     integer, intent(in)           :: emit
     double precision, intent(out) :: N_sup
@@ -1310,7 +1310,7 @@ end function Elec_supply_tip
 
      ! Finish calculating the average field
      !F_avg = F_avg / neval
-  end subroutine Do_Cuba_Suave_FE_Tip_Test
+  end subroutine Do_Cuba_Suave_FE_Tip
 
   ! Gives a gaussian emission curve
   ! where step is the current time step
