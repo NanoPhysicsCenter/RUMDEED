@@ -40,7 +40,8 @@ IMAGE_CHARGE
     Boolean (.TRUE. / .FALSE.) if system should include image charge effects.
 EMITTERS_DIM(1:3, <EMITTER NUMBER>)
     Dimensions of the emitter given as three numbers in nano-meters [nm].
-    If the emitter is a circle only the first number is relevant and is interpreted as the radius of the emitter.
+    If the emitter is a circle the first number is interpreted as the radius of the emitter, 
+    second is used for workfunction definitions and should be identical to the first number.
     For a rectangular emitter the first two numbers represent the length in the x and y directions respectively.
     Is the emitter is a hyperboloid tip the first number distance from the peak of the tip to the anode. The second number is the base radius of the tip
     and the last number is the height of the tip. See :ref:`Field emission from a hyperboloid tip <field-tip>` in the code description for more details.
@@ -49,6 +50,7 @@ EMITTERS_DIM(1:3, <EMITTER NUMBER>)
 EMITTERS_POS(1:3, <EMITTER NUMBER>)
     Position of the emitter given as three numbers in nano-meters [nm]. Here **<EMITTER NUMBER>** should be replaced by the number of the emitter.
     This line should be given for all emitters in the system.
+    The position for circle and rectangle is measured from lower left corner of the rectangle (enclosing the circle).
 EMITTERS_TYPE(<EMITTER NUMBER>)
     Geometry of the emitter is given as an integer. It should be given as one of the following integer numbers:
     
