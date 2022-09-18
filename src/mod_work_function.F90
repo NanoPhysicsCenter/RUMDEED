@@ -430,14 +430,14 @@ contains
 
       ! Scale x, y to unit square
       if (emitters_Type(emit) == 1) then ! Check if circle or rectange
-        pos_scaled(1:2) = (pos(1:2) - emitters_pos(1:2, emit)) / emitters_dim(1, emit) ! Circle
+        pos_scaled(1:2) = (pos(1:2) - emitters_pos(1:2, emit)) / (2.0d0 * emitters_dim(1:2, emit)) ! Circle
       else
         pos_scaled(1:2) = (pos(1:2) - emitters_pos(1:2, emit)) / emitters_dim(1:2, emit) ! Rectange
       end if
-
+      
       x = pos_scaled(1)
       y = pos_scaled(2)
-
+      
       ! Calculate the position in the matrix
       x_i = floor(x/x_len) + 1
       y_i = floor(y/y_len) + 1
@@ -453,7 +453,7 @@ contains
       else if (y_i < 1) then
         y_i = 1
       end if
-
+      
       ! Return the section on the emitter
       ! The numbering scheme is,
       ! |----|----|----|
@@ -468,7 +468,7 @@ contains
 
       ! Reverse the y-direction in the array
       y_i = y_num - y_i + 1
-
+      
       ! if (present(sec) .eqv. .true.) then
       !   if (abs(w_theta_arr(y_i, x_i) - 2.00d0) < 1.0E-6) then
       !     sec = 1
