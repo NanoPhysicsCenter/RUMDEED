@@ -1,7 +1,7 @@
 Introduction
 ============
 
-The Vacuum-MD program was first written by Andreas Pedersen :cite:p:`PhysRevLett.104.175002` in Python
+The Reykjavík University Molecular Dynamics code for Electron Emission and Dynamics (RUMDEED) program was first written by Andreas Pedersen :cite:p:`PhysRevLett.104.175002` in Python
 to simulate space charge limited photo emission :cite:p:`PhysRevLett.104.175002`. It was later rewritten in Fortran by Kristinn Torfason with parallelization using OpenMP. 
 It was also extended to include Field emission :cite:p:`doi:10.1063/1.4914855`:cite:p:`doi:10.1063/1.4972821` and
 Thermal-field emission :cite:p:`PhysRevApplied.15.014040`.

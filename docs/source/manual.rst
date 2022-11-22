@@ -7,7 +7,7 @@ Vacuum-MD's documentation!
 =====================================
 
 | Version: |version|
-| https://github.com/NanoPhysicsCenter/Vacuum-MD
+| https://github.com/NanoPhysicsCenter/RUMDEED
 
 .. toctree::
    :maxdepth: 2

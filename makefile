@@ -1,4 +1,4 @@
-# makefile for Vaccum
+# makefile for RUMDEED
 # Kristinn Torfason
 # 02.09.09
 

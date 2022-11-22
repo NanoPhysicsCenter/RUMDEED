@@ -1,11 +1,11 @@
-# Molecular Dynamics code
+# Reykjavík University Molecular Dynamics code for Electron Emission and Dynamics (RUMDEED)
   To compile type make
 
 ## Input file
   See Examples folder
 
 ## Manual
-  See [https://nanophysicscenter.github.io/Vacuum-MD](https://nanophysicscenter.github.io/Vacuum-MD/) or docs folder.
+  See [https://nanophysicscenter.github.io/RUMDEED](https://nanophysicscenter.github.io/RUMDEED/) or docs folder.
 
 ## Notes
   See [notes.pdf](notes/notes.pdf)

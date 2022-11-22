@@ -10,20 +10,20 @@ You will need to have **git** installed to clone the repository using the comman
 
 .. code-block:: console
 
-   git clone -b main https://github.com/NanoPhysicsCenter/Vacuum-MD.git Vacuum-MD
+   git clone -b main https://github.com/NanoPhysicsCenter/RUMDEED.git RUMDEED
 
-Where the last "Vacuum-MD" is the name of the directory you want to create and store the code in.
+Where the last "RUMDEED" is the name of the directory you want to create and store the code in.
 Once you have to code you will need the GNU Compiler Collection (**gfortran** and **gcc**) and **make** to
 compile the code into an executable file. The Intel compilers can be used instead of the GNU compilers (see below),
 but the code has mainly been tested with the GNU compilers. Once the compilers and make are installed you can
-go into the directory "Vacuum-MD" and enter the command:
+go into the directory "RUMDEED" and enter the command:
 
 .. code-block:: console
    
-   cd Vacuum-MD
+   cd RUMDEED
    make
 
-This will compile the code and create an executable named "Vacuum-MD.out" inside the build directory.
+This will compile the code and create an executable named "RUMDEED.out" inside the build directory.
 When you have the executable built you can :ref:`run the code <run>`.
 
 To use a different compiler the variables **CC** and **FC** can be passed to the make command.

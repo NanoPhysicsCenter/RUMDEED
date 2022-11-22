@@ -1,4 +1,4 @@
-# makefile for Vacuum
+# makefile for RUMDEED
 # Kristinn Torfason
 # 12.10.09
 
@@ -76,7 +76,7 @@ endif
 #FFLAGS+=-DCHUNK_SIZE=250
 
 # Name of the output file
-PROJECT_NAME=Vacuum-MD
+PROJECT_NAME=RUMDEED
 
 # makefile
 all: $(PROJECT_NAME).out unit_test.out

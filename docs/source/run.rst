@@ -7,8 +7,8 @@ Once you have :ref:`downloaded the source code and build the executable <build>`
 
 Input files
 -----------
-The Vacuum-MD program is run from the command line and reads input parameters from several input files. These file are placed in the same
-directory as the Vacuum-MD executable file. The main input files is simply called **input** and is always required. Other input files such
+The RUMDEED program is run from the command line and reads input parameters from several input files. These file are placed in the same
+directory as the RUMDEED executable file. The main input files is simply called **input** and is always required. Other input files such
 are only required when specific features of the program are used.
 
 Input file

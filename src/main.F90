@@ -1,8 +1,8 @@
 !
 ! Kristinn Torfason
-! Vacuum electronics molecular dynamics simulations
+! Reykjavík University Molecular Dynamics code for Electron Emission and Dynamics (RUMDEED)
 !
-program VacuumMD
+program RUMDEED
 ! Vacuum
   use iso_fortran_env
 #if defined(_OPENMP)
@@ -790,4 +790,4 @@ contains
     deallocate(my_seed)
 
   end subroutine Clean_up
-end program VacuumMD
+end program RUMDEED
