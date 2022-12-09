@@ -953,7 +953,7 @@ end subroutine Do_Unit_Test_Emission
     ! Open the file with initial positions of particles
     open(newunit=ud_data, iostat=IFAIL, file='rand_pos_init.dt', status='OLD', action='read')
     if (IFAIL /= 0) then
-      print '(a)', 'Vacuum: ERROR UNABLE TO OPEN file input'
+      print '(a)', 'RUMDEED: ERROR UNABLE TO OPEN file input'
       return
     end if
 

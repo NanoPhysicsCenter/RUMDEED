@@ -109,7 +109,7 @@ subroutine Init_Field_Thermo_Emission()
           !!!!!!!call Do_Field_Emission_Planar_rectangle(step, i)
           call Do_Field_Thermo_Emission_Planar_simple(step, i)
         !case default
-        !  print *, 'Vacuum: WARNING unknown emitter type!!'
+        !  print *, 'RUMDEED: WARNING unknown emitter type!!'
         !  print *, emitters_type(i)
         !end select
       end if
@@ -472,7 +472,7 @@ subroutine Init_Field_Thermo_Emission()
      & nregions, neval, fail, integral, error, prob)
 
      if (fail /= 0) then
-      print '(a)', 'Vacuum: WARNING Cuba did not return 0'
+      print '(a)', 'RUMDEED: WARNING Cuba did not return 0'
       print *, fail
       print *, error
       print *, prob

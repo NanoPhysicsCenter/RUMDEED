@@ -345,7 +345,7 @@ contains
     ! Open the file for reading
     open(newunit=ud_cross, iostat=IFAIL, file=filename_tot, status='OLD', action='READ')
     if (IFAIL /= 0) then
-      print '(a)', 'Vacuum: ERROR UNABLE TO OPEN file ', filename_tot
+      print '(a)', 'RUMDEED: ERROR UNABLE TO OPEN file ', filename_tot
       stop
     end if
 
@@ -379,7 +379,7 @@ contains
     ! Open the file for reading
     open(newunit=ud_cross, iostat=IFAIL, file=filename_ion, status='OLD', action='READ')
     if (IFAIL /= 0) then
-      print '(a)', 'Vacuum: ERROR UNABLE TO OPEN file ', filename_ion
+      print '(a)', 'RUMDEED: ERROR UNABLE TO OPEN file ', filename_ion
       stop
     end if
 

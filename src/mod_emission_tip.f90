@@ -126,7 +126,7 @@ contains
       call Do_Photo_Emission_Tip(step)
 
     case default
-      print *, 'Vacuum: ERROR unknown emitter type!!'
+      print *, 'RUMDEED: ERROR unknown emitter type!!'
       stop
       print *, emitters_type(1)
     end select
@@ -1210,7 +1210,7 @@ end function Elec_supply_tip
      & nregions, neval, fail, integral, error, prob)
 
      if (fail /= 0) then
-      print '(a)', 'Vacuum: WARNING Cuba did not return 0'
+      print '(a)', 'RUMDEED: WARNING Cuba did not return 0'
       print *, fail
       print *, error
       print *, prob
@@ -1289,7 +1289,7 @@ end function Elec_supply_tip
 
 
      if (fail /= 0) then
-      print '(a)', 'Vacuum: WARNING Cuba did not return 0'
+      print '(a)', 'RUMDEED: WARNING Cuba did not return 0'
       print *, fail
       print *, error
       print *, prob

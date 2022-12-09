@@ -121,7 +121,7 @@ contains
      & nregions, neval, fail, integral, error, prob)
 
      if (fail /= 0) then
-      print '(a)', 'Vacuum: WARNING Cuba did not return 0'
+      print '(a)', 'RUMDEED: WARNING Cuba did not return 0'
       print *, fail
       print *, error
       print *, prob
@@ -202,7 +202,7 @@ contains
 
         ! Stop the integration if it is taking to long.
         if (N_mc > 10000000) then
-          print *, 'Vacuum: Warning MC integration taking to long, stoping it'
+          print *, 'RUMDEED: Warning MC integration taking to long, stoping it'
           print *, 'mc_err = ', mc_err
           !print *, 'step = ', step
           exit
@@ -214,7 +214,7 @@ contains
         ! Stop if we are taking to long to find a favourable point.
         ! This should be rare in field emission.
         if (Nmc_try > 1000) then
-          print *, 'Vacuum: Warning to many field attempts at finding a favourable location in MC integration'
+          print *, 'RUMDEED: Warning to many field attempts at finding a favourable location in MC integration'
           print *, 'mc_err = ', mc_err
           !print *, 'step = ', step
           exit

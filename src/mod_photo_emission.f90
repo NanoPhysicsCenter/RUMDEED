@@ -61,7 +61,7 @@ contains
       & status='OLD', form='FORMATTED', access='SEQUENTIAL', action='READ')
       
     if (IFAIL /= 0) then
-      print *, 'Vacuum: Failed to open file laser. ABORTING'
+      print *, 'RUMDEED: Failed to open file laser. ABORTING'
       print *, IFAIL
       print *, iomsg
       stop
@@ -74,13 +74,13 @@ contains
     select case (GAUSS_MODE)
       case (GAUSS_ON)
         ! Gaussian pulse
-        print '(a)', 'Vacuum: Using Gaussian pulse model'
+        print '(a)', 'RUMDEED: Using Gaussian pulse model'
         EmitGauss = .TRUE.
 
         select case (LASER_MODE)
           case (LASER_FIXED)    
             ptr_Get_Photo_Emission_Energy => Get_Fixed_Laser_Energy
-            print '(a)', 'Vacuum: Using fixed photon energy' 
+            print '(a)', 'RUMDEED: Using fixed photon energy' 
             ! Read mean and std photon energy from the file
             read(unit=ud_laser, FMT=*) laser_energy, laser_variation
             ! Read Gaussian parameters from the file (mu, std and Amplitude) 
@@ -88,7 +88,7 @@ contains
 
           case (LASER_POISSON)
             ptr_Get_Photo_Emission_Energy => Get_Laser_Energy
-            print '(a)', 'Vacuum: Using poisson distributed photon energy'
+            print '(a)', 'RUMDEED: Using poisson distributed photon energy'
             ! Read mean and std photon energy from the file
             read(unit=ud_laser, FMT=*) laser_energy, laser_variation
             ! Read Gaussian parameters from the file (mu, std and Amplitude) 
@@ -96,7 +96,7 @@ contains
             ! print *, Gauss_pulse_center, Gauss_pulse_width, Gauss_pulse_amplitude, laser_energy, laser_variation
 
           case DEFAULT
-            print '(a)', 'Vacuum: ERROR UNKNOWN LASER MODE'
+            print '(a)', 'RUMDEED: ERROR UNKNOWN LASER MODE'
             print *, LASER_MODE
             stop
         end select  
@@ -104,41 +104,41 @@ contains
 
       case (GAUSS_OFF)
         ! Gauss Mode off
-        print '(a)', 'Vacuum: Using standard emission model'
+        print '(a)', 'RUMDEED: Using standard emission model'
         !EmitGauss = .FALSE.
 
         select case (LASER_MODE)
           case (LASER_FIXED)
             ptr_Get_Photo_Emission_Energy => Get_Fixed_Laser_Energy
-            print '(a)', 'Vacuum: Using fixed laser energy'    
+            print '(a)', 'RUMDEED: Using fixed laser energy'    
             ! Read mean and std photon energy from the file
             read(unit=ud_laser, FMT=*) laser_energy, laser_variation
 
           case (LASER_POISSON)
             ptr_Get_Photo_Emission_Energy => Get_Laser_Energy
-            print '(a)', 'Vacuum: Using poisson distributed photon energy'
+            print '(a)', 'RUMDEED: Using poisson distributed photon energy'
             ! Read mean and std photon energy from the file
             read(unit=ud_laser, FMT=*) laser_energy, laser_variation
 
           case DEFAULT
-            print '(a)', 'Vacuum: ERROR UNKNOWN LASER MODE'
+            print '(a)', 'RUMDEED: ERROR UNKNOWN LASER MODE'
             print *, LASER_MODE
             stop
         end select
 
       case DEFAULT
-        print '(a)', 'Vacuum: ERROR UNKNOWN LASER TYPE'
+        print '(a)', 'RUMDEED: ERROR UNKNOWN LASER TYPE'
         print *, LASER_MODE
         stop
     end select
 
     select case (PHOTON_MODE)
       case (PHOTON_ZERO)
-        print '(a)', 'Vacuum: Using zero initial velocity'
+        print '(a)', 'RUMDEED: Using zero initial velocity'
       case (PHOTON_WFD)
-        print '(a)', 'Vacuum: Using work function velocity'
+        print '(a)', 'RUMDEED: Using work function velocity'
       case DEFAULT
-        print '(a)', 'Vacuum: ERROR UNKNOWN LASER MODE'
+        print '(a)', 'RUMDEED: ERROR UNKNOWN LASER MODE'
         print *, PHOTON_MODE
         stop
     end select
@@ -177,7 +177,7 @@ contains
           stop
         end if
 
-        print '(a)', 'Vacuum: Doing spot emission'
+        print '(a)', 'RUMDEED: Doing spot emission'
         call Read_Spots_File()
       end if
     end do
@@ -199,14 +199,14 @@ contains
     open(newunit=ud_spot, iostat=IFAIL, iomsg=iomsg, file='w_spots', &
        & status='OLD', form='FORMATTED', access='SEQUENTIAL', action='READ')
     if (IFAIL /= 0) then
-      print *, 'Vacuum: Failed to open file w_spots. ABORTING'
+      print *, 'RUMDEED: Failed to open file w_spots. ABORTING'
       print *, IFAIL
       print *, iomsg
       stop
     end if
 
     read(unit=ud_spot, FMT=*) num_spots
-    print '(a)', 'Vacuum: Reading spot file'
+    print '(a)', 'RUMDEED: Reading spot file'
     
     !num_spots = 3
 
@@ -381,7 +381,7 @@ contains
           call Do_Photo_Emission_Spot(step, i)
           
         case default
-          print *, 'Vacuum: ERROR unknown emitter type!!'
+          print *, 'RUMDEED: ERROR unknown emitter type!!'
           stop
           print *, emitters_type(i)
 

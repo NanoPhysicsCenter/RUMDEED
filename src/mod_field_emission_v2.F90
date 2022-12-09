@@ -26,7 +26,7 @@ Module mod_field_emission_v2
   double precision                   :: residual = 0.0d0 ! Should be a array the size of the number of emitters
 
   ! Cuba
-  ! double precision, allocatable :: xgiven(:,:) ! xgiven(ldxgiven,ngiven) <in>, a list of points where the integrand
+  !double precision, allocatable :: xgiven(:,:) ! xgiven(ldxgiven,ngiven) <in>, a list of points where the integrand
 
   ! ----------------------------------------------------------------------------
   ! Constants for field emission
@@ -155,7 +155,7 @@ contains
           call Do_Field_Emission_Planar_rectangle(step, i)
           !call Do_Field_Emission_Planar_simple(step, i)
         !case default
-        !  print *, 'Vacuum: WARNING unknown emitter type!!'
+        !  print *, 'RUMDEED: WARNING unknown emitter type!!'
         !  print *, emitters_type(i)
         !end select
       end if
@@ -404,8 +404,8 @@ end function Escape_Prob_log
     double precision, intent(out) :: N_sup ! Number of electrons
 
     !call Do_2D_MC_plain(emit, N_sup)
-    !call Do_Cuba_Suave_FE(emit, N_sup)
-    call Do_Cuba_Divonne_FE(emit, N_sup)
+    call Do_Cuba_Suave_FE(emit, N_sup)
+    !call Do_Cuba_Divonne_FE(emit, N_sup)
   end subroutine Do_Surface_Integration_FE
 
   ! ----------------------------------------------------------------------------
@@ -460,7 +460,7 @@ end function Escape_Prob_log
   implicit none
   integer, intent(in)           :: emit
   double precision, intent(out) :: N_sup
-  !integer                       :: i
+  integer                       :: i
   integer                       :: IFAIL
 
   
@@ -469,7 +469,7 @@ end function Escape_Prob_log
   integer, parameter :: ncomp = 1 ! Number of components in the integrand
   integer            :: userdata = 0 ! User data passed to the integrand
   integer, parameter :: nvec = 1 ! Number of points given to the integrand function
-  double precision   :: epsrel = 1.0d-6 ! Requested relative error
+  double precision   :: epsrel = 1.0d-4 ! Requested relative error
   double precision   :: epsabs = 0.25d0 ! Requested absolute error
   integer            :: flags = 0+4 ! Flags
   integer            :: seed = 0 ! Seed for the rng. Zero will use Sobol.
@@ -547,12 +547,12 @@ end function Escape_Prob_log
     ! Pass the number of the emitter being integraded over to the integrand as userdata
     userdata = emit
 
-    seed = sum(my_seed(:))
+    !seed = sum(my_seed(:))
 
     !allocated(xgiven(1:ndim, 1:MAX_PARTICLES))
 
     ! Find possible peaks, i.e. all electrons with z < 5 nm.
-    !!$OMP PARALLEL DO DEFAULT(NONE) PRIVATE(i) shared(ngiven, xgiven, particles_cur_pos, nrPart) SCHEDULE(GUIDED, CHUNK_SIZE)
+    !!$OMP PARALLEL DO DEFAULT(NONE) PRIVATE(i) shared(ngiven, xgiven, particles_cur_pos, nrPart)
     !do i = 1, nrPart
     !  if (particles_cur_pos(3, i) < 5.0d-9) then
     !    !$OMP CRITICAL
@@ -563,7 +563,7 @@ end function Escape_Prob_log
     !  end if
     !end do
     !!$OMP END PARALLEL DO
-    ngiven = nrPart
+    !ngiven = nrPart
 
     call divonne(ndim, ncomp, integrand_cuba_fe, userdata, nvec,&
               epsrel, epsabs, flags, seed, mineval, maxeval,&
@@ -577,7 +577,7 @@ end function Escape_Prob_log
 
     if (fail /= 0) then
       if (abs(error(1) - epsabs) > 1.0d-2) then
-        print '(a)', 'Vacuum: WARNING Cuba did not return 0'
+        print '(a)', 'RUMDEED: WARNING Cuba did not return 0'
         print *, 'Fail = ', fail
         print *, 'nregions = ', nregions
         print *, 'neval = ', neval, ' max is ', maxeval
@@ -618,14 +618,14 @@ end function Escape_Prob_log
     integer, parameter :: ncomp = 1 ! Number of components in the integrand
     integer            :: userdata = 0 ! User data passed to the integrand
     integer, parameter :: nvec = 1 ! Number of points given to the integrand function
-    double precision   :: epsrel = 1.0d-4 ! Requested relative error
-    double precision   :: epsabs = 0.5d-1 ! Requested absolute error
+    double precision   :: epsrel = 1.0d-2 ! Requested relative error
+    double precision   :: epsabs = 1.0d-4 ! Requested absolute error
     integer            :: flags = 0+4 ! Flags
     integer            :: seed = 0 ! Seed for the rng. Zero will use Sobol.
-    integer            :: mineval = 0 ! Minimum number of integrand evaluations
+    integer            :: mineval = 1000 ! Minimum number of integrand evaluations
     integer            :: maxeval = 10000000 ! Maximum number of integrand evaluations
     integer            :: nnew = 100 ! Number of integrand evaluations in each subdivision
-    integer            :: nmin = 2   ! Minimum number of samples a former pass must contribute to a subregion to be considered in the region's compound integral value.
+    integer            :: nmin = 20   ! Minimum number of samples a former pass must contribute to a subregion to be considered in the region's compound integral value.
     double precision   :: flatness = 5.0d0 ! Determine how prominently out-liers, i.e. samples with a large fluctuation, 
                                            ! figure in the total fluctuation, which in turn determines how a region is split up.
                                            ! As suggested by its name, flatness should be chosen large for 'flat" integrand and small for 'volatile' integrands
@@ -653,7 +653,7 @@ end function Escape_Prob_log
      & nregions, neval, fail, integral, error, prob)
 
      if (fail /= 0) then
-      print '(a)', 'Vacuum: WARNING Cuba did not return 0'
+      print '(a)', 'RUMDEED: WARNING Cuba did not return 0'
       print *, fail
       print *, error
       print *, integral(1)*epsrel
@@ -769,7 +769,7 @@ end function Escape_Prob_log
      & nregions, neval, fail, integral, error, prob)
 
      if (fail /= 0) then
-      print '(a)', 'Vacuum: WARNING Cuba did not return 0'
+      print '(a)', 'RUMDEED: WARNING Cuba did not return 0'
       print *, fail
       print *, error
       print *, prob
@@ -850,7 +850,7 @@ end function Escape_Prob_log
 
         ! Stop the integration if it is taking to long.
         if (N_mc > 10000000) then
-          print *, 'Vacuum: Warning MC integration taking to long, stoping it'
+          print *, 'RUMDEED: Warning MC integration taking to long, stoping it'
           print *, 'mc_err = ', mc_err
           !print *, 'step = ', step
           exit
@@ -862,7 +862,7 @@ end function Escape_Prob_log
         ! Stop if we are taking to long to find a favourable point.
         ! This should be rare in field emission.
         if (Nmc_try > 1000) then
-          print *, 'Vacuum: Warning to many field attempts at finding a favourable location in MC integration'
+          print *, 'RUMDEED: Warning to many field attempts at finding a favourable location in MC integration'
           print *, 'mc_err = ', mc_err
           !print *, 'step = ', step
           exit

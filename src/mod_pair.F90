@@ -38,14 +38,14 @@ contains
 
     ! Check if we have reach the maximum number of paticles allowed
     if (nrPart+1 > MAX_PARTICLES) then
-      print '(a)', 'Vacuum: WARNING MAX_PARTICLES REACHED. INCREASE MAX_PARTICLES'
+      print '(a)', 'RUMDEED: WARNING MAX_PARTICLES REACHED. INCREASE MAX_PARTICLES'
       ! Add code to reallocate arrays to larger size?
     else
 
       if (present(opt_sec) .eqv. .true.) then
         if (opt_sec > MAX_SECTIONS) then
           sec = MAX_SECTIONS
-          print '(a)', 'Vacuum: WARNING MAX_SECTIONS REACHED. INCREASE MAX_SECTIONS'
+          print '(a)', 'RUMDEED: WARNING MAX_SECTIONS REACHED. INCREASE MAX_SECTIONS'
           print *, opt_sec
         else
           sec = opt_sec
@@ -455,7 +455,7 @@ contains
         write(filename, '(a12, i0)') 'out/pos.xyz.', step
         open(newunit=ud_pos_data, iostat=IFAIL, file=filename, status='REPLACE', action='write')
         if (IFAIL /= 0) then
-          print *, 'Vacuum: Failed to open the file to write position data'
+          print *, 'RUMDEED: Failed to open the file to write position data'
           return
         end if
 
@@ -496,7 +496,7 @@ contains
     ! Open the output file
     open(newunit=ud_data, iostat=IFAIL, file=filename, status='REPLACE', action='write')
     if (IFAIL /= 0) then
-      print *, 'Vacuum: Failed to open the data file.'
+      print *, 'RUMDEED: Failed to open the data file.'
       return
     end if
 

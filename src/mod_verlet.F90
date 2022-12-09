@@ -73,7 +73,7 @@ contains
 
   subroutine Read_Cross_Section_Data()
     if (collisions .eqv. .true.) then
-      print '(a)', 'Vacuum: Doing collisions reading in data'
+      print '(a)', 'RUMDEED: Doing collisions reading in data'
       call Read_Cross_Section()
     end if
    end subroutine Read_Cross_Section_Data
@@ -125,7 +125,7 @@ contains
 
     open(newunit=ud_pos_test, iostat=IFAIL, file=filename, status='replace', action='write', access='STREAM')
     if (IFAIL /= 0) then
-      print '(a)', 'Vacuum: ERROR UNABLE TO OPEN file for position'
+      print '(a)', 'RUMDEED: ERROR UNABLE TO OPEN file for position'
       print *, filename
       print *, step
     end if
@@ -438,7 +438,7 @@ contains
 
     open(newunit=ud_accel, iostat=IFAIL, file=filename, status='replace', action='write', access='STREAM')
     if (IFAIL /= 0) then
-      print '(a)', 'Vacuum: ERROR UNABLE TO OPEN file for acceleration'
+      print '(a)', 'RUMDEED: ERROR UNABLE TO OPEN file for acceleration'
       print *, filename
       print *, step
     end if

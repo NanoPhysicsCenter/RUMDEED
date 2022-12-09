@@ -118,7 +118,7 @@ contains
           !print *, 'Doing Rectangle'
           call Do_Field_Emission_Planar_rectangle(step, i)
         !case default
-        !  print *, 'Vacuum: WARNING unknown emitter type!!'
+        !  print *, 'RUMDEED: WARNING unknown emitter type!!'
         !  print *, emitters_type(i)
         !end select
       end if

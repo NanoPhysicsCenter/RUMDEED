@@ -90,7 +90,7 @@ contains
           !print *, 'Doing Rectangle'
           call Do_Field_Emission_Plane_int_rec(step, i)
         !case default
-        !  print *, 'Vacuum: WARNING unknown emitter type!!'
+        !  print *, 'RUMDEED: WARNING unknown emitter type!!'
         !  print *, emitters_type(i)
         !end select
       end if
@@ -481,7 +481,7 @@ contains
   !
   !     plane_graph_mesh_emit(int_x, int_y) = plane_graph_mesh_emit(int_x, int_y) + 1
   !   else
-  !     print *, 'Vacuum: Add_Plane_Graph_emit() error particle outside range'
+  !     print *, 'RUMDEED: Add_Plane_Graph_emit() error particle outside range'
   !     print *, 'x = ', pos(1)
   !     print *, 'y = ', pos(2)
   !     print *, 'step = ', step

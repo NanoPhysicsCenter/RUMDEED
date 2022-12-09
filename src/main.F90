@@ -32,8 +32,16 @@ program RUMDEED
 #endif
 
 
-  integer :: i, nthreads
+  integer                 :: i, nthreads
   integer, dimension(1:9) :: progress
+  integer, dimension(8)   :: values ! Date and time
+
+  call date_and_time(VALUES=values)
+
+  print '(a)', 'Reykjavík University Molecular Dynamics code for Electron Emission and Dynamics'
+  print '(a, i0.2, a, i0.2, a, i4, a, i0.2, a, i0.2, a, i0.2)', &
+        'RUMDEED: Starting (d/m/y) ', values(3), '/', values(2), '/', values(1), &
+        ' - (h:m:s) ', values(5), ':', values(6), ':', values(7)
 
   print '(4a)', 'This program was compiled by ', &
                 compiler_version(), ' using the options ', &
@@ -44,66 +52,66 @@ program RUMDEED
 #endif
 
 #if defined(_OPENMP)
-  print '(a)', 'Vacuum: Using OpenMP'
+  print '(a)', 'RUMDEED: Using OpenMP'
   nthreads = omp_get_max_threads()
   print '(tr1, a, i0)', 'Number of threads ', nthreads
 #else
-  print '(a)', 'Vacuum: Single threaded'
+  print '(a)', 'RUMDEED: Single threaded'
   nthreads = 1
 #endif
 
 
-  print '(a)', 'Vacuum: Reading input values'
+  print '(a)', 'RUMDEED: Reading input values'
   call Read_Input_Variables()
 
-  print '(a)', 'Vacuum: Initialzing'
+  print '(a)', 'RUMDEED: Initialzing'
   call Init()
 
   SELECT CASE (EMISSION_MODE)
   case(EMISSION_UNIT_TEST)
-    print '(a)', 'Vacuum: **** UNIT TESTING IS ACTIVE ****'
+    print '(a)', 'RUMDEED: **** UNIT TESTING IS ACTIVE ****'
     call Init_Unit_Test()
   case(EMISSION_PHOTO)
-    print '(a)', 'Vacuum: Doing Photo emission'
+    print '(a)', 'RUMDEED: Doing Photo emission'
     call Init_Photo_Emission()
   case(EMISSION_FIELD)
-    print '(a)', 'Vacuum: Doing Field emission'
+    print '(a)', 'RUMDEED: Doing Field emission'
     call Init_Field_Emission()
   case(EMISSION_TIP)
-    print '(a)', 'Vacuum: Doing Field emission from a tip'
+    print '(a)', 'RUMDEED: Doing Field emission from a tip'
     call Init_Emission_Tip()
   case(EMISSION_FIELD_2D_2DEG_C, EMISSION_FIELD_2D_2DEG_NC, EMISSION_FIELD_2D_DIRAC_C, EMISSION_FIELD_2D_DIRAC_NC)
-    print '(a)', 'Vacuum: Doing Field emission from 2D material'
+    print '(a)', 'RUMDEED: Doing Field emission from 2D material'
     call Init_Field_Emission_2D()
   case(EMISSION_THERMIONIC)
-    print '(a)', 'Vacuum: Doing Thermionic emission'
+    print '(a)', 'RUMDEED: Doing Thermionic emission'
     !call Init_Thermionic_Emission()
   case(EMISSION_FIELD_THERMO)
-    print '(a)', 'Vacuum: Doing General Field+Thermionic emission'
+    print '(a)', 'RUMDEED: Doing General Field+Thermionic emission'
     call Init_Field_Thermo_Emission()
   case(EMISSION_FIELD_V2)
-    print '(a)', 'Vacuum: Doing Field emission V2'
+    print '(a)', 'RUMDEED: Doing Field emission V2'
     call Init_Field_Emission_v2()
   case(EMISSION_MANUAL)
-    print '(a)', 'Vacuum: Doing manual emission'
+    print '(a)', 'RUMDEED: Doing manual emission'
     call Init_Manual()
   case DEFAULT
-    print '(a)', 'Vacuum: ERROR UNKNOWN EMISSION MODEL'
+    print '(a)', 'RUMDEED: ERROR UNKNOWN EMISSION MODEL'
     print *, EMISSION_MODE
     stop
   END SELECT
 
   print '(tr1, a, i0)', 'Number of emitters ', nrEmit
 
-  print '(a)', 'Vacuum: Writing out variables'
+  print '(a)', 'RUMDEED: Writing out variables'
   call Write_Initial_Variables()
 
-  !print '(a)', 'Vacuum: Setting up dipoles'
+  !print '(a)', 'RUMDEED: Setting up dipoles'
   !call Setup_Dipoles(5, 5, 5)
   !call Init_Dipoles(0, 0, 0)
   !call Write_Dipole_data()
 
-  print '(a)', 'Vacuum: Starting main loop'
+  print '(a)', 'RUMDEED: Starting main loop'
   print '(tr1, a, i0, a, ES12.4, a)', 'Doing ', steps, ' time steps of size ', time_step/1.0E-12, ' ps'
 
   print *, ''
@@ -149,7 +157,7 @@ program RUMDEED
     end if
 
     if (cought_stop_signal .eqv. .true.) then
-      print '(a)', 'Vacuum: Got signal SIGINT stopping main loop.'
+      print '(a)', 'RUMDEED: Got signal SIGINT stopping main loop.'
       exit ! We cought the signal to stop. Exit the main loop.
     end if
 
@@ -176,13 +184,13 @@ program RUMDEED
   end do
 
   call PrintProgress(10)
-  print '(a)', 'Vacuum: Main loop finished'
+  print '(a)', 'RUMDEED: Main loop finished'
 
 
-  print '(a)', 'Vacuum: Writing data'
+  print '(a)', 'RUMDEED: Writing data'
   call Write_Life_Time()
 
-  print '(a)', 'Vacuum: Emission clean up'
+  print '(a)', 'RUMDEED: Emission clean up'
   SELECT CASE (EMISSION_MODE)
   case(EMISSION_UNIT_TEST)
     call Clean_Up_Unit_Test()
@@ -204,15 +212,19 @@ program RUMDEED
     call Clean_Up_Manual()
   END SELECT
 
-  print '(a)', 'Vacuum: Final clean up'
+  print '(a)', 'RUMDEED: Final clean up'
   call Clean_up()
-  print '(a)', 'Vacuum: Program finished'
+  call date_and_time(VALUES=values)
+  print '(a, i0.2, a, i0.2, a, i4, a, i0.2, a, i0.2, a, i0.2)', &
+        'RUMDEED: Ended (d/m/y) ', values(3), '/', values(2), '/', values(1), &
+        ' - (h:m:s) ', values(5), ':', values(6), ':', values(7)
+  print '(a)', 'RUMDEED: Program finished'
 contains
 
   subroutine PrintProgress(i)
     integer, intent(in) :: i
 
-    print '(a, i3, a)', 'Vacuum: ', (i*10), '% done'
+    print '(a, i3, a)', 'RUMDEED: ', (i*10), '% done'
     print '(tr1, i0, a)', nrPart, ' particles in the system'
     print '(tr2, i0, a, i0, a)', nrElec, ' electrons and ', nrHole, ' holes'
     print *, ''
@@ -231,7 +243,7 @@ contains
     !Open the file 'input' for reading and check for errors
     open(newunit=ud_input, iostat=IFAIL, file='input', status='OLD', action='read')
     if (IFAIL /= 0) then
-      print '(a)', 'Vacuum: ERROR UNABLE TO OPEN file input'
+      print '(a)', 'RUMDEED: ERROR UNABLE TO OPEN file input'
       stop
     end if
 
@@ -303,7 +315,7 @@ contains
 
     open(newunit=ud_debug, iostat=IFAIL, file='debug.dt', status='replace', action='write')
     if (IFAIL /= 0) then
-      print '(a)', 'Vacuum: ERROR UNABLE TO OPEN file debug.dt'
+      print '(a)', 'RUMDEED: ERROR UNABLE TO OPEN file debug.dt'
       stop
     end if
 
@@ -431,87 +443,87 @@ contains
     ! Open data file for writing
     open(newunit=ud_pos, iostat=IFAIL, file='out/position.bin', status='REPLACE', action='write', access='STREAM')
     if (IFAIL /= 0) then
-      print *, 'Vacuum: Failed to open file position.bin. ABORTING'
+      print *, 'RUMDEED: Failed to open file position.bin. ABORTING'
       stop
     end if
 
     ! open(newunit=ud_vel, iostat=IFAIL, file='velocity.dt', status='REPLACE', action='write')
     ! if (IFAIL /= 0) then
-    !   print *, 'Vacuum: Failed to open file velocity.dt. ABORTING'
+    !   print *, 'RUMDEED: Failed to open file velocity.dt. ABORTING'
     !   stop
     ! end if
 
     open(newunit=ud_emit, iostat=IFAIL, file='out/emitted.dt', status='REPLACE', action='write')
     if (IFAIL /= 0) then
-      print *, 'Vacuum: Failed to open file emitted.dt. ABORTING'
+      print *, 'RUMDEED: Failed to open file emitted.dt. ABORTING'
       stop
     end if
 
     open(newunit=ud_absorb, iostat=IFAIL, file='out/absorbed.dt', status='REPLACE', action='write')
     if (IFAIL /= 0) then
-      print *, 'Vacuum: Failed to open file absorbed.dt. ABORTING'
+      print *, 'RUMDEED: Failed to open file absorbed.dt. ABORTING'
       stop
     end if
 
     open(newunit=ud_absorb_top, iostat=IFAIL, file='out/absorbed_top.dt', status='REPLACE', action='write')
     if (IFAIL /= 0) then
-      print *, 'Vacuum: Failed to open file absorbed_top.dt. ABORTING'
+      print *, 'RUMDEED: Failed to open file absorbed_top.dt. ABORTING'
       stop
     end if
 
     open(newunit=ud_absorb_bot, iostat=IFAIL, file='out/absorbed_bot.dt', status='REPLACE', action='write')
     if (IFAIL /= 0) then
-      print *, 'Vacuum: Failed to open file absorbed_bot.dt. ABORTING'
+      print *, 'RUMDEED: Failed to open file absorbed_bot.dt. ABORTING'
       stop
     end if
 
     open(newunit=ud_ramo, iostat=IFAIL, file='out/ramo_current.dt', status='REPLACE', action='write')
     if (IFAIL /= 0) then
-      print *, 'Vacuum: Failed to open file ramo_current.dt. ABORTING'
+      print *, 'RUMDEED: Failed to open file ramo_current.dt. ABORTING'
       stop
     end if
 
     open(newunit=ud_ramo_sec, iostat=IFAIL, file='out/ramo_current.bin', status='REPLACE', action='WRITE', &
        & access='STREAM', asynchronous='YES')
     if (IFAIL /= 0) then
-      print *, 'Vacuum: Failed to open file ramo_current.bin. ABORTING'
+      print *, 'RUMDEED: Failed to open file ramo_current.bin. ABORTING'
       stop
     end if
 
     open(newunit=ud_volt, iostat=IFAIL, file='out/volt.dt', status='REPLACE', action='write')
     if (IFAIL /= 0) then
-      print *, 'Vacuum: Failed to open file volt.dt. ABORTING'
+      print *, 'RUMDEED: Failed to open file volt.dt. ABORTING'
       stop
     end if
 
     open(newunit=ud_field, iostat=IFAIL, file='out/field.dt', status='replace', action='write')
     if (IFAIL /= 0) then
-      print '(a)', 'Vacuum: ERROR UNABLE TO OPEN file field.dt'
+      print '(a)', 'RUMDEED: ERROR UNABLE TO OPEN file field.dt'
       stop
     end if
 
     open(newunit=ud_coll, iostat=IFAIL, file='out/collisions.dt', status='replace', action='write')
     if (IFAIL /= 0) then
-      print '(a)', 'Vacuum: ERROR UNABLE TO OPEN file collisions.dt'
+      print '(a)', 'RUMDEED: ERROR UNABLE TO OPEN file collisions.dt'
       stop
     end if
 
     open(newunit=ud_integrand, iostat=IFAIL, file='out/integration.dt', status='replace', action='write')
     if (IFAIL /= 0) then
-      print '(a)', 'Vacuum: ERROR UNABLE TO OPEN file integration.dt'
+      print '(a)', 'RUMDEED: ERROR UNABLE TO OPEN file integration.dt'
       stop
     end if
 
     open(newunit=ud_gauss, iostat=IFAIL, file='out/gauss.dt', status='replace', action='write')
     if (IFAIL /= 0) then
-      print '(a)', 'Vacuum: ERROR UNABLE TO OPEN file gauss.dt'
+      print '(a)', 'RUMDEED: ERROR UNABLE TO OPEN file gauss.dt'
       stop
     end if
 
     open(newunit=ud_mh, iostat=IFAIL, file='out/mh.bin', &
     status='REPLACE', action='WRITE', access='STREAM')
     if (IFAIL /= 0) then
-      print *, 'Vacuum: Failed to open file mh.bin. ABORTING'
+      print *, 'RUMDEED: Failed to open file mh.bin. ABORTING'
       stop
     end if
     
@@ -520,14 +532,14 @@ contains
     open(newunit=ud_density_emit, iostat=IFAIL, file='out/density_emit.bin', &
     status='REPLACE', action='WRITE', access='STREAM')
     if (IFAIL /= 0) then
-      print *, 'Vacuum: Failed to open file density_emit.bin. ABORTING'
+      print *, 'RUMDEED: Failed to open file density_emit.bin. ABORTING'
       stop
     end if
 
     open(newunit=ud_density_ion, iostat=IFAIL, file='out/density_ion.bin', &
     status='REPLACE', action='WRITE', access='STREAM')
     if (IFAIL /= 0) then
-      print *, 'Vacuum: Failed to open file density_ion.bin. ABORTING'
+      print *, 'RUMDEED: Failed to open file density_ion.bin. ABORTING'
       stop
     end if
 
@@ -536,14 +548,14 @@ contains
     open(newunit=ud_density_absorb_top, iostat=IFAIL, file='out/density_absorb_top.bin', &
          status='REPLACE', action='WRITE', access='STREAM')
     if (IFAIL /= 0) then
-      print *, 'Vacuum: Failed to open file density_absorb_top.bin. ABORTING'
+      print *, 'RUMDEED: Failed to open file density_absorb_top.bin. ABORTING'
       stop
     end if
 
     open(newunit=ud_density_absorb_bot, iostat=IFAIL, file='out/density_absorb_bot.bin', &
          status='REPLACE', action='WRITE', access='STREAM')
     if (IFAIL /= 0) then
-      print *, 'Vacuum: Failed to open file density_absorb_bin.dt. ABORTING'
+      print *, 'RUMDEED: Failed to open file density_absorb_bin.dt. ABORTING'
       stop
     end if
 
@@ -554,7 +566,7 @@ contains
         write(filename, '(a11, i0, a3)') 'out/planes-', i, '.dt'
         open(newunit=planes_ud(i), iostat=IFAIL, file=filename, status='REPLACE', action='WRITE', access='STREAM')
         if (IFAIL /= 0) then
-          print *, 'Vacuum: Failed to open file for planes. ABORTING'
+          print *, 'RUMDEED: Failed to open file for planes. ABORTING'
           stop
         end if
       else

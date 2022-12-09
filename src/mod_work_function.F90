@@ -58,7 +58,7 @@ contains
     open(newunit=ud_work, iostat=IFAIL, iomsg=iomsg, file='w_theta', &
        & status='OLD', form='FORMATTED', access='SEQUENTIAL', action='READ')
     if (IFAIL /= 0) then
-      print *, 'Vacuum: Failed to open file w_theta. ABORTING'
+      print *, 'RUMDEED: Failed to open file w_theta. ABORTING'
       print *, IFAIL
       print *, iomsg
       stop
@@ -70,7 +70,7 @@ contains
     SELECT CASE (WORK_TYPE)
     case (WORK_CHECKBOARD)
       ! Checkerboard work function
-      print '(a)', 'Vacuum: Using checkerboard work function model'
+      print '(a)', 'RUMDEED: Using checkerboard work function model'
       ptr_Work_fun => w_theta_checkerboard
 
       ! Read the size of matrix from the file
@@ -89,7 +89,7 @@ contains
       end do
     case (WORK_GAUSS)
       ! Gaussian work function
-      print '(a)', 'Vacuum: Using Gaussian work function model'
+      print '(a)', 'RUMDEED: Using Gaussian work function model'
       ptr_Work_fun => w_theta_gaussian
       ! Read base work function
       ! Read number of gaussian points
@@ -118,11 +118,11 @@ contains
                                 & w_gaussians_std_x(i), w_gaussians_std_y(i)
       end do
     case (WORK_CIRCLE)
-      print '(a)', 'Vacuum: Using circle work function model'
+      print '(a)', 'RUMDEED: Using circle work function model'
       ptr_Work_fun => w_theta_circle
       !read(unit=ud_work, FMT=*) num_circles
     case (WORK_VORONOI)
-      print '(a)', 'Vacuum: Using Voronoi work function model'
+      print '(a)', 'RUMDEED: Using Voronoi work function model'
       ptr_Work_fun => w_theta_voronoi
 
       ! Read the number of sites
@@ -143,7 +143,7 @@ contains
         vor_sites_y(i) = emitters_pos(2, 1) + vor_sites_y(i)*emitters_dim(2, 1)
       end do
     case DEFAULT
-      print '(a)', 'Vacuum: ERROR UNKNOWN WORK FUNCTION TYPE'
+      print '(a)', 'RUMDEED: ERROR UNKNOWN WORK FUNCTION TYPE'
       print *, WORK_TYPE
       stop
     END SELECT

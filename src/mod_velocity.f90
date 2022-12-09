@@ -21,12 +21,12 @@ contains
         SELECT CASE (VELOCITY_MODE)
         case(VELOCITY_ZERO)
             ptr_Get_Emission_Velocity => Get_Zero_Velocity
-            print '(a)', 'Vacuum: Using zero inital velocity'
+            print '(a)', 'RUMDEED: Using zero inital velocity'
         case(VELOCITY_MB)
             ptr_Get_Emission_Velocity => Get_MB_Velocity
-            print '(a)', 'Vacuum: Using Maxwell-Boltzman velocity distribution'
+            print '(a)', 'RUMDEED: Using Maxwell-Boltzman velocity distribution'
         case DEFAULT
-            print '(a)', 'Vacuum: ERROR UNKNOWN VELOCITY MODEL'
+            print '(a)', 'RUMDEED: ERROR UNKNOWN VELOCITY MODEL'
             print *, VELOCITY_MODE
             stop
         END SELECT
