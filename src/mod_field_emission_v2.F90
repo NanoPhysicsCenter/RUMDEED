@@ -403,9 +403,20 @@ end function Escape_Prob_log
     integer, intent(in)           :: emit ! The emitter to do the integration on
     double precision, intent(out) :: N_sup ! Number of electrons
 
-    !call Do_2D_MC_plain(emit, N_sup)
-    call Do_Cuba_Suave_FE(emit, N_sup)
-    !call Do_Cuba_Divonne_FE(emit, N_sup)
+    !!call Do_2D_MC_plain(emit, N_sup)
+    !call Do_Cuba_Suave_FE(emit, N_sup)
+    !!call Do_Cuba_Divonne_FE(emit, N_sup)
+
+    SELECT CASE (cuba_method)
+    case(cuba_method_suave)
+      call Do_Cuba_Suave_FE(emit, N_sup)
+    case(cuba_method_divonne)
+      call Do_Cuba_Divonne_FE(emit, N_sup)
+    case default
+      print '(a)', 'RUMDEED: ERROR UNKNOWN INTEGRATION METHOD'
+      print *, cuba_method
+      stop
+    end select
   end subroutine Do_Surface_Integration_FE
 
   ! ----------------------------------------------------------------------------
@@ -469,12 +480,12 @@ end function Escape_Prob_log
   integer, parameter :: ncomp = 1 ! Number of components in the integrand
   integer            :: userdata = 0 ! User data passed to the integrand
   integer, parameter :: nvec = 1 ! Number of points given to the integrand function
-  double precision   :: epsrel = 1.0d-4 ! Requested relative error
-  double precision   :: epsabs = 0.25d0 ! Requested absolute error
+  !double precision   :: epsrel = 1.0d-4 ! Requested relative error
+  !double precision   :: epsabs = 0.25d0 ! Requested absolute error
   integer            :: flags = 0+4 ! Flags
   integer            :: seed = 0 ! Seed for the rng. Zero will use Sobol.
-  integer            :: mineval = 75000 ! Minimum number of integrand evaluations
-  integer            :: maxeval = 10000000 ! Maximum number of integrand evaluations
+  !integer            :: mineval = 75000 ! Minimum number of integrand evaluations
+  !integer            :: maxeval = 10000000 ! Maximum number of integrand evaluations
 
   ! Divonne specific
   integer :: key1 = 47 ! 〈in〉, determines sampling in the partitioning phase:
@@ -512,7 +523,7 @@ end function Escape_Prob_log
 ! Points falling into this border region will not be sampled directly, but will be extrapolated
 ! from two samples from the interior. Use a non-zero border if the integrand
 ! subroutine cannot produce values directly on the integration boundary.
-  double precision :: maxchisq = 10.0d0!<in>, the maximum \chi^2 value a single subregion is allowed
+  double precision :: maxchisq = 10.0d0 !<in>, the maximum \chi^2 value a single subregion is allowed
 ! to have in the final integration phase. Regions which fail this \chi^2 test and whose
 ! sample averages differ by more than mindeviation move on to the refinement phase.
   double precision :: mindeviation = 0.25d0 !<in>, a bound, given as the fraction of the requested
@@ -566,7 +577,7 @@ end function Escape_Prob_log
     !ngiven = nrPart
 
     call divonne(ndim, ncomp, integrand_cuba_fe, userdata, nvec,&
-              epsrel, epsabs, flags, seed, mineval, maxeval,&
+              cuba_epsrel, cuba_epsabs, flags, seed, cuba_mineval, cuba_maxeval,&
               key1, key2, key3, maxpass,&
               border, maxchisq, mindeviation,&
               ngiven, ldxgiven, particles_cur_pos(1:2, 1:nrPart), nextra, 0,&
@@ -576,14 +587,14 @@ end function Escape_Prob_log
     !deallocate(xgiven)
 
     if (fail /= 0) then
-      if (abs(error(1) - epsabs) > 1.0d-2) then
+      if (abs(error(1) - cuba_epsabs) > 1.0d-2) then
         print '(a)', 'RUMDEED: WARNING Cuba did not return 0'
         print *, 'Fail = ', fail
         print *, 'nregions = ', nregions
-        print *, 'neval = ', neval, ' max is ', maxeval
+        print *, 'neval = ', neval, ' max is ', cuba_maxeval
         print *, 'error(1) = ', error(1)
-        print *, 'integral(1)*epsrel = ', integral(1)*epsrel
-        print *, 'epsabs = ', epsabs
+        print *, 'integral(1)*epsrel = ', integral(1)*cuba_epsrel
+        print *, 'epsabs = ', cuba_epsabs
         print *, 'prob(1) = ', prob(1)
         print *, 'integral(1) = ', integral(1)
         call Flush_Data()
@@ -618,12 +629,12 @@ end function Escape_Prob_log
     integer, parameter :: ncomp = 1 ! Number of components in the integrand
     integer            :: userdata = 0 ! User data passed to the integrand
     integer, parameter :: nvec = 1 ! Number of points given to the integrand function
-    double precision   :: epsrel = 1.0d-2 ! Requested relative error
-    double precision   :: epsabs = 1.0d-4 ! Requested absolute error
+    !double precision   :: epsrel = 1.0d-2 ! Requested relative error
+    !double precision   :: epsabs = 1.0d-4 ! Requested absolute error
     integer            :: flags = 0+4 ! Flags
     integer            :: seed = 0 ! Seed for the rng. Zero will use Sobol.
-    integer            :: mineval = 1000 ! Minimum number of integrand evaluations
-    integer            :: maxeval = 10000000 ! Maximum number of integrand evaluations
+    !integer            :: mineval = 1000 ! Minimum number of integrand evaluations
+    !integer            :: maxeval = 10000000 ! Maximum number of integrand evaluations
     integer            :: nnew = 100 ! Number of integrand evaluations in each subdivision
     integer            :: nmin = 20   ! Minimum number of samples a former pass must contribute to a subregion to be considered in the region's compound integral value.
     double precision   :: flatness = 5.0d0 ! Determine how prominently out-liers, i.e. samples with a large fluctuation, 
@@ -647,8 +658,8 @@ end function Escape_Prob_log
     userdata = emit
 
     call suave(ndim, ncomp, integrand_cuba_fe, userdata, nvec, &
-     & epsrel, epsabs, flags, seed, &
-     & mineval, maxeval, nnew, nmin, flatness, &
+     & cuba_epsrel, cuba_epsabs, flags, seed, &
+     & cuba_mineval, cuba_maxeval, nnew, nmin, flatness, &
      & statefile, spin, &
      & nregions, neval, fail, integral, error, prob)
 
@@ -656,8 +667,8 @@ end function Escape_Prob_log
       print '(a)', 'RUMDEED: WARNING Cuba did not return 0'
       print *, fail
       print *, error
-      print *, integral(1)*epsrel
-      print *, epsabs
+      print *, integral(1)*cuba_epsrel
+      print *, cuba_epsabs
       print *, prob
       print *, integral(1)
       call Flush_Data()

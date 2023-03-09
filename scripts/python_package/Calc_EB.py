@@ -62,8 +62,8 @@ cur = df_cur['cur_roll'].iloc[-1]
 print('Current is {:6.2f} mA'.format(cur/1.0E-3))
 
 # Calculate brightness
-B = 2*cur/(np.pi**2*e_x*e_y * 1.0E-12)
-print('Brightness is {:6.2f} A/(m-rad)^2'.format(B))
+B = 2*cur/(np.pi**2*e_x*e_y)
+print('Brightness is {:6.2f} A/(nm-mrad)^2'.format(B))
 
 plt.rc('text', usetex=True)
 plt.rc('font', family='serif', size=8)

@@ -29,7 +29,7 @@ def get_git_commit():
         pass
     return ''
 
-project = 'Vacuum-MD'
+project = 'RUMDEED'
 copyright = '{}, Kristinn Torfason'.format(date.today().year)
 author = 'Kristinn Torfason'
 version = get_git_commit()

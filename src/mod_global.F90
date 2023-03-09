@@ -44,12 +44,24 @@ module mod_global
   double precision, parameter :: T_ntp = 293.15d0 ! Normal temperature in Kelvin (NIST)
   double precision, parameter :: P_ntp = 101325.0d0 ! Normal pressure in Pa (NIST)
 
+  
   ! ----------------------------------------------------------------------------
   ! Define scales used when reading and writing data
   double precision, parameter :: length_scale = 1.0d-9 ! Length scale (1 nanometer)
   double precision, parameter :: time_scale = 1.0d-12 ! Time scale (1 ps)
   double precision, parameter :: vel_scale = length_scale / time_scale ! Velocity scale (1 nm / 1 ps)
   double precision, parameter :: cur_scale = 1.0d0 ! Current scale (1 A)
+
+
+  ! ----------------------------------------------------------------------------
+  ! Parameters for the surface integration using CUBA
+  integer            :: cuba_method = 1 ! Method to use
+  integer, parameter :: cuba_method_suave = 1
+  integer, parameter :: cuba_method_divonne = 2
+  double precision   :: cuba_epsabs = 1.0d-4 ! Requested absolute error
+  double precision   :: cuba_epsrel = 1.0d-2 ! Requested relative error
+  integer            :: cuba_maxeval = 10000000 ! Maximum number of integrand evaluations
+  integer            :: cuba_mineval = 1000 ! Minimum number of integrand evaluations
 
 
   ! ----------------------------------------------------------------------------
