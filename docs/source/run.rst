@@ -8,12 +8,12 @@ Once you have :ref:`downloaded the source code and build the executable <build>`
 Input files
 -----------
 The RUMDEED program is run from the command line and reads input parameters from several input files. These file are placed in the same
-directory as the RUMDEED executable file. The main input files is simply called **input** and is always required. Other input files such
-are only required when specific features of the program are used.
+directory as the RUMDEED executable file. The main input files is called **input** and is always required. Other input files are only
+required when specific features of the program are used.
 
 Input file
 ++++++++++
-The program will read a file called **input** when it starts. This file defines the simulation parameters to be used and is a Fortran namelist file.
+The program will read the file called **input** when it starts. This file defines the simulation parameters to be used and is a Fortran namelist file.
 The parameters are described below, with an example given at the end.
 
 V_S
@@ -65,7 +65,7 @@ EMITTERS_DELAY(<EMITTER NUMBER>)
     The timestep the emitter should become active and start emitting. Here **<EMITTER NUMBER>** should be replaced by the number of the emitter.
     This line should be given for all emitters in the system.
 
-Example input file with one emitter doing planar field emission:
+Example :download:`input <files/input>` file with one emitter doing planar field emission:
 
 .. code-block:: text
 
@@ -80,7 +80,7 @@ Example input file with one emitter doing planar field emission:
 
     EMITTERS_DIM(1:3, 1) 1000.0d0, 1000.0d0, 1000.0d0,
     EMITTERS_POS(1:3, 1) = -500.0d0, -500.0d0, 0.0d0,
-    EMITTERS_TYPE(1) = 1,
+    EMITTERS_TYPE(1) = 2,
     EMITTERS_DELAY(1) = 0,
   /
 
@@ -93,7 +93,7 @@ The first line in the work function input file should be an integer number. Curr
 The second line should have two integer number that indicate the number of rows and columns in the checkerboard. The rest of the file is a matrix of numbers that
 represent the work function values in the checkerboard. Note that the checkerboard is only supported for a single emitter.
 
-Example checkerboard work function file:
+Example checkerboard :download:`work function <files/w_theta>` file:
 
 .. code-block:: text
 
@@ -102,9 +102,10 @@ Example checkerboard work function file:
   2.5d0 3.0d0
   3.0d0 2.5d0  
 
-Collisions
-++++++++++
-N\ :sub:`2` files
+..
+  Collisions
+  ++++++++++
+  N\ :sub:`2` files To do later when collisions are fully implemented
 
 Laser
 +++++
@@ -133,15 +134,51 @@ Third line is gauss pulse parameters, center (mu), width (sigma) and A(mplitude)
 The gaussian pulse is simulated with output restriction of electrons according to normal distribution.
 This should in theory simulate the Quantum Efficiency and Intensity via amplitude modulation.
 
+Examples
+--------
+
+A few examples of input files can be found in the Examples folder.
+
+Space charge limited photo emission
++++++++++++++++++++++++++++++++++++
+
+Photoemission
+
+Planar field emission
++++++++++++++++++++++
+
+The examples for planar field emission can be found in Examples/Planar-FE/ folder. Examples for homogeneous work function of 2.0 eV is given along with an alternating 2.0 and 2.5 eV
+checkerboard work function pattern.
+
+Input file
+
+.. literalinclude:: files/Examples/Planar-FE/input
+
+Work function file
+
+.. literalinclude:: files/Examples/Planar-FE/w_theta
+
+Field emission from a prolate spheroidal tip
+++++++++++++++++++++++++++++++++++++++++++++
+
+Tip
+
+Planar thermal-field emission
++++++++++++++++++++++++++++++
+
+Thermal-field
+
 
 Running the code
 -----------------
 
-To do
+To run the code place the necessary input files into the same folder as the executable file :ref:`"RUMDEED.out" <build>`. The execute the code by running the following command
+inside the folder
 
-Examples
---------
+.. code-block:: console
+   
+   ./RUMDEED.out
 
-Describe examples in the Examples/ folder and make new ones. To do...
+Output files will be placed in a folder called out and are described in :ref:`output`.
 
 .. index:: Collisions, N₂, input, w_theta, work function, time_step, time step, box_dim, steps, emission_mode, nremit
