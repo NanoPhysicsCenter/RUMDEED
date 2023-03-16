@@ -31,3 +31,8 @@ p {
   padding: 6px;
   position: relative;
 }
+
+ /* override table width restrictions */ 
+ .rst-content table.docutils th { 
+    white-space: normal; 
+}
