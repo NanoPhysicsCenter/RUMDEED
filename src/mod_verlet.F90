@@ -683,8 +683,8 @@ contains
 
     !T_temp = 300.0d0 + (1250.0d0 - 300.0d0) * step / steps
 
-    write (ud_volt, "(ES12.4, tr2, i8, tr2, ES18.8, tr2, ES18.8)", iostat=IFAIL) &
-          & cur_time, step, V_d, V_rf, T_temp
+    write (ud_volt, "(ES12.4, tr2, i8, tr2, ES18.8)", iostat=IFAIL) &
+          & cur_time, step, V_d, V_rf
   end subroutine Set_Voltage
 
   double precision pure function Voltage_Resistor()
