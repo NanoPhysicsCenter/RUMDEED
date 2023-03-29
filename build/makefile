@@ -23,14 +23,23 @@ ifndef FFLAGS
 FFLAGS=-O2
 endif
 
-# INTEL FORTRAN
+# INTEL FORTRAN CLASSIC
 ifeq ($(FC),ifort)
-$(info Using Intel Fortran)
+$(info Using Intel Fortran Classic)
 FFLAGS=-O2 -xHost -ip -ipo #-fp-model precise -g
 #-fltconsistency
 #-prec-div -prec-sqrt
 #-fp-model precise
 #FFLAGS=-check all -g -warn interfaces -warn all -traceback -ftrapuv
+ifdef OPENMP
+FFLAGS+=-qopenmp
+endif
+endif
+
+# NEW INTEL FORTRAN
+ifeq ($(FC),ifx)
+$(info Using New Intel Fortran Compiler)
+FFLAGS=-O2 -xHost -ipo
 ifdef OPENMP
 FFLAGS+=-qopenmp
 endif
