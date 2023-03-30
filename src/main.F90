@@ -426,7 +426,8 @@ contains
 
     ! Register a subroutine to catch the SIGINT signal
 #if defined(__GNUC__)
-    IFAIL = SIGNAL(SIGINT, Signal_Handler)
+    IFAIL = SIGNAL(SIGINT, Signal_Handler) ! SIGINT is used by to stop the simulations by ctrl+c
+    IFAIL = SIGNAL(16, Signal_Handler) ! SIGUSR1 is used by slurm to stop the simulation
 #endif
 
     ! Create folder for output files
