@@ -1,11 +1,10 @@
 <!DOCTYPE html>
 <html class="writer-html5" lang="en" >
 <head>
-  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.19: https://docutils.sourceforge.io/" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>7. Bibliography &mdash; Vacuum-MD 0a10c506c991fd6a860b65a05e622270dc47809e
- documentation</title>
+  <title>7. Bibliography &mdash; RUMDEED  documentation</title>
       <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
       <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
       <link rel="stylesheet" href="_static/css/custom.css" type="text/css" />
@@ -13,10 +12,11 @@
     <script src="_static/js/html5shiv.min.js"></script>
   <![endif]-->
   
+        <script integrity="sha384-vtXRMe3mGCbOeY7l30aIg8H9p3GdeSe4IFlP6G8JMa7o7lXvnz3GFKzPxzJdPfGK" src="_static/jquery.js"></script>
+        <script integrity="sha384-lSZeSIVKp9myfKbDQ3GkN/KHjUc+mzg17VKDN4Y2kUeBSJioB9QSM639vM9fuY//" src="_static/_sphinx_javascript_frameworks_compat.js"></script>
         <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
-        <script src="_static/jquery.js"></script>
-        <script src="_static/underscore.js"></script>
         <script src="_static/doctools.js"></script>
+        <script src="_static/sphinx_highlight.js"></script>
     <script src="_static/js/theme.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
@@ -28,11 +28,15 @@
     <nav data-toggle="wy-nav-shift" class="wy-nav-side">
       <div class="wy-side-scroll">
         <div class="wy-side-nav-search" >
-            <a href="manual.html" class="icon icon-home"> Vacuum-MD
+
+          
+          
+          <a href="manual.html" class="icon icon-home">
+            RUMDEED
           </a>
 <div role="search">
   <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
-    <input type="text" name="q" placeholder="Search docs" />
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
     <input type="hidden" name="check_keywords" value="yes" />
     <input type="hidden" name="area" value="default" />
   </form>
@@ -45,18 +49,26 @@
 <li class="toctree-l2"><a class="reference internal" href="intro.html#acknowledgments">1.2. Acknowledgments</a></li>
 </ul>
 </li>
-<li class="toctree-l1"><a class="reference internal" href="build.html">2. Building the code</a></li>
+<li class="toctree-l1"><a class="reference internal" href="build.html">2. Building the code</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="build.html#cuba-library">2.1. Cuba library</a></li>
+<li class="toctree-l2"><a class="reference internal" href="build.html#documentation">2.2. Documentation</a></li>
+</ul>
+</li>
 <li class="toctree-l1"><a class="reference internal" href="run.html">3. Input files and running the code</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="run.html#input-files">3.1. Input files</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="run.html#input-file">3.1.1. Input file</a></li>
 <li class="toctree-l3"><a class="reference internal" href="run.html#work-function">3.1.2. Work function</a></li>
-<li class="toctree-l3"><a class="reference internal" href="run.html#collisions">3.1.3. Collisions</a></li>
-<li class="toctree-l3"><a class="reference internal" href="run.html#laser">3.1.4. Laser</a></li>
-<li class="toctree-l3"><a class="reference internal" href="run.html#photoemission-input-warning">3.1.5. Photoemission Input Warning</a></li>
+<li class="toctree-l3"><a class="reference internal" href="run.html#laser">3.1.3. Laser</a></li>
 </ul>
 </li>
-<li class="toctree-l2"><a class="reference internal" href="run.html#running-the-code">3.2. Running the code</a></li>
-<li class="toctree-l2"><a class="reference internal" href="run.html#examples">3.3. Examples</a></li>
+<li class="toctree-l2"><a class="reference internal" href="run.html#examples">3.2. Examples</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="run.html#space-charge-limited-photo-emission">3.2.1. Space charge limited photo emission</a></li>
+<li class="toctree-l3"><a class="reference internal" href="run.html#planar-field-emission">3.2.2. Planar field emission</a></li>
+<li class="toctree-l3"><a class="reference internal" href="run.html#field-emission-from-a-prolate-spheroidal-tip">3.2.3. Field emission from a prolate spheroidal tip</a></li>
+<li class="toctree-l3"><a class="reference internal" href="run.html#planar-thermal-field-emission">3.2.4. Planar thermal-field emission</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="run.html#running-the-code">3.3. Running the code</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="output.html">4. Output and data files</a><ul>
@@ -80,15 +92,15 @@
 
     <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
           <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
-          <a href="manual.html">Vacuum-MD</a>
+          <a href="manual.html">RUMDEED</a>
       </nav>
 
       <div class="wy-nav-content">
         <div class="rst-content style-external-links">
           <div role="navigation" aria-label="Page navigation">
   <ul class="wy-breadcrumbs">
-      <li><a href="manual.html" class="icon icon-home"></a> &raquo;</li>
-      <li><span class="section-number">7. </span>Bibliography</li>
+      <li><a href="manual.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active"><span class="section-number">7. </span>Bibliography</li>
       <li class="wy-breadcrumbs-aside">
       </li>
   </ul><div class="rst-breadcrumbs-buttons" role="navigation" aria-label="Sequential page navigation">
@@ -100,25 +112,34 @@
            <div itemprop="articleBody">
              
   <section id="bibliography">
-<h1><span class="section-number">7. </span>Bibliography<a class="headerlink" href="#bibliography" title="Permalink to this headline"></a></h1>
-<p id="id1"><dl class="citation">
-<dt class="label" id="id2"><span class="brackets">1</span></dt>
-<dd><p>Andreas Pedersen, Andrei Manolescu, and Ágúst Valfells. Space-charge modulation in vacuum microdiodes at thz frequencies. <em>Phys. Rev. Lett.</em>, 104:175002, Apr 2010. URL: <a class="reference external" href="https://link.aps.org/doi/10.1103/PhysRevLett.104.175002">https://link.aps.org/doi/10.1103/PhysRevLett.104.175002</a>, <a class="reference external" href="https://doi.org/10.1103/PhysRevLett.104.175002">doi:10.1103/PhysRevLett.104.175002</a>.</p>
-</dd>
-<dt class="label" id="id3"><span class="brackets">2</span></dt>
-<dd><p>Kristinn Torfason, Agust Valfells, and Andrei Manolescu. Molecular dynamics simulations of field emission from a planar nanodiode. <em>Physics of Plasmas</em>, 22(3):033109, 2015. URL: <a class="reference external" href="https://doi.org/10.1063/1.4914855">https://doi.org/10.1063/1.4914855</a>, <a class="reference external" href="https://arxiv.org/abs/https://doi.org/10.1063/1.4914855">arXiv:https://doi.org/10.1063/1.4914855</a>, <a class="reference external" href="https://doi.org/10.1063/1.4914855">doi:10.1063/1.4914855</a>.</p>
-</dd>
-<dt class="label" id="id4"><span class="brackets">3</span></dt>
-<dd><p>Kristinn Torfason, Agust Valfells, and Andrei Manolescu. Molecular dynamics simulations of field emission from a prolate spheroidal tip. <em>Physics of Plasmas</em>, 23(12):123119, 2016. URL: <a class="reference external" href="https://doi.org/10.1063/1.4972821">https://doi.org/10.1063/1.4972821</a>, <a class="reference external" href="https://arxiv.org/abs/https://doi.org/10.1063/1.4972821">arXiv:https://doi.org/10.1063/1.4972821</a>, <a class="reference external" href="https://doi.org/10.1063/1.4972821">doi:10.1063/1.4972821</a>.</p>
-</dd>
-<dt class="label" id="id5"><span class="brackets">4</span></dt>
-<dd><p>Anna Sitek, Kristinn Torfason, Andrei Manolescu, and Ágúst Valfells. Space-charge effects in the field-assisted thermionic emission from nonuniform cathodes. <em>Phys. Rev. Applied</em>, 15:014040, Jan 2021. URL: <a class="reference external" href="https://link.aps.org/doi/10.1103/PhysRevApplied.15.014040">https://link.aps.org/doi/10.1103/PhysRevApplied.15.014040</a>, <a class="reference external" href="https://doi.org/10.1103/PhysRevApplied.15.014040">doi:10.1103/PhysRevApplied.15.014040</a>.</p>
-</dd>
-<dt class="label" id="id6"><span class="brackets">5</span></dt>
-<dd><p>Richard G Forbes and Jonathan H.B Deane. Reformulation of the standard theory of fowler–nordheim tunnelling and cold field electron emission. <em>Proceedings of the Royal Society A: Mathematical, Physical and Engineering Science</em>, 463(2087):2907–2927, 2007. URL: <a class="reference external" href="http://rspa.royalsocietypublishing.org/content/463/2087/2907.abstract">http://rspa.royalsocietypublishing.org/content/463/2087/2907.abstract</a>, <a class="reference external" href="https://arxiv.org/abs/http://rspa.royalsocietypublishing.org/content/463/2087/2907.full.pdf+html">arXiv:http://rspa.royalsocietypublishing.org/content/463/2087/2907.full.pdf+html</a>, <a class="reference external" href="https://doi.org/10.1098/rspa.2007.0030">doi:10.1098/rspa.2007.0030</a>.</p>
-</dd>
-</dl>
-</p>
+<h1><span class="section-number">7. </span>Bibliography<a class="headerlink" href="#bibliography" title="Permalink to this heading"></a></h1>
+<div class="docutils container" id="id1">
+<div class="citation" id="id2" role="doc-biblioentry">
+<span class="label"><span class="fn-bracket">[</span>1<span class="fn-bracket">]</span></span>
+<p>Andreas Pedersen, Andrei Manolescu, and Ágúst Valfells. Space-charge modulation in vacuum microdiodes at thz frequencies. <em>Phys. Rev. Lett.</em>, 104:175002, Apr 2010. URL: <a class="reference external" href="https://link.aps.org/doi/10.1103/PhysRevLett.104.175002">https://link.aps.org/doi/10.1103/PhysRevLett.104.175002</a>, <a class="reference external" href="https://doi.org/10.1103/PhysRevLett.104.175002">doi:10.1103/PhysRevLett.104.175002</a>.</p>
+</div>
+<div class="citation" id="id3" role="doc-biblioentry">
+<span class="label"><span class="fn-bracket">[</span>2<span class="fn-bracket">]</span></span>
+<p>Kristinn Torfason, Agust Valfells, and Andrei Manolescu. Molecular dynamics simulations of field emission from a planar nanodiode. <em>Physics of Plasmas</em>, 22(3):033109, 2015. URL: <a class="reference external" href="https://doi.org/10.1063/1.4914855">https://doi.org/10.1063/1.4914855</a>, <a class="reference external" href="https://arxiv.org/abs/https://doi.org/10.1063/1.4914855">arXiv:https://doi.org/10.1063/1.4914855</a>, <a class="reference external" href="https://doi.org/10.1063/1.4914855">doi:10.1063/1.4914855</a>.</p>
+</div>
+<div class="citation" id="id4" role="doc-biblioentry">
+<span class="label"><span class="fn-bracket">[</span>3<span class="fn-bracket">]</span></span>
+<p>Kristinn Torfason, Agust Valfells, and Andrei Manolescu. Molecular dynamics simulations of field emission from a prolate spheroidal tip. <em>Physics of Plasmas</em>, 23(12):123119, 2016. URL: <a class="reference external" href="https://doi.org/10.1063/1.4972821">https://doi.org/10.1063/1.4972821</a>, <a class="reference external" href="https://arxiv.org/abs/https://doi.org/10.1063/1.4972821">arXiv:https://doi.org/10.1063/1.4972821</a>, <a class="reference external" href="https://doi.org/10.1063/1.4972821">doi:10.1063/1.4972821</a>.</p>
+</div>
+<div class="citation" id="id5" role="doc-biblioentry">
+<span class="label"><span class="fn-bracket">[</span>4<span class="fn-bracket">]</span></span>
+<p>Anna Sitek, Kristinn Torfason, Andrei Manolescu, and Ágúst Valfells. Space-charge effects in the field-assisted thermionic emission from nonuniform cathodes. <em>Phys. Rev. Applied</em>, 15:014040, Jan 2021. URL: <a class="reference external" href="https://link.aps.org/doi/10.1103/PhysRevApplied.15.014040">https://link.aps.org/doi/10.1103/PhysRevApplied.15.014040</a>, <a class="reference external" href="https://doi.org/10.1103/PhysRevApplied.15.014040">doi:10.1103/PhysRevApplied.15.014040</a>.</p>
+</div>
+<div class="citation" id="id7" role="doc-biblioentry">
+<span class="label"><span class="fn-bracket">[</span>5<span class="fn-bracket">]</span></span>
+<p>T. Hahn. Cuba—a library for multidimensional numerical integration. <em>Computer Physics Communications</em>, 168(2):78–95, 2005. URL: <a class="reference external" href="https://www.sciencedirect.com/science/article/pii/S0010465505000792">https://www.sciencedirect.com/science/article/pii/S0010465505000792</a>, <a class="reference external" href="https://doi.org/https://doi.org/10.1016/j.cpc.2005.01.010">doi:https://doi.org/10.1016/j.cpc.2005.01.010</a>.</p>
+</div>
+<div class="citation" id="id6" role="doc-biblioentry">
+<span class="label"><span class="fn-bracket">[</span>6<span class="fn-bracket">]</span></span>
+<p>Richard G Forbes and Jonathan H.B Deane. Reformulation of the standard theory of fowler–nordheim tunnelling and cold field electron emission. <em>Proceedings of the Royal Society A: Mathematical, Physical and Engineering Science</em>, 463(2087):2907–2927, 2007. URL: <a class="reference external" href="http://rspa.royalsocietypublishing.org/content/463/2087/2907.abstract">http://rspa.royalsocietypublishing.org/content/463/2087/2907.abstract</a>, <a class="reference external" href="https://arxiv.org/abs/http://rspa.royalsocietypublishing.org/content/463/2087/2907.full.pdf+html">arXiv:http://rspa.royalsocietypublishing.org/content/463/2087/2907.full.pdf+html</a>, <a class="reference external" href="https://doi.org/10.1098/rspa.2007.0030">doi:10.1098/rspa.2007.0030</a>.</p>
+</div>
+</div>
+</div>
 </section>
 
 
@@ -131,7 +152,7 @@
   <hr/>
 
   <div role="contentinfo">
-    <p>&#169; Copyright 2022, Kristinn Torfason.</p>
+    <p>&#169; Copyright 2023, Kristinn Torfason.</p>
   </div>
 
   Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a

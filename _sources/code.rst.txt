@@ -5,16 +5,15 @@ The code
 
 Verlet
 ------
-For particle advancement the code uses the Velocity Verlet algorithm. The code for it can be found in **mod_verlet.F90** and the main subroutine is:
-
-.. f:autosubroutine:: velocity_verlet
+For particle advancement the code uses the Velocity Verlet algorithm. The code for it can be found in **mod_verlet.F90** and the main subroutine is called
+``velocity_verlet``.
 
 The updated positions are calculated with:
 
 .. math::
     x_{n+1} = x_n + v_n\Delta t + \frac{1}{2}a_n \Delta t^2
 
-.. f:autosubroutine:: Update_ElecHole_Position
+See the ``Update_ElecHole_Position`` subroutine.
 
 Then the force on each particle is calculate using Coulomb's law, after which the velocity is
 update using:
@@ -22,7 +21,7 @@ update using:
 .. math::
     v_{n+1} = v_n + \frac{a_n+a_{n+1}}{2} \Delta t^2
 
-.. f:autosubroutine:: Update_Velocity
+See the ``Update_Velocity`` subroutine.
 
 .. _photo:
 
@@ -37,7 +36,7 @@ Photoemission Branch
     * Emission tip (Works but probably not as intended)
     * Circle (Should work, exhaustive tests not done)
 
-* Velocity distibution is Gaussian
+* Velocity distribution is Gaussian
     * Velocity has Newtonian calculations
 
 .. math::
@@ -56,7 +55,7 @@ Photoemission Branch
 .. math::
     QE \equiv \frac{\hbar \omega}{ q_0 } \frac{ J }{ I_{\omega } } \propto ( \hbar \omega - \Phi)^2
 
-Quantum efficiency and light intensity are both variables in the amplitude so care should be taken when interpeting the input A(mplitude) of the normal distibution.
+Quantum efficiency and light intensity are both variables in the amplitude so care should be taken when interpreting the input A(mplitude) of the normal distribution.
 
 * Input file for laser and pulse
 
