@@ -55,10 +55,10 @@ contains
     character(256) :: iomsg
 
     ! Open the file that contains information about the work function
-    open(newunit=ud_work, iostat=IFAIL, iomsg=iomsg, file='w_theta', &
+    open(newunit=ud_work, iostat=IFAIL, iomsg=iomsg, file='work', &
        & status='OLD', form='FORMATTED', access='SEQUENTIAL', action='READ')
     if (IFAIL /= 0) then
-      print *, 'RUMDEED: Failed to open file w_theta. ABORTING'
+      print *, 'RUMDEED: Failed to open file work. ABORTING'
       print *, IFAIL
       print *, iomsg
       stop

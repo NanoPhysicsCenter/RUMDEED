@@ -86,14 +86,14 @@ Example :download:`input <files/input>` file with one emitter doing planar field
 
 Work function
 +++++++++++++
-For field emission and thermal-field emission the work function on the emitter surface is specified using an input file called **w_theta**. This only applies to the planar cases,
-for the hyperboloid tip surface the work function needs to specified in the file **mod_emission_top.f90** using the **w_theta** variable.
+For field emission and thermal-field emission the work function on the emitter surface is specified using an input file called **work**. This only applies to the planar cases,
+for the hyperboloid tip surface the work function needs to specified in the file **mod_emission_top.f90** using the **work** variable.
 
 The first line in the work function input file should be an integer number. Currently only the number 1 is supported which represents a checkerboard work function surface.
 The second line should have two integer number that indicate the number of rows and columns in the checkerboard. The rest of the file is a matrix of numbers that
 represent the work function values in the checkerboard. Note that the checkerboard is only supported for a single emitter.
 
-Example checkerboard :download:`work function <files/w_theta>` file:
+Example checkerboard :download:`work function <files/work>` file:
 
 .. code-block:: text
 
@@ -156,7 +156,7 @@ Input file
 
 Work function file
 
-.. literalinclude:: files/Examples/Planar-FE/w_theta
+.. literalinclude:: files/Examples/Planar-FE/work
 
 Field emission from a prolate spheroidal tip
 ++++++++++++++++++++++++++++++++++++++++++++
@@ -181,4 +181,4 @@ inside the folder
 
 Output files will be placed in a folder called out and are described in :ref:`output`.
 
-.. index:: Collisions, N₂, input, w_theta, work function, time_step, time step, box_dim, steps, emission_mode, nremit
+.. index:: Collisions, N₂, input, work, work function, time_step, time step, box_dim, steps, emission_mode, nremit
