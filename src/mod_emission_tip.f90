@@ -115,7 +115,8 @@ contains
     select case (emitters_type(1))
     case (1)
       ! Field emission
-      call Do_Field_Emission_Tip(step)
+      !call Do_Field_Emission_Tip(step)
+      call Do_Field_Emission_Tip_OLDCODE(step)
 
     case (2)
       ! Reverse the voltage
@@ -424,6 +425,149 @@ end subroutine Do_Photo_Emission_Tip
 
     !!!$OMP END PARALLEL
   end subroutine Do_Field_Emission_Tip_1
+
+  subroutine Do_Field_Emission_Tip_OLDCODE(step)
+    integer, intent(in)              :: step
+    double precision                 :: F
+    double precision, dimension(1:3) :: par_pos, surf_norm, par_vel
+    !double precision, dimension(1)   :: rnd
+    double precision, allocatable, dimension(:) :: rnd
+    integer                          :: i, j, s, IFAIL, nrElecEmit, n_r
+    double precision                 :: A_f, D_f, n_s, F_avg, n_add
+    double precision                 :: len_phi, len_xi
+    integer                          :: nr_phi, nr_xi, ndim
+    double precision                 :: xi_1, phi_1, xi_2, phi_2, xi_c, phi_c
+
+    !!$OMP SINGLE
+
+    nr_phi = 100
+    nr_xi = nr_phi
+    len_phi = 2.0d0*pi / nr_phi
+    len_xi = (max_xi - 1.0d0) / nr_xi
+
+    !print *, len_x, len_x / length
+    !print *, len_y, len_y / length
+
+    nrElecEmit = 0
+
+    !par_pos = 0.0d0
+    !n_s = 0.0d0
+    !F_avg = 0.0d0
+
+    !!$OMP END SINGLE
+
+    !!!!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(i, j, par_pos, par_elec, xi_c, phi_c, xi_1, phi_1, xi_2, phi_2, A_f, F, n_add, s, D_f, surf_norm)
+
+    !!$OMP DO PRIVATE(i, j, xi_c, phi_c, par_pos, par_elec, F, n_add, xi_1, xi_2, phi_1, phi_2, A_f) &
+    !!$OMP& REDUCTION(+:n_s,F_avg)
+    do i = 1, nr_xi
+      do j = 1, nr_phi
+        xi_c = 1.0d0 + (i - 0.5d0)*len_xi
+        phi_c = (j - 0.5d0)*len_phi
+
+        par_pos(1) = x_coor(xi_c, eta_1, phi_c)
+        par_pos(2) = y_coor(xi_c, eta_1, phi_c)
+        par_pos(3) = z_coor(xi_c, eta_1, phi_c)
+
+        F = Field_normal(par_pos, Calc_Field_at(par_pos))
+        F_avg = F_avg + F
+        !if (abs(F_avg) > 1.0d11) then
+        !  print *, 'F = ', F
+        !  print *, 'nrElec = ', nrElec
+          !stop
+        !end if
+
+        if (F >= 0.0d0) then
+          n_add = 0.0d0
+        else
+          xi_1 = 1.0d0 + (i - 1.0d0)*len_xi
+          phi_1 = (j - 1.0d0)*len_phi
+          xi_2 = 1.0d0 + (i + 0.0d0)*len_xi
+          phi_2 = (j + 0.0d0)*len_phi
+          A_f = Tip_Area(xi_1, xi_2, phi_1, phi_2)
+          n_add = Elec_Supply(A_f, F, par_pos)
+          !if (isnan(n_add) == .true.) then
+          !if (n_add < 0.0d0) then
+          !  print *, 'A_f = ', A_f
+          !  print *, 'F = ', F
+          !  print *, 'n_add = ', n_add
+            !stop
+          !end if
+        end if
+
+        n_s = n_s + n_add
+      end do
+    end do
+    !!$OMP END DO
+
+    !!$OMP SINGLE
+    print *, 'F_avg = ', F_avg
+    F_avg = F_avg / (nr_phi*nr_xi)
+    write (ud_debug, "(i8, tr2, E16.8)", iostat=IFAIL) step, F_avg
+  
+      !n_s = n_s - res_s
+    n_r = nint(n_s)
+    !res_s = n_r - n_s
+
+    !print *, 'n_r = ', n_r
+    if (n_r < 0) then
+      print *, 'n_r < 0'
+      print *, 'n_s = ', n_s
+      print *, 'n_r = ', n_r
+      stop
+    end if
+
+    allocate(rnd(1:n_r))
+    !IFAIL = vdrnguniform(VSL_RNG_METHOD_UNIFORM_STD, stream, n_r, rnd(1:n_r), 0.0d0, 1.0d0)
+    call random_number(rnd)
+
+    !!$OMP END SINGLE
+
+    !!$OMP DO PRIVATE(s, ndim, par_pos, par_elec, F, D_f, surf_norm, xi_1, phi_1)
+    do s = 1, n_r
+
+      !!!$OMP FLUSH (particles, nrElec)
+      ndim = 25
+      par_pos = Metro_algo_tip(ndim, xi_1, phi_1)
+      F = Field_normal(par_pos, Calc_Field_at(par_pos))
+
+      if (F >= 0.0d0) then
+        !Try again
+        !par_pos = Metro_algo_rec(ndim)
+        par_pos = Metro_algo_tip(ndim, xi_1, phi_1)
+        F = Field_normal(par_pos, Calc_Field_at(par_pos))
+
+        if (F >= 0.0d0) then
+          D_f = 0.0d0
+          print *, 'Warning: F > 0.0d0'
+        end if
+      else
+        D_f = Escape_Prob_Tip(F, par_pos)
+      end if
+
+      if (rnd(s) <= D_f) then
+        !par_pos(3) = par_pos(3) + 1.0d0*length
+        surf_norm = surface_normal(par_pos)
+        par_pos = par_pos + surf_norm*length_scale
+        !!$OMP CRITICAL
+          par_vel = 0.0d0
+          call Add_Particle(par_pos, par_vel, species_elec, step, 1, -1)
+          !nrElec = nrElec + 1
+          nrElecEmit = nrElecEmit + 1
+        !!$OMP END CRITICAL
+      end if
+    end do
+    !!$OMP END DO
+
+    !!$OMP MASTER
+    deallocate(rnd)
+
+    posInit = posInit + nrElecEmit
+    nrEmitted = nrEmitted + nrElecEmit
+    !!$OMP END MASTER
+
+    !!!$OMP END PARALLEL        
+  end subroutine Do_Field_Emission_Tip_OLDCODE
 
   subroutine Do_Simple_Field_Emission_tip(step)
     integer, intent(in) :: step
