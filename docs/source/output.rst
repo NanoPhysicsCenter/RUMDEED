@@ -251,10 +251,3 @@ Text file ending in .dt have to data orginzed as columns. Files ending in .bin a
   * - Type
     - integer
     - integer
-
----------
-
-Scripts
--------
-
-Describe some of the scripts in the scripts/ folder. How to use them and what they do.
