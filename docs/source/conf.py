@@ -30,7 +30,7 @@ def get_git_commit():
     return ''
 
 project = 'RUMDEED'
-copyright = '{}, Kristinn Torfason'.format(date.today().year)
+copyright = '{}, NanoPhysics group'.format(date.today().year)
 author = 'Kristinn Torfason'
 version = get_git_commit()
 
