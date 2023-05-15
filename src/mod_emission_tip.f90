@@ -133,8 +133,7 @@ contains
     end select
 
     cur_time = time_step * step / time_scale ! Scaled in units of time_scale
-    write (ud_emit, "(E14.6, *(tr8, i6))", iostat=IFAIL) cur_time, step, posInit, &
-    & nrEmitted, nrElec
+    write (ud_emit, "(E14.6, *(tr8, i6))", iostat=IFAIL) cur_time, step, nrEmitted, nrElec
   end subroutine Do_Emission_Tip
 
 !----------------------------------------------------------------------------------------
@@ -450,16 +449,7 @@ end subroutine Do_Photo_Emission_Tip
 
     nrElecEmit = 0
 
-    !par_pos = 0.0d0
-    !n_s = 0.0d0
-    !F_avg = 0.0d0
-
-    !!$OMP END SINGLE
-
-    !!!!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(i, j, par_pos, par_elec, xi_c, phi_c, xi_1, phi_1, xi_2, phi_2, A_f, F, n_add, s, D_f, surf_norm)
-
-    !!$OMP DO PRIVATE(i, j, xi_c, phi_c, par_pos, par_elec, F, n_add, xi_1, xi_2, phi_1, phi_2, A_f) &
-    !!$OMP& REDUCTION(+:n_s,F_avg)
+    !print *, 'Integration loop'
     do i = 1, nr_xi
       do j = 1, nr_phi
         xi_c = 1.0d0 + (i - 0.5d0)*len_xi
@@ -498,14 +488,12 @@ end subroutine Do_Photo_Emission_Tip
         n_s = n_s + n_add
       end do
     end do
-    !!$OMP END DO
 
-    !!$OMP SINGLE
-    print *, 'F_avg = ', F_avg
+    !print *, 'F_avg = ', F_avg
     F_avg = F_avg / (nr_phi*nr_xi)
     write (ud_debug, "(i8, tr2, E16.8)", iostat=IFAIL) step, F_avg
   
-      !n_s = n_s - res_s
+    !n_s = n_s - res_s
     n_r = nint(n_s)
     !res_s = n_r - n_s
 
@@ -521,28 +509,32 @@ end subroutine Do_Photo_Emission_Tip
     !IFAIL = vdrnguniform(VSL_RNG_METHOD_UNIFORM_STD, stream, n_r, rnd(1:n_r), 0.0d0, 1.0d0)
     call random_number(rnd)
 
-    !!$OMP END SINGLE
-
-    !!$OMP DO PRIVATE(s, ndim, par_pos, par_elec, F, D_f, surf_norm, xi_1, phi_1)
+    !print *, 'Emission loop'
     do s = 1, n_r
 
       !!!$OMP FLUSH (particles, nrElec)
       ndim = 25
-      par_pos = Metro_algo_tip(ndim, xi_1, phi_1)
-      F = Field_normal(par_pos, Calc_Field_at(par_pos))
+      !print *, 'Metro algo 1'
+      !par_pos = Metro_algo_tip(ndim, xi_1, phi_1)
+      call Metro_algo_tip_v2(ndim, xi_1, phi_1, F, D_f, par_pos)
+      !F = Field_normal(par_pos, Calc_Field_at(par_pos))
 
       if (F >= 0.0d0) then
         !Try again
-        !par_pos = Metro_algo_rec(ndim)
-        par_pos = Metro_algo_tip(ndim, xi_1, phi_1)
+        !print *, 'Metro algo 2'
+        !par_pos = Metro_algo_tip(ndim, xi_1, phi_1)
+        call Metro_algo_tip_v2(ndim, xi_1, phi_1, F, D_f, par_pos)
         F = Field_normal(par_pos, Calc_Field_at(par_pos))
 
         if (F >= 0.0d0) then
           D_f = 0.0d0
           print *, 'Warning: F > 0.0d0'
         end if
-      else
-        D_f = Escape_Prob_Tip(F, par_pos)
+      !else
+      !  print *, 'Escape prob'
+      !  print *, 'F = ', F
+      !  print *, 'par_pos = ', par_pos
+      !  D_f = Escape_Prob_Tip(F, par_pos)
       end if
 
       if (rnd(s) <= D_f) then
@@ -1169,7 +1161,6 @@ end function Elec_supply_tip
       print *, 'pos ', pos
       print *, 'v_y ', v_y(F, pos)
       print *, 'F ', F
-      print *, 'WTF'
       !pause
     end if
     !print *, 'Escape_Prob-- ', Escape_Prob_Tip

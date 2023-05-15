@@ -226,7 +226,7 @@ contains
 
     print '(a, i3, a)', 'RUMDEED: ', (i*10), '% done'
     print '(tr1, i0, a)', nrPart, ' particles in the system'
-    print '(tr2, i0, a, i0, a)', nrElec, ' electrons and ', nrHole, ' holes'
+    !print '(tr2, i0, a, i0, a)', nrElec, ' electrons and ', nrHole, ' holes'
     print *, ''
   end subroutine PrintProgress
 
