@@ -78,7 +78,7 @@ Example :download:`input <files/input>` file with one emitter doing planar field
     NREMIT = 1,
     IMAGE_CHARGE = .TRUE.
 
-    EMITTERS_DIM(1:3, 1) 1000.0d0, 1000.0d0, 1000.0d0,
+    EMITTERS_DIM(1:3, 1) 1000.0d0, 1000.0d0, 0.0d0,
     EMITTERS_POS(1:3, 1) = -500.0d0, -500.0d0, 0.0d0,
     EMITTERS_TYPE(1) = 2,
     EMITTERS_DELAY(1) = 0,
