@@ -400,7 +400,7 @@ contains
     integer                          :: nrElecEmit, nrTry
     double precision, dimension(1:3) :: par_pos, par_vel, field
     !double precision                :: r_e, theta_e
-    double precision                 :: r_e, r_e2, r2, p_eV
+    double precision                 :: r_e, r_e2, r2, p_eV, schk_wf
     
     ! Get Energy distribution of the photons
     p_eV = ptr_Get_Photo_Emission_Energy()
@@ -448,10 +448,12 @@ contains
       nrTry = nrTry + 1 ! Add one more try
       par_pos(3) = 0.0d0 * length_scale ! Check in plane
       
-
-      if (w_theta_xy(par_pos, emit) <= p_eV) then
-
-        field = Calc_Field_at(par_pos)
+      ! Schottkey Effect, reduction of workfunction due to electric field
+      ! Workfunction_reduction = sqrt ( (electron_charge^3 * electric_fielc)/(4 * pi * epsilon_0) )
+      field = Calc_Field_at(par_pos)
+      schk_wf = w_theta_xy(par_pos, emit) - sqrt( ( q_0**3 * field(3)) / (4 * pi * epsilon_0))
+      if (schk_wf <= p_eV) then
+        
         if (field(3) < 0.0d0) then
           par_pos(3) = 1.0d0 * length_scale ! Above plane
           field = Calc_Field_at(par_pos)
@@ -462,7 +464,7 @@ contains
             if (PHOTON_MODE == 1) then
               par_vel = 0.0d0
             else if (PHOTON_MODE == 2) then
-              par_vel(3) = sqrt((2 * ((p_eV - w_theta_xy(par_pos, emit))*q_0))/m_0) ! <-- Newtonian
+              par_vel(3) = sqrt((2 * ((p_eV - schk_wf)*q_0))/m_0) ! <-- Newtonian
             else
               print *, "WARNING: Unknown photon velocity mode!"
             end if
