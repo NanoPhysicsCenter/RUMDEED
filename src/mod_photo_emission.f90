@@ -400,7 +400,7 @@ contains
     integer                          :: nrElecEmit, nrTry
     double precision, dimension(1:3) :: par_pos, par_vel, field
     !double precision                :: r_e, theta_e
-    double precision                 :: r_e, r_e2, r2, p_eV, schk_wf
+    double precision                 :: r_e, r_e2, r2, p_eV, schk_wf, schk_red
     
     ! Get Energy distribution of the photons
     p_eV = ptr_Get_Photo_Emission_Energy()
@@ -450,11 +450,23 @@ contains
       
       ! Schottkey Effect, reduction of workfunction due to electric field
       ! Workfunction_reduction = sqrt ( (electron_charge^3 * electric_fielc)/(4 * pi * epsilon_0) )
-      field = Calc_Field_at(par_pos)
-      schk_wf = w_theta_xy(par_pos, emit) - sqrt( ( q_0**3 * field(3)) / (4 * pi * epsilon_0))
-      if (schk_wf <= p_eV) then
-        
-        if (field(3) < 0.0d0) then
+      
+      !print *, "Field:"
+      !print *, field
+      !print *, "workfunction:"
+      !print *, w_theta_xy(par_pos, emit)
+      !print *, "Schokkly Reduction:"
+      
+      !print *, schk_red
+ 
+      !print *, "Testing Schokkly"
+      !print *, schk_wf
+      
+      field = Calc_Field_at(par_pos)  
+      if (field(3) < 0.0d0) then
+        schk_red = sqrt( ( -field(3) *  (q_0**3)) / (4 * pi * epsilon_0)) / q_0
+        schk_wf = w_theta_xy(par_pos, emit) - schk_red
+        if (schk_wf <= p_eV) then
           par_pos(3) = 1.0d0 * length_scale ! Above plane
           field = Calc_Field_at(par_pos)
 
