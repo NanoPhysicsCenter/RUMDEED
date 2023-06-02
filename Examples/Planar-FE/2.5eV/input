@@ -7,7 +7,7 @@
   NREMIT = 1,                            ! Number of emitters in the system
   IMAGE_CHARGE = .True.,                 ! True means use image charge effects
   N_IC_MAX = 1,                          ! Number of image charge partners to use
-  COLLISIONS = .True.,                   ! Ion collisions with N2, still in development
+  COLLISIONS = .False.,                   ! Ion collisions with N2, still in development
   T_temp = 293.15d0,                     ! Temperature for ion gas or cathode if thermal-field emission
   P_abs = 1.0d0,                         ! Pressure for ion gas
 
