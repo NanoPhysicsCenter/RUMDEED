@@ -270,7 +270,7 @@ module mod_global
   ! ----------------------------------------------------------------------------
   ! Other stuff
   logical            :: write_ramo_sec = .False. ! Write out the ramo current for each section.
-  logical            :: write_position_file = .False. ! Write ot the particle position information.
+  logical            :: write_position_file = .False. ! Write data to the particle position information.
 
 
   ! ----------------------------------------------------------------------------
