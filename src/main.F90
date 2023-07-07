@@ -564,7 +564,7 @@ contains
     ! Files for planes
     do i = 1, planes_N
       if (planes_z(i) > 0.0d0) then
-        write(filename, '(a11, i0, a3)') 'out/planes-', i, '.dt'
+        write(filename, '(a11, i0, a3)') 'out/planes-', i, '.bin'
         open(newunit=planes_ud(i), iostat=IFAIL, file=filename, status='REPLACE', action='WRITE', access='STREAM')
         if (IFAIL /= 0) then
           print *, 'RUMDEED: Failed to open file for planes. ABORTING'

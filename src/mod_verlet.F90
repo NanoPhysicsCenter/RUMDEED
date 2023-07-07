@@ -177,7 +177,7 @@ contains
           ! Record information about this particle
           write(unit=planes_ud(k)) particles_cur_pos(1, i)/length_scale, particles_cur_pos(2, i)/length_scale, &
                                           & particles_cur_vel(1, i), particles_cur_vel(2, i), particles_cur_vel(3, i), &
-                                          & particles_emitter(i), particles_section(i)
+                                          & particles_emitter(i), particles_section(i), particles_id(i)
         end if
       end if
     end do
