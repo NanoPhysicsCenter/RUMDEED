@@ -62,4 +62,4 @@ This documentation can also be generate using the make file with the command:
 This will produce html and pdf files in the docs/build directory. You must have **Python** and **venv** installed to generate the HTML documentation.
 To make the pdf file **xelatex** and **xindy** must be installed.
 
-.. index:: build, make, git, compiler, gfortran, github, Intel, ifort, ifx, Cuba library
+.. index:: build, make, git, compiler, gfortran, github, Intel, ifort, ifx, Cuba library, Windows Subsystem for Linux (WSL), Python, venv, xelatex, xindy
