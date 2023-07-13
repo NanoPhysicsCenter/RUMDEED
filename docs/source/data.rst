@@ -230,10 +230,10 @@ Plot absorption density
 
 
 Emittance data
-~~~~~~~~~~~~~~
+--------------
 
 Calculates the emittance
-========================
+~~~~~~~~~~~~~~~~~~~~~~~~
 
 Input is a pandas dataframe that has columns called x and x’.
 

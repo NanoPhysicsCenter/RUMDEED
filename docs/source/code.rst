@@ -1,25 +1,33 @@
 Code description
 ================
 
-The code
+Below is a short description of the theory and equations used in the code.
 
 Verlet
 ------
-For particle advancement the code uses the Velocity Verlet algorithm. The code for it can be found in **mod_verlet.F90** and the main subroutine is called
-``velocity_verlet``.
+For particle advancement the code uses a variant of the Velocity Verlet algorithm :cite:p:`PhysRev.159.98` called Beeman's algorithm :cite:`LEVITT1983617,BEEMAN1976130`. The code for it can be found in **mod_verlet.F90** and the main subroutine is called
+``Velocity_Verlet``.
 
 The updated positions are calculated with:
 
 .. math::
-    x_{n+1} = x_n + v_n\Delta t + \frac{1}{2}a_n \Delta t^2
+    \mathbf{x}_{n}(t + \Delta t) = \mathbf{x}_n(t) + \mathbf{v}_n(t)\Delta t + \frac{1}{6}\left(4\mathbf{a}_n(t) - \mathbf{a}_n(t - \Delta t) \right) \Delta t^2
 
 See the ``Update_ElecHole_Position`` subroutine.
 
-Then the force on each particle is calculate using Coulomb's law, after which the velocity is
-update using:
+Then the force on each particle is calculate using Coulomb's law,
 
 .. math::
-    v_{n+1} = v_n + \frac{a_n+a_{n+1}}{2} \Delta t^2
+    \mathbf{a}_n(t + \Delta t) = \frac{q_n}{m_n} \left( E_0(\mathbf{x}_n(t+\Delta t))
+    + \frac{q_n}{4\pi \epsilon_0} \sum_{k\neq n} q_k\frac{\hat{\mathbf{r}}_{nk}}{\mathbf{r}_{nk}^2}
+    + \frac{q_n}{4\pi\epsilon_0}\sum_j Q_j\frac{\hat{\mathbf{r}}_{nj}}{\mathbf{r}_{nj}^2} \right)
+
+The force calculation takes into account the vaccum field :math:`E_0` and the field from other particles. Image charges are also taken into account.
+See the ``Calculate_Acceleration_Particles`` subroutine and also the ``Calc_Field_at`` subroutine.
+After the force calculate the velocity is update using:
+
+.. math::
+    \mathbf{v}_{n}(t+\Delta t) = \mathbf{v}_n(t) + \frac{1}{6}\left( 2\mathbf{a}_{n}(t + \Delta t) + 5\mathbf{a}_n(t) - \mathbf{a}_n(t - \Delta t) \right)\Delta t
 
 See the ``Update_Velocity`` subroutine.
 
@@ -66,26 +74,30 @@ Quantum efficiency and light intensity are both variables in the amplitude so ca
 
 Field emission
 --------------
-Field emission
+The field emission code uses the Fowler-Nordheim equation to calculate the total number of electrons to emit.
+The code for this can be found in **mod_field_emission_v2.F90**.
+
+The Fowler-Nordheim equation :cite:p:`Forbes08112007` is
 
 .. math::
-    J = \frac{a}{\phi t^2(l)}F^2 exp(-\nu(l)b\phi^{3/2}/F)
+    J = \frac{a_{FN}}{\phi t^2(\ell)}F^2 exp(-\nu(\ell)b_{FN}\phi^{3/2}/F)
 
-See :cite:p:`Forbes08112007` for nu and t
-
-.. math::
-    \nu(l) = 1 - l + \frac{1}{6}l \ln(l)
+where :math:`a_{FN}` and :math:`b_{FN}` are the first and second Fowler-Nordheim constants respectively.
+The functions :math:`\nu(\ell)` and :math:`t(\ell)` arise due to image charge effects and are given by
 
 .. math::
-    t(l) = 1 + l\left( \frac{1}{9} - \frac{1}{18}\ln(l) \right)
+    \nu(\ell) = 1 - \ell + \frac{1}{6}\ell \ln(\ell)
 
 .. math::
-    l = \frac{F}{F_\phi} = \frac{e^3}{4\pi\epsilon_0} \frac{F}{\phi^2}
+    t(\ell) = 1 + \ell\left( \frac{1}{9} - \frac{1}{18}\ln(\ell) \right)
+
+.. math::
+    \ell = \frac{F}{F_\phi} = \frac{e^3}{4\pi\epsilon_0} \frac{F}{\phi^2}
 
 If \(\phi\) is in eV and \(F\) in V/m then
 
 .. math::
-  l = \frac{e}{4\pi\epsilon_0} \frac{F}{\phi^2}
+  \ell = \frac{e}{4\pi\epsilon_0} \frac{F}{\phi^2}
 
 .. _field-tip:
 
@@ -97,3 +109,5 @@ Tip stuff
 Thermal-field emission
 ----------------------
 Thermo-Field
+
+.. index:: Verlet, Beeman, code, Fowler-Nordheim
