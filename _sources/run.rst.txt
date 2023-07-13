@@ -7,9 +7,9 @@ Once you have :ref:`downloaded the source code and build the executable <build>`
 
 Input files
 -----------
-The RUMDEED program is run from the command line and reads input parameters from several input files. These file are placed in the same
-directory as the RUMDEED executable file. The main input files is called **input** and is always required. Other input files are only
-required when specific features of the program are used.
+The RUMDEED program is executed from the command line and retrieves input parameters from various input files.
+These files should be located in the same directory as the RUMDEED executable file. The primary input file, named **input**, is always necessary.
+Additional input files are only required when utilizing specific functionalities of the program.
 
 Input file
 ++++++++++
@@ -65,7 +65,7 @@ EMITTERS_DELAY(<EMITTER NUMBER>)
     The timestep the emitter should become active and start emitting. Here **<EMITTER NUMBER>** should be replaced by the number of the emitter.
     This line should be given for all emitters in the system.
 
-Example :download:`input <files/input>` file with one emitter doing planar field emission:
+An example :download:`input file <files/input>` with one emitter doing planar field emission can be seen below:
 
 .. code-block:: text
 
@@ -86,14 +86,15 @@ Example :download:`input <files/input>` file with one emitter doing planar field
 
 Work function
 +++++++++++++
-For field emission and thermal-field emission the work function on the emitter surface is specified using an input file called **work**. This only applies to the planar cases,
-for the hyperboloid tip surface the work function needs to specified in the file **mod_emission_top.f90** using the **work** variable.
+To specify the work function on the emitter surface for field emission and thermal-field emission, an input file called **work** is utilized.
+For the hyperboloid tip surface, the work function needs to be specified within the file **mod_emission_top.f90** using the work variable.
 
-The first line in the work function input file should be an integer number. Currently only the number 1 is supported which represents a checkerboard work function surface.
-The second line should have two integer number that indicate the number of rows and columns in the checkerboard. The rest of the file is a matrix of numbers that
-represent the work function values in the checkerboard. Note that the checkerboard is only supported for a single emitter.
+The first line must contain an integer number. Currently, only the number 1 is supported, indicating a checkerboard work function surface.
+The second line should consist of two integer numbers, representing the number of rows and columns in the checkerboard, respectively.
+The remaining portion of the file should consist of a matrix of numbers that correspond to the work function values within the checkerboard.
+It is important to note that the checkerboard functionality is only supported for a single emitter.
 
-Example checkerboard :download:`work function <files/work>` file:
+An example checkerboard :download:`work input function file <files/work>` can be seen below:
 
 .. code-block:: text
 
