@@ -30,6 +30,13 @@ program RUMDEED
     end function getpid
   end interface
 #endif
+! AMD AOCC compiler macro is defined in the Makefile. Not sure what the predefined macro for the AMD AOCC compiler is.
+#if defined(_AOCC_)
+  interface
+    integer function getpid()
+    end function getpid
+  end interface
+#endif
 
 
   integer                 :: i, nthreads

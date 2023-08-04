@@ -77,6 +77,14 @@ FFLAGS+=-mp
 endif
 endif
 
+ifeq ($(FC),flang)
+$(info Using AMD Fortran)
+FFLAGS=-O3 -march=native -D_AOCC_=1
+ifdef OPENMP
+FFLAGS+=-fopenmp
+endif
+endif
+
 ifdef UNIT_TEST
 FFLAGS+=-D_UNIT_TEST_
 endif
