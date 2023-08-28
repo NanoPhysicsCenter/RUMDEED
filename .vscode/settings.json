@@ -1,8 +1,0 @@
-{
-    "fortran.includePaths": [
-        "/home/kristor/Work/Vacuum-MD/build"
-    ],
-    "fortran.gfortranExecutable": "gfortran",
-    "jupyter.jupyterServerType": "remote",
-    "restructuredtext.confPath": "${workspaceFolder}/docs/source"
-}
