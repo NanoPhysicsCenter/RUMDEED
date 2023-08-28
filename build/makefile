@@ -10,7 +10,7 @@ ifeq ($(origin CC),default)
 CC = gcc
 endif
 
-GIT_VERSION := $(shell git describe --dirty --always --tags)
+GIT_VERSION := $(shell git describe --dirty --always --tags || echo `date +'%d/%m/%Y'`)
 
 CUBA_LIB=../cuba/lib/libcuba.a
 
