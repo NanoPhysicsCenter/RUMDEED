@@ -1,10 +1,10 @@
 <!DOCTYPE html>
 <html class="writer-html5" lang="en" >
 <head>
-  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.19: https://docutils.sourceforge.io/" />
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.18.1: http://docutils.sourceforge.net/" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>6. Code description &mdash; RUMDEED  documentation</title>
+  <title>7. Code description &mdash; RUMDEED  documentation</title>
       <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
       <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
       <link rel="stylesheet" href="_static/css/custom.css" type="text/css" />
@@ -12,16 +12,16 @@
     <script src="_static/js/html5shiv.min.js"></script>
   <![endif]-->
   
-        <script integrity="sha384-vtXRMe3mGCbOeY7l30aIg8H9p3GdeSe4IFlP6G8JMa7o7lXvnz3GFKzPxzJdPfGK" src="_static/jquery.js"></script>
-        <script integrity="sha384-lSZeSIVKp9myfKbDQ3GkN/KHjUc+mzg17VKDN4Y2kUeBSJioB9QSM639vM9fuY//" src="_static/_sphinx_javascript_frameworks_compat.js"></script>
-        <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
-        <script src="_static/doctools.js"></script>
-        <script src="_static/sphinx_highlight.js"></script>
+        <script src="_static/jquery.js?v=5d32c60e"></script>
+        <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js?v=b3ba4146"></script>
+        <script src="_static/doctools.js?v=888ff710"></script>
+        <script src="_static/sphinx_highlight.js?v=4825356b"></script>
         <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
     <script src="_static/js/theme.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
-    <link rel="next" title="7. Bibliography" href="bib.html" />
+    <link rel="next" title="8. Bibliography" href="bib.html" />
     <link rel="prev" title="5. Data analysis examples" href="data.html" /> 
 </head>
 
@@ -73,19 +73,34 @@
 <li class="toctree-l2"><a class="reference internal" href="run.html#running-the-code">3.3. Running the code</a></li>
 </ul>
 </li>
-<li class="toctree-l1"><a class="reference internal" href="output.html">4. Output and data files</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="output.html#scripts">4.1. Scripts</a></li>
-</ul>
-</li>
+<li class="toctree-l1"><a class="reference internal" href="output.html">4. Output and data files</a></li>
 <li class="toctree-l1"><a class="reference internal" href="data.html">5. Data analysis examples</a></li>
-<li class="toctree-l1 current"><a class="current reference internal" href="#">6. Code description</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="#verlet">6.1. Verlet</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#photo-emission">6.2. Photo emission</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#field-emission">6.3. Field emission</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#thermal-field-emission">6.4. Thermal-field emission</a></li>
+<li class="toctree-l1"><a class="reference internal" href="data.html#checkerboard">6. Checkerboard</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="data.html#thermal-field-emission">6.1. Thermal field emission</a></li>
+<li class="toctree-l2"><a class="reference internal" href="data.html#read-input-parameters">6.2. Read input parameters</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="data.html#emission-information">6.2.1. Emission information</a></li>
 </ul>
 </li>
-<li class="toctree-l1"><a class="reference internal" href="bib.html">7. Bibliography</a></li>
+<li class="toctree-l2"><a class="reference internal" href="data.html#current">6.3. Current</a></li>
+<li class="toctree-l2"><a class="reference internal" href="data.html#density">6.4. Density</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="data.html#plot-emission-density">6.4.1. Plot emission density</a></li>
+<li class="toctree-l3"><a class="reference internal" href="data.html#plot-absorption-density">6.4.2. Plot absorption density</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="data.html#emittance-data">6.5. Emittance data</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="data.html#calculates-the-emittance">6.5.1. Calculates the emittance</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">7. Code description</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#verlet">7.1. Verlet</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#photo-emission">7.2. Photo emission</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#field-emission">7.3. Field emission</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#thermal-field-emission">7.4. Thermal-field emission</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="bib.html">8. Bibliography</a></li>
 </ul>
 
         </div>
@@ -102,12 +117,12 @@
           <div role="navigation" aria-label="Page navigation">
   <ul class="wy-breadcrumbs">
       <li><a href="manual.html" class="icon icon-home" aria-label="Home"></a></li>
-      <li class="breadcrumb-item active"><span class="section-number">6. </span>Code description</li>
+      <li class="breadcrumb-item active"><span class="section-number">7. </span>Code description</li>
       <li class="wy-breadcrumbs-aside">
       </li>
   </ul><div class="rst-breadcrumbs-buttons" role="navigation" aria-label="Sequential page navigation">
         <a href="data.html" class="btn btn-neutral float-left" title="5. Data analysis examples" accesskey="p"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
-        <a href="bib.html" class="btn btn-neutral float-right" title="7. Bibliography" accesskey="n">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="bib.html" class="btn btn-neutral float-right" title="8. Bibliography" accesskey="n">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
   </div>
   <hr/>
 </div>
@@ -115,24 +130,30 @@
            <div itemprop="articleBody">
              
   <section id="code-description">
-<h1><span class="section-number">6. </span>Code description<a class="headerlink" href="#code-description" title="Permalink to this heading"></a></h1>
-<p>The code</p>
+<h1><span class="section-number">7. </span>Code description<a class="headerlink" href="#code-description" title="Permalink to this heading"></a></h1>
+<p>Below is a short description of the theory and equations used in the code.</p>
 <section id="verlet">
-<h2><span class="section-number">6.1. </span>Verlet<a class="headerlink" href="#verlet" title="Permalink to this heading"></a></h2>
-<p>For particle advancement the code uses the Velocity Verlet algorithm. The code for it can be found in <strong>mod_verlet.F90</strong> and the main subroutine is called
-<code class="docutils literal notranslate"><span class="pre">velocity_verlet</span></code>.</p>
+<h2><span class="section-number">7.1. </span>Verlet<a class="headerlink" href="#verlet" title="Permalink to this heading"></a></h2>
+<p>For particle advancement the code uses a variant of the Velocity Verlet algorithm <span id="id1">[<a class="reference internal" href="bib.html#id8" title="Loup Verlet. Computer &quot;experiments&quot; on classical fluids. i. thermodynamical properties of lennard-jones molecules. Phys. Rev., 159:98–103, Jul 1967. URL: https://link.aps.org/doi/10.1103/PhysRev.159.98, doi:10.1103/PhysRev.159.98.">6</a>]</span> called Beeman’s algorithm <span id="id2">[<a class="reference internal" href="bib.html#id9" title="Michael Levitt, Hagai Meirovitch, and R. Huber. Integrating the equations of motion. Journal of Molecular Biology, 168(3):617 - 620, 1983. URL: http://www.sciencedirect.com/science/article/pii/S0022283683803052, doi:https://doi.org/10.1016/S0022-2836(83)80305-2.">7</a>, <a class="reference internal" href="bib.html#id10" title="D. Beeman. Some multistep methods for use in molecular dynamics calculations. Journal of Computational Physics, 20(2):130 - 139, 1976. URL: http://www.sciencedirect.com/science/article/pii/0021999176900590, doi:https://doi.org/10.1016/0021-9991(76)90059-0.">8</a>]</span>. The code for it can be found in <strong>mod_verlet.F90</strong> and the main subroutine is called
+<code class="docutils literal notranslate"><span class="pre">Velocity_Verlet</span></code>.</p>
 <p>The updated positions are calculated with:</p>
 <div class="math notranslate nohighlight">
-\[x_{n+1} = x_n + v_n\Delta t + \frac{1}{2}a_n \Delta t^2\]</div>
+\[\mathbf{x}_{n}(t + \Delta t) = \mathbf{x}_n(t) + \mathbf{v}_n(t)\Delta t + \frac{1}{6}\left(4\mathbf{a}_n(t) - \mathbf{a}_n(t - \Delta t) \right) \Delta t^2\]</div>
 <p>See the <code class="docutils literal notranslate"><span class="pre">Update_ElecHole_Position</span></code> subroutine.</p>
-<p>Then the force on each particle is calculate using Coulomb’s law, after which the velocity is
-update using:</p>
+<p>Then the force on each particle is calculate using Coulomb’s law,</p>
 <div class="math notranslate nohighlight">
-\[v_{n+1} = v_n + \frac{a_n+a_{n+1}}{2} \Delta t^2\]</div>
+\[\mathbf{a}_n(t + \Delta t) = \frac{q_n}{m_n} \left( E_0(\mathbf{x}_n(t+\Delta t))
++ \frac{q_n}{4\pi \epsilon_0} \sum_{k\neq n} q_k\frac{\hat{\mathbf{r}}_{nk}}{\mathbf{r}_{nk}^2}
++ \frac{q_n}{4\pi\epsilon_0}\sum_j Q_j\frac{\hat{\mathbf{r}}_{nj}}{\mathbf{r}_{nj}^2} \right)\]</div>
+<p>The force calculation takes into account the vaccum field <span class="math notranslate nohighlight">\(E_0\)</span> and the field from other particles. Image charges are also taken into account.
+See the <code class="docutils literal notranslate"><span class="pre">Calculate_Acceleration_Particles</span></code> subroutine and also the <code class="docutils literal notranslate"><span class="pre">Calc_Field_at</span></code> subroutine.
+After the force calculate the velocity is update using:</p>
+<div class="math notranslate nohighlight">
+\[\mathbf{v}_{n}(t+\Delta t) = \mathbf{v}_n(t) + \frac{1}{6}\left( 2\mathbf{a}_{n}(t + \Delta t) + 5\mathbf{a}_n(t) - \mathbf{a}_n(t - \Delta t) \right)\Delta t\]</div>
 <p>See the <code class="docutils literal notranslate"><span class="pre">Update_Velocity</span></code> subroutine.</p>
 </section>
 <section id="photo-emission">
-<span id="photo"></span><h2><span class="section-number">6.2. </span>Photo emission<a class="headerlink" href="#photo-emission" title="Permalink to this heading"></a></h2>
+<span id="photo"></span><h2><span class="section-number">7.2. </span>Photo emission<a class="headerlink" href="#photo-emission" title="Permalink to this heading"></a></h2>
 <p>Photoemission Branch</p>
 <ul>
 <li><p>Photoemission based on Workfunction pattern - see mod_workfunction as well</p>
@@ -184,26 +205,29 @@ update using:</p>
 </ul>
 </section>
 <section id="field-emission">
-<span id="field"></span><h2><span class="section-number">6.3. </span>Field emission<a class="headerlink" href="#field-emission" title="Permalink to this heading"></a></h2>
-<p>Field emission</p>
+<span id="field"></span><h2><span class="section-number">7.3. </span>Field emission<a class="headerlink" href="#field-emission" title="Permalink to this heading"></a></h2>
+<p>The field emission code uses the Fowler-Nordheim equation to calculate the total number of electrons to emit.
+The code for this can be found in <strong>mod_field_emission_v2.F90</strong>.</p>
+<p>The Fowler-Nordheim equation <span id="id3">[<a class="reference internal" href="bib.html#id6" title="Richard G Forbes and Jonathan H.B Deane. Reformulation of the standard theory of fowler–nordheim tunnelling and cold field electron emission. Proceedings of the Royal Society A: Mathematical, Physical and Engineering Science, 463(2087):2907-2927, 2007. URL: http://rspa.royalsocietypublishing.org/content/463/2087/2907.abstract, arXiv:http://rspa.royalsocietypublishing.org/content/463/2087/2907.full.pdf+html, doi:10.1098/rspa.2007.0030.">9</a>]</span> is</p>
 <div class="math notranslate nohighlight">
-\[J = \frac{a}{\phi t^2(l)}F^2 exp(-\nu(l)b\phi^{3/2}/F)\]</div>
-<p>See <span id="id1">[<a class="reference internal" href="bib.html#id6" title="Richard G Forbes and Jonathan H.B Deane. Reformulation of the standard theory of fowler–nordheim tunnelling and cold field electron emission. Proceedings of the Royal Society A: Mathematical, Physical and Engineering Science, 463(2087):2907-2927, 2007. URL: http://rspa.royalsocietypublishing.org/content/463/2087/2907.abstract, arXiv:http://rspa.royalsocietypublishing.org/content/463/2087/2907.full.pdf+html, doi:10.1098/rspa.2007.0030.">6</a>]</span> for nu and t</p>
+\[J = \frac{a_{FN}}{\phi t^2(\ell)}F^2 exp(-\nu(\ell)b_{FN}\phi^{3/2}/F)\]</div>
+<p>where <span class="math notranslate nohighlight">\(a_{FN}\)</span> and <span class="math notranslate nohighlight">\(b_{FN}\)</span> are the first and second Fowler-Nordheim constants respectively.
+The functions <span class="math notranslate nohighlight">\(\nu(\ell)\)</span> and <span class="math notranslate nohighlight">\(t(\ell)\)</span> arise due to image charge effects and are given by</p>
 <div class="math notranslate nohighlight">
-\[\nu(l) = 1 - l + \frac{1}{6}l \ln(l)\]</div>
+\[\nu(\ell) = 1 - \ell + \frac{1}{6}\ell \ln(\ell)\]</div>
 <div class="math notranslate nohighlight">
-\[t(l) = 1 + l\left( \frac{1}{9} - \frac{1}{18}\ln(l) \right)\]</div>
+\[t(\ell) = 1 + \ell\left( \frac{1}{9} - \frac{1}{18}\ln(\ell) \right)\]</div>
 <div class="math notranslate nohighlight">
-\[l = \frac{F}{F_\phi} = \frac{e^3}{4\pi\epsilon_0} \frac{F}{\phi^2}\]</div>
+\[\ell = \frac{F}{F_\phi} = \frac{e^3}{4\pi\epsilon_0} \frac{F}{\phi^2}\]</div>
 <p>If (phi) is in eV and (F) in V/m then</p>
 <div class="math notranslate nohighlight">
-\[l = \frac{e}{4\pi\epsilon_0} \frac{F}{\phi^2}\]</div>
+\[\ell = \frac{e}{4\pi\epsilon_0} \frac{F}{\phi^2}\]</div>
 <p id="field-tip">Tip stuff</p>
 </section>
 <section id="thermal-field-emission">
-<span id="thermal-field"></span><h2><span class="section-number">6.4. </span>Thermal-field emission<a class="headerlink" href="#thermal-field-emission" title="Permalink to this heading"></a></h2>
+<span id="thermal-field"></span><h2><span class="section-number">7.4. </span>Thermal-field emission<a class="headerlink" href="#thermal-field-emission" title="Permalink to this heading"></a></h2>
 <p>Thermo-Field</p>
-</section>
+<span class="target" id="index-0"></span></section>
 </section>
 
 
@@ -211,13 +235,13 @@ update using:</p>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
         <a href="data.html" class="btn btn-neutral float-left" title="5. Data analysis examples" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
-        <a href="bib.html" class="btn btn-neutral float-right" title="7. Bibliography" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="bib.html" class="btn btn-neutral float-right" title="8. Bibliography" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>
 
   <div role="contentinfo">
-    <p>&#169; Copyright 2023, Kristinn Torfason.</p>
+    <p>&#169; Copyright 2023, NanoPhysics group.</p>
   </div>
 
   Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a

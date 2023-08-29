@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html class="writer-html5" lang="en" >
 <head>
-  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.19: https://docutils.sourceforge.io/" />
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.18.1: http://docutils.sourceforge.net/" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>2. Building the code &mdash; RUMDEED  documentation</title>
@@ -12,11 +12,11 @@
     <script src="_static/js/html5shiv.min.js"></script>
   <![endif]-->
   
-        <script integrity="sha384-vtXRMe3mGCbOeY7l30aIg8H9p3GdeSe4IFlP6G8JMa7o7lXvnz3GFKzPxzJdPfGK" src="_static/jquery.js"></script>
-        <script integrity="sha384-lSZeSIVKp9myfKbDQ3GkN/KHjUc+mzg17VKDN4Y2kUeBSJioB9QSM639vM9fuY//" src="_static/_sphinx_javascript_frameworks_compat.js"></script>
-        <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
-        <script src="_static/doctools.js"></script>
-        <script src="_static/sphinx_highlight.js"></script>
+        <script src="_static/jquery.js?v=5d32c60e"></script>
+        <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js?v=b3ba4146"></script>
+        <script src="_static/doctools.js?v=888ff710"></script>
+        <script src="_static/sphinx_highlight.js?v=4825356b"></script>
     <script src="_static/js/theme.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
@@ -72,19 +72,34 @@
 <li class="toctree-l2"><a class="reference internal" href="run.html#running-the-code">3.3. Running the code</a></li>
 </ul>
 </li>
-<li class="toctree-l1"><a class="reference internal" href="output.html">4. Output and data files</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="output.html#scripts">4.1. Scripts</a></li>
-</ul>
-</li>
+<li class="toctree-l1"><a class="reference internal" href="output.html">4. Output and data files</a></li>
 <li class="toctree-l1"><a class="reference internal" href="data.html">5. Data analysis examples</a></li>
-<li class="toctree-l1"><a class="reference internal" href="code.html">6. Code description</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="code.html#verlet">6.1. Verlet</a></li>
-<li class="toctree-l2"><a class="reference internal" href="code.html#photo-emission">6.2. Photo emission</a></li>
-<li class="toctree-l2"><a class="reference internal" href="code.html#field-emission">6.3. Field emission</a></li>
-<li class="toctree-l2"><a class="reference internal" href="code.html#thermal-field-emission">6.4. Thermal-field emission</a></li>
+<li class="toctree-l1"><a class="reference internal" href="data.html#checkerboard">6. Checkerboard</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="data.html#thermal-field-emission">6.1. Thermal field emission</a></li>
+<li class="toctree-l2"><a class="reference internal" href="data.html#read-input-parameters">6.2. Read input parameters</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="data.html#emission-information">6.2.1. Emission information</a></li>
 </ul>
 </li>
-<li class="toctree-l1"><a class="reference internal" href="bib.html">7. Bibliography</a></li>
+<li class="toctree-l2"><a class="reference internal" href="data.html#current">6.3. Current</a></li>
+<li class="toctree-l2"><a class="reference internal" href="data.html#density">6.4. Density</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="data.html#plot-emission-density">6.4.1. Plot emission density</a></li>
+<li class="toctree-l3"><a class="reference internal" href="data.html#plot-absorption-density">6.4.2. Plot absorption density</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="data.html#emittance-data">6.5. Emittance data</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="data.html#calculates-the-emittance">6.5.1. Calculates the emittance</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="code.html">7. Code description</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="code.html#verlet">7.1. Verlet</a></li>
+<li class="toctree-l2"><a class="reference internal" href="code.html#photo-emission">7.2. Photo emission</a></li>
+<li class="toctree-l2"><a class="reference internal" href="code.html#field-emission">7.3. Field emission</a></li>
+<li class="toctree-l2"><a class="reference internal" href="code.html#thermal-field-emission">7.4. Thermal-field emission</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="bib.html">8. Bibliography</a></li>
 </ul>
 
         </div>
@@ -115,33 +130,42 @@
              
   <section id="building-the-code">
 <span id="build"></span><h1><span class="section-number">2. </span>Building the code<a class="headerlink" href="#building-the-code" title="Permalink to this heading"></a></h1>
-<p>The code was built to run on Linux systems. For Windows users it’s recommended to use the
+<p>The code has been developed to run specifically on Linux systems. If you are a Windows user,
+it is recommended to utilize the Windows Subsystem for Linux (WSL)
+for running the code. You can find installation instructions for WSL at the following link:
 <a class="reference external" href="https://docs.microsoft.com/en-us/windows/wsl/install">Windows Subsystem for Linux (WSL)</a>.</p>
-<p>The RUMDEED code can be obtained from the NanoPhysics Centers Github repository.
-You will need to have <strong>git</strong> installed to clone the repository using the command:</p>
+<p>To obtain the RUMDEED code, you can access it from the NanoPhysics Centers Github repository.
+Prior to cloning the repository, ensure that you have the <strong>git</strong> tool installed.
+Use the following command to clone the repository:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">git clone -b main https://github.com/NanoPhysicsCenter/RUMDEED.git RUMDEED</span>
 </pre></div>
 </div>
-<p>Where the last “RUMDEED” is the name of the directory you want to create and store the code in.
-Once you have to code you will need the GNU Compiler Collection (<strong>gfortran</strong> and <strong>gcc</strong>) and <strong>make</strong> to
-compile the code into an executable file. The Intel compilers can be used instead of the GNU compilers (see below),
-but the code has mainly been tested with the GNU compilers. Once the necessary build utilities are installed you can
-go into the directory “RUMDEED” and enter the command:</p>
+<p>In the command mentioned above, “RUMDEED” represents the name of the directory in which you wish to create and store the code.
+You can replace this with any other name of your choice.</p>
+<p>Once you have acquired the code, you will need to have the GNU Compiler Collection (<strong>gfortran</strong> and <strong>gcc</strong>) and <strong>make</strong>
+installed on your system in order to compile the code and generate an executable file.
+Although it is possible to use the Intel compilers instead of the GNU compilers,
+it is important to note that the code has primarily been tested with the GNU compilers.</p>
+<p>After installing the necessary build utilities, navigate to the “RUMDEED” directory and execute the following command:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">make</span>
 </pre></div>
 </div>
-<p>This will compile the code and create an executable named “RUMDEED.out” inside the build directory.
-When you have the executable built you can <a class="reference internal" href="run.html#run"><span class="std std-ref">run the code</span></a>.</p>
-<p>To use a different compiler the variables <strong>CC</strong> and <strong>FC</strong> can be passed to the make command.
-For example to compile with the Intel compilers:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">make CC=icc FC=ifort</span>
+<p>This command will compile the code and generate an executable file named <em>RUMDEED.out</em> within the build directory.
+Once the compilation is complete, you can proceed to run the code as explained in the documentation.</p>
+<p>If you prefer to use a different compiler, you can specify the <strong>CC</strong> and <strong>FC</strong> variables when executing the make command.
+For instance, if you want to compile using the Intel compilers, utilize the following command:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">make CC=icx FC=ifx</span>
 </pre></div>
 </div>
+<p>Please refer to the <a class="reference internal" href="run.html#run"><span class="std std-ref">“Input files and running the code”</span></a> in the documentation for further instructions on running the code.</p>
 <section id="cuba-library">
 <h2><span class="section-number">2.1. </span>Cuba library<a class="headerlink" href="#cuba-library" title="Permalink to this heading"></a></h2>
-<p>The code uses the <a class="reference external" href="https://feynarts.de/cuba/">Cuba library</a> for numerical integration <span id="id2">[<a class="reference internal" href="bib.html#id7" title="T. Hahn. Cuba—a library for multidimensional numerical integration. Computer Physics Communications, 168(2):78-95, 2005. URL: https://www.sciencedirect.com/science/article/pii/S0010465505000792, doi:https://doi.org/10.1016/j.cpc.2005.01.010.">5</a>]</span>. The make file will automatically download and build the code
-for the Cuba library. To download the code <strong>wget</strong> needs to be installed. If the download fails the file ‘Cuba-4.2.2.tar.gz’ can be download manually from the Cuba website and
-placed into the cuba folder. The script ‘install-cuba.sh’ can then be run to build the library.</p>
+<p>The code uses the <a class="reference external" href="https://feynarts.de/cuba/">Cuba library</a> for numerical integration <span id="id2">[<a class="reference internal" href="bib.html#id7" title="T. Hahn. Cuba—a library for multidimensional numerical integration. Computer Physics Communications, 168(2):78-95, 2005. URL: https://www.sciencedirect.com/science/article/pii/S0010465505000792, doi:https://doi.org/10.1016/j.cpc.2005.01.010.">5</a>]</span>.
+When executing the make file, you will be prompted to download and build the Cuba library.
+It is necessary to have <strong>wget</strong> installed on your system to have the make file automatically download and build the library.
+In case the download encounters any issues or if you prefer to manually download the library,
+you can obtain the file ‘Cuba-4.2.2.tar.gz’ directly from the Cuba website.
+After acquiring the file, please place it into the cuba folder. To build the library, simply execute the ‘install-cuba.sh’ script.</p>
 </section>
 <section id="documentation">
 <h2><span class="section-number">2.2. </span>Documentation<a class="headerlink" href="#documentation" title="Permalink to this heading"></a></h2>
@@ -165,7 +189,7 @@ To make the pdf file <strong>xelatex</strong> and <strong>xindy</strong> must be
   <hr/>
 
   <div role="contentinfo">
-    <p>&#169; Copyright 2023, Kristinn Torfason.</p>
+    <p>&#169; Copyright 2023, NanoPhysics group.</p>
   </div>
 
   Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a

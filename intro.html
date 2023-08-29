@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html class="writer-html5" lang="en" >
 <head>
-  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.19: https://docutils.sourceforge.io/" />
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.18.1: http://docutils.sourceforge.net/" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>1. Introduction &mdash; RUMDEED  documentation</title>
@@ -12,16 +12,16 @@
     <script src="_static/js/html5shiv.min.js"></script>
   <![endif]-->
   
-        <script integrity="sha384-vtXRMe3mGCbOeY7l30aIg8H9p3GdeSe4IFlP6G8JMa7o7lXvnz3GFKzPxzJdPfGK" src="_static/jquery.js"></script>
-        <script integrity="sha384-lSZeSIVKp9myfKbDQ3GkN/KHjUc+mzg17VKDN4Y2kUeBSJioB9QSM639vM9fuY//" src="_static/_sphinx_javascript_frameworks_compat.js"></script>
-        <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
-        <script src="_static/doctools.js"></script>
-        <script src="_static/sphinx_highlight.js"></script>
+        <script src="_static/jquery.js?v=5d32c60e"></script>
+        <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js?v=b3ba4146"></script>
+        <script src="_static/doctools.js?v=888ff710"></script>
+        <script src="_static/sphinx_highlight.js?v=4825356b"></script>
     <script src="_static/js/theme.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
     <link rel="next" title="2. Building the code" href="build.html" />
-    <link rel="prev" title="RUMDEED’s documentation (Apr 25, 2023)" href="manual.html" /> 
+    <link rel="prev" title="RUMDEED’s documentation (Aug 29, 2023)" href="manual.html" /> 
 </head>
 
 <body class="wy-body-for-nav"> 
@@ -72,19 +72,34 @@
 <li class="toctree-l2"><a class="reference internal" href="run.html#running-the-code">3.3. Running the code</a></li>
 </ul>
 </li>
-<li class="toctree-l1"><a class="reference internal" href="output.html">4. Output and data files</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="output.html#scripts">4.1. Scripts</a></li>
-</ul>
-</li>
+<li class="toctree-l1"><a class="reference internal" href="output.html">4. Output and data files</a></li>
 <li class="toctree-l1"><a class="reference internal" href="data.html">5. Data analysis examples</a></li>
-<li class="toctree-l1"><a class="reference internal" href="code.html">6. Code description</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="code.html#verlet">6.1. Verlet</a></li>
-<li class="toctree-l2"><a class="reference internal" href="code.html#photo-emission">6.2. Photo emission</a></li>
-<li class="toctree-l2"><a class="reference internal" href="code.html#field-emission">6.3. Field emission</a></li>
-<li class="toctree-l2"><a class="reference internal" href="code.html#thermal-field-emission">6.4. Thermal-field emission</a></li>
+<li class="toctree-l1"><a class="reference internal" href="data.html#checkerboard">6. Checkerboard</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="data.html#thermal-field-emission">6.1. Thermal field emission</a></li>
+<li class="toctree-l2"><a class="reference internal" href="data.html#read-input-parameters">6.2. Read input parameters</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="data.html#emission-information">6.2.1. Emission information</a></li>
 </ul>
 </li>
-<li class="toctree-l1"><a class="reference internal" href="bib.html">7. Bibliography</a></li>
+<li class="toctree-l2"><a class="reference internal" href="data.html#current">6.3. Current</a></li>
+<li class="toctree-l2"><a class="reference internal" href="data.html#density">6.4. Density</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="data.html#plot-emission-density">6.4.1. Plot emission density</a></li>
+<li class="toctree-l3"><a class="reference internal" href="data.html#plot-absorption-density">6.4.2. Plot absorption density</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="data.html#emittance-data">6.5. Emittance data</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="data.html#calculates-the-emittance">6.5.1. Calculates the emittance</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="code.html">7. Code description</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="code.html#verlet">7.1. Verlet</a></li>
+<li class="toctree-l2"><a class="reference internal" href="code.html#photo-emission">7.2. Photo emission</a></li>
+<li class="toctree-l2"><a class="reference internal" href="code.html#field-emission">7.3. Field emission</a></li>
+<li class="toctree-l2"><a class="reference internal" href="code.html#thermal-field-emission">7.4. Thermal-field emission</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="bib.html">8. Bibliography</a></li>
 </ul>
 
         </div>
@@ -105,7 +120,7 @@
       <li class="wy-breadcrumbs-aside">
       </li>
   </ul><div class="rst-breadcrumbs-buttons" role="navigation" aria-label="Sequential page navigation">
-        <a href="manual.html" class="btn btn-neutral float-left" title="RUMDEED’s documentation (Apr 25, 2023)" accesskey="p"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="manual.html" class="btn btn-neutral float-left" title="RUMDEED’s documentation (Aug 29, 2023)" accesskey="p"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
         <a href="build.html" class="btn btn-neutral float-right" title="2. Building the code" accesskey="n">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
   </div>
   <hr/>
@@ -117,15 +132,15 @@
 <h1><span class="section-number">1. </span>Introduction<a class="headerlink" href="#introduction" title="Permalink to this heading"></a></h1>
 <p>The Reykjavík University Molecular Dynamics code for Electron Emission and Dynamics (RUMDEED) program was first written by Andreas Pedersen in Python
 to simulate space charge limited photo emission <span id="id1">[<a class="reference internal" href="bib.html#id2" title="Andreas Pedersen, Andrei Manolescu, and Ágúst Valfells. Space-charge modulation in vacuum microdiodes at thz frequencies. Phys. Rev. Lett., 104:175002, Apr 2010. URL: https://link.aps.org/doi/10.1103/PhysRevLett.104.175002, doi:10.1103/PhysRevLett.104.175002.">1</a>]</span>. It was later rewritten in Fortran by Kristinn Torfason with parallelization using OpenMP.
-He also extended the code to include Field emission <span id="id2">[<a class="reference internal" href="bib.html#id3" title="Kristinn Torfason, Agust Valfells, and Andrei Manolescu. Molecular dynamics simulations of field emission from a planar nanodiode. Physics of Plasmas, 22(3):033109, 2015. URL: https://doi.org/10.1063/1.4914855, arXiv:https://doi.org/10.1063/1.4914855, doi:10.1063/1.4914855.">2</a>]</span><span id="id3">[<a class="reference internal" href="bib.html#id4" title="Kristinn Torfason, Agust Valfells, and Andrei Manolescu. Molecular dynamics simulations of field emission from a prolate spheroidal tip. Physics of Plasmas, 23(12):123119, 2016. URL: https://doi.org/10.1063/1.4972821, arXiv:https://doi.org/10.1063/1.4972821, doi:10.1063/1.4972821.">3</a>]</span> and
-Thermal-field emission <span id="id4">[<a class="reference internal" href="bib.html#id5" title="Anna Sitek, Kristinn Torfason, Andrei Manolescu, and Ágúst Valfells. Space-charge effects in the field-assisted thermionic emission from nonuniform cathodes. Phys. Rev. Applied, 15:014040, Jan 2021. URL: https://link.aps.org/doi/10.1103/PhysRevApplied.15.014040, doi:10.1103/PhysRevApplied.15.014040.">4</a>]</span>. Laser pulse additions were added by Hákon Örn.</p>
+He also extended the code to include Field emission <span id="id2">[<a class="reference internal" href="bib.html#id3" title="Kristinn Torfason, Agust Valfells, and Andrei Manolescu. Molecular dynamics simulations of field emission from a planar nanodiode. Physics of Plasmas, 22(3):033109, 2015. URL: https://doi.org/10.1063/1.4914855, arXiv:https://doi.org/10.1063/1.4914855, doi:10.1063/1.4914855.">2</a>, <a class="reference internal" href="bib.html#id4" title="Kristinn Torfason, Agust Valfells, and Andrei Manolescu. Molecular dynamics simulations of field emission from a prolate spheroidal tip. Physics of Plasmas, 23(12):123119, 2016. URL: https://doi.org/10.1063/1.4972821, arXiv:https://doi.org/10.1063/1.4972821, doi:10.1063/1.4972821.">3</a>]</span> and
+Thermal-field emission <span id="id3">[<a class="reference internal" href="bib.html#id5" title="Anna Sitek, Kristinn Torfason, Andrei Manolescu, and Ágúst Valfells. Space-charge effects in the field-assisted thermionic emission from nonuniform cathodes. Phys. Rev. Applied, 15:014040, Jan 2021. URL: https://link.aps.org/doi/10.1103/PhysRevApplied.15.014040, doi:10.1103/PhysRevApplied.15.014040.">4</a>]</span>. Laser pulse additions were added by Hákon Örn.</p>
 <section id="features">
 <span id="index-0"></span><h2><span class="section-number">1.1. </span>Features<a class="headerlink" href="#features" title="Permalink to this heading"></a></h2>
 <p>Photo emission, Field emission, Thermal-field emission</p>
 </section>
 <section id="acknowledgments">
 <h2><span class="section-number">1.2. </span>Acknowledgments<a class="headerlink" href="#acknowledgments" title="Permalink to this heading"></a></h2>
-<p>Funded by the Icelandic Research Fund, grants number 12000-902, 174127-051, 174127-052, 218029-051, and 195943.
+<p>Funded by the Icelandic Research Fund, grants number 12000-902, 174127-051, 218029-051, and 195943.
 Also supported by the Reykjavik University Development Fund and by the Air Force Office of Scientific Research under Grant No. FA9550-18-1-7011.
 Any opinions, findings, and conclusions or recommendations expressed in this material are those of the authors and do not
 necessarily reflect the views of the United States Air Force.</p>
@@ -136,14 +151,14 @@ necessarily reflect the views of the United States Air Force.</p>
            </div>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
-        <a href="manual.html" class="btn btn-neutral float-left" title="RUMDEED’s documentation (Apr 25, 2023)" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="manual.html" class="btn btn-neutral float-left" title="RUMDEED’s documentation (Aug 29, 2023)" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
         <a href="build.html" class="btn btn-neutral float-right" title="2. Building the code" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>
 
   <div role="contentinfo">
-    <p>&#169; Copyright 2023, Kristinn Torfason.</p>
+    <p>&#169; Copyright 2023, NanoPhysics group.</p>
   </div>
 
   Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a

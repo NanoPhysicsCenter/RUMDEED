@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html class="writer-html5" lang="en" >
 <head>
-  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.19: https://docutils.sourceforge.io/" />
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.18.1: http://docutils.sourceforge.net/" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>5. Data analysis examples &mdash; RUMDEED  documentation</title>
@@ -12,15 +12,15 @@
     <script src="_static/js/html5shiv.min.js"></script>
   <![endif]-->
   
-        <script integrity="sha384-vtXRMe3mGCbOeY7l30aIg8H9p3GdeSe4IFlP6G8JMa7o7lXvnz3GFKzPxzJdPfGK" src="_static/jquery.js"></script>
-        <script integrity="sha384-lSZeSIVKp9myfKbDQ3GkN/KHjUc+mzg17VKDN4Y2kUeBSJioB9QSM639vM9fuY//" src="_static/_sphinx_javascript_frameworks_compat.js"></script>
-        <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
-        <script src="_static/doctools.js"></script>
-        <script src="_static/sphinx_highlight.js"></script>
+        <script src="_static/jquery.js?v=5d32c60e"></script>
+        <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js?v=b3ba4146"></script>
+        <script src="_static/doctools.js?v=888ff710"></script>
+        <script src="_static/sphinx_highlight.js?v=4825356b"></script>
     <script src="_static/js/theme.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
-    <link rel="next" title="6. Code description" href="code.html" />
+    <link rel="next" title="7. Code description" href="code.html" />
     <link rel="prev" title="4. Output and data files" href="output.html" /> 
 </head>
 
@@ -72,19 +72,34 @@
 <li class="toctree-l2"><a class="reference internal" href="run.html#running-the-code">3.3. Running the code</a></li>
 </ul>
 </li>
-<li class="toctree-l1"><a class="reference internal" href="output.html">4. Output and data files</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="output.html#scripts">4.1. Scripts</a></li>
-</ul>
-</li>
+<li class="toctree-l1"><a class="reference internal" href="output.html">4. Output and data files</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">5. Data analysis examples</a></li>
-<li class="toctree-l1"><a class="reference internal" href="code.html">6. Code description</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="code.html#verlet">6.1. Verlet</a></li>
-<li class="toctree-l2"><a class="reference internal" href="code.html#photo-emission">6.2. Photo emission</a></li>
-<li class="toctree-l2"><a class="reference internal" href="code.html#field-emission">6.3. Field emission</a></li>
-<li class="toctree-l2"><a class="reference internal" href="code.html#thermal-field-emission">6.4. Thermal-field emission</a></li>
+<li class="toctree-l1"><a class="reference internal" href="#checkerboard">6. Checkerboard</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#thermal-field-emission">6.1. Thermal field emission</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#read-input-parameters">6.2. Read input parameters</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#emission-information">6.2.1. Emission information</a></li>
 </ul>
 </li>
-<li class="toctree-l1"><a class="reference internal" href="bib.html">7. Bibliography</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#current">6.3. Current</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#density">6.4. Density</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#plot-emission-density">6.4.1. Plot emission density</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#plot-absorption-density">6.4.2. Plot absorption density</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#emittance-data">6.5. Emittance data</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#calculates-the-emittance">6.5.1. Calculates the emittance</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="code.html">7. Code description</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="code.html#verlet">7.1. Verlet</a></li>
+<li class="toctree-l2"><a class="reference internal" href="code.html#photo-emission">7.2. Photo emission</a></li>
+<li class="toctree-l2"><a class="reference internal" href="code.html#field-emission">7.3. Field emission</a></li>
+<li class="toctree-l2"><a class="reference internal" href="code.html#thermal-field-emission">7.4. Thermal-field emission</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="bib.html">8. Bibliography</a></li>
 </ul>
 
         </div>
@@ -106,7 +121,7 @@
       </li>
   </ul><div class="rst-breadcrumbs-buttons" role="navigation" aria-label="Sequential page navigation">
         <a href="output.html" class="btn btn-neutral float-left" title="4. Output and data files" accesskey="p"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
-        <a href="code.html" class="btn btn-neutral float-right" title="6. Code description" accesskey="n">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="code.html" class="btn btn-neutral float-right" title="7. Code description" accesskey="n">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
   </div>
   <hr/>
 </div>
@@ -115,21 +130,275 @@
              
   <section id="data-analysis-examples">
 <h1><span class="section-number">5. </span>Data analysis examples<a class="headerlink" href="#data-analysis-examples" title="Permalink to this heading"></a></h1>
-<p>Example scripts and data analysis</p>
+<p>The example directory contains a number of examples with Python Jupiter notebooks that show data analysis.
+The output of the example notebook for the thermal-field emission example is shown below.</p>
+</section>
+<section id="checkerboard">
+<h1><span class="section-number">6. </span>Checkerboard<a class="headerlink" href="#checkerboard" title="Permalink to this heading"></a></h1>
+<section id="thermal-field-emission">
+<h2><span class="section-number">6.1. </span>Thermal field emission<a class="headerlink" href="#thermal-field-emission" title="Permalink to this heading"></a></h2>
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">import</span> <span class="nn">pandas</span> <span class="k">as</span> <span class="nn">pd</span>
+
+<span class="kn">import</span> <span class="nn">matplotlib</span>
+<span class="kn">import</span> <span class="nn">matplotlib.pyplot</span> <span class="k">as</span> <span class="nn">plt</span>
+<span class="kn">from</span> <span class="nn">matplotlib.patches</span> <span class="kn">import</span> <span class="n">Ellipse</span>
+<span class="o">%</span><span class="k">matplotlib</span> inline
+<span class="kn">import</span> <span class="nn">seaborn</span> <span class="k">as</span> <span class="nn">sns</span>
+<span class="n">sns</span><span class="o">.</span><span class="n">set_theme</span><span class="p">()</span>
+
+<span class="kn">import</span> <span class="nn">os.path</span> <span class="k">as</span> <span class="nn">path</span>
+<span class="kn">import</span> <span class="nn">f90nml</span>
+
+<span class="c1"># Path to simulations</span>
+<span class="n">filepath</span> <span class="o">=</span> <span class="s1">&#39;./&#39;</span>
+</pre></div>
+</div>
+</section>
+<section id="read-input-parameters">
+<h2><span class="section-number">6.2. </span>Read input parameters<a class="headerlink" href="#read-input-parameters" title="Permalink to this heading"></a></h2>
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># input file</span>
+<span class="n">filename_input</span> <span class="o">=</span> <span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">filepath</span><span class="p">,</span> <span class="s1">&#39;input&#39;</span><span class="p">)</span>
+
+<span class="c1"># Read the input file for parameters used</span>
+<span class="n">input_nml</span> <span class="o">=</span> <span class="n">f90nml</span><span class="o">.</span><span class="n">read</span><span class="p">(</span><span class="n">filename_input</span><span class="p">)</span>
+
+<span class="c1"># Read the init.bin file for system parameters</span>
+<span class="c1">#epsilon_r, m_eeff, m_heff, length_scale, time_scale, vel_scale, cur_scale, MAX_PARTICLES, MAX_EMITTERS, MAX_SECTIONS, MAX_LIFE_TIME</span>
+<span class="n">dt_sys</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">dtype</span><span class="p">([(</span><span class="s1">&#39;epsilon_r&#39;</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">),</span> \
+                   <span class="p">(</span><span class="s1">&#39;m_eeff&#39;</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">),</span> \
+                   <span class="p">(</span><span class="s1">&#39;m_heff&#39;</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">),</span> \
+                   <span class="p">(</span><span class="s1">&#39;length_scale&#39;</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">),</span> \
+                   <span class="p">(</span><span class="s1">&#39;time_scale&#39;</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">),</span> \
+                   <span class="p">(</span><span class="s1">&#39;vel_scale&#39;</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">),</span> \
+                   <span class="p">(</span><span class="s1">&#39;cur_scale&#39;</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">),</span> \
+                   <span class="p">(</span><span class="s1">&#39;MAX_PARTICLES&#39;</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">),</span> \
+                   <span class="p">(</span><span class="s1">&#39;MAX_EMITTERS&#39;</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">),</span> \
+                   <span class="p">(</span><span class="s1">&#39;MAX_SECTIONS&#39;</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">),</span> \
+                   <span class="p">(</span><span class="s1">&#39;MAX_LIFE_TIME&#39;</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">)</span> <span class="p">])</span>
+<span class="n">filename_initbin</span> <span class="o">=</span> <span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">filepath</span><span class="p">,</span> <span class="s1">&#39;out/init.bin&#39;</span><span class="p">)</span>
+<span class="n">data_sys</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">memmap</span><span class="p">(</span><span class="n">filename_initbin</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dt_sys</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s1">&#39;r&#39;</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="s1">&#39;F&#39;</span><span class="p">)</span>
+<span class="n">input_nml</span><span class="p">[</span><span class="s1">&#39;system&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="nb">zip</span><span class="p">(</span><span class="n">data_sys</span><span class="o">.</span><span class="n">dtype</span><span class="o">.</span><span class="n">names</span><span class="p">,</span> <span class="n">data_sys</span><span class="p">[</span><span class="mi">0</span><span class="p">]))</span>
+
+<span class="c1"># Print input parameters</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">input_nml</span><span class="p">)</span>
+</pre></div>
+</div>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">&amp;</span><span class="nb">input</span>
+    <span class="n">v_s</span> <span class="o">=</span> <span class="mf">2000.0</span>
+    <span class="n">box_dim</span> <span class="o">=</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">1000.0</span>
+    <span class="n">time_step</span> <span class="o">=</span> <span class="mf">0.0001</span>
+    <span class="n">steps</span> <span class="o">=</span> <span class="mi">2000</span>
+    <span class="n">emission_mode</span> <span class="o">=</span> <span class="mi">9</span>
+    <span class="n">nremit</span> <span class="o">=</span> <span class="mi">1</span>
+    <span class="n">image_charge</span> <span class="o">=</span> <span class="o">.</span><span class="n">true</span><span class="o">.</span>
+    <span class="n">n_ic_max</span> <span class="o">=</span> <span class="mi">1</span>
+    <span class="n">collisions</span> <span class="o">=</span> <span class="o">.</span><span class="n">false</span><span class="o">.</span>
+    <span class="n">t_temp</span> <span class="o">=</span> <span class="mf">293.15</span>
+    <span class="n">p_abs</span> <span class="o">=</span> <span class="mf">1.0</span>
+    <span class="n">emitters_dim</span><span class="p">(</span><span class="mi">1</span><span class="p">:</span><span class="mi">3</span><span class="p">,</span><span class="mi">1</span><span class="p">)</span> <span class="o">=</span> <span class="mf">500.0</span><span class="p">,</span> <span class="mf">500.0</span><span class="p">,</span> <span class="mf">0.0</span>
+    <span class="n">emitters_pos</span><span class="p">(</span><span class="mi">1</span><span class="p">:</span><span class="mi">3</span><span class="p">,</span><span class="mi">1</span><span class="p">)</span> <span class="o">=</span> <span class="o">-</span><span class="mf">250.0</span><span class="p">,</span> <span class="o">-</span><span class="mf">250.0</span><span class="p">,</span> <span class="mf">0.0</span>
+    <span class="n">emitters_type</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span> <span class="o">=</span> <span class="mi">2</span>
+    <span class="n">emitters_delay</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span> <span class="o">=</span> <span class="mi">0</span>
+<span class="o">/</span>
+
+<span class="o">&amp;</span><span class="n">system</span>
+    <span class="n">max_emitters</span> <span class="o">=</span> <span class="mi">1</span>
+    <span class="n">max_life_time</span> <span class="o">=</span> <span class="mi">1000</span>
+    <span class="n">max_particles</span> <span class="o">=</span> <span class="mi">500000</span>
+    <span class="n">max_sections</span> <span class="o">=</span> <span class="mi">9216</span>
+    <span class="n">cur_scale</span> <span class="o">=</span> <span class="mf">1.0</span>
+    <span class="n">epsilon_r</span> <span class="o">=</span> <span class="mf">1.0</span>
+    <span class="n">length_scale</span> <span class="o">=</span> <span class="mf">1e-09</span>
+    <span class="n">m_eeff</span> <span class="o">=</span> <span class="mf">1.0</span>
+    <span class="n">m_heff</span> <span class="o">=</span> <span class="mf">1.0</span>
+    <span class="n">time_scale</span> <span class="o">=</span> <span class="mf">1e-12</span>
+    <span class="n">vel_scale</span> <span class="o">=</span> <span class="mf">1000.0000000000001</span>
+<span class="o">/</span>
+</pre></div>
+</div>
+<section id="emission-information">
+<h3><span class="section-number">6.2.1. </span>Emission information<a class="headerlink" href="#emission-information" title="Permalink to this heading"></a></h3>
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Emission file</span>
+<span class="n">filename_emit</span> <span class="o">=</span> <span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">filepath</span><span class="p">,</span> <span class="s1">&#39;out/emitted.dt&#39;</span><span class="p">)</span>
+
+<span class="c1"># Read data into a pandas dataframe</span>
+<span class="n">df_emit</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="n">filepath_or_buffer</span><span class="o">=</span><span class="n">filename_emit</span><span class="p">,</span> <span class="n">index_col</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">delim_whitespace</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> \
+                      <span class="n">header</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">names</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;time&#39;</span><span class="p">,</span> <span class="s1">&#39;step&#39;</span><span class="p">,</span> <span class="s1">&#39;nrEmit&#39;</span><span class="p">,</span> <span class="s1">&#39;nrElec&#39;</span><span class="p">,</span> <span class="s1">&#39;nrEmit1&#39;</span><span class="p">])</span>
+
+<span class="c1"># Plot number of particles emitted per time step</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">df_emit</span><span class="p">[</span><span class="s1">&#39;nrEmit&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">to_numpy</span><span class="p">())</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">xlabel</span><span class="p">(</span><span class="s1">&#39;Time step [\#]&#39;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">ylabel</span><span class="p">(</span><span class="s1">&#39;Emitted [\#]&#39;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+
+<span class="c1"># Plot total number of particles in the system as a function of time</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">df_emit</span><span class="p">[</span><span class="s1">&#39;time&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">to_numpy</span><span class="p">(),</span> <span class="n">df_emit</span><span class="p">[</span><span class="s1">&#39;nrElec&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">to_numpy</span><span class="p">())</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">xlabel</span><span class="p">(</span><span class="s1">&#39;t [ps]&#39;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">ylabel</span><span class="p">(</span><span class="s1">&#39;Electrons [\#]&#39;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+</pre></div>
+</div>
+<img alt="_images/output_5_0.png" src="_images/output_5_0.png" />
+<img alt="_images/output_5_1.png" src="_images/output_5_1.png" />
+</section>
+</section>
+<section id="current">
+<h2><span class="section-number">6.3. </span>Current<a class="headerlink" href="#current" title="Permalink to this heading"></a></h2>
+<p>Read ramo current and plot</p>
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Ramo current</span>
+<span class="n">filename_ramo</span> <span class="o">=</span> <span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">filepath</span><span class="p">,</span> <span class="s1">&#39;out/ramo_current.dt&#39;</span><span class="p">)</span>
+
+<span class="c1"># Read the data into a pandas dataframe</span>
+<span class="c1">#cur_time, step, ramo_cur, V_d, nrPart, nrElec, nrHole</span>
+<span class="n">df_cur</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="n">filepath_or_buffer</span><span class="o">=</span><span class="n">filename_ramo</span><span class="p">,</span> <span class="n">index_col</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">delim_whitespace</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> \
+                     <span class="n">header</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">names</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;time&#39;</span><span class="p">,</span> <span class="s1">&#39;step&#39;</span><span class="p">,</span> <span class="s1">&#39;current&#39;</span><span class="p">,</span> <span class="s1">&#39;volt&#39;</span><span class="p">,</span> <span class="s1">&#39;nrPart&#39;</span><span class="p">,</span> <span class="s1">&#39;nrElec&#39;</span><span class="p">,</span> <span class="s1">&#39;nrHole&#39;</span><span class="p">,</span> <span class="s1">&#39;avg_mob&#39;</span><span class="p">,</span> <span class="s1">&#39;avg_speed&#39;</span><span class="p">,</span> <span class="s1">&#39;ramo_1&#39;</span><span class="p">,</span> <span class="s1">&#39;ramo_2&#39;</span><span class="p">])</span>
+
+<span class="c1"># Plot current in mA as a function of time in ps</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">df_cur</span><span class="p">[</span><span class="s1">&#39;time&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">to_numpy</span><span class="p">(),</span> <span class="n">df_cur</span><span class="p">[</span><span class="s1">&#39;current&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">to_numpy</span><span class="p">()</span><span class="o">/</span><span class="mf">1.0E-3</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">xlabel</span><span class="p">(</span><span class="s1">&#39;t [ps]&#39;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">ylabel</span><span class="p">(</span><span class="s1">&#39;I [mA]&#39;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+</pre></div>
+</div>
+<img alt="_images/output_7_0.png" src="_images/output_7_0.png" />
+</section>
+<section id="density">
+<h2><span class="section-number">6.4. </span>Density<a class="headerlink" href="#density" title="Permalink to this heading"></a></h2>
+<section id="plot-emission-density">
+<h3><span class="section-number">6.4.1. </span>Plot emission density<a class="headerlink" href="#plot-emission-density" title="Permalink to this heading"></a></h3>
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">filename_emit_den</span> <span class="o">=</span> <span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">filepath</span><span class="p">,</span> <span class="s1">&#39;out/density_emit.bin&#39;</span><span class="p">)</span>
+
+<span class="c1"># Binary file layout</span>
+<span class="c1"># float64 (double precision numbers)</span>
+<span class="c1"># int32 (32bit integers)</span>
+<span class="n">dt_emit_type</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">dtype</span><span class="p">([(</span><span class="s1">&#39;x&#39;</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">),</span> <span class="p">(</span><span class="s1">&#39;y&#39;</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">),</span> <span class="p">(</span><span class="s1">&#39;emit&#39;</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">),</span> <span class="p">(</span><span class="s1">&#39;sec&#39;</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">),</span> <span class="p">(</span><span class="s1">&#39;id&#39;</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">)])</span>
+
+<span class="c1"># Memory map the file</span>
+<span class="c1"># mode=r (Read only)</span>
+<span class="c1"># order=F (Fortran style array)</span>
+<span class="n">data_mem_emit</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">memmap</span><span class="p">(</span><span class="n">filename_emit_den</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dt_emit_type</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s1">&#39;r&#39;</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="s1">&#39;F&#39;</span><span class="p">)</span>
+
+<span class="c1"># Read the data into dataframe</span>
+<span class="n">df_emit</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="o">.</span><span class="n">from_records</span><span class="p">(</span><span class="n">data</span><span class="o">=</span><span class="n">data_mem_emit</span><span class="p">,</span> <span class="n">columns</span><span class="o">=</span><span class="n">data_mem_emit</span><span class="o">.</span><span class="n">dtype</span><span class="o">.</span><span class="n">names</span><span class="p">)</span>
+
+<span class="n">g</span> <span class="o">=</span> <span class="n">sns</span><span class="o">.</span><span class="n">jointplot</span><span class="p">(</span><span class="n">data</span><span class="o">=</span><span class="n">df_emit</span><span class="p">,</span> <span class="n">x</span><span class="o">=</span><span class="s2">&quot;x&quot;</span><span class="p">,</span> <span class="n">y</span><span class="o">=</span><span class="s2">&quot;y&quot;</span><span class="p">)</span>
+<span class="n">g</span><span class="o">.</span><span class="n">set_axis_labels</span><span class="p">(</span><span class="s2">&quot;x [nm]&quot;</span><span class="p">,</span> <span class="s2">&quot;y [nm]&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">&lt;</span><span class="n">seaborn</span><span class="o">.</span><span class="n">axisgrid</span><span class="o">.</span><span class="n">JointGrid</span> <span class="n">at</span> <span class="mh">0x7fdd49645760</span><span class="o">&gt;</span>
+</pre></div>
+</div>
+<img alt="_images/output_10_1.png" src="_images/output_10_1.png" />
+</section>
+<section id="plot-absorption-density">
+<h3><span class="section-number">6.4.2. </span>Plot absorption density<a class="headerlink" href="#plot-absorption-density" title="Permalink to this heading"></a></h3>
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">filename_abs</span> <span class="o">=</span> <span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">filepath</span><span class="p">,</span> <span class="s1">&#39;out/density_absorb_top.bin&#39;</span><span class="p">)</span>
+
+<span class="c1"># Binary file layout</span>
+<span class="c1"># float64 (double precision numbers)</span>
+<span class="c1"># int32 (32bit integers)</span>
+<span class="n">dt_abs_type</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">dtype</span><span class="p">([(</span><span class="s1">&#39;x&#39;</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">),</span> <span class="p">(</span><span class="s1">&#39;y&#39;</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">),</span> <span class="p">(</span><span class="s1">&#39;vx&#39;</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">),</span> <span class="p">(</span><span class="s1">&#39;vy&#39;</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">),</span> <span class="p">(</span><span class="s1">&#39;vz&#39;</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">),</span> <span class="p">(</span><span class="s1">&#39;emit&#39;</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">),</span> <span class="p">(</span><span class="s1">&#39;sec&#39;</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">),</span>  <span class="p">(</span><span class="s1">&#39;id&#39;</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">)])</span>
+
+<span class="c1"># Memory map the file</span>
+<span class="c1"># mode=r (Read only)</span>
+<span class="c1"># order=F (Fortran style array)</span>
+<span class="n">data_mem_abs</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">memmap</span><span class="p">(</span><span class="n">filename_abs</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dt_abs_type</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s1">&#39;r&#39;</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="s1">&#39;F&#39;</span><span class="p">)</span>
+
+<span class="c1"># Read the data into dataframe</span>
+<span class="n">df_abs</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="o">.</span><span class="n">from_records</span><span class="p">(</span><span class="n">data</span><span class="o">=</span><span class="n">data_mem_abs</span><span class="p">,</span> <span class="n">columns</span><span class="o">=</span><span class="n">data_mem_abs</span><span class="o">.</span><span class="n">dtype</span><span class="o">.</span><span class="n">names</span><span class="p">)</span>
+
+<span class="n">h</span> <span class="o">=</span> <span class="n">sns</span><span class="o">.</span><span class="n">jointplot</span><span class="p">(</span><span class="n">data</span><span class="o">=</span><span class="n">df_abs</span><span class="p">,</span> <span class="n">x</span><span class="o">=</span><span class="s2">&quot;x&quot;</span><span class="p">,</span> <span class="n">y</span><span class="o">=</span><span class="s2">&quot;y&quot;</span><span class="p">)</span>
+<span class="n">h</span><span class="o">.</span><span class="n">set_axis_labels</span><span class="p">(</span><span class="s2">&quot;x [nm]&quot;</span><span class="p">,</span> <span class="s2">&quot;y [nm]&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">&lt;</span><span class="n">seaborn</span><span class="o">.</span><span class="n">axisgrid</span><span class="o">.</span><span class="n">JointGrid</span> <span class="n">at</span> <span class="mh">0x7fdd496452e0</span><span class="o">&gt;</span>
+</pre></div>
+</div>
+<img alt="_images/output_12_1.png" src="_images/output_12_1.png" />
+</section>
+</section>
+<section id="emittance-data">
+<h2><span class="section-number">6.5. </span>Emittance data<a class="headerlink" href="#emittance-data" title="Permalink to this heading"></a></h2>
+<section id="calculates-the-emittance">
+<h3><span class="section-number">6.5.1. </span>Calculates the emittance<a class="headerlink" href="#calculates-the-emittance" title="Permalink to this heading"></a></h3>
+<p>Input is a pandas dataframe that has columns called x and x’.</p>
+<p>It returns the Emittance, sigma_w, sigma_wp and theta. * emittance
+[units of x * x’] [nm-mrad] * sigma_w is the semi-major axis of the
+ellipse [units of x] * sigma_wp is the semi-minor axis of the ellipse
+[units of x’] * theta is the rotation of the ellipse [deg]</p>
+<div class="line-block">
+<div class="line">See <a class="reference external" href="http://uspas.fnal.gov/materials/10MIT/Emittance.pdf">http://uspas.fnal.gov/materials/10MIT/Emittance.pdf</a> or J. Buon,
+“Beam phase space and emittance”.</div>
+<div class="line">See also USPAS notes Barletta, Spentzouris, Harms</div>
+<div class="line"><a class="reference external" href="https://uspas.fnal.gov/materials/10MIT/MIT-Fund.shtml">https://uspas.fnal.gov/materials/10MIT/MIT-Fund.shtml</a></div>
+<div class="line"><a class="reference external" href="https://uspas.fnal.gov/materials/10MIT/Emittance.pdf">https://uspas.fnal.gov/materials/10MIT/Emittance.pdf</a></div>
+</div>
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="k">def</span> <span class="nf">Calc_Emittance</span><span class="p">(</span><span class="n">df_emitt</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">xp</span><span class="p">):</span>
+    <span class="n">sigma_x</span> <span class="o">=</span> <span class="n">df_emitt</span><span class="p">[</span><span class="n">x</span><span class="p">]</span><span class="o">.</span><span class="n">std</span><span class="p">(</span><span class="n">ddof</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span> <span class="c1"># \sigma_x, ddof=0 means use N as normalization</span>
+    <span class="n">sigma_xp</span> <span class="o">=</span> <span class="n">df_emitt</span><span class="p">[</span><span class="n">xp</span><span class="p">]</span><span class="o">.</span><span class="n">std</span><span class="p">(</span><span class="n">ddof</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span> <span class="c1"># \sigma_{x^\prime}</span>
+    <span class="n">cov_xxp</span> <span class="o">=</span> <span class="n">df_emitt</span><span class="o">.</span><span class="n">cov</span><span class="p">()[</span><span class="n">x</span><span class="p">][</span><span class="n">xp</span><span class="p">]</span> <span class="c1"># \sigma_x\sigma_{x^\prime}</span>
+    <span class="n">N</span> <span class="o">=</span> <span class="n">df_emitt</span><span class="p">[</span><span class="n">x</span><span class="p">]</span><span class="o">.</span><span class="n">count</span><span class="p">()</span>
+    <span class="n">cov_xxp</span> <span class="o">=</span> <span class="n">cov_xxp</span><span class="o">*</span><span class="p">(</span><span class="n">N</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span><span class="o">/</span><span class="n">N</span> <span class="c1"># Use N as normalization, Pandas uses N-1</span>
+    <span class="n">r</span> <span class="o">=</span> <span class="n">df_emitt</span><span class="o">.</span><span class="n">corr</span><span class="p">(</span><span class="n">method</span><span class="o">=</span><span class="s1">&#39;pearson&#39;</span><span class="p">)[</span><span class="n">x</span><span class="p">][</span><span class="n">xp</span><span class="p">]</span>
+
+    <span class="c1">#emittance = sigma_x*sigma_xp*np.sqrt(1.0-r**2)</span>
+    <span class="n">emittance</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">sigma_x</span><span class="o">**</span><span class="mi">2</span><span class="o">*</span><span class="n">sigma_xp</span><span class="o">**</span><span class="mi">2</span> <span class="o">-</span> <span class="n">cov_xxp</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span>
+
+    <span class="n">sigma_w</span>  <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span> <span class="mf">0.5</span><span class="o">*</span><span class="p">(</span><span class="n">sigma_x</span><span class="o">**</span><span class="mi">2</span> <span class="o">+</span> <span class="n">sigma_xp</span><span class="o">**</span><span class="mi">2</span> <span class="o">+</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span> <span class="p">(</span><span class="n">sigma_x</span><span class="o">**</span><span class="mi">2</span> <span class="o">-</span> <span class="n">sigma_xp</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span><span class="o">**</span><span class="mi">2</span> <span class="o">+</span> <span class="p">(</span><span class="mf">2.0</span><span class="o">*</span><span class="n">cov_xxp</span><span class="p">)</span><span class="o">**</span><span class="mi">2</span> <span class="p">))</span> <span class="p">)</span>
+    <span class="n">sigma_wp</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span> <span class="mf">0.5</span><span class="o">*</span><span class="p">(</span><span class="n">sigma_x</span><span class="o">**</span><span class="mi">2</span> <span class="o">+</span> <span class="n">sigma_xp</span><span class="o">**</span><span class="mi">2</span> <span class="o">-</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span> <span class="p">(</span><span class="n">sigma_x</span><span class="o">**</span><span class="mi">2</span> <span class="o">-</span> <span class="n">sigma_xp</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span><span class="o">**</span><span class="mi">2</span> <span class="o">+</span> <span class="p">(</span><span class="mf">2.0</span><span class="o">*</span><span class="n">cov_xxp</span><span class="p">)</span><span class="o">**</span><span class="mi">2</span> <span class="p">))</span> <span class="p">)</span>
+
+    <span class="n">theta</span> <span class="o">=</span> <span class="mf">0.5</span><span class="o">*</span><span class="n">np</span><span class="o">.</span><span class="n">arctan2</span><span class="p">(</span><span class="mf">2.0</span><span class="o">*</span><span class="n">cov_xxp</span><span class="p">,</span> <span class="p">(</span><span class="n">sigma_x</span><span class="o">**</span><span class="mi">2</span> <span class="o">-</span> <span class="n">sigma_xp</span><span class="o">**</span><span class="mi">2</span><span class="p">))</span> <span class="c1"># in rad</span>
+    <span class="n">theta</span> <span class="o">=</span> <span class="n">theta</span> <span class="o">*</span> <span class="mi">180</span><span class="o">/</span><span class="n">np</span><span class="o">.</span><span class="n">pi</span> <span class="c1"># Convert from rad to deg</span>
+
+    <span class="c1">#emittance = sigma_w*sigma_wp</span>
+
+    <span class="k">return</span> <span class="n">emittance</span><span class="p">,</span> <span class="n">sigma_w</span><span class="p">,</span> <span class="n">sigma_wp</span><span class="p">,</span> <span class="n">theta</span>
+</pre></div>
+</div>
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">df_abs</span><span class="p">[</span><span class="s1">&#39;v&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">df_abs</span><span class="p">[</span><span class="s1">&#39;vx&#39;</span><span class="p">]</span><span class="o">**</span><span class="mi">2</span> <span class="o">+</span> <span class="n">df_abs</span><span class="p">[</span><span class="s1">&#39;vy&#39;</span><span class="p">]</span><span class="o">**</span><span class="mi">2</span> <span class="o">+</span> <span class="n">df_abs</span><span class="p">[</span><span class="s1">&#39;vz&#39;</span><span class="p">]</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span>
+
+<span class="n">df_abs</span><span class="p">[</span><span class="s2">&quot;x&#39;&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="n">df_abs</span><span class="p">[</span><span class="s1">&#39;vx&#39;</span><span class="p">]</span><span class="o">/</span><span class="n">df_abs</span><span class="p">[</span><span class="s1">&#39;vz&#39;</span><span class="p">])</span><span class="o">/</span><span class="mf">1.0E-3</span>
+<span class="n">df_abs</span><span class="p">[</span><span class="s1">&#39;x&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">df_abs</span><span class="p">[</span><span class="s1">&#39;x&#39;</span><span class="p">]</span>
+
+<span class="n">df_abs</span><span class="p">[</span><span class="s2">&quot;y&#39;&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="n">df_abs</span><span class="p">[</span><span class="s1">&#39;vy&#39;</span><span class="p">]</span><span class="o">/</span><span class="n">df_abs</span><span class="p">[</span><span class="s1">&#39;vz&#39;</span><span class="p">])</span><span class="o">/</span><span class="mf">1.0E-3</span>
+<span class="n">df_abs</span><span class="p">[</span><span class="s1">&#39;y&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">df_abs</span><span class="p">[</span><span class="s1">&#39;y&#39;</span><span class="p">]</span>
+<span class="n">e_x</span><span class="p">,</span> <span class="n">sw</span><span class="p">,</span> <span class="n">swp</span><span class="p">,</span> <span class="n">th</span> <span class="o">=</span> <span class="n">Calc_Emittance</span><span class="p">(</span><span class="n">df_abs</span><span class="p">,</span> <span class="s2">&quot;x&quot;</span><span class="p">,</span> <span class="s2">&quot;x&#39;&quot;</span><span class="p">)</span>
+<span class="n">e_y</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">Calc_Emittance</span><span class="p">(</span><span class="n">df_abs</span><span class="p">,</span> <span class="s2">&quot;y&quot;</span><span class="p">,</span> <span class="s2">&quot;y&#39;&quot;</span><span class="p">)</span>
+<span class="n">emittance</span> <span class="o">=</span> <span class="p">(</span><span class="n">e_x</span> <span class="o">+</span> <span class="n">e_y</span><span class="p">)</span><span class="o">/</span><span class="mi">2</span>
+<span class="n">sigma_w</span> <span class="o">=</span> <span class="n">sw</span>
+<span class="n">sigma_wp</span> <span class="o">=</span> <span class="n">swp</span>
+<span class="n">theta_ell</span> <span class="o">=</span> <span class="n">th</span>
+
+<span class="c1"># Plot x and x&#39;</span>
+<span class="n">ell_0</span> <span class="o">=</span> <span class="n">Ellipse</span><span class="p">([</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">],</span> <span class="mf">2.0</span><span class="o">*</span><span class="n">sigma_w</span><span class="p">,</span> <span class="mf">2.0</span><span class="o">*</span><span class="n">sigma_wp</span><span class="p">,</span> <span class="n">theta_ell</span><span class="p">,</span> <span class="n">zorder</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+<span class="n">ax</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplot</span><span class="p">(</span><span class="mi">111</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">df_abs</span><span class="p">[</span><span class="s1">&#39;x&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">to_numpy</span><span class="p">(),</span> <span class="n">df_abs</span><span class="p">[</span><span class="s2">&quot;x&#39;&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">to_numpy</span><span class="p">(),</span> <span class="s1">&#39;o&#39;</span><span class="p">,</span> <span class="n">zorder</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">xlabel</span><span class="p">(</span><span class="s1">&#39;x [nm]&#39;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">ylabel</span><span class="p">(</span><span class="s2">&quot;x&#39; [mrad]&quot;</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">add_artist</span><span class="p">(</span><span class="n">ell_0</span><span class="p">)</span>
+<span class="n">ell_0</span><span class="o">.</span><span class="n">set_facecolor</span><span class="p">(</span><span class="s1">&#39;red&#39;</span><span class="p">)</span>
+<span class="n">ell_0</span><span class="o">.</span><span class="n">set_alpha</span><span class="p">(</span><span class="mf">0.5</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+</pre></div>
+</div>
+<img alt="_images/output_16_0.png" src="_images/output_16_0.png" />
 <span class="target" id="index-0"></span></section>
+</section>
+</section>
 
 
            </div>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
         <a href="output.html" class="btn btn-neutral float-left" title="4. Output and data files" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
-        <a href="code.html" class="btn btn-neutral float-right" title="6. Code description" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="code.html" class="btn btn-neutral float-right" title="7. Code description" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>
 
   <div role="contentinfo">
-    <p>&#169; Copyright 2023, Kristinn Torfason.</p>
+    <p>&#169; Copyright 2023, NanoPhysics group.</p>
   </div>
 
   Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a

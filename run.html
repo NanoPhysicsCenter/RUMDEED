@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html class="writer-html5" lang="en" >
 <head>
-  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.19: https://docutils.sourceforge.io/" />
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.18.1: http://docutils.sourceforge.net/" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>3. Input files and running the code &mdash; RUMDEED  documentation</title>
@@ -12,11 +12,11 @@
     <script src="_static/js/html5shiv.min.js"></script>
   <![endif]-->
   
-        <script integrity="sha384-vtXRMe3mGCbOeY7l30aIg8H9p3GdeSe4IFlP6G8JMa7o7lXvnz3GFKzPxzJdPfGK" src="_static/jquery.js"></script>
-        <script integrity="sha384-lSZeSIVKp9myfKbDQ3GkN/KHjUc+mzg17VKDN4Y2kUeBSJioB9QSM639vM9fuY//" src="_static/_sphinx_javascript_frameworks_compat.js"></script>
-        <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
-        <script src="_static/doctools.js"></script>
-        <script src="_static/sphinx_highlight.js"></script>
+        <script src="_static/jquery.js?v=5d32c60e"></script>
+        <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js?v=b3ba4146"></script>
+        <script src="_static/doctools.js?v=888ff710"></script>
+        <script src="_static/sphinx_highlight.js?v=4825356b"></script>
     <script src="_static/js/theme.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
@@ -72,19 +72,34 @@
 <li class="toctree-l2"><a class="reference internal" href="#running-the-code">3.3. Running the code</a></li>
 </ul>
 </li>
-<li class="toctree-l1"><a class="reference internal" href="output.html">4. Output and data files</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="output.html#scripts">4.1. Scripts</a></li>
-</ul>
-</li>
+<li class="toctree-l1"><a class="reference internal" href="output.html">4. Output and data files</a></li>
 <li class="toctree-l1"><a class="reference internal" href="data.html">5. Data analysis examples</a></li>
-<li class="toctree-l1"><a class="reference internal" href="code.html">6. Code description</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="code.html#verlet">6.1. Verlet</a></li>
-<li class="toctree-l2"><a class="reference internal" href="code.html#photo-emission">6.2. Photo emission</a></li>
-<li class="toctree-l2"><a class="reference internal" href="code.html#field-emission">6.3. Field emission</a></li>
-<li class="toctree-l2"><a class="reference internal" href="code.html#thermal-field-emission">6.4. Thermal-field emission</a></li>
+<li class="toctree-l1"><a class="reference internal" href="data.html#checkerboard">6. Checkerboard</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="data.html#thermal-field-emission">6.1. Thermal field emission</a></li>
+<li class="toctree-l2"><a class="reference internal" href="data.html#read-input-parameters">6.2. Read input parameters</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="data.html#emission-information">6.2.1. Emission information</a></li>
 </ul>
 </li>
-<li class="toctree-l1"><a class="reference internal" href="bib.html">7. Bibliography</a></li>
+<li class="toctree-l2"><a class="reference internal" href="data.html#current">6.3. Current</a></li>
+<li class="toctree-l2"><a class="reference internal" href="data.html#density">6.4. Density</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="data.html#plot-emission-density">6.4.1. Plot emission density</a></li>
+<li class="toctree-l3"><a class="reference internal" href="data.html#plot-absorption-density">6.4.2. Plot absorption density</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="data.html#emittance-data">6.5. Emittance data</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="data.html#calculates-the-emittance">6.5.1. Calculates the emittance</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="code.html">7. Code description</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="code.html#verlet">7.1. Verlet</a></li>
+<li class="toctree-l2"><a class="reference internal" href="code.html#photo-emission">7.2. Photo emission</a></li>
+<li class="toctree-l2"><a class="reference internal" href="code.html#field-emission">7.3. Field emission</a></li>
+<li class="toctree-l2"><a class="reference internal" href="code.html#thermal-field-emission">7.4. Thermal-field emission</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="bib.html">8. Bibliography</a></li>
 </ul>
 
         </div>
@@ -118,9 +133,9 @@
 <p>Once you have <a class="reference internal" href="build.html#build"><span class="std std-ref">downloaded the source code and build the executable</span></a> you can run program using the instructions below.</p>
 <section id="input-files">
 <h2><span class="section-number">3.1. </span>Input files<a class="headerlink" href="#input-files" title="Permalink to this heading"></a></h2>
-<p>The RUMDEED program is run from the command line and reads input parameters from several input files. These file are placed in the same
-directory as the RUMDEED executable file. The main input files is called <strong>input</strong> and is always required. Other input files are only
-required when specific features of the program are used.</p>
+<p>The RUMDEED program is executed from the command line and retrieves input parameters from various input files.
+These files should be located in the same directory as the RUMDEED executable file. The primary input file, named <strong>input</strong>, is always necessary.
+Additional input files are only required when utilizing specific functionalities of the program.</p>
 <section id="input-file">
 <h3><span class="section-number">3.1.1. </span>Input file<a class="headerlink" href="#input-file" title="Permalink to this heading"></a></h3>
 <p>The program will read the file called <strong>input</strong> when it starts. This file defines the simulation parameters to be used and is a Fortran namelist file.
@@ -167,7 +182,7 @@ The position for circle and rectangle is measured from lower left corner of the 
 This line should be given for all emitters in the system.</p>
 </dd>
 </dl>
-<p>Example <a class="reference download internal" download="" href="_downloads/a782dae52dac1debdcc4c6c31a9139b7/input"><code class="xref download docutils literal notranslate"><span class="pre">input</span></code></a> file with one emitter doing planar field emission:</p>
+<p>An example <a class="reference download internal" download="" href="_downloads/a782dae52dac1debdcc4c6c31a9139b7/input"><code class="xref download docutils literal notranslate"><span class="pre">input</span> <span class="pre">file</span></code></a> with one emitter doing planar field emission can be seen below:</p>
 <div class="highlight-text notranslate"><div class="highlight"><pre><span></span>&amp;INPUT
   V_S = 1.0d3,
   BOX_DIM = 0.0d0, 0.0d0, 1000.0d0,
@@ -177,7 +192,7 @@ This line should be given for all emitters in the system.</p>
   NREMIT = 1,
   IMAGE_CHARGE = .TRUE.
 
-  EMITTERS_DIM(1:3, 1) 1000.0d0, 1000.0d0, 1000.0d0,
+  EMITTERS_DIM(1:3, 1) 1000.0d0, 1000.0d0, 0.0d0,
   EMITTERS_POS(1:3, 1) = -500.0d0, -500.0d0, 0.0d0,
   EMITTERS_TYPE(1) = 2,
   EMITTERS_DELAY(1) = 0,
@@ -187,12 +202,13 @@ This line should be given for all emitters in the system.</p>
 </section>
 <section id="work-function">
 <h3><span class="section-number">3.1.2. </span>Work function<a class="headerlink" href="#work-function" title="Permalink to this heading"></a></h3>
-<p>For field emission and thermal-field emission the work function on the emitter surface is specified using an input file called <strong>w_theta</strong>. This only applies to the planar cases,
-for the hyperboloid tip surface the work function needs to specified in the file <strong>mod_emission_top.f90</strong> using the <strong>w_theta</strong> variable.</p>
-<p>The first line in the work function input file should be an integer number. Currently only the number 1 is supported which represents a checkerboard work function surface.
-The second line should have two integer number that indicate the number of rows and columns in the checkerboard. The rest of the file is a matrix of numbers that
-represent the work function values in the checkerboard. Note that the checkerboard is only supported for a single emitter.</p>
-<p>Example checkerboard <a class="reference download internal" download="" href="_downloads/405ac0cf5655d8fa391194a02d99b1ee/w_theta"><code class="xref download docutils literal notranslate"><span class="pre">work</span> <span class="pre">function</span></code></a> file:</p>
+<p>To specify the work function on the emitter surface for field emission and thermal-field emission, an input file called <strong>work</strong> is utilized.
+For the hyperboloid tip surface, the work function needs to be specified within the file <strong>mod_emission_top.f90</strong> using the work variable.</p>
+<p>The first line must contain an integer number. Currently, only the number 1 is supported, indicating a checkerboard work function surface.
+The second line should consist of two integer numbers, representing the number of rows and columns in the checkerboard, respectively.
+The remaining portion of the file should consist of a matrix of numbers that correspond to the work function values within the checkerboard.
+It is important to note that the checkerboard functionality is only supported for a single emitter.</p>
+<p>An example checkerboard <a class="reference download internal" download="" href="_downloads/6a894f8503ab0d4e3a926e3a2743cce0/work"><code class="xref download docutils literal notranslate"><span class="pre">work</span> <span class="pre">input</span> <span class="pre">function</span> <span class="pre">file</span></code></a> can be seen below:</p>
 <div class="highlight-text notranslate"><div class="highlight"><pre><span></span>1
 2 2
 2.5d0 3.0d0
@@ -290,7 +306,7 @@ inside the folder</p>
   <hr/>
 
   <div role="contentinfo">
-    <p>&#169; Copyright 2023, Kristinn Torfason.</p>
+    <p>&#169; Copyright 2023, NanoPhysics group.</p>
   </div>
 
   Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a

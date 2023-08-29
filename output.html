@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html class="writer-html5" lang="en" >
 <head>
-  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.19: https://docutils.sourceforge.io/" />
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.18.1: http://docutils.sourceforge.net/" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>4. Output and data files &mdash; RUMDEED  documentation</title>
@@ -12,11 +12,11 @@
     <script src="_static/js/html5shiv.min.js"></script>
   <![endif]-->
   
-        <script integrity="sha384-vtXRMe3mGCbOeY7l30aIg8H9p3GdeSe4IFlP6G8JMa7o7lXvnz3GFKzPxzJdPfGK" src="_static/jquery.js"></script>
-        <script integrity="sha384-lSZeSIVKp9myfKbDQ3GkN/KHjUc+mzg17VKDN4Y2kUeBSJioB9QSM639vM9fuY//" src="_static/_sphinx_javascript_frameworks_compat.js"></script>
-        <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
-        <script src="_static/doctools.js"></script>
-        <script src="_static/sphinx_highlight.js"></script>
+        <script src="_static/jquery.js?v=5d32c60e"></script>
+        <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js?v=b3ba4146"></script>
+        <script src="_static/doctools.js?v=888ff710"></script>
+        <script src="_static/sphinx_highlight.js?v=4825356b"></script>
     <script src="_static/js/theme.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
@@ -72,19 +72,34 @@
 <li class="toctree-l2"><a class="reference internal" href="run.html#running-the-code">3.3. Running the code</a></li>
 </ul>
 </li>
-<li class="toctree-l1 current"><a class="current reference internal" href="#">4. Output and data files</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="#scripts">4.1. Scripts</a></li>
-</ul>
-</li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">4. Output and data files</a></li>
 <li class="toctree-l1"><a class="reference internal" href="data.html">5. Data analysis examples</a></li>
-<li class="toctree-l1"><a class="reference internal" href="code.html">6. Code description</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="code.html#verlet">6.1. Verlet</a></li>
-<li class="toctree-l2"><a class="reference internal" href="code.html#photo-emission">6.2. Photo emission</a></li>
-<li class="toctree-l2"><a class="reference internal" href="code.html#field-emission">6.3. Field emission</a></li>
-<li class="toctree-l2"><a class="reference internal" href="code.html#thermal-field-emission">6.4. Thermal-field emission</a></li>
+<li class="toctree-l1"><a class="reference internal" href="data.html#checkerboard">6. Checkerboard</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="data.html#thermal-field-emission">6.1. Thermal field emission</a></li>
+<li class="toctree-l2"><a class="reference internal" href="data.html#read-input-parameters">6.2. Read input parameters</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="data.html#emission-information">6.2.1. Emission information</a></li>
 </ul>
 </li>
-<li class="toctree-l1"><a class="reference internal" href="bib.html">7. Bibliography</a></li>
+<li class="toctree-l2"><a class="reference internal" href="data.html#current">6.3. Current</a></li>
+<li class="toctree-l2"><a class="reference internal" href="data.html#density">6.4. Density</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="data.html#plot-emission-density">6.4.1. Plot emission density</a></li>
+<li class="toctree-l3"><a class="reference internal" href="data.html#plot-absorption-density">6.4.2. Plot absorption density</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="data.html#emittance-data">6.5. Emittance data</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="data.html#calculates-the-emittance">6.5.1. Calculates the emittance</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="code.html">7. Code description</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="code.html#verlet">7.1. Verlet</a></li>
+<li class="toctree-l2"><a class="reference internal" href="code.html#photo-emission">7.2. Photo emission</a></li>
+<li class="toctree-l2"><a class="reference internal" href="code.html#field-emission">7.3. Field emission</a></li>
+<li class="toctree-l2"><a class="reference internal" href="code.html#thermal-field-emission">7.4. Thermal-field emission</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="bib.html">8. Bibliography</a></li>
 </ul>
 
         </div>
@@ -125,10 +140,11 @@ Text file ending in .dt have to data orginzed as columns. Files ending in .bin a
 <hr class="docutils" />
 <div class="line-block">
 <div class="line"><strong>emitted.dt</strong></div>
-<div class="line">The file emitted.dt contains information about the number of particles emitted from the cathode. The date in the columns is</div>
+<div class="line">The file emitted.dt contains information about the number of particles emitted from the cathode.</div>
+<div class="line">The date in the columns is</div>
 </div>
 <table class="docutils align-default" id="id2">
-<caption><span class="caption-text">emitted.dt</span><a class="headerlink" href="#id2" title="Permalink to this table"></a></caption>
+<caption><span class="caption-number">Table 4.1 </span><span class="caption-text">emitted.dt</span><a class="headerlink" href="#id2" title="Permalink to this table"></a></caption>
 <thead>
 <tr class="row-odd"><th class="head stub"></th>
 <th class="head"><p>Time</p></th>
@@ -167,10 +183,11 @@ Text file ending in .dt have to data orginzed as columns. Files ending in .bin a
 <hr class="docutils" />
 <div class="line-block">
 <div class="line"><strong>absorbed.dt</strong>, <strong>absorb_bot.dt</strong> and <strong>absorb_top.dt</strong></div>
-<div class="line">The file absorbed.dt contains information about the number of particles absorbed by the cathode or anode. While absorb_bot.dt contains data only for the cathode and absorb_top.dt for the anode. The date in the columns is</div>
+<div class="line">The file absorbed.dt contains information about the number of particles absorbed by the cathode or anode. While absorb_bot.dt contains data only for the cathode and absorb_top.dt for the anode.</div>
+<div class="line">The date in the columns is</div>
 </div>
 <table class="docutils align-default" id="id3">
-<caption><span class="caption-text">absorbed.dt, absorb_bot.dt, absorb_top.dt</span><a class="headerlink" href="#id3" title="Permalink to this table"></a></caption>
+<caption><span class="caption-number">Table 4.2 </span><span class="caption-text">absorbed.dt, absorb_bot.dt, absorb_top.dt</span><a class="headerlink" href="#id3" title="Permalink to this table"></a></caption>
 <thead>
 <tr class="row-odd"><th class="head stub"></th>
 <th class="head"><p>Time</p></th>
@@ -200,10 +217,11 @@ Text file ending in .dt have to data orginzed as columns. Files ending in .bin a
 <hr class="docutils" />
 <div class="line-block">
 <div class="line"><strong>field.dt</strong></div>
-<div class="line">The file field.dt contains information about the electric field. The date in the columns is</div>
+<div class="line">The file field.dt contains information about the electric field.</div>
+<div class="line">The date in the columns is</div>
 </div>
 <table class="docutils align-default" id="id4">
-<caption><span class="caption-text">field.dt</span><a class="headerlink" href="#id4" title="Permalink to this table"></a></caption>
+<caption><span class="caption-number">Table 4.3 </span><span class="caption-text">field.dt</span><a class="headerlink" href="#id4" title="Permalink to this table"></a></caption>
 <thead>
 <tr class="row-odd"><th class="head stub"></th>
 <th class="head"><p>Time step</p></th>
@@ -242,11 +260,11 @@ Text file ending in .dt have to data orginzed as columns. Files ending in .bin a
 <hr class="docutils" />
 <div class="line-block">
 <div class="line"><strong>integration.dt</strong></div>
-<div class="line">The file integration.dt contains information about the Monte Carlo integration performed by the Cuba library <span id="id1">[<a class="reference internal" href="bib.html#id7" title="T. Hahn. Cuba—a library for multidimensional numerical integration. Computer Physics Communications, 168(2):78-95, 2005. URL: https://www.sciencedirect.com/science/article/pii/S0010465505000792, doi:https://doi.org/10.1016/j.cpc.2005.01.010.">5</a>]</span>.</div>
-<div class="line">The default integration method used is call Divone. Please refer to the Cuba library manual for more information. It can be found in the Cuba directory. The date in the columns is</div>
+<div class="line">The file integration.dt contains information about the Monte Carlo integration performed by the Cuba library <span id="id1">[<a class="reference internal" href="bib.html#id7" title="T. Hahn. Cuba—a library for multidimensional numerical integration. Computer Physics Communications, 168(2):78-95, 2005. URL: https://www.sciencedirect.com/science/article/pii/S0010465505000792, doi:https://doi.org/10.1016/j.cpc.2005.01.010.">5</a>]</span>. The default integration method used is call Divone. Please refer to the Cuba library manual for more information. It can be found in the Cuba directory.</div>
+<div class="line">The date in the columns is</div>
 </div>
 <table class="docutils align-default" id="id5">
-<caption><span class="caption-text">integration.dt</span><a class="headerlink" href="#id5" title="Permalink to this table"></a></caption>
+<caption><span class="caption-number">Table 4.4 </span><span class="caption-text">integration.dt</span><a class="headerlink" href="#id5" title="Permalink to this table"></a></caption>
 <thead>
 <tr class="row-odd"><th class="head stub"></th>
 <th class="head"><p>Number of the emitter</p></th>
@@ -282,10 +300,11 @@ Text file ending in .dt have to data orginzed as columns. Files ending in .bin a
 <hr class="docutils" />
 <div class="line-block">
 <div class="line"><strong>ramo_current.dt</strong></div>
-<div class="line">The file ramo_current.dt contains information about the Ramo current. The date in the columns is</div>
+<div class="line">The file ramo_current.dt contains information about the Ramo current.</div>
+<div class="line">The date in the columns is</div>
 </div>
 <table class="docutils align-default" id="id6">
-<caption><span class="caption-text">ramo_current.dt</span><a class="headerlink" href="#id6" title="Permalink to this table"></a></caption>
+<caption><span class="caption-number">Table 4.5 </span><span class="caption-text">ramo_current.dt</span><a class="headerlink" href="#id6" title="Permalink to this table"></a></caption>
 <thead>
 <tr class="row-odd"><th class="head stub"></th>
 <th class="head"><p>Time</p></th>
@@ -340,7 +359,7 @@ Text file ending in .dt have to data orginzed as columns. Files ending in .bin a
 <div class="line">The date in the columns is</div>
 </div>
 <table class="docutils align-default" id="id7">
-<caption><span class="caption-text">volt.dt</span><a class="headerlink" href="#id7" title="Permalink to this table"></a></caption>
+<caption><span class="caption-number">Table 4.6 </span><span class="caption-text">volt.dt</span><a class="headerlink" href="#id7" title="Permalink to this table"></a></caption>
 <thead>
 <tr class="row-odd"><th class="head stub"></th>
 <th class="head"><p>Time</p></th>
@@ -367,12 +386,11 @@ Text file ending in .dt have to data orginzed as columns. Files ending in .bin a
 <hr class="docutils" />
 <div class="line-block">
 <div class="line"><strong>gauss.dt</strong></div>
-<div class="line">The file gauss.dt contains information about the Gaussian distribution used in the photoemission model. The Gaussian emission can be turned on</div>
-<div class="line">and off in the mod_photo_emission.f90 file by setting the variable <strong>EmitGauss</strong> to true or false. Parameters for the Gaussian emission can be</div>
-<div class="line">set in the <a class="reference internal" href="run.html#run"><span class="std std-ref">laser file</span></a>. The date in the columns is</div>
+<div class="line">The file gauss.dt contains information about the Gaussian distribution used in the photoemission model. The Gaussian emission can be turned on and off in the mod_photo_emission.f90 file by setting the variable <strong>EmitGauss</strong> to true or false. Parameters for the Gaussian emission can be set in the <a class="reference internal" href="run.html#run"><span class="std std-ref">laser file</span></a>.</div>
+<div class="line">The date in the columns is</div>
 </div>
 <table class="docutils align-default" id="id8">
-<caption><span class="caption-text">gauss.dt</span><a class="headerlink" href="#id8" title="Permalink to this table"></a></caption>
+<caption><span class="caption-number">Table 4.7 </span><span class="caption-text">gauss.dt</span><a class="headerlink" href="#id8" title="Permalink to this table"></a></caption>
 <thead>
 <tr class="row-odd"><th class="head stub"></th>
 <th class="head"><p>Time step</p></th>
@@ -391,10 +409,177 @@ Text file ending in .dt have to data orginzed as columns. Files ending in .bin a
 </tbody>
 </table>
 <hr class="docutils" />
-<section id="scripts">
-<h2><span class="section-number">4.1. </span>Scripts<a class="headerlink" href="#scripts" title="Permalink to this heading"></a></h2>
-<p>Describe some of the scripts in the scripts/ folder. How to use them and what they do.</p>
-</section>
+<div class="line-block">
+<div class="line"><strong>density_emit.bin</strong></div>
+<div class="line">The file density_emit.bin contains information about the density of the emitted particles. The file is written in binary format and contains the x and y coordinates of the emitted particles, along with emitted id, section and the ID number of the particle. This data is repated for each emitted particle.</div>
+<div class="line">An example of how to read the data is shown in the Python Jupiter notebooks found in the exmaples folder.</div>
+</div>
+<table class="docutils align-default" id="id9">
+<caption><span class="caption-number">Table 4.8 </span><span class="caption-text">density_emit.bin</span><a class="headerlink" href="#id9" title="Permalink to this table"></a></caption>
+<thead>
+<tr class="row-odd"><th class="head stub"><p>Data</p></th>
+<th class="head"><p>type</p></th>
+<th class="head"><p>Units</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><th class="stub"><p>x position</p></th>
+<td><p>float64</p></td>
+<td><p>nm</p></td>
+</tr>
+<tr class="row-odd"><th class="stub"><p>y position</p></th>
+<td><p>float64</p></td>
+<td><p>nm</p></td>
+</tr>
+<tr class="row-even"><th class="stub"><p>Emitter ID</p></th>
+<td><p>int32</p></td>
+<td><p>#</p></td>
+</tr>
+<tr class="row-odd"><th class="stub"><p>Emitter section</p></th>
+<td><p>int32</p></td>
+<td><p>#</p></td>
+</tr>
+<tr class="row-even"><th class="stub"><p>Particle ID</p></th>
+<td><p>int32</p></td>
+<td><p>#</p></td>
+</tr>
+</tbody>
+</table>
+<hr class="docutils" />
+<div class="line-block">
+<div class="line"><strong>density_absorb_top.bin</strong> and <strong>density_absorb_bot.bin</strong></div>
+<div class="line">The files density_absorb_top.bin and density_absorb_bot.bin contains information about the density of the absorbed particles. The files are written in binary format and contain the x and y coordinates of the absorbed particles, along with absorbed id, section and the ID number of the particle. This data is repated for each absorbed particle. The top file also contains the velocity of velocity of the absorbed particles.</div>
+<div class="line">An example of how to read the data is shown in the Python Jupiter notebooks found in the exmaples folder.</div>
+</div>
+<table class="docutils align-default" id="id10">
+<caption><span class="caption-number">Table 4.9 </span><span class="caption-text">density_absorb_top.bin</span><a class="headerlink" href="#id10" title="Permalink to this table"></a></caption>
+<thead>
+<tr class="row-odd"><th class="head stub"><p>Data</p></th>
+<th class="head"><p>type</p></th>
+<th class="head"><p>Units</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><th class="stub"><p>x position</p></th>
+<td><p>float64</p></td>
+<td><p>nm</p></td>
+</tr>
+<tr class="row-odd"><th class="stub"><p>y position</p></th>
+<td><p>float64</p></td>
+<td><p>nm</p></td>
+</tr>
+<tr class="row-even"><th class="stub"><p>x velocity</p></th>
+<td><p>float64</p></td>
+<td><p>m/s</p></td>
+</tr>
+<tr class="row-odd"><th class="stub"><p>y velocity</p></th>
+<td><p>float64</p></td>
+<td><p>m/s</p></td>
+</tr>
+<tr class="row-even"><th class="stub"><p>z velocity</p></th>
+<td><p>float64</p></td>
+<td><p>m/s</p></td>
+</tr>
+<tr class="row-odd"><th class="stub"><p>Emitter ID</p></th>
+<td><p>int32</p></td>
+<td><p>#</p></td>
+</tr>
+<tr class="row-even"><th class="stub"><p>Emitter section</p></th>
+<td><p>int32</p></td>
+<td><p>#</p></td>
+</tr>
+<tr class="row-odd"><th class="stub"><p>Particle ID</p></th>
+<td><p>int32</p></td>
+<td><p>#</p></td>
+</tr>
+</tbody>
+</table>
+<table class="docutils align-default" id="id11">
+<caption><span class="caption-number">Table 4.10 </span><span class="caption-text">density_absorb_bot.bin</span><a class="headerlink" href="#id11" title="Permalink to this table"></a></caption>
+<thead>
+<tr class="row-odd"><th class="head stub"><p>Data</p></th>
+<th class="head"><p>type</p></th>
+<th class="head"><p>Units</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><th class="stub"><p>x position</p></th>
+<td><p>float64</p></td>
+<td><p>nm</p></td>
+</tr>
+<tr class="row-odd"><th class="stub"><p>y position</p></th>
+<td><p>float64</p></td>
+<td><p>nm</p></td>
+</tr>
+<tr class="row-even"><th class="stub"><p>Emitter ID</p></th>
+<td><p>int32</p></td>
+<td><p>#</p></td>
+</tr>
+<tr class="row-odd"><th class="stub"><p>Emitter section</p></th>
+<td><p>int32</p></td>
+<td><p>#</p></td>
+</tr>
+<tr class="row-even"><th class="stub"><p>Particle ID</p></th>
+<td><p>int32</p></td>
+<td><p>#</p></td>
+</tr>
+</tbody>
+</table>
+<hr class="docutils" />
+<div class="line-block">
+<div class="line"><strong>planes-?.bin</strong></div>
+<div class="line">The files planes-?.bin contain information about particles when they pass through imaginary planes in the system. The number of planes-?.dt files is set using the <strong>planes_N</strong> variable in the input file. The positions of the imagninary planes are the specified using the <strong>planes_z</strong> variable. Up to 10 planes can be specified. The planes are numbered from 0 to 9. The planes are specified in the input file as</div>
+</div>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>planes_N = 2
+planes_z = 0.0d0, 100.0d0
+</pre></div>
+</div>
+<div class="line-block">
+<div class="line">The files are written in binary format and contain the x and y coordinates of the particles, the velocity of the particles, along with the emitter id, emitter section and particle id. This data is repated for each particle that passes through the plane.</div>
+</div>
+<table class="docutils align-default" id="id12">
+<caption><span class="caption-number">Table 4.11 </span><span class="caption-text">planes-?.bin</span><a class="headerlink" href="#id12" title="Permalink to this table"></a></caption>
+<thead>
+<tr class="row-odd"><th class="head stub"><p>Data</p></th>
+<th class="head"><p>type</p></th>
+<th class="head"><p>Units</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><th class="stub"><p>x position</p></th>
+<td><p>float64</p></td>
+<td><p>nm</p></td>
+</tr>
+<tr class="row-odd"><th class="stub"><p>y position</p></th>
+<td><p>float64</p></td>
+<td><p>nm</p></td>
+</tr>
+<tr class="row-even"><th class="stub"><p>x velocity</p></th>
+<td><p>float64</p></td>
+<td><p>m/s</p></td>
+</tr>
+<tr class="row-odd"><th class="stub"><p>y velocity</p></th>
+<td><p>float64</p></td>
+<td><p>m/s</p></td>
+</tr>
+<tr class="row-even"><th class="stub"><p>z velocity</p></th>
+<td><p>float64</p></td>
+<td><p>m/s</p></td>
+</tr>
+<tr class="row-odd"><th class="stub"><p>Emitter ID</p></th>
+<td><p>int32</p></td>
+<td><p>#</p></td>
+</tr>
+<tr class="row-even"><th class="stub"><p>Emitter section</p></th>
+<td><p>int32</p></td>
+<td><p>#</p></td>
+</tr>
+<tr class="row-odd"><th class="stub"><p>Particle ID</p></th>
+<td><p>int32</p></td>
+<td><p>#</p></td>
+</tr>
+</tbody>
+</table>
 </section>
 
 
@@ -408,7 +593,7 @@ Text file ending in .dt have to data orginzed as columns. Files ending in .bin a
   <hr/>
 
   <div role="contentinfo">
-    <p>&#169; Copyright 2023, Kristinn Torfason.</p>
+    <p>&#169; Copyright 2023, NanoPhysics group.</p>
   </div>
 
   Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a

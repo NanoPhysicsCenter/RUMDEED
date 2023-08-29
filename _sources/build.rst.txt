@@ -3,41 +3,53 @@
 Building the code
 =================
 
-The code was built to run on Linux systems. For Windows users it's recommended to use the
+The code has been developed to run specifically on Linux systems. If you are a Windows user,
+it is recommended to utilize the Windows Subsystem for Linux (WSL)
+for running the code. You can find installation instructions for WSL at the following link:
 `Windows Subsystem for Linux (WSL) <https://docs.microsoft.com/en-us/windows/wsl/install>`_.
 
-The RUMDEED code can be obtained from the NanoPhysics Centers Github repository.
-You will need to have **git** installed to clone the repository using the command:
+To obtain the RUMDEED code, you can access it from the NanoPhysics Centers Github repository.
+Prior to cloning the repository, ensure that you have the **git** tool installed.
+Use the following command to clone the repository:
 
 .. code-block:: console
 
    git clone -b main https://github.com/NanoPhysicsCenter/RUMDEED.git RUMDEED
 
-Where the last "RUMDEED" is the name of the directory you want to create and store the code in.
-Once you have to code you will need the GNU Compiler Collection (**gfortran** and **gcc**) and **make** to
-compile the code into an executable file. The Intel compilers can be used instead of the GNU compilers (see below),
-but the code has mainly been tested with the GNU compilers. Once the necessary build utilities are installed you can
-go into the directory "RUMDEED" and enter the command:
+In the command mentioned above, "RUMDEED" represents the name of the directory in which you wish to create and store the code.
+You can replace this with any other name of your choice.
+
+Once you have acquired the code, you will need to have the GNU Compiler Collection (**gfortran** and **gcc**) and **make**
+installed on your system in order to compile the code and generate an executable file.
+Although it is possible to use the Intel compilers instead of the GNU compilers,
+it is important to note that the code has primarily been tested with the GNU compilers.
+
+After installing the necessary build utilities, navigate to the "RUMDEED" directory and execute the following command:
 
 .. code-block:: console
    
    make
 
-This will compile the code and create an executable named "RUMDEED.out" inside the build directory.
-When you have the executable built you can :ref:`run the code <run>`.
+This command will compile the code and generate an executable file named *RUMDEED.out* within the build directory.
+Once the compilation is complete, you can proceed to run the code as explained in the documentation.
 
-To use a different compiler the variables **CC** and **FC** can be passed to the make command.
-For example to compile with the Intel compilers:
+If you prefer to use a different compiler, you can specify the **CC** and **FC** variables when executing the make command.
+For instance, if you want to compile using the Intel compilers, utilize the following command:
 
 .. code-block:: console
 
-   make CC=icc FC=ifort
+   make CC=icx FC=ifx
+
+Please refer to the :ref:`"Input files and running the code" <run>` in the documentation for further instructions on running the code.
 
 Cuba library
 ------------
-The code uses the `Cuba library <https://feynarts.de/cuba/>`_ for numerical integration :cite:p:`HAHN200578`. The make file will automatically download and build the code
-for the Cuba library. To download the code **wget** needs to be installed. If the download fails the file 'Cuba-4.2.2.tar.gz' can be download manually from the Cuba website and
-placed into the cuba folder. The script 'install-cuba.sh' can then be run to build the library.
+The code uses the `Cuba library <https://feynarts.de/cuba/>`_ for numerical integration :cite:p:`HAHN200578`.
+When executing the make file, you will be prompted to download and build the Cuba library.
+It is necessary to have **wget** installed on your system to have the make file automatically download and build the library.
+In case the download encounters any issues or if you prefer to manually download the library,
+you can obtain the file 'Cuba-4.2.2.tar.gz' directly from the Cuba website.
+After acquiring the file, please place it into the cuba folder. To build the library, simply execute the 'install-cuba.sh' script.
 
 Documentation
 -------------
@@ -50,4 +62,4 @@ This documentation can also be generate using the make file with the command:
 This will produce html and pdf files in the docs/build directory. You must have **Python** and **venv** installed to generate the HTML documentation.
 To make the pdf file **xelatex** and **xindy** must be installed.
 
-.. index:: build, make, git, compiler, gfortran, github, Intel, ifort, Cuba library
+.. index:: build, make, git, compiler, gfortran, github, Intel, ifort, ifx, Cuba library, Windows Subsystem for Linux (WSL), Python, venv, xelatex, xindy
