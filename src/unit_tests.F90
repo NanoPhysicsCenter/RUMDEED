@@ -18,7 +18,6 @@ program Vacuum_Unit_Test
   use mod_field_thermo_emission
   use mod_pair
   use mod_unit_tests
-  use mod_manual_emission
 #if defined(__INTEL_COMPILER)
   use IFPORT ! Needed for getpid()
 #endif

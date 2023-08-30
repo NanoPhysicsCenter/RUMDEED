@@ -105,7 +105,7 @@ unit_test.out: $(PROJECT_NAME).out ../src/unit_tests.F90
 			mod_field_thermo_emission.o mod_kevin_rjgtf.o \
 			mod_emission_tip.o mod_hyperboloid_tip.o mod_field_emission_2D.o \
 			mod_work_function.o mod_collisions.o \
-			mod_velocity.o mod_manual_emission.o \
+			mod_velocity.o \
 			$(CUBA_LIB) -lpthread -lm -ldl -o unit_test.out
 
 $(PROJECT_NAME).out: ../src/main.F90 ../cuba/lib/libcuba.a \
@@ -122,15 +122,14 @@ $(PROJECT_NAME).out: ../src/main.F90 ../cuba/lib/libcuba.a \
 			mod_work_function.mod mod_work_function.o \
 			mod_collisions.mod mod_collisions.o \
 			mod_kevin_rjgtf.mod mod_kevin_rjgtf.o \
-			mod_velocity.mod mod_velocity.o \
-			mod_manual_emission.mod mod_manual_emission.o
+			mod_velocity.mod mod_velocity.o
 		$(FC) $(FFLAGS) -D_GIT_VERSION_=\"${GIT_VERSION}\" \
 		    ../src/main.F90 mod_global.o mod_verlet.o mod_pair.o \
 			mod_unit_tests.o mod_photo_emission.o mod_field_emission.o mod_field_emission_v2.o \
 			mod_field_thermo_emission.o mod_kevin_rjgtf.o \
 			mod_emission_tip.o mod_hyperboloid_tip.o mod_field_emission_2D.o \
 			mod_work_function.o mod_collisions.o \
-			mod_velocity.o mod_manual_emission.o \
+			mod_velocity.o \
 			$(CUBA_LIB) -lpthread -lm -ldl -o $(PROJECT_NAME).out
 
 ../cuba/Cuba-4.2.2.tar.gz:
@@ -180,9 +179,6 @@ mod_emission_tip.mod mod_emission_tip.o: ../src/mod_emission_tip.f90 mod_global.
 
 mod_hyperboloid_tip.mod mod_hyperboloid_tip.o: ../src/mod_hyperboloid_tip.f90 mod_global.mod
 		$(FC) -c $(FFLAGS) ../src/mod_hyperboloid_tip.f90
-
-mod_manual_emission.mod mod_manual_emission.o: ../src/mod_manual_emission.f90 mod_global.mod mod_verlet.mod mod_pair.mod
-		$(FC) -c $(FFLAGS) ../src/mod_manual_emission.f90
 
 #mod_thermionic_emission.mod mod_thermionic_emission.o: ../src/mod_thermionic_emission.f90 mod_global.mod mod_verlet.mod mod_pair.mod
 #		$(FC) -c $(FFLAGS) ../src/mod_thermionic_emission.f90
