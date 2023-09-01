@@ -359,9 +359,6 @@ contains
     allocate(life_time(1:MAX_LIFE_TIME, 1:2))
     allocate(ramo_current(1:nrSpecies))
 
-    allocate(density_map_elec(1:N_x_densmap, 1:N_y_densmap))
-    allocate(density_map_hole(1:N_x_densmap, 1:N_y_densmap))
-
     particles_cur_pos     = 0.0d0
     particles_prev_pos    = 0.0d0
     particles_cur_vel     = 0.0d0
@@ -378,9 +375,6 @@ contains
     ramo_current = 0.0d0
     ramo_current_emit(1:MAX_SECTIONS, 1:MAX_EMITTERS) = 0.0d0
     life_time = 0
-
-    density_map_elec = 0
-    density_map_hole = 0
 
     !V_cur = 0.0d0
     !V_prev = 0.0d0
@@ -800,9 +794,6 @@ contains
 
     deallocate(ramo_current)
     deallocate(life_time)
-
-    deallocate(density_map_elec)
-    deallocate(density_map_hole)
 
     deallocate(my_seed)
 

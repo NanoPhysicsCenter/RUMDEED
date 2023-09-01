@@ -129,13 +129,6 @@ module mod_global
   integer,          dimension(:),    allocatable :: emitters_Type        ! The type of emitter
   integer,          dimension(:),    allocatable :: emitters_delay       ! The time step the emitters become active
 
-  ! Density map
-  integer, dimension(:, :), allocatable :: density_map_elec
-  integer, dimension(:, :), allocatable :: density_map_hole
-  integer, parameter                    :: N_x_densmap = 100, N_y_densmap = 100
-  !double precision                      :: dens_x_d, dens_y_d
-
-
   ! ----------------------------------------------------------------------------
   ! Define input parameters
   double precision :: V_d     ! Voltage over the gap

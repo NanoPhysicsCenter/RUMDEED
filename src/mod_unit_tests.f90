@@ -162,9 +162,6 @@ end subroutine Do_Unit_Test_Emission
     ramo_current = 0.0d0
     life_time = 0
 
-    density_map_elec = 0
-    density_map_hole = 0
-
     ! Start with an empty system
     nrPart      = 0
     nrElec      = 0
