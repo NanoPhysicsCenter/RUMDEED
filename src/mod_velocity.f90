@@ -8,8 +8,9 @@ module mod_velocity
 use mod_global
 implicit none
 
-integer, parameter :: VELOCITY_ZERO = 1
-integer, parameter :: VELOCITY_MB   = 2
+integer, parameter :: VELOCITY_ZERO   = 1
+integer, parameter :: VELOCITY_MB     = 2
+integer, parameter :: VELOCITY_PHOTON = 3
 
 PRIVATE
 PUBLIC Init_Emission_Velocity, VELOCITY_ZERO, VELOCITY_MB
@@ -25,6 +26,9 @@ contains
         case(VELOCITY_MB)
             ptr_Get_Emission_Velocity => Get_MB_Velocity
             print '(a)', 'RUMDEED: Using Maxwell-Boltzman velocity distribution'
+        case(VELOCITY_PHOTON)
+            ptr_Get_Emission_Velocity => Get_Photon_Velocity
+            print '(a)', 'RUMDEED: Using photon energy'
         case DEFAULT
             print '(a)', 'RUMDEED: ERROR UNKNOWN VELOCITY MODEL'
             print *, VELOCITY_MODE
@@ -60,9 +64,17 @@ contains
         Get_MB_Velocity(1:2) = box_muller(mean, std)
         Get_MB_Velocity(2:3) = box_muller(mean, std)
 
-        !Get_MB_Velocity(:, 1) = 0.0d0
-        !Get_MB_Velocity(:, 2) = 0.0d0
         Get_MB_Velocity(3) = abs(Get_MB_Velocity(3)) ! Positive velocity in the z-direction
     end function Get_MB_Velocity
+
+    ! ----------------------------------------------------------------------------
+    ! Generate velocity from a depentant on the photon energy and work function.
+    ! *TODO* Is implemented in the photo_emission module. Move it here.
+    function Get_Photon_Velocity()
+        double precision, dimension(1:3) :: Get_Photon_Velocity
+
+        Get_Photon_Velocity(1:2) = 0.0d0
+        Get_Photon_Velocity(3) = 0.0d0 !sqrt((2.0d0 * ((p_eV - w_theta_xy(par_pos, emit))*q_0))/m_0)
+    end function Get_Photon_Velocity
 
 end module mod_velocity

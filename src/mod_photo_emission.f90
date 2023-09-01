@@ -626,6 +626,7 @@ contains
             if (PHOTON_MODE == 1) then
               par_vel = 0.0d0
             else if (PHOTON_MODE == 2) then
+              par_vel(1:2) = 0.0d0
               par_vel(3) = sqrt((2 * ((p_eV - w_theta_xy(par_pos, emit))*q_0))/m_0) ! <-- Newtonian
             else
               print *, "WARNING: Unknown photon velocity mode!"
