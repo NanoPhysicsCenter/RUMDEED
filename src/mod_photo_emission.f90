@@ -219,21 +219,6 @@ contains
       spot_radius_sq(i) = (spot_radius_sq(i) * length_scale)**2
     end do
 
-    ! 1
-    !spot_pos(1, 1) = 30.0*length_scale
-    !spot_pos(2, 1) = 20.0*length_scale
-    !spot_radius_sq(1) = (5.0*length_scale)**2
-
-    ! 2
-    !spot_pos(1, 2) = 3.0*length_scale
-    !spot_pos(2, 2) = 65.0*length_scale
-    !spot_radius_sq(2) = (5.3*length_scale)**2
-
-    ! 3
-    !spot_pos(1, 3) = 60.0*length_scale
-    !spot_pos(2, 3) = 90.0*length_scale
-    !spot_radius_sq(3) = (10.0*length_scale)**2
-
   end subroutine Read_Spots_File
 
   subroutine Do_Photo_Emission_Spot(step, emit)
@@ -330,10 +315,6 @@ contains
 
       if (r_sq <= spot_radius_sq(i)) then
         Emit_From_Spot = .true. ! We emit from this position
-        !print *, par_pos(1:3)/length_scale
-        !print *, spot_radius_sq(i)/length_scale**2
-        !print *, k1/length_scale, k2/length_scale
-        !pause
         exit ! We can exit the loop. No need to check other spots
       end if
     end do
@@ -346,10 +327,6 @@ contains
 
     posInit            = 0
     nrEmitted_emitters = 0
-
-    !if (step > 2) then
-    !  return
-    !end if
 
     ! Check if we are doing a Gaussian distributed emission
     ! and set the max number of electrons allowed to be emitted if we are
@@ -436,31 +413,12 @@ contains
       end do
       ! Shifting position to comply with checkerboard workfunction location function
       par_pos(1:2) = emitters_pos(1:2, emit) + par_pos(1:2) + emitters_dim(1:2, emit)
-      
-      ! ! This does not give an equal distribution of random points on the circle
-      ! ! Rewrite to x and y random to accpect or reject if x^2+y^2<r^2
-      ! CALL RANDOM_NUMBER(par_pos(1:2)) ! Gives a random number between 0 and 1
-      ! r_e = emitters_dim(1, emit) * par_pos(1)
-      ! theta_e = 2.0d0*pi * par_pos(2)
-      ! par_pos(1) = r_e * cos(theta_e) + emitters_pos(1, emit)
-      ! par_pos(2) = r_e * sin(theta_e) + emitters_pos(2, emit)
 
       nrTry = nrTry + 1 ! Add one more try
       par_pos(3) = 0.0d0 * length_scale ! Check in plane
       
       ! Schottkey Effect, reduction of workfunction due to electric field
       ! Workfunction_reduction = sqrt ( (electron_charge^3 * electric_fielc)/(4 * pi * epsilon_0) )
-      
-      !print *, "Field:"
-      !print *, field
-      !print *, "workfunction:"
-      !print *, w_theta_xy(par_pos, emit)
-      !print *, "Schokkly Reduction:"
-      
-      !print *, schk_red
- 
-      !print *, "Testing Schokkly"
-      !print *, schk_wf
       
       field = Calc_Field_at(par_pos)  
       if (field(3) < 0.0d0) then
@@ -517,8 +475,7 @@ contains
 
     do while (nrTry <= MAX_EMISSION_TRY)
 
-      ! Check if we have reached the max number
-      ! of electrons to be emitted
+      ! Check if we have reached the max number of electrons to be emitted
       if ((nrElecEmit >= maxElecEmit) .and. (maxElecEmit /= -1)) then
         exit
       end if
@@ -532,7 +489,6 @@ contains
       call random_number(par_pos(1:2)) ! Gives a random number [0,1]
 
       par_pos(1:2) = emitters_pos(1:2, emit) + emitters_dim(1:2, emit)*par_pos(1:2)
-      !par_pos(2) = emitters_pos(2, emit) + emitters_dim(2, emit)*par_pos(2)
 
       nrTry = nrTry + 1
       par_pos(3) = 0.0d0 * length_scale ! Check in plane
@@ -548,22 +504,16 @@ contains
           if (field(3) < 0.0d0) then
             par_pos(3) = 1.0d0 * length_scale ! Place above plane
             
-
             if (PHOTON_MODE == 1) then
               par_vel = 0.0d0
             else if (PHOTON_MODE == 2) then
-              !par_vel = 0.0d0 ! Need to modify this to K = h (v - v_0) for excess energy
+              par_vel(1:2) = 0.0d0 ! Set x and y components to zero
               par_vel(3) = sqrt((2 * ((p_eV - w_theta_xy(par_pos, emit))*q_0))/m_0) ! <-- Newtonian
             else
               print *, "WARNING: Unknown photon velocity mode!"
             end if
             
-            !print *, par_vel
             call Add_Particle(par_pos, par_vel, species_elec, step, emit, -1)
-
-            !print *, 'field = ', field
-            !pause
-            !call Add_Plane_Graph_emitt(par_pos, par_vel)
 
             nrElecEmit = nrElecEmit + 1
             nrEmitted_emitters(emit) = nrEmitted_emitters(emit) + 1
@@ -626,7 +576,7 @@ contains
             if (PHOTON_MODE == 1) then
               par_vel = 0.0d0
             else if (PHOTON_MODE == 2) then
-              par_vel(1:2) = 0.0d0
+              par_vel(1:2) = 0.0d0 ! Set x and y components to zero
               par_vel(3) = sqrt((2 * ((p_eV - w_theta_xy(par_pos, emit))*q_0))/m_0) ! <-- Newtonian
             else
               print *, "WARNING: Unknown photon velocity mode!"

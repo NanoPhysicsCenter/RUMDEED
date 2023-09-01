@@ -164,26 +164,6 @@ program RUMDEED
       exit ! We cought the signal to stop. Exit the main loop.
     end if
 
-    ! if (i == progress(1)) then
-    !   call PrintProgress(1)
-    ! else if (i == progress(2)) then
-    !   call PrintProgress(2)
-    ! else if (i == progress(3)) then
-    !   call PrintProgress(3)
-    ! else if (i == progress(4)) then
-    !   call PrintProgress(4)
-    ! else if (i == progress(5)) then
-    !   call PrintProgress(5)
-    ! else if (i == progress(6)) then
-    !   call PrintProgress(6)
-    ! else if (i == progress(7)) then
-    !   call PrintProgress(7)
-    ! else if (i == progress(8)) then
-    !   call PrintProgress(8)
-    ! else if (i == progress(9)) then
-    !   call PrintProgress(9)
-    ! end if
-
   end do
 
   call PrintProgress(10)
@@ -297,9 +277,6 @@ contains
 
     ! Planes are in length_scale (nm)
     planes_z = planes_z * length_scale
-  
-    !dens_x_d = box_dim(1) / (N_x_densmap-1)
-    !dens_y_d = box_dim(2) / (N_y_densmap-1)
 
     !time_step: The size of the time step
     time_step = time_step * time_scale
@@ -385,10 +362,6 @@ contains
     nrHole      = 0
     nrElecHole  = 0
 
-    !startElecHoles = 1
-    !endElecHoles   = 0
-
-
     nrPart_remove = 0
     nrElec_remove = 0
     nrHole_remove = 0
@@ -414,12 +387,6 @@ contains
     progress(2) = nint(0.2d0*steps)
     progress(1) = nint(0.1d0*steps)
 
-    !call RANDOM_SEED(size = n)
-    !allocate(my_seed(n))
-    !my_seed = SEED
-    !call RANDOM_SEED(PUT = my_seed)
-    !deallocate(my_seed)
-
     call init_random_seed()
 
     ! Register a subroutine to catch the SIGINT signal
@@ -437,7 +404,6 @@ contains
 
     ! Set the number of cores Cuba should use to 0, i.e. no parallelization in cuba.
     call cubacores(0, 1000)
-
 
     ! Open data file for writing
     open(newunit=ud_pos, iostat=IFAIL, file='out/position.bin', status='REPLACE', action='write', access='STREAM')

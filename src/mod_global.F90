@@ -181,9 +181,6 @@ module mod_global
   integer :: nrElec_remove ! Number of electrons to be removed
   integer :: nrHole_remove ! Number of holes to be removed
 
-  !integer :: startElecHoles
-  !integer :: endElecHoles
-
   integer, dimension(:), allocatable :: nrElec_remove_top_emit
 
 
