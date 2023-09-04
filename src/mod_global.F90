@@ -216,6 +216,7 @@ module mod_global
   integer, parameter :: EMISSION_FIELD_THERMO      = 9 ! Planar Field + Thermionic emission
   integer, parameter :: EMISSION_FIELD_V2          = 10 ! Development emission
   integer, parameter :: EMISSION_TEST              = 99 ! Development emission
+  integer, parameter :: EMISSION_MANUAL            = 999 ! Manual placement of electrons for testing/debuging
 
   integer            :: EMISSION_MODE           ! Parameter that defines the emission mode
 

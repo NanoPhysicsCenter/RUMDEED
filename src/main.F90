@@ -19,6 +19,7 @@ program RUMDEED
   !use mod_therminoic_emission
   use mod_pair
   use mod_unit_tests
+  use mod_manual_emission
 #if defined(__INTEL_COMPILER)
   use IFPORT ! Needed for getpid()
 #endif
@@ -98,6 +99,9 @@ program RUMDEED
   case(EMISSION_FIELD_V2)
     print '(a)', 'RUMDEED: Doing Field emission V2'
     call Init_Field_Emission_v2()
+  case(EMISSION_MANUAL)
+    print '(a)', 'Vacuum: Doing manual emission'
+    call Init_Manual()
   case DEFAULT
     print '(a)', 'RUMDEED: ERROR UNKNOWN EMISSION MODEL'
     print *, EMISSION_MODE
@@ -191,6 +195,8 @@ program RUMDEED
     call Clean_Up_Field_Thermo_Emission()
   case(EMISSION_FIELD_V2)
     call Clean_Up_Field_Emission_v2()
+  case(EMISSION_MANUAL)
+    call Clean_Up_Manual()
   END SELECT
 
   print '(a)', 'RUMDEED: Final clean up'

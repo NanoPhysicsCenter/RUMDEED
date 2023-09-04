@@ -40,13 +40,13 @@ contains
     !if (nrElecHole > 0) then
       call Update_ElecHole_Position(step)
 
-      if (EMISSION_MODE == EMISSION_UNIT_TEST) then
+      if ((EMISSION_MODE == EMISSION_UNIT_TEST) .or. (EMISSION_MODE == EMISSION_MANUAL)) then
         call Write_Position_Test(step)
       end if
 
       call Calculate_Acceleration_Particles()
 
-      if (EMISSION_MODE == EMISSION_UNIT_TEST) then
+      if ((EMISSION_MODE == EMISSION_UNIT_TEST) .or. (EMISSION_MODE == EMISSION_MANUAL)) then
         call Write_Acceleration_Test(step)
       end if
 
