@@ -15,9 +15,10 @@ class bcolors:
     BOLD = '\033[1m'
     UNDERLINE = '\033[4m'
 
-""" # Intel Classic
+# Intel New
 os.chdir('../build/')
-make_process = subprocess.Popen("make clean all install CC=gcc FC=ifort UNIT_TEST=1", shell=True, stderr=subprocess.STDOUT)
+print('Compiling with Intel OneAPI')
+make_process = subprocess.Popen(["make", "clean", "all", "CC=icx", "FC=ifx", "UNIT_TEST=1"], shell=False, stderr=subprocess.STDOUT, stdout=subprocess.DEVNULL)
 if make_process.wait() != 0:
     print(bcolors.FAIL + 'Intel Classic FAILED' + bcolors.ENDC)
 else:
@@ -34,11 +35,12 @@ else:
     os.chdir('../')
     time.sleep(5)
 
-#print('')
-##exit() """
+print('')
+##exit()
 
 os.chdir('../build/')
-make_process = subprocess.Popen("make clean all install CC=gcc FC=gfortran UNIT_TEST=1", shell=True, stderr=subprocess.STDOUT)
+print('Compiling with GNU')
+make_process = subprocess.Popen(["make", "clean", "all", "CC=gcc", "FC=gfortran", "UNIT_TEST=1"], shell=False, stderr=subprocess.STDOUT, stdout=subprocess.DEVNULL)
 if make_process.wait() != 0:
     print(bcolors.FAIL + 'GNU FAILED' + bcolors.ENDC)
 else:
