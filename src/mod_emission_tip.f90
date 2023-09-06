@@ -58,7 +58,7 @@ contains
   subroutine Init_Emission_Tip()
 
     ! Function that checks the boundary conditions for the System
-    ptr_Check_Boundary => Check_Boundary_ElecHole_Tip
+    ptr_Check_Boundary => Check_Boundary_Tip
 
     ! Function for the electric field in the system
     ptr_field_E => field_E_Hyperboloid
@@ -1036,7 +1036,7 @@ end subroutine Do_Photo_Emission_Tip
   ! Checks the boundary conditions of the box.
   ! Check which particles to remove
   ! Enforce periodic boundary conditions (ToDo)
-  subroutine Check_Boundary_ElecHole_Tip(i)
+  subroutine Check_Boundary_Tip(i)
     integer, intent(in) :: i
     double precision    :: x, y, z, eta
 
@@ -1056,7 +1056,7 @@ end subroutine Do_Photo_Emission_Tip
       call Mark_Particles_Remove(i, remove_bot)
     end if
 
-  end subroutine Check_Boundary_ElecHole_Tip
+  end subroutine Check_Boundary_Tip
 
 !----------------------------------------------------------------------------------------
 ! The functions v_y and t_y are because of the image charge effect in the FN equation.

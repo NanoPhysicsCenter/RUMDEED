@@ -1,6 +1,5 @@
 !-------------------------------------------!
-! Module for Electron hole pair creation    !
-! and removal                               !
+! Module for particle creation and removal  !
 ! Kristinn Torfason                         !
 ! 08.05.15                                  !
 !-------------------------------------------!
@@ -80,17 +79,19 @@ contains
         !if (abs(par_pos(3) - 1.0d0*length_scale) < 1.0E-3) then
           write(unit=ud_density_emit) (par_pos(1) / length_scale), (par_pos(2) / length_scale), emit, sec, nrID
         !end if
-      else ! N_2^+ Ion
+      else if (par_species == species_ion) then ! Ion
         particles_charge(nrPart+1) = +1.0d0*q_0
         particles_mass(nrPart+1) = m_N2p
-        nrHole = nrHole + 1
+        nrIon = nrIon + 1
         write(unit=ud_density_ion) (par_pos(1) / length_scale), (par_pos(2) / length_scale), (par_pos(3) / length_scale), nrID
+      else
+        print *, 'ERROR UNKNOWN PARTICLE TYPE'
+        stop
       end if
 
       ! Update the number of particles in the system
-      nrElecHole = nrElec + nrHole
-      nrPart = nrElecHole
-      !endElecHoles = nrPart
+      nrElecIon = nrElec + nrIon
+      nrPart = nrElecIon
 
       nrID = nrID + 1
     end if
@@ -163,10 +164,10 @@ contains
           print *, 'Error unkown remove case ', m
       END SELECT
 
-    else if (particles_species(i) == species_hole) then
+    else if (particles_species(i) == species_ion) then
 
       !$OMP ATOMIC UPDATE
-      nrHole_remove = nrHole_remove + 1
+      nrIon_remove = nrIon_remove + 1
 
       SELECT CASE (m)
       CASE (remove_top)
@@ -174,13 +175,13 @@ contains
           nrPart_remove_top = nrPart_remove_top + 1
 
           !$OMP ATOMIC UPDATE
-          nrHole_remove_top = nrHole_remove_top + 1
+          nrIon_remove_top = nrIon_remove_top + 1
         CASE (remove_bot)
           !$OMP ATOMIC UPDATE
           nrPart_remove_bot = nrPart_remove_bot + 1
 
           !$OMP ATOMIC UPDATE
-          nrHole_remove_bot = nrHole_remove_bot + 1
+          nrIon_remove_bot = nrIon_remove_bot + 1
         CASE DEFAULT
           print *, 'Error unkown remove case ', m
       END SELECT
@@ -306,36 +307,28 @@ contains
       ! Update the number of particles in the system
       !nrPart = nrPart - nrPart_remove
       nrElec = nrElec - nrElec_remove
-      nrHole = nrHole - nrHole_remove
-
-      !print *, 'nrElec_remove = ', nrElec_remove
-      !print *, 'nrHole_remove = ', nrHole_remove
-      !print *, 'nrPart_remove = ', nrPart_remove
-      !print *, 'nrPart - nrPart_remove = ', nrPart - nrPart_remove
+      nrIon = nrIon - nrIon_remove
 
       ! This should not happen, but just in case.
       if (nrElec < 0) nrElec = 0
-      if (nrHole < 0) nrHole = 0
+      if (nrIon < 0) nrIon = 0
 
-      nrElecHole = nrElec + nrHole
-      nrPart = nrElecHole
-
-      !startElecHoles = 1
-      !endElecHoles = startElecHoles + nrElecHole - 1
+      nrElecIon = nrElec + nrIon
+      nrPart = nrElecIon
 
       particles_mask = .true. ! Reset the mask. .true. means all particles are active.
 
       ! Reset the number of particles to remove
       nrPart_remove = 0
       nrElec_remove = 0
-      nrHole_remove = 0
+      nrIon_remove = 0
 
       nrPart_remove_top = 0
       nrPart_remove_bot = 0
       nrElec_remove_top = 0
       nrElec_remove_bot = 0
-      nrHole_remove_top = 0
-      nrHole_remove_bot = 0
+      nrIon_remove_top = 0
+      nrIon_remove_bot = 0
 
       nrElec_remove_top_emit(1:MAX_EMITTERS) = 0
     end if
@@ -365,13 +358,13 @@ contains
     integer             :: IFAIL, i
 
     write (ud_absorb, "(ES12.4, *(tr2, i8))", iostat=IFAIL) cur_time, step, &
-    & nrPart_remove, nrElec_remove, nrHole_remove
+    & nrPart_remove, nrElec_remove, nrIon_remove
 
     write (ud_absorb_top, "(ES12.4, *(tr2, i8))", iostat=IFAIL) cur_time, step, &
-    & nrPart_remove_top, nrElec_remove_top, nrHole_remove_top, (nrElec_remove_top_emit(i), i = 1, nrEmit)
+    & nrPart_remove_top, nrElec_remove_top, nrIon_remove_top, (nrElec_remove_top_emit(i), i = 1, nrEmit)
 
     write (ud_absorb_bot, "(ES12.4, *(tr2, i8))", iostat=IFAIL) cur_time, step, &
-    & nrPart_remove_bot, nrElec_remove_bot, nrHole_remove_bot
+    & nrPart_remove_bot, nrElec_remove_bot, nrIon_remove_bot
   end subroutine Write_Absorbed
 
   ! ----------------------------------------------------------------------------
@@ -398,7 +391,7 @@ contains
     write(unit=ud_ramo, &
     & fmt="(ES12.4, tr2, i8, tr2, ES12.4, tr2, ES12.4, tr2, i6, tr2, i6, tr2, i6, tr2, ES12.4, tr2, ES12.4, *(tr2, ES12.4))", &
     & iostat=IFAIL) &
-    & cur_time, step, ramo_cur, V_d, nrPart, nrElec, nrHole, avg_mob, avg_speed, (ramo_current(i), i = 1, nrSpecies)
+    & cur_time, step, ramo_cur, V_d, nrPart, nrElec, nrIon, avg_mob, avg_speed, (ramo_current(i), i = 1, nrSpecies)
 
   end subroutine Write_Ramo_current
 
@@ -526,8 +519,6 @@ contains
     integer                              :: i, j, lt, s
 
     j = 0
-    !k = lbound(A, 1)
-    !k = startElecHoles
     do i = k, m
       if (mask(i) .eqv. .true.) then
         j = j + 1

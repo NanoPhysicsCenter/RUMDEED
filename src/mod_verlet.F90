@@ -36,9 +36,9 @@ contains
     ! Update the voltage in the system
     call Set_Voltage(step)
 
-    ! Update the position of particles (Electrons / Holes)
-    !if (nrElecHole > 0) then
-      call Update_ElecHole_Position(step)
+    ! Update the position of particles (Electrons / Ion's)
+    !if (nrElecIon > 0) then
+      call Update_Particle_Position(step)
 
       if ((EMISSION_MODE == EMISSION_UNIT_TEST) .or. (EMISSION_MODE == EMISSION_MANUAL)) then
         call Write_Position_Test(step)
@@ -79,7 +79,7 @@ contains
    end subroutine Read_Cross_Section_Data
 
   ! ----------------------------------------------------------------------------
-  subroutine Update_ElecHole_Position(step)
+  subroutine Update_Particle_Position(step)
     ! Update the position of particles in the verlet integration
     integer, intent(in) :: step
     integer             :: i
@@ -109,7 +109,7 @@ contains
       call Check_Planes(i)
     end do
     !$OMP END PARALLEL DO
-  end subroutine Update_ElecHole_Position
+  end subroutine Update_Particle_Position
 
 
   subroutine Write_Position_Test(step)
@@ -143,7 +143,7 @@ contains
   ! ----------------------------------------------------------------------------
   ! Checks the boundary conditions of the box.
   ! Check which particles to remove
-  subroutine Check_Boundary_ElecHole_Planar(i)
+  subroutine Check_Boundary_Planar(i)
     integer, intent(in) :: i
     double precision    :: z
 
@@ -156,7 +156,7 @@ contains
         call Mark_Particles_Remove(i, remove_top)
     end if
 
-  end subroutine Check_Boundary_ElecHole_Planar
+  end subroutine Check_Boundary_Planar
 
   ! ----------------------------------------------------------------------------
   ! Check planes where to record information
@@ -188,7 +188,7 @@ contains
   ! Checks the boundary conditions of the box.
   ! Check which particles to remove
   ! Enforce periodic boundary conditions
-  subroutine Check_Boundary_ElecHole_Periodic(i)
+  subroutine Check_Boundary_Periodic(i)
     integer, intent(in) :: i
     double precision    :: x, y, z
 
@@ -207,7 +207,7 @@ contains
     particles_cur_pos(1, i) = modulo(x, box_dim(1))
     particles_cur_pos(1, i) = modulo(y, box_dim(2))
 
-  end subroutine Check_Boundary_ElecHole_Periodic
+  end subroutine Check_Boundary_Periodic
 
   ! ----------------------------------------------------------------------------
   subroutine Update_Velocity(step)

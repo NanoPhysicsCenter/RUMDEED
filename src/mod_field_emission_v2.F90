@@ -100,7 +100,7 @@ contains
     nrEmitted_emitters = 0 ! Number of electrons emitted from emitter number i in this time step
 
     ! Function that checks the boundary conditions for the System
-    ptr_Check_Boundary => Check_Boundary_ElecHole_Planar
+    ptr_Check_Boundary => Check_Boundary_Planar
 
     ! Function for the electric field in the system
     ptr_field_E => field_E_planar
@@ -1331,6 +1331,8 @@ end function Escape_Prob_log
     ! Test Escape_Prob
     ! Test Elec_Supply_V2
     ! Test check_limits_metro_rec
+
+    print *, 'Running tests for the field emission module'
 
     ! Set the work function
     ptr_Work_fun => FE_Test_Work_fun

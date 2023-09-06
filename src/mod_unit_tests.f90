@@ -14,7 +14,7 @@ module mod_unit_tests
   implicit none
 
   PRIVATE
-  PUBLIC :: Init_Unit_Test, Clean_Up_Unit_Test
+  PUBLIC :: Init_Unit_Test, Clean_Up_Unit_Test, Do_Unit_Tests, Run_Unit_Tests
 
   ! ----------------------------------------------------------------------------
   ! Variables
@@ -23,6 +23,10 @@ module mod_unit_tests
 
   ! Constant used in MC integration
   double precision :: time_step_div_q0
+
+  ! Passed / failed color strings
+  character(len=16), parameter :: passed_str = achar(27)//'[32m PASSED'//achar(27)//'[0m'
+  character(len=16), parameter :: failed_str = achar(27)//'[31m FAILED'//achar(27)//'[0m'
 
 contains
   !-----------------------------------------------------------------------------
@@ -36,7 +40,7 @@ subroutine Init_Unit_Test()
   nrEmitted_emitters = 0 ! Number of electrons emitted from emitter number i in this time step
 
   ! Function that checks the boundary conditions for the System
-  ptr_Check_Boundary => Check_Boundary_ElecHole_Planar
+  ptr_Check_Boundary => Check_Boundary_Planar
 
   ! Function for the electric field in the system
   ptr_field_E => field_E_planar
@@ -59,6 +63,10 @@ subroutine Clean_Up_Unit_Test()
   deallocate(nrEmitted_emitters)
 end subroutine Clean_Up_Unit_Test
 
+subroutine Do_Unit_Tests()
+  print *, 'HELLO DOING Unit Tests'
+end subroutine Do_Unit_Tests
+
   !-----------------------------------------------------------------------------
   ! This subroutine gets called from main when the emitters should emit the electrons
 subroutine Do_Unit_Test_Emission(step)
@@ -72,6 +80,7 @@ subroutine Do_Unit_Test_Emission(step)
 
   nrElecEmitAll = 0
   nrEmitted_emitters = 0
+  print *, 'HELLO DOING UNIT TEST EMISSION'
 
   ! open(newunit=ud_file, iostat=IFAIL, file='Unit_Test_1.bin', status='OLD', action='READ', access='STREAM')
 
@@ -127,10 +136,13 @@ end subroutine Do_Unit_Test_Emission
 
 
   subroutine Run_Unit_Tests()
+    print *, ''
     call Test_Field_Emission_Module()
-
+    
+    print *, ''
     call Test_Acceleration_Without_Image_Charge()
 
+    print *, ''
     call Test_Image_Charge()
 
     !call Test_Acceleration_With_Image_Charge()
@@ -165,23 +177,19 @@ end subroutine Do_Unit_Test_Emission
     ! Start with an empty system
     nrPart      = 0
     nrElec      = 0
-    nrHole      = 0
-    nrElecHole  = 0
-
-    !startElecHoles = 1
-    !endElecHoles   = 0
-
+    nrIon      = 0
+    nrElecIon  = 0
 
     nrPart_remove = 0
     nrElec_remove = 0
-    nrHole_remove = 0
+    nrIon_remove = 0
 
     nrPart_remove_top = 0
     nrPart_remove_bot = 0
     nrElec_remove_top = 0
     nrElec_remove_bot = 0
-    nrHole_remove_top = 0
-    nrHole_remove_bot = 0
+    nrIon_remove_top = 0
+    nrIon_remove_bot = 0
 
     ! Set input variables
     box_dim = (/ 100.0d0*length_scale, 100.0d0*length_scale, d_test /)
@@ -220,81 +228,57 @@ end subroutine Do_Unit_Test_Emission
     double precision, parameter      :: V_test = 2.0d0 ! V
     double precision, parameter      :: delta_t_test = 0.25d-15 ! Time step
 
-    double precision, parameter      :: pre_fac_c_test = q_0**2/(4.0d0*pi*m_0*epsilon_0)
-    double precision, parameter      :: pre_fac_E_test = q_0/m_0
+    double precision, parameter      :: pre_fac_c_test = q_0**2/(4.0d0*pi*epsilon_0*epsilon_r)
+    !double precision, parameter      :: pre_fac_E_test = q_0/m_0
 
-    ! We must use OMP MASTER here because the variables declared above
-    ! are private for each thread and are NOT shared.
     print *, 'Running test for acceleration without image charge'
 
-    ! Electric field in the system
+    ! Electric field in the system (Planar case)
     E_test = (/ 0.0d0, 0.0d0, -1.0d0*V_test/d_test /)
 
     !--------------------------------------------------------------------------
     ! Location of particles
-    R_1 = (/  3.0d0, -10.0d0, 2.0d0 /) * length_scale
+
+    ! Particle 1 with negative charge
+    R_1 = (/  3.0d0, -10.0d0, 2.0d0 /) * length_scale 
+
+    ! Particle 2 with negative charge
     R_2 = (/ -9.0d0,  26.0d0, 80.0d0 /) * length_scale
+
+    ! Particle 3 with positive charge
     R_3 = (/  6.0d0, -24.0d0, 56.53d0 /) * length_scale
-
-    ! Location of image charge partners
-    ! Particle 1
-    ! Above (Charge: Positive)
-    R_1a = R_1
-    R_1a(3) = 2.0d0*d_test - R_1a(3)
-
-    ! Below (Charge: Positive)
-    R_1b = R_1
-    R_1b(3) = -1.0d0*R_1b(3)
-
-    ! Particle 2
-    ! Above (Charge: Positive)
-    R_2a = R_2
-    R_2a(3) = 2.0d0*d_test - R_2a(3)
-
-    ! Below (Charge: Positive)
-    R_2b = R_2
-    R_2b(3) = -1.0d0*R_2b(3)
-
-    ! Particle 3
-    ! Above (Charge: Negative)
-    R_3a = R_3
-    R_3a(3) = 2.0d0*d_test - R_3a(3)
-
-    ! Below (Charge: Negative)
-    R_3b = R_3
-    R_3b(3) = -1.0d0*R_3b(3)
 
     !--------------------------------------------------------------------------
     ! Calculate the acceleration
     ! Particle 1
     ! Acceleration from other particles
-    a_12  = +1.0d0*pre_fac_c_test * (R_1 - R_2) / norm2(R_1 - R_2)**3
-    a_13  = -1.0d0*pre_fac_c_test * (R_1 - R_3) / norm2(R_1 - R_3)**3
+    a_12  = +1.0d0*pre_fac_c_test/m_0 * (R_1 - R_2) / norm2(R_1 - R_2)**3
+    a_13  = -1.0d0*pre_fac_c_test/m_0 * (R_1 - R_3) / norm2(R_1 - R_3)**3
 
     ! Acceleration from the electric field in the diode
-    a_1E = -1.0d0*pre_fac_E_test * E_test
+    a_1E = -1.0d0*q_0/m_0 * E_test
 
     ! Total acceleration 1
     a_1 = a_12 + a_13 + a_1E
 
     ! Particle 2
     ! Acceleration from other particles
-    a_21  = +1.0d0*pre_fac_c_test * (R_2 - R_1) / norm2(R_2 - R_1)**3
-    a_23  = -1.0d0*pre_fac_c_test * (R_2 - R_3) / norm2(R_2 - R_3)**3
+    a_21  = +1.0d0*pre_fac_c_test/m_0 * (R_2 - R_1) / norm2(R_2 - R_1)**3
+    a_23  = -1.0d0*pre_fac_c_test/m_0 * (R_2 - R_3) / norm2(R_2 - R_3)**3
 
     ! Acceleration from the electric field in the diode
-    a_2E = -1.0d0*pre_fac_E_test * E_test
+    a_2E = -1.0d0*q_0/m_0 * E_test
 
     ! Total aceleration on particle 2
     a_2 = a_21 + a_23 + a_2E
 
     ! Particle 3
     ! Acceleration from other particles
-    a_31  = -1.0d0*pre_fac_c_test * (R_3 - R_1) / norm2(R_3 - R_1)**3
-    a_32  = -1.0d0*pre_fac_c_test * (R_3 - R_2) / norm2(R_3 - R_2)**3
+    a_31  = -1.0d0*pre_fac_c_test/m_N2p * (R_3 - R_1) / norm2(R_3 - R_1)**3
+    a_32  = -1.0d0*pre_fac_c_test/m_N2p * (R_3 - R_2) / norm2(R_3 - R_2)**3
 
     ! Acceleration from the electric field in the diode
-    a_3E = +1.0d0*pre_fac_E_test * E_test
+    a_3E = +1.0d0*q_0/m_N2p * E_test
 
     ! Total acceleration on particle 3
     a_3 = a_31 + a_32 + a_3E
@@ -311,7 +295,7 @@ end subroutine Do_Unit_Test_Emission
     par_vel = 0.0d0
     call Add_Particle(R_1, par_vel, species_elec, 1, 0, -1)
     call Add_Particle(R_2, par_vel, species_elec, 1, 0, -1)
-    call Add_Particle(R_3, par_vel, species_hole, 1, 0, -1)
+    call Add_Particle(R_3, par_vel, species_ion, 1, 0, -1)
 
     call Calculate_Acceleration_Particles()
 
@@ -325,18 +309,18 @@ end subroutine Do_Unit_Test_Emission
     a_3_res = particles_cur_accel(:, 3)
 
     if (all(abs(a_1 - a_1_res)/a_1 < tolerance_rel)) then
-      print *, 'Particle 1 PASSED'
+      print *, 'Particle 1'//passed_str
     else
-      print *, 'Particle 1 FAILED'
+      print *, 'Particle 1'//failed_str
       print *, a_1_res
       print *, a_1
       print *, ''
     end if
 
     if (all(abs(a_2 - a_2_res)/a_2 < tolerance_rel)) then
-      print *, 'Particle 2 PASSED'
+      print *, 'Particle 2'//passed_str
     else
-      print *, 'Particle 2 FAILED'
+      print *, 'Particle 2'//failed_str
       print *, 'Results'
       print *, a_2_res
       print *, 'Expected'
@@ -348,23 +332,28 @@ end subroutine Do_Unit_Test_Emission
     end if
 
     if (all(abs(a_3 - a_3_res)/a_3 < tolerance_rel)) then
-      print *, 'Particle 3 PASSED'
+      print *, 'Particle 3'//passed_str
     else
-      print *, 'Particle 3 FAILED'
+      print *, 'Particle 3'//failed_str
+      print *, 'Results'
       print *, a_3_res
+      print *, 'Expected'
       print *, a_3
+      print *, 'Difference'
+      print *, abs(a_3 - a_3_res)
+      print *, all(abs(a_3 - a_3_res) < tolerance_rel)
       print *, ''
     end if
 
     if (abs(E_test(3) - E_F(3))/E_test(3) < tolerance_rel) then
       if ( (abs(E_test(1) - 0.0d0) < tolerance_abs) .and. (abs(E_test(2) - 0.0d0) < tolerance_abs) ) then
-        print *, 'Electric field without particles PASSED'
+        print *, 'Electric field without particles in planar case'//passed_str
       else
-        print *, 'Electric field without particles FAILED'
+        print *, 'Electric field without particles in planar case'//failed_str
         print *, 'x and y component not zero'
       end if
     else
-      print *, 'Electric field without particles FAILED'
+      print *, 'Electric field without particles in planar case'//failed_str
       print *, 'z component not correct'
       print *, 'E_test = ', E_test
       print *, 'E_F = ', E_F
@@ -374,9 +363,9 @@ end subroutine Do_Unit_Test_Emission
 
     E_python = (/ -314559.29097098, 1423979.07058996, -20246038.87978313 /) ! Results from Python script (no image charge)
     if (all(abs(E_python - E_pos)/E_python < tolerance_rel)) then
-      print *, 'Electric field with particles PASSED'
+      print *, 'Electric field with particles'//passed_str
     else
-      print *, 'Electric field with particles FAILED'
+      print *, 'Electric field with particles'//failed_str
       print *, 'E_python = ', E_python
       print *, 'E_pos = ', E_pos
       print *, 'abs(E_python - E_pos)/E_python = ', abs(E_python - E_pos)/E_python
@@ -385,7 +374,7 @@ end subroutine Do_Unit_Test_Emission
 
     print *, 'Acceleration test without image charge finished'
     print *, ''
-  end subroutine
+  end subroutine Test_Acceleration_Without_Image_Charge
 
   !-----------------------------------------------------------------------------
   ! Test the function Force_Image_charges_v2(pos_1, pos_2)
@@ -416,7 +405,7 @@ end subroutine Do_Unit_Test_Emission
 
     ! We have two particles, an electron at,
     R_1 = (/  3.0d0, -10.0d0, 2.0d0 /) * length_scale
-    ! and hole at,
+    ! and ion at,
     R_2 = (/  6.0d0, -24.0d0, 98.53d0 /) * length_scale
 
     ! Let's test the self interaction first
@@ -651,7 +640,7 @@ end subroutine Do_Unit_Test_Emission
 
   !-----------------------------------------------------------------------------
   ! Test the Acceleration calculations
-  ! Two electrons and one hole are placed in the system
+  ! Two electrons and one ion are placed in the system
   ! The acceleration is calculated using Coulomb's law and also with the
   ! Calculate Acceleration subroutine.
   subroutine Test_Acceleration_With_Image_Charge()
@@ -671,7 +660,7 @@ end subroutine Do_Unit_Test_Emission
     double precision, parameter      :: V_test = 2.0d0 ! V
     double precision, parameter      :: delta_t_test = 0.25d-15 ! Time step
 
-    double precision, parameter      :: pre_fac_c_test = q_0**2/(4.0d0*pi*m_0*epsilon_0)
+    double precision, parameter      :: pre_fac_c_test = q_0**2/(4.0d0*pi*epsilon_0*epsilon_r)
     double precision, parameter      :: pre_fac_E_test = q_0/m_0
 
     ! We must use OMP MASTER here because the variables declared above
@@ -729,7 +718,7 @@ end subroutine Do_Unit_Test_Emission
     ! Other electron (-q*+q = -q**2)
     a_12a = -1.0d0*pre_fac_c_test * (R_1 - R_2a) / norm2(R_1 - R_2a)**3
     a_12b = -1.0d0*pre_fac_c_test * (R_1 - R_2b) / norm2(R_1 - R_2b)**3
-    ! Other hole (-q*-q = +q**2)
+    ! Other ion (-q*-q = +q**2)
     a_13a = +1.0d0*pre_fac_c_test * (R_1 - R_3a) / norm2(R_1 - R_3a)**3
     a_13b = +1.0d0*pre_fac_c_test * (R_1 - R_3b) / norm2(R_1 - R_3b)**3
 
@@ -750,7 +739,7 @@ end subroutine Do_Unit_Test_Emission
     ! Self (-q*+q = -q**2)
     a_22a = -1.0d0*pre_fac_c_test * (R_2 - R_2a) / norm2(R_2 - R_2a)**3
     a_22b = -1.0d0*pre_fac_c_test * (R_2 - R_2b) / norm2(R_2 - R_2b)**3
-    ! Other hole (-q*-q = +q**2)
+    ! Other ion (-q*-q = +q**2)
     a_23a = +1.0d0*pre_fac_c_test * (R_2 - R_3a) / norm2(R_2 - R_3a)**3
     a_23b = +1.0d0*pre_fac_c_test * (R_2 - R_3b) / norm2(R_2 - R_3b)**3
 
@@ -787,7 +776,7 @@ end subroutine Do_Unit_Test_Emission
     par_vel = 0.0d0
     call Add_Particle(R_1, par_vel, species_elec, 1, 0, -1)
     call Add_Particle(R_2, par_vel, species_elec, 1, 0, -1)
-    call Add_Particle(R_3, par_vel, species_hole, 1, 0, -1)
+    call Add_Particle(R_3, par_vel, species_ion, 1, 0, -1)
 
     call Calculate_Acceleration_Particles()
 

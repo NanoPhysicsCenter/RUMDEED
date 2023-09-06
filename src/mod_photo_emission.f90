@@ -152,7 +152,7 @@ contains
     allocate(nrEmitted_emitters(1:nrEmit))
 
     ! Function that checks the boundary conditions for the System
-    ptr_Check_Boundary => Check_Boundary_ElecHole_Planar
+    ptr_Check_Boundary => Check_Boundary_Planar
     
     ! Function for the electric field in the system
     ptr_field_E => field_E_planar

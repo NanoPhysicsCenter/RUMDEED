@@ -113,69 +113,64 @@ program RUMDEED
   print '(a)', 'RUMDEED: Writing out variables'
   call Write_Initial_Variables()
 
-  !print '(a)', 'RUMDEED: Setting up dipoles'
-  !call Setup_Dipoles(5, 5, 5)
-  !call Init_Dipoles(0, 0, 0)
-  !call Write_Dipole_data()
+  ! Check if we are doing unit tests. If so, then avoid the main loop.
+  if (EMISSION_MODE == EMISSION_UNIT_TEST) then
+    print '(a)', 'RUMDEED: Starting unit tests'
+    call Run_Unit_Tests()
+  else
 
-  print '(a)', 'RUMDEED: Starting main loop'
-  print '(tr1, a, i0, a, ES12.4, a)', 'Doing ', steps, ' time steps of size ', time_step/1.0E-12, ' ps'
+    print '(a)', 'RUMDEED: Starting main loop'
+    print '(tr1, a, i0, a, ES12.4, a)', 'Doing ', steps, ' time steps of size ', time_step/1.0E-12, ' ps'
 
-  print *, ''
+    print *, ''
 
-  cur_time = 0
-  call Set_Voltage(0) ! Set voltage for time step 0
+    cur_time = 0
+    call Set_Voltage(0) ! Set voltage for time step 0
 
-  do i = 1, steps
+    do i = 1, steps
 
-    ! Do Emission
-    !print *, 'Emission'
-    call ptr_Do_Emission(i)
+      ! Do Emission
+      !print *, 'Emission'
+      call ptr_Do_Emission(i)
 
-    ! Update the position of all particles
-    !print *, 'Update position'
-    call Update_Position(i)
-    call Write_Position(i)
-    !call Write_Position_XYZ_Step(i)
+      ! Update the position of all particles
+      !print *, 'Update position'
+      call Update_Position(i)
+      call Write_Position(i)
+      !call Write_Position_XYZ_Step(i)
 
-    ! Remove particles from the system
-    !print *, 'Remove particles'
-    call Remove_Particles(i)
+      ! Remove particles from the system
+      !print *, 'Remove particles'
+      call Remove_Particles(i)
 
-    ! Do Collisions
-    call Do_Collisions(i)
+      ! Do Collisions
+      call Do_Collisions(i)
 
-    ! Flush data
-    call Flush_Data()
+      ! Flush data
+      call Flush_Data()
 
-    !do j = 1, 9
-    !  if (i == progress(j)) then
-    !    call PrintProgress(j)
-    !    call Flush_Data()
-    !    exit
-    !  end if
-    !end do
+      ! Check the progress, if we are at 10%, 20%, 30%, ...
+      ! then print the progress and flush data
+      if (any(i .eq. progress) .eqv. .true.) then
+        call PrintProgress(nint(i*10.0d0/steps))
+        !call Flush_Data()
+      end if
 
-    ! Check the progress, if we are at 10%, 20%, 30%, ...
-    ! then print the progress and flush data
-    if (any(i .eq. progress) .eqv. .true.) then
-      call PrintProgress(nint(i*10.0d0/steps))
-      !call Flush_Data()
-    end if
+      if (cought_stop_signal .eqv. .true.) then
+        print '(a)', 'RUMDEED: Got signal SIGINT stopping main loop.'
+        exit ! We cought the signal to stop. Exit the main loop.
+      end if
 
-    if (cought_stop_signal .eqv. .true.) then
-      print '(a)', 'RUMDEED: Got signal SIGINT stopping main loop.'
-      exit ! We cought the signal to stop. Exit the main loop.
-    end if
-
-  end do
-
-  call PrintProgress(10)
-  print '(a)', 'RUMDEED: Main loop finished'
+    end do
+  
+    call PrintProgress(10)
+    print '(a)', 'RUMDEED: Main loop finished'
 
 
-  print '(a)', 'RUMDEED: Writing data'
-  call Write_Life_Time()
+    print '(a)', 'RUMDEED: Writing data'
+    call Write_Life_Time()
+
+  endif ! EMISSION_MODE == EMISSION_UNIT_TEST
 
   print '(a)', 'RUMDEED: Emission clean up'
   SELECT CASE (EMISSION_MODE)
@@ -212,8 +207,8 @@ contains
     integer, intent(in) :: i
 
     print '(a, i3, a)', 'RUMDEED: ', (i*10), '% done'
-    print '(tr1, i0, a)', nrPart, ' particles in the system'
-    !print '(tr2, i0, a, i0, a)', nrElec, ' electrons and ', nrHole, ' holes'
+    !print '(tr1, i0, a)', nrPart, ' particles in the system'
+    print '(tr2, i0, a, i0, a)', nrElec, ' electrons and ', nrIon, ' ions'
     print *, ''
   end subroutine PrintProgress
 
@@ -365,19 +360,19 @@ contains
     ! Start with an empty system
     nrPart      = 0
     nrElec      = 0
-    nrHole      = 0
-    nrElecHole  = 0
+    nrIon      = 0
+    nrElecIon  = 0
 
     nrPart_remove = 0
     nrElec_remove = 0
-    nrHole_remove = 0
+    nrIon_remove = 0
 
     nrPart_remove_top = 0
     nrPart_remove_bot = 0
     nrElec_remove_top = 0
     nrElec_remove_bot = 0
-    nrHole_remove_top = 0
-    nrHole_remove_bot = 0
+    nrIon_remove_top = 0
+    nrIon_remove_bot = 0
 
     ! ID starts with 0
     nrID = 0
@@ -643,7 +638,8 @@ contains
     write(ud_init, '(a)') material
     write(ud_init, fmt_rel) 'epsilon_r  = ', epsilon_r, 'Relative permittivity'
     write(ud_init, fmt_rel) 'm_eeff     = ', m_eeff,    'Effective mass for electrons'
-    write(ud_init, fmt_rel) 'm_heff     = ', m_heff,    'Effective mass for holes'
+    write(ud_init, fmt_rel) 'm_ieff     = ', m_ieff,    'Effective mass for ions'
+    !write(ud_init, fmt_rel) 'm_heff     = ', m_heff,    'Effective mass for holes'
     write(ud_init, *) '---------------------------------------------------------'
     write(ud_init, *)
     write(ud_init, *)
@@ -700,7 +696,7 @@ contains
       stop
     end if
 
-    write(unit=ud_init) epsilon_r, m_eeff, m_heff, length_scale, time_scale, vel_scale, cur_scale, &
+    write(unit=ud_init) epsilon_r, m_eeff, m_ieff, length_scale, time_scale, vel_scale, cur_scale, &
                         MAX_PARTICLES, MAX_EMITTERS, MAX_SECTIONS, MAX_LIFE_TIME
 
     close(unit=ud_init, iostat=IFAIL, status='keep')

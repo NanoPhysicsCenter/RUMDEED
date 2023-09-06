@@ -15,7 +15,8 @@ module mod_global
   character(len=*), parameter :: material = 'Vacuum' ! Material used
   double precision, parameter :: epsilon_r = 1.0d0 ! Relative permittivity
   double precision, parameter :: m_eeff = 1.0d0 ! Effective mass for electrons
-  double precision, parameter :: m_heff = 1.0d0 ! Effective mass for holes
+  !double precision, parameter :: m_heff = 1.0d0 ! Effective mass for holes
+  double precision, parameter :: m_ieff = 1.0d0 ! Effective mass for ions
 
 
   ! ----------------------------------------------------------------------------
@@ -36,7 +37,7 @@ module mod_global
   !double precision, parameter :: m_e = m_eeff * m_0 ! m_e* Effective electron mass (kg)
   !double precision, parameter :: m_h = m_heff * m_0! m_h* Effective hole mass (kg)
 
-  double precision, parameter :: m_N2p = 14.0067d0*m_u - m_0 ! Mass of N_2^+
+  double precision, parameter :: m_N2p = 14.0067d0*m_u - m_0 ! Mass of N_2^+ ion (kg)
 
   double precision, parameter :: q_0 = 1.6021766208d-19 ! Elementary charge (C)
   double precision, parameter :: q_02 = q_0**2 ! Elementary charge squared (C)
@@ -71,18 +72,12 @@ module mod_global
   integer, parameter :: MAX_EMITTERS  = 1      ! Maximum number of emitters in the system
   integer, parameter :: MAX_SECTIONS  = 96*96    ! Maximum number of sections an emitter can have
 
-
-  !! ----------------------------------------------------------------------------
-  !! Define the charge of the electrons and holes
-  !integer, parameter :: charge_elec = -1
-  !integer, parameter :: charge_hole = +1
-
   ! ----------------------------------------------------------------------------
   ! Define the particle species
   integer, parameter :: species_unkown   = 0 ! Unknown particle
   integer, parameter :: species_elec     = 1 ! Electron
-  integer, parameter :: species_hole     = 2 ! Hole
-  integer, parameter :: nrSpecies        = 2 ! 2 = Elec, Hole
+  integer, parameter :: species_ion      = 2 ! Ion
+  integer, parameter :: nrSpecies        = 2 ! 2 = Elec or Ion
 
 
   ! ----------------------------------------------------------------------------
@@ -161,10 +156,10 @@ module mod_global
 
   ! ----------------------------------------------------------------------------
   ! Define run time variables
-  integer :: nrPart ! Number of particles in the system (nrPart = nrElec + nrHole + nrFixedPart)
+  integer :: nrPart ! Number of particles in the system (nrPart = nrElec + nrIon + nrFixedPart)
   integer :: nrElec ! Number of electrons in the system
-  integer :: nrHole ! Number of holes in the system
-  integer :: nrElecHole
+  integer :: nrIon ! Number of ion's in the system
+  integer :: nrElecIon
   integer :: nrEmit ! Number of emitters in the system
   integer :: nrID   ! Number for the current id
 
@@ -174,12 +169,12 @@ module mod_global
   integer :: nrElec_remove_top
   integer :: nrElec_remove_bot
 
-  integer :: nrHole_remove_top
-  integer :: nrHole_remove_bot
+  integer :: nrIon_remove_top
+  integer :: nrIon_remove_bot
 
   integer :: nrPart_remove ! Number of particles to be removed
   integer :: nrElec_remove ! Number of electrons to be removed
-  integer :: nrHole_remove ! Number of holes to be removed
+  integer :: nrIon_remove ! Number of ion's to be removed
 
   integer, dimension(:), allocatable :: nrElec_remove_top_emit
 
@@ -262,10 +257,10 @@ module mod_global
   ! ----------------------------------------------------------------------------
   ! unit descriptors for data files (text files)
   integer :: ud_pos ! Position file
-  integer :: ud_emit ! File for emitted electrons and holes
-  integer :: ud_absorb ! File for absorbed electrons and holes
-  integer :: ud_absorb_top ! File for absorbed electrons and holes
-  integer :: ud_absorb_bot ! File for absorbed electrons and holes
+  integer :: ud_emit ! File for emitted electrons and ion's
+  integer :: ud_absorb ! File for absorbed electrons and ion's
+  integer :: ud_absorb_top ! File for absorbed electrons and ion's
+  integer :: ud_absorb_bot ! File for absorbed electrons and ion's
   integer :: ud_ramo ! File for the Ramo current
   integer :: ud_volt ! Voltage in the system
   integer :: ud_debug ! File for debuging and testing

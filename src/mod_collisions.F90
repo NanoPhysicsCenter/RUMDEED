@@ -172,7 +172,7 @@ contains
 
               !$OMP CRITICAL
               ! Add the new positively charged ion to the system
-              call Add_Particle(cur_pos, par_vec, species_hole, step, 1, step+life_time) ! Ion
+              call Add_Particle(cur_pos, par_vec, species_ion, step, 1, step+life_time) ! Ion
               !$OMP END CRITICAL
 
               nrIon = nrIon + 1
