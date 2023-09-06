@@ -1154,15 +1154,15 @@ end function Elec_supply_tip
       print *, 'Escape_prob = ', Escape_prob_Tip
       print *, ''
     end if
-    if (isnan(Escape_Prob_tip) .eqv. .True.) then
-    print *, 'Escape_Prob++ ', Escape_Prob_Tip
-      print *, 'b_FN ', b_FN
-      print *, 'w_theta_pos_tip ', w_theta_pos_tip(pos)
-      print *, 'pos ', pos
-      print *, 'v_y ', v_y(F, pos)
-      print *, 'F ', F
-      !pause
-    end if
+    !if (isnan(Escape_Prob_tip) .eqv. .True.) then
+    !print *, 'Escape_Prob++ ', Escape_Prob_Tip
+    !  print *, 'b_FN ', b_FN
+    !  print *, 'w_theta_pos_tip ', w_theta_pos_tip(pos)
+    !  print *, 'pos ', pos
+    !  print *, 'v_y ', v_y(F, pos)
+    !  print *, 'F ', F
+    !  !pause
+    !end if
     !print *, 'Escape_Prob-- ', Escape_Prob_Tip
     !print *, isnan(Escape_Prob_Tip)
     !print *, ieee_is_nan(Escape_Prob_Tip)
