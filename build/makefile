@@ -134,7 +134,7 @@ $(PROJECT_NAME).out: ../src/main.F90 ../cuba/lib/libcuba.a \
 			$(CUBA_LIB) -lpthread -lm -ldl -o $(PROJECT_NAME).out
 
 ../cuba/Cuba-4.2.2.tar.gz:
-		cd ../cuba/; ./get-cuba.sh
+		cd ../cuba/; ./get-cuba.sh; md5sum -c md5hash.md5
 
 ../cuba/Cuba-4.2.2/cuba.h: ../cuba/Cuba-4.2.2.tar.gz
 		cd ../cuba/; tar -xvzf Cuba-4.2.2.tar.gz
