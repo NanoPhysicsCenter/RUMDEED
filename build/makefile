@@ -3,6 +3,7 @@
 # 12.10.09
 
 # Compiler to use
+# Override default values if nothing else is set
 ifeq ($(origin FC),default)
 FC = gfortran
 endif
@@ -15,7 +16,7 @@ GIT_VERSION := $(shell git describe --dirty --always --tags || echo `date +'%d/%
 CUBA_LIB=../cuba/lib/libcuba.a
 
 #UNIT_TEST = 1
-OPENMP = 1 # Comment out to disable OpenMP | changing value does nothing
+OPENMP ?= yes # Set to something else to disable OpenMP
 
 # Compile flags
 # UNKNOWN COMPILERS
@@ -31,7 +32,7 @@ FFLAGS=-O2 -xHost -ip -ipo #-fp-model precise -g
 #-prec-div -prec-sqrt
 #-fp-model precise
 #FFLAGS=-check all -g -warn interfaces -warn all -traceback -ftrapuv
-ifdef OPENMP
+ifeq ($(OPENMP),yes)
 FFLAGS+=-qopenmp
 endif
 endif
@@ -40,7 +41,7 @@ endif
 ifeq ($(FC),ifx)
 $(info Using New Intel Fortran Compiler)
 FFLAGS=-O2 -xHost -ipo
-ifdef OPENMP
+ifeq ($(OPENMP),yes)
 FFLAGS+=-qopenmp
 endif
 endif
@@ -51,7 +52,7 @@ ifneq (,$(findstring gfortran,$(FC)))
 $(info Using GNU Fortran)
 FFLAGS=-O3 -march=native -flto=auto
 #FFLAGS=-g -fcheck=all -Wall -fbacktrace -ffpe-trap=invalid,zero,overflow,underflow
-ifdef OPENMP
+ifeq ($(OPENMP),yes)
 FFLAGS+=-fopenmp
 endif
 endif
@@ -62,7 +63,7 @@ $(info Using PGI Fortran)
 FFLAGS=-fast
 #FFLAGS=-fast -Minfo -Mllvm
 #FFLAGS=-g -gopt -Mbounds -Mchkfpstk -Mchkfpstk -Mchkfpstk -Melf -traceback
-ifdef OPENMP
+ifeq ($(OPENMP),yes)
 FFLAGS+=-mp
 endif
 endif
@@ -72,7 +73,7 @@ ifeq ($(FC),nvfortran)
 $(info Using NVidia Fortran)
 #FFLAGS=-O3 -fastsse -Mipa=fast,inline -Munroll
 FFLAGS=-O3 -fastsse
-ifdef OPENMP
+ifeq ($(OPENMP),yes)
 FFLAGS+=-mp
 endif
 endif
@@ -80,7 +81,7 @@ endif
 ifeq ($(FC),flang)
 $(info Using AMD Fortran)
 FFLAGS=-O3 -march=native -D_AOCC_=1
-ifdef OPENMP
+ifeq ($(OPENMP),yes)
 FFLAGS+=-fopenmp
 endif
 endif
