@@ -288,7 +288,7 @@ contains
     time_step2 = time_step**2 ! Time_step squared
 
     ! Temperature, pressure and density
-    P_abs = P_abs * P_ntp 
+    P_abs = P_abs * P_ntp
     n_d = P_abs/(k_b*T_temp)
 
     ! steps: Number of time steps that the program will simulate
@@ -364,19 +364,19 @@ contains
     ! Start with an empty system
     nrPart      = 0
     nrElec      = 0
-    nrIon      = 0
-    nrElecIon  = 0
+    nrIon       = 0
+    nrElecIon   = 0
 
     nrPart_remove = 0
     nrElec_remove = 0
-    nrIon_remove = 0
+    nrIon_remove  = 0
 
     nrPart_remove_top = 0
     nrPart_remove_bot = 0
     nrElec_remove_top = 0
     nrElec_remove_bot = 0
-    nrIon_remove_top = 0
-    nrIon_remove_bot = 0
+    nrIon_remove_top  = 0
+    nrIon_remove_bot  = 0
 
     ! ID starts with 0
     nrID = 0

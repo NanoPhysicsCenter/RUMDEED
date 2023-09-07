@@ -142,8 +142,8 @@ mod_verlet.mod mod_verlet.o: ../src/mod_verlet.F90 mod_global.mod mod_pair.mod m
 mod_pair.mod mod_pair.o: ../src/mod_pair.F90 mod_global.mod
 		$(FC) -c $(FFLAGS) ../src/mod_pair.F90
 
-mod_tests.mod mod_tests.o: ../src/mod_tests.f90 mod_global.mod mod_verlet.mod mod_pair.mod mod_field_emission_v2.mod
-		$(FC) -c $(FFLAGS) ../src/mod_tests.f90
+mod_tests.mod mod_tests.o: ../src/mod_tests.F90 mod_global.mod mod_verlet.mod mod_pair.mod mod_field_emission_v2.mod
+		$(FC) -c $(FFLAGS) ../src/mod_tests.F90
 
 mod_photo_emission.mod mod_photo_emission.o: ../src/mod_photo_emission.f90 mod_global.mod mod_verlet.mod mod_pair.mod mod_velocity.mod
 		$(FC) -c $(FFLAGS) ../src/mod_photo_emission.f90

@@ -143,7 +143,7 @@ module mod_global
   integer          :: ion_life_time = 100000000 ! Lifetime of ions
 
   double precision :: T_temp = T_ntp ! Temperature in Kelvin
-  double precision :: P_abs = P_ntp  ! Pressure as fraction of P_std
+  double precision :: P_abs = 1.0d0  ! Pressure as fraction of P_ntp
   double precision :: n_d = P_ntp/(k_b*T_ntp) ! Density of N2
 
   double precision :: R_s = 0.0d0 ! Series resistor
