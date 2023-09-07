@@ -18,7 +18,7 @@ program RUMDEED
   use mod_field_thermo_emission
   !use mod_therminoic_emission
   use mod_pair
-  use mod_unit_tests
+  use mod_tests
   use mod_manual_emission
 #if defined(__INTEL_COMPILER)
   use IFPORT ! Needed for getpid()
@@ -54,6 +54,10 @@ program RUMDEED
                 compiler_version(), ' using the options ', &
                 compiler_options()
 
+#if _TESTING_MODE_ == 1
+  print '(a)', 'RUMDEED: **** TESTING MODE ACTIVE ****'
+#endif
+
 #if defined(_GIT_VERSION_)
   print '(2a)', 'GIT version: ', _GIT_VERSION_
 #endif
@@ -75,9 +79,9 @@ program RUMDEED
   call Init()
 
   SELECT CASE (EMISSION_MODE)
-  case(EMISSION_UNIT_TEST)
-    print '(a)', 'RUMDEED: **** UNIT TESTING IS ACTIVE ****'
-    call Init_Unit_Test()
+  case(EMISSION_TEST)
+    print '(a)', 'RUMDEED: **** DOING UNIT AND INTEGRATION TESTS ****'
+    call Init_Test()
   case(EMISSION_PHOTO)
     print '(a)', 'RUMDEED: Doing Photo emission'
     call Init_Photo_Emission()
@@ -114,9 +118,9 @@ program RUMDEED
   call Write_Initial_Variables()
 
   ! Check if we are doing unit tests. If so, then avoid the main loop.
-  if (EMISSION_MODE == EMISSION_UNIT_TEST) then
-    print '(a)', 'RUMDEED: Starting unit tests'
-    call Run_Unit_Tests()
+  if (EMISSION_MODE == EMISSION_TEST) then
+    print '(a)', 'RUMDEED: Starting tests'
+    call Run_Tests()
   else
 
     print '(a)', 'RUMDEED: Starting main loop'
@@ -170,12 +174,12 @@ program RUMDEED
     print '(a)', 'RUMDEED: Writing data'
     call Write_Life_Time()
 
-  endif ! EMISSION_MODE == EMISSION_UNIT_TEST
+  endif ! EMISSION_MODE == EMISSION_TEST
 
   print '(a)', 'RUMDEED: Emission clean up'
   SELECT CASE (EMISSION_MODE)
-  case(EMISSION_UNIT_TEST)
-    call Clean_Up_Unit_Test()
+  case(EMISSION_TEST)
+    call Clean_Up_Test()
   case(EMISSION_PHOTO)
     call Clean_Up_Photo_Emission()
   case(EMISSION_FIELD)

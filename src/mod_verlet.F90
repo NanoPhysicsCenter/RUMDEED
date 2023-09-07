@@ -40,15 +40,19 @@ contains
     !if (nrElecIon > 0) then
       call Update_Particle_Position(step)
 
-      if ((EMISSION_MODE == EMISSION_UNIT_TEST) .or. (EMISSION_MODE == EMISSION_MANUAL)) then
+#if _TESTING_MODE_ == 1
+      !if ((EMISSION_MODE == EMISSION_TEST) .or. (EMISSION_MODE == EMISSION_MANUAL)) then
         call Write_Position_Test(step)
-      end if
+      !end if
+#endif
 
       call Calculate_Acceleration_Particles()
 
-      if ((EMISSION_MODE == EMISSION_UNIT_TEST) .or. (EMISSION_MODE == EMISSION_MANUAL)) then
+#if _TESTING_MODE_ == 1
+      !if ((EMISSION_MODE == EMISSION_TEST) .or. (EMISSION_MODE == EMISSION_MANUAL)) then
         call Write_Acceleration_Test(step)
-      end if
+      !end if
+#endif
 
       ! Reset the ramo current. Note, this should be done after set_voltage,
       ! since the ramo current may be used there.

@@ -15,50 +15,103 @@ class bcolors:
     BOLD = '\033[1m'
     UNDERLINE = '\033[4m'
 
-# Intel New
+# -------------------------------------------------------------------
+# Intel OneAPI SERIAL
 os.chdir('../build/')
-print('Compiling using Intel OneAPI without OpenMP')
-make_process = subprocess.Popen(["make", "clean", "all", "CC=icx", "FC=ifx", "UNIT_TEST=1", "OPENMP=no"], shell=False, stderr=subprocess.STDOUT, stdout=subprocess.DEVNULL)
+print('Compiling using Intel OneAPI Serial')
+make_process = subprocess.Popen(["make", "clean", "all", "CC=icx", "FC=ifx", "TESTING_MODE=1", "OPENMP=no"], shell=False, stderr=subprocess.STDOUT, stdout=subprocess.DEVNULL)
 if make_process.wait() != 0:
-    print(bcolors.FAIL + 'Intel Classic FAILED' + bcolors.ENDC)
+    print(bcolors.FAIL + 'Intel OneAPI Serial FAILED' + bcolors.ENDC)
 else:
-    print(bcolors.OKGREEN + 'Intel Classic OK' + bcolors.ENDC)
+    print(bcolors.OKGREEN + 'Intel OneAPI Serial compiled' + bcolors.ENDC)
     os.chdir('../tests/')
     shutil.rmtree('run_intel', ignore_errors=True)
-    os.mkdir('run_intel')
-    os.chdir('run_intel')
+    os.makedirs('run_intel/serial')
+    os.chdir('run_intel/serial')
     os.mkdir('pos')
-    shutil.copy('../../build/RUMDEED.out', './RUMDEED.out')
-    shutil.copy('../input', './input')
+    shutil.copy('../../../build/RUMDEED.out', './RUMDEED.out')
+    shutil.copy('../../input', './input')
     Vacuum_Process = subprocess.Popen("./RUMDEED.out", shell=True, stderr=subprocess.STDOUT)
     Vacuum_Process.wait()
-    os.chdir('../')
+    os.chdir('../../')
     time.sleep(5)
 
 print('')
-##exit()
+# -------------------------------------------------------------------
 
+# -------------------------------------------------------------------
+# Intel OneAPI OpenMP
 os.chdir('../build/')
-print('Compiling using GNU without OpenMP')
-make_process = subprocess.Popen(["make", "clean", "all", "CC=gcc", "FC=gfortran", "UNIT_TEST=1", "OPENMP=no"], shell=False, stderr=subprocess.STDOUT, stdout=subprocess.DEVNULL)
+print('Compiling using Intel OneAPI with OpenMP')
+make_process = subprocess.Popen(["make", "clean", "all", "CC=icx", "FC=ifx", "TESTING_MODE=1", "OPENMP=yes"], shell=False, stderr=subprocess.STDOUT, stdout=subprocess.DEVNULL)
 if make_process.wait() != 0:
-    print(bcolors.FAIL + 'GNU FAILED' + bcolors.ENDC)
+    print(bcolors.FAIL + 'Intel OneAPI OpenMP FAILED' + bcolors.ENDC)
 else:
-    print(bcolors.OKGREEN + 'GNU OK' + bcolors.ENDC)
+    print(bcolors.OKGREEN + 'Intel OneAPI OpenMP compiled' + bcolors.ENDC)
+    os.chdir('../tests/')
+    #shutil.rmtree('run_intel', ignore_errors=True)
+    os.makedirs('run_intel/openmp')
+    os.chdir('run_intel/openmp')
+    os.mkdir('pos')
+    shutil.copy('../../../build/RUMDEED.out', './RUMDEED.out')
+    shutil.copy('../../input', './input')
+    Vacuum_Process = subprocess.Popen("./RUMDEED.out", shell=True, stderr=subprocess.STDOUT)
+    Vacuum_Process.wait()
+    os.chdir('../../')
+    time.sleep(5)
+
+print('')
+# -------------------------------------------------------------------
+
+# -------------------------------------------------------------------
+# GNU SERIAL
+os.chdir('../build/')
+print('Compiling using GNU Serial')
+make_process = subprocess.Popen(["make", "clean", "all", "CC=gcc", "FC=gfortran", "TESTING_MODE=1", "OPENMP=no"], shell=False, stderr=subprocess.STDOUT, stdout=subprocess.DEVNULL)
+if make_process.wait() != 0:
+    print(bcolors.FAIL + 'GNU SERIAL FAILED' + bcolors.ENDC)
+else:
+    print(bcolors.OKGREEN + 'GNU SERIAL compiled' + bcolors.ENDC)
     os.chdir('../tests/')
     shutil.rmtree('run_gnu', ignore_errors=True)
-    os.mkdir('run_gnu')
-    os.chdir('run_gnu')
+    os.makedirs('run_gnu/serial')
+    os.chdir('run_gnu/serial')
     os.mkdir('pos')
     os.mkdir('accel')
-    shutil.copy('../../build/RUMDEED.out', './RUMDEED.out')
-    shutil.copy('../input', './input')
+    shutil.copy('../../../build/RUMDEED.out', './RUMDEED.out')
+    shutil.copy('../../input', './input')
     Vacuum_Process = subprocess.Popen("./RUMDEED.out", shell=True, stderr=subprocess.STDOUT)
     Vacuum_Process.wait()
-    os.chdir('../')
+    os.chdir('../../')
     time.sleep(5)
 
 print('')
+# -------------------------------------------------------------------
+
+# -------------------------------------------------------------------
+# GNU SERIAL
+os.chdir('../build/')
+print('Compiling using GNU OpenMP')
+make_process = subprocess.Popen(["make", "clean", "all", "CC=gcc", "FC=gfortran", "TESTING_MODE=1", "OPENMP=yes"], shell=False, stderr=subprocess.STDOUT, stdout=subprocess.DEVNULL)
+if make_process.wait() != 0:
+    print(bcolors.FAIL + 'GNU OpenMP FAILED' + bcolors.ENDC)
+else:
+    print(bcolors.OKGREEN + 'GNU OpenMP compiled' + bcolors.ENDC)
+    os.chdir('../tests/')
+    #shutil.rmtree('run_gnu', ignore_errors=True)
+    os.makedirs('run_gnu/openmp')
+    os.chdir('run_gnu/openmp')
+    os.mkdir('pos')
+    os.mkdir('accel')
+    shutil.copy('../../../build/RUMDEED.out', './RUMDEED.out')
+    shutil.copy('../../input', './input')
+    Vacuum_Process = subprocess.Popen("./RUMDEED.out", shell=True, stderr=subprocess.STDOUT)
+    Vacuum_Process.wait()
+    os.chdir('../../')
+    time.sleep(5)
+
+print('')
+# -------------------------------------------------------------------
 
 """ os.chdir('../build/')
 make_process = subprocess.Popen("make clean all install CC=gcc FC=pgfortran UNIT_TEST=1", shell=True, stderr=subprocess.STDOUT)

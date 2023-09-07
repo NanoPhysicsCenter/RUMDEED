@@ -15,8 +15,9 @@ GIT_VERSION := $(shell git describe --dirty --always --tags || echo `date +'%d/%
 
 CUBA_LIB=../cuba/lib/libcuba.a
 
-#UNIT_TEST = 1
 OPENMP ?= yes # Set to something else to disable OpenMP
+
+TESTING_MODE ?= 2 # Set to 1 to enable testing mode
 
 # Compile flags
 # UNKNOWN COMPILERS
@@ -86,10 +87,6 @@ FFLAGS+=-fopenmp
 endif
 endif
 
-ifdef UNIT_TEST
-FFLAGS+=-D_UNIT_TEST_
-endif
-
 # Chunk size for OpenMP
 #FFLAGS+=-DCHUNK_SIZE=250
 
@@ -97,23 +94,13 @@ endif
 PROJECT_NAME=RUMDEED
 
 # makefile
-all: $(PROJECT_NAME).out unit_test.out
-
-unit_test.out: $(PROJECT_NAME).out ../src/unit_tests.F90
-			$(FC) $(FFLAGS) -D_GIT_VERSION_=\"${GIT_VERSION}\" \
-			../src/unit_tests.F90 mod_global.o mod_verlet.o mod_pair.o \
-			mod_unit_tests.o mod_photo_emission.o mod_field_emission.o mod_field_emission_v2.o \
-			mod_field_thermo_emission.o mod_kevin_rjgtf.o \
-			mod_emission_tip.o mod_hyperboloid_tip.o mod_field_emission_2D.o \
-			mod_work_function.o mod_collisions.o \
-			mod_velocity.o \
-			$(CUBA_LIB) -lpthread -lm -ldl -o unit_test.out
+all: $(PROJECT_NAME).out
 
 $(PROJECT_NAME).out: ../src/main.F90 ../cuba/lib/libcuba.a \
 			mod_global.mod mod_global.o \
 			mod_verlet.mod mod_verlet.o \
 			mod_pair.mod mod_pair.o	\
-			mod_unit_tests.mod mod_unit_tests.o \
+			mod_tests.mod mod_tests.o \
 			mod_photo_emission.mod mod_photo_emission.o \
 			mod_field_emission.mod mod_field_emission.o \
 			mod_emission_tip.mod mod_emission_tip.o \
@@ -125,9 +112,9 @@ $(PROJECT_NAME).out: ../src/main.F90 ../cuba/lib/libcuba.a \
 			mod_kevin_rjgtf.mod mod_kevin_rjgtf.o \
 			mod_velocity.mod mod_velocity.o \
 			mod_manual_emission.mod mod_manual_emission.o
-		$(FC) $(FFLAGS) -D_GIT_VERSION_=\"${GIT_VERSION}\" \
+		$(FC) $(FFLAGS) -D_GIT_VERSION_=\"${GIT_VERSION}\" -D_TESTING_MODE_=${TESTING_MODE} \
 		    ../src/main.F90 mod_global.o mod_verlet.o mod_pair.o \
-			mod_unit_tests.o mod_photo_emission.o mod_field_emission.o mod_field_emission_v2.o \
+			mod_tests.o mod_photo_emission.o mod_field_emission.o mod_field_emission_v2.o \
 			mod_field_thermo_emission.o mod_kevin_rjgtf.o \
 			mod_emission_tip.o mod_hyperboloid_tip.o mod_field_emission_2D.o \
 			mod_work_function.o mod_collisions.o \
@@ -155,8 +142,8 @@ mod_verlet.mod mod_verlet.o: ../src/mod_verlet.F90 mod_global.mod mod_pair.mod m
 mod_pair.mod mod_pair.o: ../src/mod_pair.F90 mod_global.mod
 		$(FC) -c $(FFLAGS) ../src/mod_pair.F90
 
-mod_unit_tests.mod mod_unit_tests.o: ../src/mod_unit_tests.f90 mod_global.mod mod_verlet.mod mod_pair.mod mod_field_emission_v2.mod
-		$(FC) -c $(FFLAGS) ../src/mod_unit_tests.f90
+mod_tests.mod mod_tests.o: ../src/mod_tests.f90 mod_global.mod mod_verlet.mod mod_pair.mod mod_field_emission_v2.mod
+		$(FC) -c $(FFLAGS) ../src/mod_tests.f90
 
 mod_photo_emission.mod mod_photo_emission.o: ../src/mod_photo_emission.f90 mod_global.mod mod_verlet.mod mod_pair.mod mod_velocity.mod
 		$(FC) -c $(FFLAGS) ../src/mod_photo_emission.f90
@@ -199,7 +186,6 @@ clean:
 		rm -f *.mod
 		rm -f *.smod
 		rm -f $(PROJECT_NAME).out
-		rm -f unit_test.out
 		rm -f $(CUBA_LIB)
 		rm -f ../cuba/Cuba-4.2.2/libcuba.a
 		cd ../cuba/Cuba-4.2.2/ && make clean
