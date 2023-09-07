@@ -65,7 +65,7 @@ print('') """
 # GNU SERIAL
 os.chdir('../build/')
 print('Compiling using GNU Serial')
-make_process = subprocess.Popen(["make", "clean", "all", "CC=gcc-12", "FC=gfortran-12", "TESTING_MODE=1", "OPENMP=no"], shell=False, stderr=subprocess.STDOUT, stdout=subprocess.DEVNULL)
+make_process = subprocess.Popen(["make", "clean", "all", "CC=gcc", "FC=gfortran", "TESTING_MODE=1", "OPENMP=no"], shell=False, stderr=subprocess.STDOUT, stdout=subprocess.DEVNULL)
 if make_process.wait() != 0:
     print(bcolors.FAIL + 'GNU SERIAL FAILED' + bcolors.ENDC)
 else:
@@ -89,7 +89,7 @@ print('')
 # GNU SERIAL
 os.chdir('../build/')
 print('Compiling using GNU OpenMP')
-make_process = subprocess.Popen(["make", "clean", "all", "CC=gcc-12", "FC=gfortran-12", "TESTING_MODE=1", "OPENMP=yes"], shell=False, stderr=subprocess.STDOUT, stdout=subprocess.DEVNULL)
+make_process = subprocess.Popen(["make", "clean", "all", "CC=gcc", "FC=gfortran", "TESTING_MODE=1", "OPENMP=yes"], shell=False, stderr=subprocess.STDOUT, stdout=subprocess.DEVNULL)
 if make_process.wait() != 0:
     print(bcolors.FAIL + 'GNU OpenMP FAILED' + bcolors.ENDC)
 else:
