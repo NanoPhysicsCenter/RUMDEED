@@ -108,3 +108,9 @@ else:
 
 print('')
 # -------------------------------------------------------------------
+
+# -------------------------------------------------------------------
+# Clean up
+os.chdir('../build/')
+print('Cleaining up')
+make_process = subprocess.Popen(["make", "clean"], shell=False, stderr=subprocess.STDOUT, stdout=subprocess.DEVNULL)
