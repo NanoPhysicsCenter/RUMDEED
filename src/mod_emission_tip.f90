@@ -1198,7 +1198,7 @@ end function Elec_supply_tip
   !A = Tip_Area(1.0d0, max_xi, 0.0d0, 2.0d0*pi)
 
   ! Surface position
-  ! Cuba does the intergration over the hybercube.
+  ! Cuba does the integration over the hybercube.
   ! It gives us coordinates between 0 and 1.
   xi = (max_xi - 1.0d0)*xx(1) + 1.0d0
   phi = 2.0d0*pi*xx(2)
@@ -1231,7 +1231,7 @@ end function Elec_supply_tip
     ff(1) = 0.0d0
   end if
 
-  ! We mutiply with 2.0*pi (max_xi - 1.0) because Cuba does the 
+  ! We multiply with 2.0*pi (max_xi - 1.0) because Cuba does the 
   ! integration over the hybercube, i.e. from 0 to 1.
   ff(1) = 2.0d0*pi*(max_xi - 1.0d0)*ff(1)
   
@@ -1260,7 +1260,7 @@ end function Elec_supply_tip
     !A = Tip_Area(1.0d0, max_xi, 0.0d0, 2.0d0*pi)
 
     ! Surface position
-    ! Cuba does the intergration over the hybercube.
+    ! Cuba does the integration over the hybercube.
     ! It gives us coordinates between 0 and 1.
     xi = (max_xi - 1.0d0)*xx(1) + 1.0d0
     phi = 2.0d0*pi*xx(2)
@@ -1293,7 +1293,7 @@ end function Elec_supply_tip
       ff(1) = 0.0d0
     end if
 
-    ! We mutiply with 2.0*pi (max_xi - 1.0) because Cuba does the 
+    ! We multiply with 2.0*pi (max_xi - 1.0) because Cuba does the 
     ! integration over the hybercube, i.e. from 0 to 1.
     ff(1) = 2.0d0*pi*(max_xi - 1.0d0)*ff(1)
     
