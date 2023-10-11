@@ -269,7 +269,7 @@ subroutine Do_Photo_Emission_Tip(step)
   ! Check if we are doing a Gaussian distributed emission
   ! and set the max number of electrons allowed to be emitted if we are.
   ! We treat the number from the gauss distribution as a mean number of a
-  ! poission random number generator.
+  ! poisson random number generator.
   if (EmitGauss .eqv. .TRUE.) then
     maxElecEmit = Rand_Poission( Gauss_Emission(step) )
   end if
@@ -678,7 +678,7 @@ end subroutine Do_Photo_Emission_Tip
     ! Get a random initial position on the surface of the tip.
     ! We pick this location from a uniform distribution.
     count = 0
-    do ! Infinite loop, we try to find a favourable position to start from
+    do ! Infinite loop, we try to find a favorable position to start from
       CALL RANDOM_NUMBER(cur_pos(1:2))
 
       xi = (max_xi - 1.0d0)*cur_pos(1) + 1.0d0
@@ -696,7 +696,7 @@ end subroutine Do_Photo_Emission_Tip
         exit ! We found a nice spot so we exit the loop
       else
         count = count + 1
-        if (count > 10000) exit ! The loop is infnite, must stop it at some point.
+        if (count > 10000) exit ! The loop is infinite, must stop it at some point.
         ! In field emission it is rare the we reach the CL limit.
       end if
     end do
@@ -705,7 +705,7 @@ end subroutine Do_Photo_Emission_Tip
     if (eta_f < 0.0d0) then
       df_cur = Escape_Prob_tip(field(3), cur_pos)
     else
-      df_cur = 0.0d0 ! Zero escape probabilty if field is not favourable
+      df_cur = 0.0d0 ! Zero escape probability if field is not favorable
     end if
 
     !---------------------------------------------------------------------------
@@ -728,18 +728,18 @@ end subroutine Do_Photo_Emission_Tip
       field = Calc_Field_at(new_pos)
       new_eta_f = Field_normal(new_pos, field)
 
-      ! Check if the field is favourable for emission at the new position.
+      ! Check if the field is favorable for emission at the new position.
       ! If it is not then cycle, i.e. we reject this location and
       ! pick another one.
       if (new_eta_f > 0.0d0) cycle ! Do the next loop iteration, i.e. find a new position.
 
-      ! Calculate the escape probability at the new position, to compair with
+      ! Calculate the escape probability at the new position, to compar with
       ! the current position.
       df_new = Escape_Prob_Tip(new_eta_f, new_pos)
 
       ! If the escape probability is higher in the new location,
       ! then we jump to that location. If it is not then we jump to that
-      ! location with the probabilty df_new / df_cur.
+      ! location with the probability df_new / df_cur.
       if (df_new > df_cur) then
         cur_pos = new_pos ! New position becomes the current position
         df_cur = df_new
@@ -957,7 +957,7 @@ end subroutine Do_Photo_Emission_Tip
       !new_val = norm2(par_elec%accel)
       new_val = eta_f
 
-      ! Check if this point is favourable for emission
+      ! Check if this point is favorable for emission
       if ((eta_f < 0.0d0) .and. (field(3) < 0.0d0)) then
         new_val_s = +1
       else
@@ -1109,8 +1109,8 @@ end subroutine Do_Photo_Emission_Tip
   ! J = a_FN*F^2/(t_y^2*w_theta)*exp(-b_FN*w_theta^(3/2)*v_y/F)
   ! We break it into two parts
   ! J = Elec_Supply*Escape_Prob .
-  ! Elec_supply is the the part before the exponental
-  ! and Escape_prob is the exponental.
+  ! Elec_supply is the the part before the exponential
+  ! and Escape_prob is the exponential.
 
   ! The electron supply part
   ! This functions returns the number of electrons
@@ -1215,9 +1215,9 @@ end function Elec_supply_tip
   ! Add to the average field
   !F_avg = F_avg + field
 
-  ! Check if the field is favourable for emission
+  ! Check if the field is favorable for emission
   if (eta_f < 0.0d0) then
-    ! The field is favourable for emission
+    ! The field is favorable for emission
 
     ! Calculate the scale factors
     h_xi = a_foci*sqrt((xi**2 - eta_1**2)/(xi**2 - 1.0d0))
@@ -1226,7 +1226,7 @@ end function Elec_supply_tip
     ! Calculate the current density at this point
     ff(1) = Elec_Supply_tip(eta_f, par_pos) * h_xi * h_phi
   else
-    ! The field is NOT favourable for emission
+    ! The field is NOT favorable for emission
     ! This point does not contribute
     ff(1) = 0.0d0
   end if
@@ -1277,9 +1277,9 @@ end function Elec_supply_tip
     ! Add to the average field
     !F_avg = F_avg + field
 
-    ! Check if the field is favourable for emission
+    ! Check if the field is favorable for emission
     if (eta_f < 0.0d0) then
-      ! The field is favourable for emission
+      ! The field is favorable for emission
 
       ! Calculate the scale factors
       h_xi = a_foci*sqrt((xi**2 - eta_1**2)/(xi**2 - 1.0d0))
@@ -1288,7 +1288,7 @@ end function Elec_supply_tip
       ! Calculate the current density at this point
       ff(1) = Elec_Supply_tip(eta_f, par_pos)*Escape_Prob_Tip(eta_f, par_pos) * h_xi * h_phi
     else
-      ! The field is NOT favourable for emission
+      ! The field is NOT favorable for emission
       ! This point does not contribute
       ff(1) = 0.0d0
     end if
@@ -1324,7 +1324,7 @@ end function Elec_supply_tip
                                            ! with high peaks.
     character          :: statefile = "" ! File to save the state in. Empty string means don't do it.
     integer            :: spin = -1 ! Spinning cores
-    integer            :: nregions ! <out> The actual number of subregions nedded
+    integer            :: nregions ! <out> The actual number of subregions needed
     integer            :: neval ! <out> The actual number of integrand evaluations needed
     integer            :: fail ! <out> Error flag (0 = Success, -1 = Dimension out of range, >0 = Accuracy goal was not met)
     double precision, dimension(1:ncomp) :: integral ! <out> The integral of the integrand over the unit hybercube
@@ -1335,7 +1335,7 @@ end function Elec_supply_tip
     ! Initialize the average field to zero
     !F_avg = 0.0d0
 
-    ! Pass the number of the emitter being integraded over to the integrand as userdata
+    ! Pass the number of the emitter being integrated over to the integrand as userdata
     userdata = emit
 
     call suave(ndim, ncomp, integrand_cuba_fe_tip, userdata, nvec, &

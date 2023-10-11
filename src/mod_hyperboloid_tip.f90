@@ -15,7 +15,7 @@ Module mod_hyperboloid_tip
   double precision            :: eta_1 ! eta_1 = -cos(theta) defines the surface of the tip
   double precision, parameter :: eta_2 = 0.0d0 ! Defines the anode plane (should be 0)
   double precision            :: max_xi ! Max value for xi variable for the surface (tip height)
-  double precision            :: shift_z ! shift_z = a_foci*eta_1*max_xi Shift the z-coordinate uppwards. Base of tip at z = 0
+  double precision            :: shift_z ! shift_z = a_foci*eta_1*max_xi Shift the z-coordinate upwards. Base of tip at z = 0
   double precision            :: h_tip ! Height of the tip from base
   double precision            :: R_base ! Base radius
   double precision            :: pre_fac_E_tip
@@ -128,7 +128,7 @@ contains
 !       stop
 !     end if
 
-    ! Electric field for the hyperboloid gemoetry
+    ! Electric field for the hyperboloid geometry
     pre_fac_E_tip_xyz = pre_fac_E_tip * 1.0d0/(pos_pro(1)**2 - pos_pro(2)**2)
 
     ! if we are near the tip then the x and y components should be zero
