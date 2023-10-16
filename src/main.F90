@@ -17,6 +17,7 @@ program RUMDEED
   use mod_field_emission_2D
   use mod_field_thermo_emission
   !use mod_therminoic_emission
+  use mod_cylindrical_tip
   use mod_pair
   use mod_tests
   use mod_manual_emission
@@ -103,6 +104,9 @@ program RUMDEED
   case(EMISSION_FIELD_V2)
     print '(a)', 'RUMDEED: Doing Field emission V2'
     call Init_Field_Emission_v2()
+  case(EMISSION_FIELD_CYL_TIP)
+    print '(a)', 'RUMDEED: Doing Field emission from a cylindrical tip'
+    call Init_Cylindrical_Tip()
   case(EMISSION_MANUAL)
     print '(a)', 'Vacuum: Doing manual emission'
     call Init_Manual()
@@ -128,7 +132,7 @@ program RUMDEED
 
     print *, ''
 
-    cur_time = 0
+    cur_time = 0.0d0
     call Set_Voltage(0) ! Set voltage for time step 0
 
     do i = 1, steps
@@ -194,6 +198,8 @@ program RUMDEED
     call Clean_Up_Field_Thermo_Emission()
   case(EMISSION_FIELD_V2)
     call Clean_Up_Field_Emission_v2()
+  case(EMISSION_FIELD_CYL_TIP)
+    call Clean_Up_Cylindrical_Tip()
   case(EMISSION_MANUAL)
     call Clean_Up_Manual()
   END SELECT

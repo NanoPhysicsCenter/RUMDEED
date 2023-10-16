@@ -22,24 +22,26 @@ module mod_global
   ! ----------------------------------------------------------------------------
   ! Define physical constants
   ! See http://physics.nist.gov/cuu/Constants/index.html
-  double precision, parameter :: pi = 3.14159265358979324d0 ! Pi
-  double precision, parameter :: h = 6.626070040d-34 ! Planck's constant, h (Js)
-  double precision, parameter :: k_b = 1.38064852d-23 ! Boltzmann constant (J/K)
+  ! Last updated 14.10.2023
+  double precision, parameter :: pi = 3.141592653589793238462643383279502884197169399375105820974944592307816406286d0 ! Pi with 75 digits
+  double precision, parameter :: h = 6.62607015d-34 ! Planck's constant, h (Js)
+  double precision, parameter :: k_b = 1.380649d-23 ! Boltzmann constant (J/K)
   double precision, parameter :: c = 299792458.0d0 ! Speed of light (m/s)
-  double precision, parameter :: mu_0 = 4.0d0*pi * 1.0d-7 ! Vacuum permeability (H/m)
+  !double precision, parameter :: mu_0 = 4*pi * 1.0d-7 ! Vacuum permeability (H/m)
+  double precision, parameter :: mu_0 = 1.25663706212d-6 ! Vacuum permeability (H/m) (N/A^2)
   double precision, parameter :: epsilon_0 = 1.0d0/(mu_0 * c**2) ! Vacuum permittivity (F/m)
   !double precision, parameter :: epsilon_0 = 8.854187817d-12 ! Farads / meters
   double precision, parameter :: epsilon = epsilon_r * epsilon_0 ! Permittivity
-  double precision, parameter :: m_u = 1.660539040d-27 ! Atomic mass unit (kg)
-  double precision, parameter :: h_bar = 1.054571726d-34 ! Planck's constant, h/(2*pi) (Js)
+  double precision, parameter :: m_u = 1.66053906660d-27 ! Atomic mass unit (kg)
+  double precision, parameter :: h_bar = h/(2.0d0*pi) ! Reduced Planck's constant, h/(2*pi) (Js)
 
-  double precision, parameter :: m_0 = 9.10938356d-31 ! Free electron mass (kg)
+  double precision, parameter :: m_0 = 9.1093837015d-31 ! Free electron mass (kg)
   !double precision, parameter :: m_e = m_eeff * m_0 ! m_e* Effective electron mass (kg)
   !double precision, parameter :: m_h = m_heff * m_0! m_h* Effective hole mass (kg)
 
-  double precision, parameter :: m_N2p = 14.0067d0*m_u - m_0 ! Mass of N_2^+ ion (kg)
+  double precision, parameter :: m_N2p = 2*14.00674d0*m_u - m_0 ! Mass of N_2^+ ion (kg)
 
-  double precision, parameter :: q_0 = 1.6021766208d-19 ! Elementary charge (C)
+  double precision, parameter :: q_0 = 1.602176634d-19 ! Elementary charge (C)
   double precision, parameter :: q_02 = q_0**2 ! Elementary charge squared (C)
 
   double precision, parameter :: T_ntp = 293.15d0 ! Normal temperature in Kelvin (NIST)
@@ -56,13 +58,15 @@ module mod_global
 
   ! ----------------------------------------------------------------------------
   ! Parameters for the surface integration using CUBA
-  integer            :: cuba_method = 1 ! Method to use
+  integer            :: cuba_method = 2 ! Method to use
   integer, parameter :: cuba_method_suave = 1
   integer, parameter :: cuba_method_divonne = 2
   double precision   :: cuba_epsabs = 1.0d-4 ! Requested absolute error
   double precision   :: cuba_epsrel = 1.0d-2 ! Requested relative error
-  integer            :: cuba_maxeval = 10000000 ! Maximum number of integrand evaluations
-  integer            :: cuba_mineval = 1000 ! Minimum number of integrand evaluations
+  !double precision   :: cuba_epsabs = 1.0d-8 ! Requested absolute error
+  !double precision   :: cuba_epsrel = 1.0d-14 ! Requested relative error
+  integer            :: cuba_maxeval = 5000000 ! Maximum number of integrand evaluations
+  integer            :: cuba_mineval = 100000 ! Minimum number of integrand evaluations
 
 
   ! ----------------------------------------------------------------------------
@@ -210,6 +214,7 @@ module mod_global
   integer, parameter :: EMISSION_FIELD_2D_DIRAC_NC = 8 ! Field emission from 2D material
   integer, parameter :: EMISSION_FIELD_THERMO      = 9 ! Planar Field + Thermionic emission
   integer, parameter :: EMISSION_FIELD_V2          = 10 ! Development emission
+  integer, parameter :: EMISSION_FIELD_CYL_TIP     = 11 ! Field emission from a cylindrical tip
   integer, parameter :: EMISSION_MANUAL            = 999 ! Manual placement of electrons for testing/debuging
 
   integer            :: EMISSION_MODE           ! Parameter that defines the emission mode
@@ -314,7 +319,7 @@ module mod_global
       integer, intent(in) :: i
     end subroutine Check_Boundary
 
-    pure function Electric_Field(pos) result(field_E)
+    function Electric_Field(pos) result(field_E)
       double precision, dimension(1:3), intent(in) :: pos
       double precision, dimension(1:3)             :: field_E
     end function Electric_Field
@@ -326,15 +331,15 @@ module mod_global
     function Image_Charge_effect(pos_1, pos_2)
       double precision, dimension(1:3)             :: Image_Charge_effect
       double precision, dimension(1:3), intent(in) :: pos_1, pos_2
-   end function Image_Charge_effect
+    end function Image_Charge_effect
 
-   function Get_Emission_Velocity()
+    function Get_Emission_Velocity()
       double precision, dimension(1:3) :: Get_Emission_Velocity
-   end function Get_Emission_Velocity
+    end function Get_Emission_Velocity
 
-   function Get_Photo_Emission_Energy()
+    function Get_Photo_Emission_Energy()
       double precision                 :: Get_Photo_Emission_Energy
-   end function Get_Photo_Emission_Energy
+    end function Get_Photo_Emission_Energy
   end interface
 
   ! Pointers
