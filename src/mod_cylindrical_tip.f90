@@ -8,7 +8,7 @@ Module mod_cylindrical_tip
     use mod_global
     use mod_verlet
     use mod_pair
-    use mod_work_function
+    !use mod_work_function
     use kdtree2_precision_module
     use kdtree2_module
     use, intrinsic :: ieee_arithmetic, only: ieee_value, ieee_signaling_nan
@@ -24,6 +24,28 @@ Module mod_cylindrical_tip
     double precision, dimension(:, :), allocatable :: kd_mesh ! Mesh for the KD-tree
     double precision, dimension(:, :), allocatable :: kd_data ! Data for the KD-tree
 
+    ! Declare type to store the kd-tree for the image charges
+    ! This is a workaround since we cannot declare an array of pointers in Fortran
+    type :: tree_pointer
+      integer :: thread_id ! Thread ID
+      type(kdtree2), pointer :: kd_tree => null() ! KD-tree for the image charges
+    end type
+    
+    type(tree_pointer), dimension(:), allocatable :: kd_tree_image ! KD-tree array for the image charges
+    double precision, dimension(:, :), allocatable :: kd_image_elec_pos ! Positions of the electron in image charge data
+
+    ! Positions of the image charges and the electron
+    ! Cylindrical coordinates (r, z)
+    double precision, dimension(:, :), allocatable :: kd_image_one_pos ! Data for image charge 1
+    double precision, dimension(:, :), allocatable :: kd_image_two_pos ! Data for image charge 2
+    double precision, dimension(:, :), allocatable :: kd_image_three_pos ! Data for image charge 3
+
+    ! Data for the image charges
+    ! (G, F) see notes for details
+    double precision, dimension(:, :), allocatable :: kd_image_one_data ! Data for image charge 1
+    double precision, dimension(:, :), allocatable :: kd_image_two_data ! Data for image charge 2
+    double precision, dimension(:, :), allocatable :: kd_image_three_data ! Data for image charge 3
+
     ! ----------------------------------------------------------------------------
     ! Variables
     integer, dimension(:), allocatable :: nrEmitted_emitters
@@ -33,7 +55,7 @@ Module mod_cylindrical_tip
     double precision, parameter :: length_scale_cyl = 1.0d-6 ! Length scale for the cylindrical tip
     double precision, parameter :: radius_cyl = 12.0d0*length_scale_cyl ! Radius of the cylinder
     double precision, parameter :: height_cyl = 100.0d0*length_scale_cyl ! Height of the cylinder
-    double precision, parameter :: radius_cor = 1.0d0*length_scale_cyl ! Radius of the corner
+    double precision, parameter :: radius_cor = 4.0d0*length_scale_cyl/pi ! Radius of the corner
 
     integer, parameter          :: sec_top = 1 ! Top section
     integer, parameter          :: sec_side = 2 ! Side section
@@ -96,7 +118,7 @@ subroutine Init_Cylindrical_Tip()
     allocate(nrEmitted_emitters(1:nrEmit))
 
     ! Function that checks the boundary conditions for the System
-    ptr_Check_Boundary => Check_Boundary_Planar ! Check_Boundary_Cylinder
+    ptr_Check_Boundary => Check_Boundary_Cylinder
 
     ! Function for the electric field in the system
     ptr_field_E => field_E_cylinder
@@ -107,7 +129,7 @@ subroutine Init_Cylindrical_Tip()
     ! The function to do image charge effects
     ptr_Image_Charge_effect => Force_Image_charges_v2 ! Force_Image_charges for the cylinder
 
-    call Read_work_function()
+    !call Read_work_function()
 
     ! Parameters used in the module
     time_step_div_q0 = time_step / q_0
@@ -116,7 +138,7 @@ subroutine Init_Cylindrical_Tip()
     call Create_KD_Tree()
 
     ! ! Open the file for debugging
-    ! open(newunit=ud_cyl_debug, file='cyl_debug.dt', status='replace', action='write')
+    open(newunit=ud_cyl_debug, file='cyl_debug.dt', status='replace', action='write')
 
     ! ! Debugging the kd-tree, its data and interpolation
     ! pos_test(1) = -0.011920996665774017d0*1.0d-3
@@ -155,9 +177,10 @@ end subroutine Init_Cylindrical_Tip
 !-------------------------------------------!
 ! Create the K-dimensional tree using the kdtree2 module
 subroutine Create_KD_Tree()
-    character (len=*), parameter :: filename_meshdata="Cyl_mesh_data.txt"
+    character (len=*), parameter :: filename_meshdata = "Cyl_mesh_data.txt"
+    character (len=*), parameter :: filename_imagedata = "image_charge_data.txt"
     integer                      :: IFAIL
-    integer                      :: ud_meshdata
+    integer                      :: ud_meshdata, ud_imagedata
     integer                      :: n_points, k
 
     ! Read the mesh and data from file
@@ -176,18 +199,19 @@ subroutine Create_KD_Tree()
       n_points = n_points + 1
     end do
 
-    ! Allocate the array to hold the file
-    allocate(kd_mesh(1:3, 1:n_points))
-    allocate(kd_data(1:3, 1:n_points))
-
     ! Rewind to the start of the file
     rewind(ud_meshdata)
 
+    ! Allocate the arrays to hold the file
+    allocate(kd_mesh(1:3, 1:n_points))
+    allocate(kd_data(1:3, 1:n_points))
+
     ! Read the file into the array and scale the coordinates from mm to m
     do k = 1, n_points
-        read(ud_meshdata, *) kd_mesh(1, k), kd_mesh(2, k), kd_mesh(3, k), kd_data(1, k), kd_data(2, k), kd_data(3, k)
-        ! Convert from mm to m
-        kd_mesh(:, k) = kd_mesh(:, k) * 1.0d-3
+      read(ud_meshdata, *) kd_mesh(1, k), kd_mesh(2, k), kd_mesh(3, k), kd_data(1, k), kd_data(2, k), kd_data(3, k)
+    
+      ! Convert from mm to m
+      kd_mesh(:, k) = kd_mesh(:, k) * 1.0d-3
     end do
 
     ! Close the file
@@ -195,6 +219,56 @@ subroutine Create_KD_Tree()
 
     ! Create the kd-tree
     kd_tree => kdtree2_create(kd_mesh, sort=.true., rearrange=.true.)
+
+    ! Read the image charge data from file
+    ! Open the file for reading
+    open(newunit=ud_imagedata, iostat=IFAIL, file=filename_imagedata, status='OLD', action='READ')
+
+    ! Count the number of lines in the file
+    n_points = 0
+    do
+      read(ud_imagedata, *, iostat=IFAIL)
+      if (IFAIL /= 0) exit
+      n_points = n_points + 1
+    end do
+
+    ! Rewind to the start of the file
+    rewind(ud_meshdata)
+
+    ! Allocate the arrays to hold the file
+    allocate(kd_image_elec_pos(1:2, 1:n_points))
+    allocate(kd_image_one_pos(1:2, 1:n_points))
+    allocate(kd_image_two_pos(1:2, 1:n_points))
+    allocate(kd_image_three_pos(1:2, 1:n_points))
+    allocate(kd_image_one_data(1:2, 1:n_points))
+    allocate(kd_image_two_data(1:2, 1:n_points))
+    allocate(kd_image_three_data(1:2, 1:n_points))
+
+    ! Read the file into the array and scale the coordinates from mm to m
+    do k = 1, n_points
+      ! Columns: r0, z0, r1, z1, G1, F1, r2, z2, G2, F2, r3, z3, G3, F3
+      read(ud_imagedata, *) kd_image_elec_pos(1, k), kd_image_elec_pos(2, k), &
+                            kd_image_one_pos(1, k), kd_image_one_pos(2, k), kd_image_one_data(1, k), kd_image_one_data(2, k), &
+                            kd_image_two_pos(1, k), kd_image_two_pos(2, k), kd_image_two_data(1, k), kd_image_two_data(2, k), &
+                            kd_image_three_pos(1, k), kd_image_three_pos(2, k), kd_image_three_data(1, k), kd_image_three_data(2, k)
+      
+      ! Convert from mm to m
+      kd_image_elec_pos(:, k) = kd_image_elec_pos(:, k) * 1.0d-3
+      kd_image_one_pos(:, k) = kd_image_one_pos(:, k) * 1.0d-3
+      kd_image_two_pos(:, k) = kd_image_two_pos(:, k) * 1.0d-3
+    end do
+
+    ! Close the file
+    close(unit=ud_imagedata, iostat=IFAIL, status='keep')
+
+    ! Create the kd-tree's for the image charges
+    ! One tree per OpenMP thread (The KD-Tree is not thread safe)
+    allocate(kd_tree_image(1:nthreads))
+    do k = 1, nthreads
+      kd_tree_image(k)%thread_id = k
+      kd_tree_image(k)%kd_tree => kdtree2_create(kd_image_elec_pos, sort=.true., rearrange=.true.)
+    end do
+
 end subroutine Create_KD_Tree
 
 function field_E_cylinder(pos) result(field_E)
@@ -236,8 +310,49 @@ function field_E_cylinder(pos) result(field_E)
     do k = 1, nn
         field_E = field_E + w(k) * kd_data(:, kd_results(k)%idx)
     end do
-    field_E = field_E * 0.25d2 ! Debug to make field larger
+    field_E = field_E * 0.20d2 ! Debug to make field larger
 end function field_E_cylinder
+
+subroutine Check_Boundary_Cylinder(i)
+  integer, intent(in) :: i
+  double precision    :: x, y, z, r2, RR
+
+  ! Get the position of the particle
+  x = particles_cur_pos(1, i)
+  y = particles_cur_pos(2, i)
+  z = particles_cur_pos(3, i)
+
+  ! Calculate the distance from the center of the cylinder
+  r2 = x**2 + y**2
+
+  ! Check if the particle should be removed from the system
+
+  ! Check top and bottom plates
+  if (z < 0.0d0) then
+      call Mark_Particles_Remove(i, remove_bot)
+  else if (z > box_dim(3)) then
+      call Mark_Particles_Remove(i, remove_top)
+  else if (z > 0.0d0 .and. z < (height_cyl - radius_cor)) then ! Check if the particle is inside the cylinder
+    ! Check cylinder
+      if (r2 < radius_cyl**2) then
+          call Mark_Particles_Remove(i, remove_bot)
+      end if
+  else if (z > (height_cyl - radius_cor) .and. z < height_cyl) then ! Check if the particle is inside the torus (corner)
+    ! Check corner
+    if ((radius_cyl - radius_cor - sqrt(r2))**2 + (z - (height_cyl - radius_cor))**2 < radius_cor**2) then
+      call Mark_Particles_Remove(i, remove_bot)
+    else if (r2 < (radius_cyl - radius_cor)**2) then ! Cylinder inside the torus!
+      call Mark_Particles_Remove(i, remove_bot)
+    end if
+
+    ! Check the top of the corner
+    RR = radius_cyl - radius_cor + sqrt(radius_cor**2 - (z - (height_cyl - radius_cor))**2)
+    if (r2 < RR**2) then
+      call Mark_Particles_Remove(i, remove_bot)
+    end if
+  end if
+
+end subroutine Check_Boundary_Cylinder
 
 subroutine Do_Field_Emission_Cylinder(step)
     integer, intent(in) :: step
@@ -265,6 +380,8 @@ subroutine Do_Field_Emission_Cylinder(step)
     nrElecEmit = 0
     nrEmitted_emitters(emit) = 0
 
+    Df_avg = 0.0d0
+    i = 0
     ! Loop over the electrons to be emitted.
     do s = 1, N_round
         ! Get the position of the particle
@@ -282,10 +399,15 @@ subroutine Do_Field_Emission_Cylinder(step)
           stop
         else
           D_f = Escape_Prob_log(F_norm, par_pos)
+          !D_f = Escape_Prob(F_norm, par_pos)
+          !D_f = 1.0d-4 ! Set the escape probability to a small number for debugging
+          Df_avg = Df_avg + exp(D_f)
+          !df_avg = df_avg + exp(D_f)
+          i = i + 1
         end if
-        df_avg = df_avg + exp(D_f)
-  
-        CALL RANDOM_NUMBER(rnd)
+
+        call RANDOM_NUMBER(rnd)
+        !if (rnd <= D_f) then
         if (log(rnd) <= D_f) then
           ! Calculate the position of the particle (1 nm above the surface)
           par_pos = par_pos + n_vec*length_scale
@@ -299,6 +421,13 @@ subroutine Do_Field_Emission_Cylinder(step)
           nrEmitted_emitters(emit) = nrEmitted_emitters(emit) + 1
         end if
       end do
+
+      Df_avg = Df_avg / dble(i)
+      print *, 'df_avg = ', Df_avg
+      if (Df_avg > 1.0d-4) then
+        print *, 'RUMDEED: Df_avg > 1.0d-4 (Do_Field_Emission_Cylinder)'
+        cought_stop_signal = .true.
+      end if
 
     write (ud_emit, "(E14.6, *(tr8, i6))", iostat=IFAIL) cur_time, step, nrElecEmit, nrElec, &
                                                        & (nrEmitted_emitters(i), i = 1, nrEmit)
@@ -384,6 +513,8 @@ subroutine Metropolis_Hastings_cyl_tip(ndim_in, F_out, F_norm_out, pos_xyz_out, 
     pos_xyz_out = pos_xyz_cur
     sec_out = sec_cur
     n_vec = surface_normal(pos_xyz_cur, pos_cur, sec_cur)
+
+    write(ud_cyl_debug, *) pos_xyz_cur, pos_cur, sec_cur, n_vec
 end subroutine Metropolis_Hastings_cyl_tip
 
 subroutine Jump_MH(pos_cur, sec_cur, pos_new, sec_new)
@@ -794,6 +925,8 @@ end function Convert_to_xyz
 ! Clean up the cylinder emission
 subroutine Clean_Up_Cylindrical_Tip()
     deallocate(nrEmitted_emitters)
+
+    close(unit=ud_cyl_debug)
 end subroutine Clean_Up_Cylindrical_Tip
 
 !-------------------------------------------!
@@ -829,11 +962,11 @@ subroutine Do_Surface_Integration(N_sup)
   double precision function v_y(F, pos)
     double precision, intent(in)                 :: F
     double precision, dimension(1:3), intent(in) :: pos
-    integer                                      :: emit = 1
+    !integer                                      :: emit = 1
     double precision                             :: l
 
     if (image_charge .eqv. .true.) then
-      l = l_const * (-1.0d0*F) / w_theta_xy(pos, emit)**2 ! l = y^2, y = 3.79E-4 * sqrt(F_old) / w_theta
+      l = l_const * (-1.0d0*F) / w_theta_pos_tip(pos)**2 ! l = y^2, y = 3.79E-4 * sqrt(F_old) / w_theta
       if (l > 1.0d0) then
         l = 1.0d0
       end if
@@ -846,11 +979,11 @@ subroutine Do_Surface_Integration(N_sup)
   double precision function t_y(F, pos)
     double precision, intent(in)                 :: F
     double precision, dimension(1:3), intent(in) :: pos
-    integer                                      :: emit = 1
+    !integer                                      :: emit = 1
     double precision                             :: l
 
     if (image_charge .eqv. .true.) then
-      l = l_const * (-1.0d0*F) / w_theta_xy(pos, emit)**2 ! l = y^2, y = 3.79E-4 * sqrt(F_old) / w_theta
+      l = l_const * (-1.0d0*F) / w_theta_pos_tip(pos)**2 ! l = y^2, y = 3.79E-4 * sqrt(F_old) / w_theta
       if (l > 1.0d0) then
         print *, 'Error: l > 1.0'
         print *, 'l = ', l, ', F = ', F, ', t_y = ', t_y
@@ -872,19 +1005,27 @@ subroutine Do_Surface_Integration(N_sup)
   double precision function Escape_Prob(F, pos)
     double precision, intent(in)                 :: F
     double precision, dimension(1:3), intent(in) :: pos
-    integer                                      :: emit = 1
+    !integer                                      :: emit = 1
 
-    Escape_Prob = exp(b_FN * (sqrt(w_theta_xy(pos, emit)))**3 * v_y(F, pos) / (-1.0d0*F))
-
+    Escape_Prob = exp(b_FN * (sqrt(w_theta_pos_tip(pos)))**3 * v_y(F, pos) / abs(F))
+    if (Escape_Prob > 1.0d0) then
+      print *, 'Escape_prob is larger than 1.0'
+      print *, 'Escape_prob = ', Escape_Prob
+      print *, ''
+    else if (Escape_Prob < 0.0d0) then
+      print *, 'Escape_prob is smaller than 0.0'
+      print *, 'Escape_prob = ', Escape_Prob
+      print *, ''
+    end if
   end function Escape_Prob
 
   ! Returns the log of the escape probability.
   double precision function Escape_Prob_log(F, pos)
     double precision, intent(in)                 :: F
     double precision, dimension(1:3), intent(in) :: pos
-    integer                                      :: emit = 1
+    !integer                                      :: emit = 1
 
-    Escape_Prob_log = b_FN * (sqrt(w_theta_xy(pos, emit)))**3 * v_y(F, pos) / (-1.0d0*F)
+    Escape_Prob_log = b_FN * (sqrt(w_theta_pos_tip(pos)))**3 * v_y(F, pos) / (-1.0d0*F)
 
   end function Escape_Prob_log
 
@@ -896,10 +1037,16 @@ subroutine Do_Surface_Integration(N_sup)
   double precision function Elec_Supply_V2(F, pos)
     double precision, dimension(1:3), intent(in) :: pos
     double precision,                 intent(in) :: F
-    integer                                      :: emit = 1
+    !integer                                      :: emit = 1
 
-    Elec_Supply_V2 = time_step_div_q0 * a_FN/(t_y(F, pos)**2*w_theta_xy(pos, emit)) * F**2
+    Elec_Supply_V2 = time_step_div_q0 * a_FN/(t_y(F, pos)**2*w_theta_pos_tip(pos)) * F**2
   end function Elec_Supply_V2
+
+  double precision function w_theta_pos_tip(pos)
+    double precision, dimension(1:3), intent(in) :: pos
+
+    w_theta_pos_tip = 4.65d0
+  end function w_theta_pos_tip
 
   !-----------------------------------------------------------------------------
   ! Gives the component of the field normal to the surface
@@ -909,8 +1056,9 @@ subroutine Do_Surface_Integration(N_sup)
     double precision                             :: Field_normal
     double precision, dimension(1:3)             :: unit_vec
 
-    unit_vec = surface_normal(par_xyz_pos, par_pos_org, sec_in)
-    Field_normal = dot_product(unit_vec, field_E)
+    !unit_vec = surface_normal(par_xyz_pos, par_pos_org, sec_in)
+    !Field_normal = dot_product(unit_vec, field_E)
+    Field_normal = -1.0d0*sqrt(field_E(1)**2 + field_E(2)**2 + field_E(3)**2) ! Field magnitude for debugging
   end function Field_normal
 
   !-----------------------------------------------------------------------------

@@ -40,7 +40,7 @@ program RUMDEED
 #endif
 
 
-  integer                 :: i, nthreads
+  integer                 :: i
   integer, dimension(1:9) :: progress
   integer, dimension(8)   :: values ! Date and time
 

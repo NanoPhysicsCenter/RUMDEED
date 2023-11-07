@@ -293,6 +293,7 @@ module mod_global
   ! Other
   logical            :: cought_stop_signal = .false. ! If true we stop the main loop
   integer, parameter :: SIGINT = 2 ! Interrupt signal (Ctrl+C)
+  integer            :: nthreads ! Number of OpenMP threads
 
   ! Units tests
   double precision, parameter :: tolerance_rel = 0.02d0 ! 2% relative error tolerance
@@ -311,7 +312,7 @@ module mod_global
                    planes_N, planes_z
 
   ! ----------------------------------------------------------------------------
-  ! Prodecure interfaces and pointers
+  ! Procedure interfaces and pointers
   ! These are subroutines/functions that change depending on the type of
   ! emission / geometry used.
   interface

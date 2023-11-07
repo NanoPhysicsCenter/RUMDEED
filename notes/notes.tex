@@ -881,6 +881,11 @@ For this section we use toroidal coordinates \((\rho,\, \phi,\, \theta)\)
   z &= b - \rho + \rho\sin{\theta}\, ,
 \end{align}
 where \(\theta \in [0,\, \pi/2]\) and \(\phi \in [0,\, 2\pi]\). In our geometry \(\rho\) has a fixed value.
+
+A Point inside the Torus will satisfy
+\begin{equation}
+  \left( R_0 - \sqrt{x^2 + y^2} \right)^2 + \left( z - (b - \rho)\right)^2 < \rho^2\, .
+\end{equation}
 %
 \subsection{Arc length}
 Arc lengths used for tuning the step size in the MH algorithm. The Pythagorean theorem is used to calculate the distance between two points.
