@@ -58,9 +58,10 @@ module mod_global
 
   ! ----------------------------------------------------------------------------
   ! Parameters for the surface integration using CUBA
-  integer            :: cuba_method = 2 ! Method to use
   integer, parameter :: cuba_method_suave = 1
   integer, parameter :: cuba_method_divonne = 2
+  integer            :: cuba_method = cuba_method_divonne ! Method to use
+
   double precision   :: cuba_epsabs = 1.0d-4 ! Requested absolute error
   double precision   :: cuba_epsrel = 1.0d-2 ! Requested relative error
   !double precision   :: cuba_epsabs = 1.0d-8 ! Requested absolute error
@@ -331,7 +332,7 @@ module mod_global
 
     function Image_Charge_effect(pos_1, pos_2)
       double precision, dimension(1:3)             :: Image_Charge_effect
-      double precision, dimension(1:3), intent(in) :: pos_1, pos_2
+      double precision, dimension(1:3), intent(in) :: pos_1, pos_2 ! Image charge effects of pos_2 on pos_1
     end function Image_Charge_effect
 
     function Get_Emission_Velocity()

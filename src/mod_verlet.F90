@@ -484,7 +484,8 @@ contains
   ! F = (pos_1 - pos_ic)/r**3
   ! i.e. without q_1*q_2/(4\pi\epsilon_0)
   function Force_Image_charges_v2(pos_1, pos_2)
-    double precision, intent(in), dimension(1:3) :: pos_1, pos_2
+    double precision, intent(in), dimension(1:3) :: pos_1 ! Position of the particle we are calculating the force/acceleration on
+    double precision, intent(in), dimension(1:3) :: pos_2 ! Position of the particle that is acting on the particle at pos_1
     double precision, dimension(1:3)             :: Force_Image_charges_v2
     integer                                      :: n
     double precision, dimension(1:3)             :: pos_ic, diff

@@ -502,7 +502,7 @@ module kdtree2_module
   ! Return points within a fixed ball of arb vector/extant point 
   !
   public :: kdtree2_sort_results
-  ! Sort, in order of increasing distance, rseults from above.
+  ! Sort, in order of increasing distance, results from above.
   !
   public :: kdtree2_r_count, kdtree2_r_count_around_point 
   ! Count points within a fixed ball of arb vector/extant point 

@@ -6,6 +6,9 @@
 
 Module mod_cylindrical_tip
     use mod_global
+#if defined(_OPENMP)
+    use omp_lib
+#endif
     use mod_verlet
     use mod_pair
     !use mod_work_function
@@ -32,6 +35,7 @@ Module mod_cylindrical_tip
     end type
     
     type(tree_pointer), dimension(:), allocatable :: kd_tree_image ! KD-tree array for the image charges
+    type(kdtree2), pointer :: kd_tree_image_single => null() ! KD-tree for the image charges
     double precision, dimension(:, :), allocatable :: kd_image_elec_pos ! Positions of the electron in image charge data
 
     ! Positions of the image charges and the electron
@@ -42,9 +46,9 @@ Module mod_cylindrical_tip
 
     ! Data for the image charges
     ! (G, F) see notes for details
-    double precision, dimension(:, :), allocatable :: kd_image_one_data ! Data for image charge 1
-    double precision, dimension(:, :), allocatable :: kd_image_two_data ! Data for image charge 2
-    double precision, dimension(:, :), allocatable :: kd_image_three_data ! Data for image charge 3
+    double precision, dimension(:), allocatable :: kd_image_one_data ! Data for image charge 1
+    double precision, dimension(:), allocatable :: kd_image_two_data ! Data for image charge 2
+    double precision, dimension(:), allocatable :: kd_image_three_data ! Data for image charge 3
 
     ! ----------------------------------------------------------------------------
     ! Variables
@@ -55,7 +59,7 @@ Module mod_cylindrical_tip
     double precision, parameter :: length_scale_cyl = 1.0d-6 ! Length scale for the cylindrical tip
     double precision, parameter :: radius_cyl = 12.0d0*length_scale_cyl ! Radius of the cylinder
     double precision, parameter :: height_cyl = 100.0d0*length_scale_cyl ! Height of the cylinder
-    double precision, parameter :: radius_cor = 4.0d0*length_scale_cyl/pi ! Radius of the corner
+    double precision, parameter :: radius_cor = 1.0d0*length_scale_cyl ! Radius of the corner
 
     integer, parameter          :: sec_top = 1 ! Top section
     integer, parameter          :: sec_side = 2 ! Side section
@@ -101,7 +105,7 @@ Module mod_cylindrical_tip
 
     ! ----------------------------------------------------------------------------
     ! Variables for the Metropolis-Hastings algorithm
-    integer, parameter                 :: N_MH_step = 25 ! Number of steps to do in the MH algorithm
+    integer, parameter                 :: N_MH_step = 55 ! Number of steps to do in the MH algorithm
 
 contains
 
@@ -127,7 +131,8 @@ subroutine Init_Cylindrical_Tip()
     ptr_Do_Emission => Do_Field_Emission_Cylinder
 
     ! The function to do image charge effects
-    ptr_Image_Charge_effect => Force_Image_charges_v2 ! Force_Image_charges for the cylinder
+    ptr_Image_Charge_effect => Image_Charge_cylinder ! Force_Image_charges for the cylinder
+    !ptr_Image_Charge_effect => Force_Image_charges_v2
 
     !call Read_work_function()
 
@@ -218,11 +223,15 @@ subroutine Create_KD_Tree()
     close(unit=ud_meshdata, iostat=IFAIL, status='keep')
 
     ! Create the kd-tree
-    kd_tree => kdtree2_create(kd_mesh, sort=.true., rearrange=.true.)
+    kd_tree => kdtree2_create(kd_mesh, sort=.false., rearrange=.true.)
 
     ! Read the image charge data from file
     ! Open the file for reading
     open(newunit=ud_imagedata, iostat=IFAIL, file=filename_imagedata, status='OLD', action='READ')
+    if (IFAIL /= 0) then
+      print '(a)', 'RUMDEED: ERROR UNABLE TO OPEN file ', filename_imagedata
+      stop
+    end if
 
     ! Count the number of lines in the file
     n_points = 0
@@ -232,6 +241,8 @@ subroutine Create_KD_Tree()
       n_points = n_points + 1
     end do
 
+    !print *, 'n_points = ', n_points
+
     ! Rewind to the start of the file
     rewind(ud_meshdata)
 
@@ -240,22 +251,31 @@ subroutine Create_KD_Tree()
     allocate(kd_image_one_pos(1:2, 1:n_points))
     allocate(kd_image_two_pos(1:2, 1:n_points))
     allocate(kd_image_three_pos(1:2, 1:n_points))
-    allocate(kd_image_one_data(1:2, 1:n_points))
-    allocate(kd_image_two_data(1:2, 1:n_points))
-    allocate(kd_image_three_data(1:2, 1:n_points))
+    allocate(kd_image_one_data(1:n_points))
+    allocate(kd_image_two_data(1:n_points))
+    allocate(kd_image_three_data(1:n_points))
 
     ! Read the file into the array and scale the coordinates from mm to m
     do k = 1, n_points
-      ! Columns: r0, z0, r1, z1, G1, F1, r2, z2, G2, F2, r3, z3, G3, F3
+      !print *, 'k = ', k
+      ! Columns: r0, z0, r1, z1, Q1, r2, z2, Q2, r3, z3, Q3
       read(ud_imagedata, *) kd_image_elec_pos(1, k), kd_image_elec_pos(2, k), &
-                            kd_image_one_pos(1, k), kd_image_one_pos(2, k), kd_image_one_data(1, k), kd_image_one_data(2, k), &
-                            kd_image_two_pos(1, k), kd_image_two_pos(2, k), kd_image_two_data(1, k), kd_image_two_data(2, k), &
-                            kd_image_three_pos(1, k), kd_image_three_pos(2, k), kd_image_three_data(1, k), kd_image_three_data(2, k)
+                            kd_image_one_pos(1, k), kd_image_one_pos(2, k), kd_image_one_data(k), &
+                            kd_image_two_pos(1, k), kd_image_two_pos(2, k), kd_image_two_data(k), &
+                            kd_image_three_pos(1, k), kd_image_three_pos(2, k), kd_image_three_data(k)
+
+      !print *, 'kd_image_elec_pos(:, k) = ', kd_image_elec_pos(:, k)
+      !print *, 'kd_image_one_pos(:, k) = ', kd_image_one_pos(:, k)
+      !print *, 'kd_image_two_pos(:, k) = ', kd_image_two_pos(:, k)
+      !print *, 'kd_image_three_pos(:, k) = ', kd_image_three_pos(:, k)
+
+      !print *, ''
       
       ! Convert from mm to m
       kd_image_elec_pos(:, k) = kd_image_elec_pos(:, k) * 1.0d-3
       kd_image_one_pos(:, k) = kd_image_one_pos(:, k) * 1.0d-3
       kd_image_two_pos(:, k) = kd_image_two_pos(:, k) * 1.0d-3
+      kd_image_three_pos(:, k) = kd_image_three_pos(:, k) * 1.0d-3
     end do
 
     ! Close the file
@@ -263,11 +283,13 @@ subroutine Create_KD_Tree()
 
     ! Create the kd-tree's for the image charges
     ! One tree per OpenMP thread (The KD-Tree is not thread safe)
-    allocate(kd_tree_image(1:nthreads))
-    do k = 1, nthreads
-      kd_tree_image(k)%thread_id = k
-      kd_tree_image(k)%kd_tree => kdtree2_create(kd_image_elec_pos, sort=.true., rearrange=.true.)
-    end do
+    !allocate(kd_tree_image(1:nthreads))
+    !do k = 1, nthreads
+    !  kd_tree_image(k)%thread_id = k
+    !  kd_tree_image(k)%kd_tree => kdtree2_create(kd_image_elec_pos, sort=.false., rearrange=.true.)
+    !end do
+
+    kd_tree_image_single => kdtree2_create(kd_image_elec_pos, sort=.false., rearrange=.true.)
 
 end subroutine Create_KD_Tree
 
@@ -310,7 +332,7 @@ function field_E_cylinder(pos) result(field_E)
     do k = 1, nn
         field_E = field_E + w(k) * kd_data(:, kd_results(k)%idx)
     end do
-    field_E = field_E * 0.20d2 ! Debug to make field larger
+    field_E = field_E * 0.40d1 ! Debug to make field larger
 end function field_E_cylinder
 
 subroutine Check_Boundary_Cylinder(i)
@@ -401,7 +423,13 @@ subroutine Do_Field_Emission_Cylinder(step)
           D_f = Escape_Prob_log(F_norm, par_pos)
           !D_f = Escape_Prob(F_norm, par_pos)
           !D_f = 1.0d-4 ! Set the escape probability to a small number for debugging
-          Df_avg = Df_avg + exp(D_f)
+          !print *, 'D_f = ', D_f
+          if (D_f < -500.0d0) then
+            Df_avg = Df_avg + 0.0d0
+          else
+            Df_avg = Df_avg + exp(D_f)
+          end if
+          !Df_avg = Df_avg + exp(D_f)
           !df_avg = df_avg + exp(D_f)
           i = i + 1
         end if
@@ -930,6 +958,91 @@ subroutine Clean_Up_Cylindrical_Tip()
 end subroutine Clean_Up_Cylindrical_Tip
 
 !-------------------------------------------!
+! Image charge effect
+function Image_Charge_cylinder(pos_1, pos_2)
+  double precision, dimension(1:3)             :: Image_Charge_cylinder ! Image charge effect
+  double precision, intent(in), dimension(1:3) :: pos_1 ! Position of the particle we are calculating the force/acceleration on
+  double precision, intent(in), dimension(1:3) :: pos_2 ! Position of the particle that is acting on the particle at pos_1
+
+  ! Local variables
+  integer :: thread
+  double precision, dimension(1:3) :: pos_1_ic, pos_2_ic, pos_3_ic ! Positions of the image charges
+  double precision, dimension(1:2) :: pos_2d ! 2D position of the particle that is acting on the particle at pos_1
+  double precision                 :: data_1_ic, data_2_ic, data_3_ic ! Data for the image charges
+  double precision                 :: angle ! Rotation angle for the image charges
+  double precision                 :: r ! Temporary variable for radius
+  double precision                 :: Q1, Q2, Q3 ! Charge of the image charges
+  double precision, dimension(1:3) :: diff1, diff2, diff3 ! Difference between the position of the particle we are calculating the force/acceleration on from the image charges
+  double precision                 :: r1, r2, r3 ! Distance from the particle we are calculating the force/acceleration on to the image charges
+
+  integer, parameter                        :: nn = 4 ! number of nearest neighbors to find
+  type(kdtree2_result)                      :: kd_results(1:nn) ! results from the kd-tree
+
+  ! Find the thread number
+!#if defined(_OPENMP)
+!  thread = omp_get_thread_num() + 1 ! +1 since the thread number starts at 0
+!#else
+!  thread = 1
+!#endif
+
+  ! Get the positions of the image charges from the kd-tree
+  angle = atan2(pos_2(2), pos_2(1))
+  pos_2d(1) = sqrt(pos_2(1)**2 + pos_2(2)**2) ! Cylindrical coordinates
+  pos_2d(2) = pos_2(3)
+  !call kdtree2_n_nearest(tp=kd_tree_image(thread)%kd_tree, qv=pos_2d, nn=nn, results=kd_results)
+  !$omp critical (kdtree2)
+  call kdtree2_n_nearest(tp=kd_tree_image_single, qv=pos_2d, nn=nn, results=kd_results)
+  !$omp end critical (kdtree2)
+
+  ! Image charge positions (r and z or x and z)
+  ! r or x
+  pos_1_ic(1) = kd_image_one_pos(1, kd_results(1)%idx)
+  pos_2_ic(1) = kd_image_two_pos(1, kd_results(1)%idx)
+  pos_3_ic(1) = kd_image_three_pos(1, kd_results(1)%idx)
+  ! z
+  pos_1_ic(3) = kd_image_one_pos(2, kd_results(1)%idx)
+  pos_2_ic(3) = kd_image_two_pos(2, kd_results(1)%idx)
+  pos_3_ic(3) = kd_image_three_pos(2, kd_results(1)%idx)
+
+  ! Image charge data (Q)
+  ! This value should be a fraction of q_2 (charge of particle 2), because later the values are multiplied by q_2 / (4*pi*epsilon)
+  Q1 = kd_image_one_data(kd_results(1)%idx)
+  Q2 = kd_image_two_data(kd_results(1)%idx)
+  Q3 = kd_image_three_data(kd_results(1)%idx)
+
+  ! Rotate the image charges positions
+  r = pos_1_ic(1)
+  pos_1_ic(1) = r * cos(angle)
+  pos_1_ic(2) = r * sin(angle)
+  pos_1_ic(3) = pos_1_ic(3)
+
+  r = pos_2_ic(1)
+  pos_2_ic(1) = r * cos(angle)
+  pos_2_ic(2) = r * sin(angle)
+  pos_2_ic(3) = pos_2_ic(3)
+
+  r = pos_3_ic(1)
+  pos_3_ic(1) = r * cos(angle)
+  pos_3_ic(2) = r * sin(angle)
+  pos_3_ic(3) = pos_3_ic(3)
+
+  ! Distance from par_1 to the image charges
+  diff1 = pos_1 - pos_1_ic
+  r1 = sqrt( sum(diff1**2) ) + length_scale**2
+
+  diff2 = pos_1 - pos_2_ic
+  r2 = sqrt( sum(diff2**2) ) + length_scale**2
+
+  diff3 = pos_1 - pos_3_ic
+  r3 = sqrt( sum(diff3**2) ) + length_scale**2
+
+  ! Calculate the force from the image charges
+  ! (-1.0) since the charges are opposite
+  Image_Charge_cylinder = (diff1*Q1/r1**3 + diff2*Q2/r2**3 + diff3*Q3/r3**3)
+  !Image_Charge_cylinder = 0.0d0
+end function Image_Charge_cylinder
+
+!-------------------------------------------!
 ! Surface integration
 
   ! ----------------------------------------------------------------------------
@@ -1252,6 +1365,7 @@ subroutine Do_Surface_Integration(N_sup)
     !-----------------------------------------------------------------------------
     ! Integrate over the corner surface
     userdata = sec_corner
+    !print *, 'Doing corner'
    
     call divonne(ndim, ncomp, integrand_cuba_cyl, userdata, nvec,&
                  cuba_epsrel, cuba_epsabs, flags, seed, cuba_mineval, cuba_maxeval,&
@@ -1277,7 +1391,11 @@ subroutine Do_Surface_Integration(N_sup)
     end if
    
     ! Store the results
-    N_side = integral(1)
+    N_corner = integral(1)
+
+    !print *, 'Done corner'
+    !print 
+    !pause
 
     ! Finish calculating the average field
     F_avg = F_avg / neval
@@ -1287,11 +1405,11 @@ subroutine Do_Surface_Integration(N_sup)
                           & nregions, neval, fail, integral(1), error(1), prob(1)
 
     ! Calculate the total number of electrons emitted
-    !print *, 'N_top = ', N_top
-    !print *, 'N_side = ', N_side
-    !print *, 'N_corner = ', N_corner
+    print *, 'N_top = ', N_top
+    print *, 'N_side = ', N_side
+    print *, 'N_corner = ', N_corner
     N_sup = N_top + N_side + N_corner
-    !print *, 'N_sup = ', N_sup
+    print *, 'N_sup = ', N_sup
     
     ! Set probabilities of emitting from different surfaces
     prob_top = N_top / N_sup

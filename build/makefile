@@ -15,7 +15,7 @@ GIT_VERSION := $(shell git describe --dirty --always --tags || echo `date +'%d/%
 
 CUBA_LIB=../cuba/lib/libcuba.a
 
-OPENMP ?= yes # Set to something else to disable OpenMP
+OPENMP ?= yes# Set to something else to disable OpenMP
 
 TESTING_MODE ?= 2 # Set to 1 to enable testing mode
 
@@ -55,7 +55,10 @@ FFLAGS=-O3 -march=native -flto=auto
 #FFLAGS=-g -fcheck=all -Wall -fbacktrace -ffpe-trap=invalid,zero,overflow,underflow,denormal
 ifeq ($(OPENMP),yes)
 FFLAGS+=-fopenmp
+else
+FFLAGS+=-fno-openmp
 endif
+$(info $$OPENMP is [${OPENMP}])
 endif
 
 # PGI FORTRAN
@@ -173,8 +176,8 @@ mod_emission_tip.mod mod_emission_tip.o: ../src/mod_emission_tip.f90 mod_global.
 mod_hyperboloid_tip.mod mod_hyperboloid_tip.o: ../src/mod_hyperboloid_tip.f90 mod_global.mod
 		$(FC) -c $(FFLAGS) ../src/mod_hyperboloid_tip.f90
 
-mod_cylindrical_tip.mod mod_cylindrical_tip.o: ../src/mod_cylindrical_tip.f90 mod_global.mod mod_verlet.mod mod_pair.mod mod_velocity.mod kdtree2_module.mod
-		$(FC) -c $(FFLAGS) ../src/mod_cylindrical_tip.f90
+mod_cylindrical_tip.mod mod_cylindrical_tip.o: ../src/mod_cylindrical_tip.F90 mod_global.mod mod_verlet.mod mod_pair.mod mod_velocity.mod kdtree2_module.mod
+		$(FC) -c $(FFLAGS) ../src/mod_cylindrical_tip.F90
 
 mod_manual_emission.mod mod_manual_emission.o: ../src/mod_manual_emission.f90 mod_global.mod mod_verlet.mod mod_pair.mod
 		$(FC) -c $(FFLAGS) ../src/mod_manual_emission.f90
