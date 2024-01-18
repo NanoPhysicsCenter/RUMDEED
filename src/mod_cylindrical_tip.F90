@@ -459,7 +459,7 @@ subroutine Do_Field_Emission_Cylinder(step)
       end do
 
       Df_avg = Df_avg / dble(i)
-      print *, 'df_avg = ', Df_avg
+      !print *, 'df_avg = ', Df_avg
       if (Df_avg > 1.0d-4) then
         print *, 'RUMDEED: Df_avg > 1.0d-4 (Do_Field_Emission_Cylinder)'
         cought_stop_signal = .true.
