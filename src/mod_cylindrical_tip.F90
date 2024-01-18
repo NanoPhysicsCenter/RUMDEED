@@ -115,7 +115,7 @@ contains
 subroutine Init_Cylindrical_Tip()
     ! Local variables
     double precision :: int_res
-    double precision, dimension(1:3) :: E_test, pos_test
+    double precision, dimension(1:3) :: E_test, pos_test, vel_test
     integer :: IFAIL
 
     ! Allocate the number of emitters
@@ -157,12 +157,20 @@ subroutine Init_Cylindrical_Tip()
     ! print *, '? 285521.7478622014 V/m ?'
     ! print *, ''
 
-    ! print *, 'Calling Calc_E_edge_cyl'
-    ! call Calc_E_edge_cyl()
-    ! print *, 'Calling Calc_E_side_cyl'
-    ! call Calc_E_top_cyl()
-    ! print *, 'Calling Calc_E_top_cyl'
-    ! call Calc_E_corner_cyl()
+    !pos_test(1) = 0.0d0
+    !pos_test(2) = 0.0d0
+    !pos_test(3) = 0.0d0
+    
+    !vel_test = 0.0d0
+
+    !call Add_Particle(pos_test, vel_test, species_elec, 0, 1, -1, sec_top)
+
+    !print *, 'Calling Calc_E_edge_cyl'
+    !call Calc_E_edge_cyl()
+    !print *, 'Calling Calc_E_side_cyl'
+    !call Calc_E_top_cyl()
+    !print *, 'Calling Calc_E_top_cyl'
+    !call Calc_E_corner_cyl()
 
     ! ! Debugging the integration
     ! print *, 'Calling Do_Cuba_Suave'
@@ -176,7 +184,7 @@ subroutine Init_Cylindrical_Tip()
     ! !print *, 'Corner area = ', area_corner
 
     ! close(unit=ud_cyl_debug, iostat=IFAIL, status='keep')
-    ! stop
+    !stop
 end subroutine Init_Cylindrical_Tip
 
 !-------------------------------------------!
@@ -1405,11 +1413,11 @@ subroutine Do_Surface_Integration(N_sup)
                           & nregions, neval, fail, integral(1), error(1), prob(1)
 
     ! Calculate the total number of electrons emitted
-    print *, 'N_top = ', N_top
-    print *, 'N_side = ', N_side
-    print *, 'N_corner = ', N_corner
+    !print *, 'N_top = ', N_top
+    !print *, 'N_side = ', N_side
+    !print *, 'N_corner = ', N_corner
     N_sup = N_top + N_side + N_corner
-    print *, 'N_sup = ', N_sup
+    !print *, 'N_sup = ', N_sup
     
     ! Set probabilities of emitting from different surfaces
     prob_top = N_top / N_sup
@@ -1579,6 +1587,9 @@ subroutine Do_Surface_Integration(N_sup)
     double precision, dimension(1:2) :: upper, lower, range
     double precision                 :: jacobian ! Jacobian of the transformation from the hypercube to the surface
 
+    ! Other variables
+    integer :: IFAIL
+
     !print *, 'Integrand called'
     ! Surface position
     ! Cuba does the integration over the hybercube.
@@ -1713,6 +1724,11 @@ subroutine Do_Surface_Integration(N_sup)
     !if (userdata == sec_corner) then
     !  print *, 'ff(1) = ', ff(1)
     !end if
+
+    write (ud_field, "(*(E16.8, tr2))", iostat=IFAIL) &
+                                      par_pos(1), par_pos(2), par_pos(3), &
+                                      field(1), field(2), field(3), &
+                                      field_norm
   end function integrand_cuba_cyl
 
 !-------------------------------------------!
@@ -1726,21 +1742,21 @@ subroutine Calc_E_edge_cyl()
     ! Local
     integer :: k
     integer, parameter :: N_p = 100
-    real(kdkind), dimension(1:3) :: p, E_vec
+    real(kdkind), dimension(1:3) :: p, E_vec, E_vec_image
     double precision :: phi, rho
     integer :: ud_cyl_side_left, ud_cyl_side_right, IFAIL
     character (len=*), parameter :: filename_cyl_side_left="cyl_side_left.dt"
     character (len=*), parameter :: filename_cyl_side_right="cyl_side_right.dt"
 
     ! Data arrays
-    double precision, dimension(:, :), allocatable :: data_cyl_side_left, data_cyl_side_right
+    double precision, dimension(:, :, :), allocatable :: data_cyl_side_left, data_cyl_side_right
     double precision, dimension(:, :), allocatable :: p_cyl_side_left, p_cyl_side_right
     double precision, dimension(:), allocatable    :: len_cyl_side_left, len_cyl_side_right
 
     print *, 'Calc_E_edge_cyl started'
 
-    allocate(data_cyl_side_right(1:3, 1:N_p))
-    allocate(data_cyl_side_left(1:3, 1:N_p))
+    allocate(data_cyl_side_right(1:2, 1:3, 1:N_p))
+    allocate(data_cyl_side_left(1:2, 1:3, 1:N_p))
     allocate(len_cyl_side_right(1:N_p))
     allocate(len_cyl_side_left(1:N_p))
     allocate(p_cyl_side_right(1:3, 1:N_p))
@@ -1761,8 +1777,10 @@ subroutine Calc_E_edge_cyl()
         len_cyl_side_right(k) = p(3)
 
         E_vec = field_E_cylinder(p)
+        E_vec_image = Calc_Field_at(p)
         ! Store data in array
-        data_cyl_side_right(:, k) = E_vec(:)
+        data_cyl_side_right(1, :, k) = E_vec(:)
+        data_cyl_side_right(2, :, k) = E_vec_image(:)
 
         ! Left edge
         phi = pi
@@ -1774,8 +1792,10 @@ subroutine Calc_E_edge_cyl()
         len_cyl_side_left(k) = (height_cyl - radius_cor) - p(3)
 
         E_vec = field_E_cylinder(p)
+        E_vec_image = Calc_Field_at(p)
         ! Store data in array
-        data_cyl_side_left(:, k) = E_vec(:)
+        data_cyl_side_left(1, :, k) = E_vec(:)
+        data_cyl_side_left(2, :, k) = E_vec_image(:)
     end do
 
     ! Open data files
@@ -1794,8 +1814,10 @@ subroutine Calc_E_edge_cyl()
     ! Write data to files
     print *, 'Writing data to files'
     do k = 1, N_p
-      write(ud_cyl_side_left, *) data_cyl_side_left(:, k), len_cyl_side_left(k), p_cyl_side_left(:, k)
-      write(ud_cyl_side_right, *) data_cyl_side_right(:, k), len_cyl_side_right(k), p_cyl_side_right(:, k)
+      write(ud_cyl_side_left,  *) data_cyl_side_left(1, :, k), data_cyl_side_left(2, :, k), &
+                                  len_cyl_side_left(k), p_cyl_side_left(:, k)
+      write(ud_cyl_side_right, *) data_cyl_side_right(1, :, k), data_cyl_side_right(2, :, k), &
+                                  len_cyl_side_right(k), p_cyl_side_right(:, k)
     end do
 
     ! Close data files
@@ -1820,7 +1842,7 @@ subroutine Calc_E_corner_cyl()
     ! Local
     integer :: k
     integer, parameter :: N_p = 100
-    real(kdkind), dimension(1:3) :: p, E_vec
+    real(kdkind), dimension(1:3) :: p, E_vec, E_vec_image
     double precision :: phi, theta, rho
     integer :: ud_cyl_corner_left, ud_cyl_corner_right, IFAIL
     
@@ -1828,12 +1850,12 @@ subroutine Calc_E_corner_cyl()
     character (len=*), parameter :: filename_cyl_corner_right="cyl_corner_right.dt"
 
     ! Data arrays
-    double precision, dimension(:, :), allocatable :: data_cyl_corner_left, data_cyl_corner_right
+    double precision, dimension(:, :, :), allocatable :: data_cyl_corner_left, data_cyl_corner_right
     double precision, dimension(:, :), allocatable :: p_cyl_corner_left, p_cyl_corner_right
     double precision, dimension(:), allocatable    :: len_cyl_corner_left, len_cyl_corner_right
 
-    allocate(data_cyl_corner_left(1:3, 1:N_p))
-    allocate(data_cyl_corner_right(1:3, 1:N_p))
+    allocate(data_cyl_corner_left(1:2, 1:3, 1:N_p))
+    allocate(data_cyl_corner_right(1:2, 1:3, 1:N_p))
     allocate(len_cyl_corner_left(1:N_p))
     allocate(len_cyl_corner_right(1:N_p))
     allocate(p_cyl_corner_left(1:3, 1:N_p))
@@ -1854,8 +1876,10 @@ subroutine Calc_E_corner_cyl()
         len_cyl_corner_right(k) = radius_cor*theta
 
         E_vec = field_E_cylinder(p)
+        E_vec_image = Calc_Field_at(p)
         ! Store data in array
-        data_cyl_corner_right(:, k) = E_vec(:)
+        data_cyl_corner_right(1, :, k) = E_vec(:)
+        data_cyl_corner_right(2, :, k) = E_vec_image(:)
 
         ! Left corner
         phi = pi
@@ -1868,8 +1892,10 @@ subroutine Calc_E_corner_cyl()
         len_cyl_corner_left(k) = radius_cor*(pi/2.0d0 - theta)
 
         E_vec = field_E_cylinder(p)
+        E_vec_image = Calc_Field_at(p)
         ! Store data in array
-        data_cyl_corner_left(:, k) = E_vec(:)
+        data_cyl_corner_left(1, :, k) = E_vec(:)
+        data_cyl_corner_left(2, :, k) = E_vec_image(:)
     end do
 
         ! Open data files
@@ -1886,8 +1912,10 @@ subroutine Calc_E_corner_cyl()
 
     ! Write data to files
     do k = 1, N_p
-        write(ud_cyl_corner_left, *) data_cyl_corner_left(:, k), len_cyl_corner_left(k), p_cyl_corner_left(:, k)
-        write(ud_cyl_corner_right, *) data_cyl_corner_right(:, k), len_cyl_corner_right(k), p_cyl_corner_right(:, k)
+        write(ud_cyl_corner_left,  *) data_cyl_corner_left(1, :, k), data_cyl_corner_left(2, :, k), &
+                                      len_cyl_corner_left(k), p_cyl_corner_left(:, k)
+        write(ud_cyl_corner_right, *) data_cyl_corner_right(1, :, k), data_cyl_corner_right(2, :, k), &
+                                      len_cyl_corner_right(k), p_cyl_corner_right(:, k)
     end do
 
     ! Close data files
@@ -1910,19 +1938,19 @@ subroutine Calc_E_top_cyl()
     ! Local
     integer :: k
     integer, parameter :: N_p = 100
-    real(kdkind), dimension(1:3) :: p, E_vec
+    real(kdkind), dimension(1:3) :: p, E_vec, E_vec_image
     double precision :: rho_max
     integer :: ud_cyl_top_left, ud_cyl_top_right, IFAIL
     character (len=*), parameter :: filename_cyl_top_left="cyl_top_left.dt"
     character (len=*), parameter :: filename_cyl_top_right="cyl_top_right.dt"
 
     ! Data arrays
-    double precision, dimension(:, :), allocatable :: data_cyl_top_left, data_cyl_top_right
+    double precision, dimension(:, :, :), allocatable :: data_cyl_top_left, data_cyl_top_right
     double precision, dimension(:, :), allocatable :: p_cyl_top_left, p_cyl_top_right
     double precision, dimension(:), allocatable    :: len_cyl_top_left, len_cyl_top_right
 
-    allocate(data_cyl_top_left(1:3, 1:N_p))
-    allocate(data_cyl_top_right(1:3, 1:N_p))
+    allocate(data_cyl_top_left(1:2, 1:3, 1:N_p))
+    allocate(data_cyl_top_right(1:2, 1:3, 1:N_p))
     allocate(len_cyl_top_left(1:N_p))
     allocate(len_cyl_top_right(1:N_p))
     allocate(p_cyl_top_left(1:3, 1:N_p))
@@ -1946,8 +1974,10 @@ subroutine Calc_E_top_cyl()
         len_cyl_top_right(k) = (radius_cyl - radius_cor) - p(1)
 
         E_vec = field_E_cylinder(p)
+        E_vec_image = Calc_Field_at(p)
         ! Store data in array
-        data_cyl_top_left(:, k) = E_vec(:)
+        data_cyl_top_left(1, :, k) = E_vec(:)
+        data_cyl_top_left(2, :, k) = E_vec_image(:)
 
         ! Left side
         !phi = pi
@@ -1963,8 +1993,10 @@ subroutine Calc_E_top_cyl()
         len_cyl_top_left(k) = abs(p(1))
 
         E_vec = field_E_cylinder(p)
+        E_vec_image = Calc_Field_at(p)
         ! Store data in array
-        data_cyl_top_right(:, k) = E_vec(:)
+        data_cyl_top_right(1, :, k) = E_vec(:)
+        data_cyl_top_right(2, :, k) = E_vec_image(:)
     end do
 
     ! Open data files
@@ -1981,8 +2013,10 @@ subroutine Calc_E_top_cyl()
 
     ! Write data to files
     do k = 1, N_p
-        write(ud_cyl_top_left, *) data_cyl_top_left(:, k), len_cyl_top_left(k), p_cyl_top_left(:, k)
-        write(ud_cyl_top_right, *) data_cyl_top_right(:, k), len_cyl_top_right(k), p_cyl_top_right(:, k)
+        write(ud_cyl_top_left,  *) data_cyl_top_left(1, :, k), data_cyl_top_left(2, :, k), &
+                                   len_cyl_top_left(k), p_cyl_top_left(:, k)
+        write(ud_cyl_top_right, *) data_cyl_top_right(1, :, k), data_cyl_top_right(2, :, k), &
+                                   len_cyl_top_right(k), p_cyl_top_right(:, k)
     end do
 
     ! Close data files
