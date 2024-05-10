@@ -46,11 +46,31 @@ program RUMDEED
 
   call date_and_time(VALUES=values)
 
+  ! Print the logo
+  !######  #     # #     # ######  ####### ####### ######  
+  !#     # #     # ##   ## #     # #       #       #     # 
+  !#     # #     # # # # # #     # #       #       #     # 
+  !######  #     # #  #  # #     # #####   #####   #     # 
+  !#   #   #     # #     # #     # #       #       #     # 
+  !#    #  #     # #     # #     # #       #       #     # 
+  !#     #  #####  #     # ######  ####### ####### ######   
+
+  print '(a)', '  ######  #     # #     # ######  ####### ####### ######  '
+  print '(a)', '  #     # #     # ##   ## #     # #       #       #     # '
+  print '(a)', '  #     # #     # # # # # #     # #       #       #     # '
+  print '(a)', '  ######  #     # #  #  # #     # #####   #####   #     # '
+  print '(a)', '  #   #   #     # #     # #     # #       #       #     # '
+  print '(a)', '  #    #  #     # #     # #     # #       #       #     # '
+  print '(a)', '  #     #  #####  #     # ######  ####### ####### ######  '
+  print '(a)', ''
+
+  ! Print the version and date
   print '(a)', 'Reykjavík University Molecular Dynamics code for Electron Emission and Dynamics'
   print '(a, i0.2, a, i0.2, a, i4, a, i0.2, a, i0.2, a, i0.2)', &
         'RUMDEED: Starting (d/m/y) ', values(3), '/', values(2), '/', values(1), &
         ' - (h:m:s) ', values(5), ':', values(6), ':', values(7)
 
+  ! Print the compiler version and options
   print '(4a)', 'This program was compiled by ', &
                 compiler_version(), ' using the options ', &
                 compiler_options()
@@ -672,6 +692,7 @@ contains
     write(ud_init, *) '---------------------------------------------------------'
     write(ud_init, fmt_int) 'MAX_PARTICLES       = ', MAX_PARTICLES, 'Maximum number of electrons in the system'
     !write(ud_init, fmt_int) 'SEED                = ', SEED,          'Seed value used in the random number generator'
+    write(ud_init, fmt_int)  'my_seed             = ', my_seed(:),    'Seed value used in the random number generator'
     !write(ud_init, fmt_int) 'MAX_EMISSION_TRY    = ', MAX_EMISSION_TRY,    'Maximum number of failed emission attempts'
     !write(ud_init, fmt_int) 'MAX_TIME_STEP_WRITE = ', MAX_TIME_STEP_WRITE, 'Maximum number of times steps to output data'
     write(ud_init, *) '---------------------------------------------------------'

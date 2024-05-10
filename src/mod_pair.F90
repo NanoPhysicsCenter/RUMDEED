@@ -400,7 +400,7 @@ contains
   subroutine Write_Position(step)
     integer, intent(in)              :: step
     integer                          :: i
-    integer, parameter               :: N_steps = 10
+    integer, parameter               :: N_steps = 1
     double precision, dimension(1:3) :: par_pos
 
     if (write_position_file .eqv. .True.) then

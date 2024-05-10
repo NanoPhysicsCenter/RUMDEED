@@ -172,6 +172,8 @@ subroutine Init_Cylindrical_Tip()
     !print *, 'Calling Calc_E_top_cyl'
     !call Calc_E_corner_cyl()
 
+    !call Calc_E_around_cyl()
+
     ! ! Debugging the integration
     ! print *, 'Calling Do_Cuba_Suave'
     ! call Do_Cuba_Suave(int_res)
@@ -340,49 +342,113 @@ function field_E_cylinder(pos) result(field_E)
     do k = 1, nn
         field_E = field_E + w(k) * kd_data(:, kd_results(k)%idx)
     end do
-    field_E = field_E * 0.40d1 ! Debug to make field larger
+    field_E = field_E * 0.425d1 ! Debug to make field larger
 end function field_E_cylinder
 
 subroutine Check_Boundary_Cylinder(i)
   integer, intent(in) :: i
-  double precision    :: x, y, z, r2, RR
+  integer             :: sec
+
+  ! Check the boundary conditions for the particle
+  if (Check_Boundary_Cylinder_pos(particles_cur_pos(:, i), sec) .eqv. .true.) then
+    ! Remove the particle from the system
+    call Mark_Particles_Remove(i, sec)
+  end if
+
+end subroutine Check_Boundary_Cylinder
+
+! Check the boundary conditions for the cylindrical tip
+! Return true if the particle should be removed (i.e., it is inside the cylinder)
+! Return false if the particle should not be removed (i.e., it is outside the cylinder)
+logical function Check_Boundary_Cylinder_pos(par_pos, sec, do_pad_in)
+  double precision, dimension(1:3), intent(in) :: par_pos
+  integer, intent(out)                         :: sec
+  double precision                             :: x, y, z, r2, RR
+  logical, intent(in), optional                :: do_pad_in
+  logical                                      :: do_pad
+
+  ! Check if the particle should be padded
+  if (present(do_pad_in)) then
+    do_pad = do_pad_in
+  else
+    do_pad = .true.
+  end if
 
   ! Get the position of the particle
-  x = particles_cur_pos(1, i)
-  y = particles_cur_pos(2, i)
-  z = particles_cur_pos(3, i)
+  if (do_pad .eqv. .true.) then
+    x = par_pos(1) + 10.0d-12*sign(1.0d0, par_pos(1)) ! Pad the position with a small number to avoid false positives when the particle is on the boundary
+    y = par_pos(2) + 10.0d-12*sign(1.0d0, par_pos(2))
+    z = par_pos(3) + 10.0d-12*sign(1.0d0, par_pos(3))
+  else
+    x = par_pos(1)
+    y = par_pos(2)
+    z = par_pos(3)
+  end if
 
   ! Calculate the distance from the center of the cylinder
   r2 = x**2 + y**2
 
-  ! Check if the particle should be removed from the system
+  sec = remove_unknown ! Default value unknown
+  Check_Boundary_Cylinder_pos = .false. ! Default value is that the particle is not removed
 
+  ! Check if the particle should be removed from the system
   ! Check top and bottom plates
   if (z < 0.0d0) then
-      call Mark_Particles_Remove(i, remove_bot)
+      print *, 'RUMDEED: Particle below the bottom plate (Check_Boundary_Cylinder)'
+      sec = remove_bot
+      Check_Boundary_Cylinder_pos = .true.
   else if (z > box_dim(3)) then
-      call Mark_Particles_Remove(i, remove_top)
+      print *, 'RUMDEED: Particle above the top plate (Check_Boundary_Cylinder)'
+      sec = remove_top
+      Check_Boundary_Cylinder_pos = .true.
   else if (z > 0.0d0 .and. z < (height_cyl - radius_cor)) then ! Check if the particle is inside the cylinder
     ! Check cylinder
       if (r2 < radius_cyl**2) then
-          call Mark_Particles_Remove(i, remove_bot)
+          print *, 'RUMDEED: Particle inside the cylinder (Check_Boundary_Cylinder)'
+          print *, 'r2 = ', r2
+          print *, 'radius_cyl**2 = ', radius_cyl**2
+          print *, 'x = ', par_pos(1)
+          print *, 'y = ', par_pos(2)
+          print *, 'z = ', par_pos(3)
+          print *, ''
+          sec =  remove_bot
+          Check_Boundary_Cylinder_pos = .true.
       end if
   else if (z > (height_cyl - radius_cor) .and. z < height_cyl) then ! Check if the particle is inside the torus (corner)
     ! Check corner
     if ((radius_cyl - radius_cor - sqrt(r2))**2 + (z - (height_cyl - radius_cor))**2 < radius_cor**2) then
-      call Mark_Particles_Remove(i, remove_bot)
+      print *, 'RUMDEED: Particle inside the corner 1 (Check_Boundary_Cylinder)'
+      print *, 'r2 = ', r2
+      print *, 'x = ', par_pos(1)
+      print *, 'y = ', par_pos(2)
+      print *, 'z = ', par_pos(3)
+      print *, ''
+      sec =  remove_bot
+      Check_Boundary_Cylinder_pos = .true.
     else if (r2 < (radius_cyl - radius_cor)**2) then ! Cylinder inside the torus!
-      call Mark_Particles_Remove(i, remove_bot)
+      print *, 'RUMDEED: Particle inside the torus (Check_Boundary_Cylinder)'
+      print *, 'r2 = ', r2
+      print *, 'x = ', par_pos(1)
+      print *, 'y = ', par_pos(2)
+      print *, 'z = ', par_pos(3)
+      print *, ''
+      sec = remove_bot
+      Check_Boundary_Cylinder_pos = .true.
     end if
 
     ! Check the top of the corner
     RR = radius_cyl - radius_cor + sqrt(radius_cor**2 - (z - (height_cyl - radius_cor))**2)
     if (r2 < RR**2) then
-      call Mark_Particles_Remove(i, remove_bot)
+      print *, 'RUMDEED: Particle inside the corner 2 (Check_Boundary_Cylinder)'
+      print *, 'x = ', par_pos(1)
+      print *, 'y = ', par_pos(2)
+      print *, 'z = ', par_pos(3)
+      print *, ''
+      sec = remove_bot
+      Check_Boundary_Cylinder_pos = .true.
     end if
   end if
-
-end subroutine Check_Boundary_Cylinder
+end function Check_Boundary_Cylinder_pos
 
 subroutine Do_Field_Emission_Cylinder(step)
     integer, intent(in) :: step
@@ -396,9 +462,10 @@ subroutine Do_Field_Emission_Cylinder(step)
     ! Emission variables
     double precision                 :: D_f, Df_avg, F_norm, rnd
     double precision, dimension(1:3) :: F, n_vec
-    integer                          :: s, sec
+    integer                          :: s, sec, sec_b
     integer                          :: nrElecEmit
-    double precision, dimension(1:3) :: par_pos, par_vel
+    double precision, dimension(1:3) :: par_pos, par_vel, old_pos
+    !logical                          :: to_pause = .false.
 
     nrEmitted_emitters = 0
 
@@ -446,11 +513,31 @@ subroutine Do_Field_Emission_Cylinder(step)
         !if (rnd <= D_f) then
         if (log(rnd) <= D_f) then
           ! Calculate the position of the particle (1 nm above the surface)
+          !if (Check_Boundary_Cylinder_pos(par_pos, sec_b) .eqv. .true.) then
+          !  print *, 'RUMDEED: Particle inside the cylinder BEFORE (Do_Field_Emission_Cylinder)'
+          !  !pause
+          !  to_pause = .true.
+          !end if
+          old_pos = par_pos
           par_pos = par_pos + n_vec*length_scale
           ! Calculate the velocity of the particle
           par_vel = 0.0d0
 
           ! Add the particle to the system
+          ! Check if the particle is inside the corner
+          !if (Check_Boundary_Cylinder_pos(par_pos, sec_b, .false.) .eqv. .true.) then
+          !  print *, 'RUMDEED: Particle inside the cylinder AFTER (Do_Field_Emission_Cylinder)'
+          !  !pause
+          !  print *, 'old_pos = ', old_pos/length_scale
+          !  print *, 'par_pos = ', par_pos/length_scale
+          !  print *, 'n_vec = ', n_vec
+          !  to_pause = .true.
+          !end if
+
+          !if (to_pause .eqv. .true.) then
+          !  pause
+          !end if
+
           call Add_Particle(par_pos, par_vel, species_elec, step, emit, -1, sec)
 
           nrElecEmit = nrElecEmit + 1
@@ -462,6 +549,9 @@ subroutine Do_Field_Emission_Cylinder(step)
       !print *, 'df_avg = ', Df_avg
       if (Df_avg > 1.0d-4) then
         print *, 'RUMDEED: Df_avg > 1.0d-4 (Do_Field_Emission_Cylinder)'
+        print *, step
+        write_position_file = .true.
+        call Write_Position(0)
         cought_stop_signal = .true.
       end if
 
@@ -487,6 +577,7 @@ subroutine Metropolis_Hastings_cyl_tip(ndim_in, F_out, F_norm_out, pos_xyz_out, 
     double precision                 :: alpha, rnd
     !double precision                 :: ratio
     integer                          :: i, accepted = 0, rejected = 0
+    integer                          :: sec_b
 
     k = 0
     ! Get a random initial position on the surface
@@ -496,6 +587,11 @@ subroutine Metropolis_Hastings_cyl_tip(ndim_in, F_out, F_norm_out, pos_xyz_out, 
 
       F_cur = Calc_Field_at(pos_cur)
       pos_xyz_cur = Convert_to_xyz(pos_cur, sec_cur)
+      !if (Check_Boundary_Cylinder_pos(pos_xyz_cur, sec_b) .eqv. .true.) then
+      !  print *, 'RUMDEED: Particle inside the cylinder INITIAL (Metropolis_Hastings_cyl_tip)'
+      !  print *, 'pos_xyz_cur = ', pos_xyz_cur/length_scale
+      !  pause
+      !end if
       F_norm_cur = Field_normal(pos_xyz_cur, pos_cur, F_cur, sec_cur)
       if (F_norm_cur < 0.0d0) then ! Check that the field is negative
         exit ! Exit the loop
@@ -513,6 +609,14 @@ subroutine Metropolis_Hastings_cyl_tip(ndim_in, F_out, F_norm_out, pos_xyz_out, 
         ! Propose a new position
         call Jump_MH(pos_cur, sec_cur, pos_new, sec_new)
         pos_xyz_new = Convert_to_xyz(pos_new, sec_new)
+        !if (Check_Boundary_Cylinder_pos(pos_xyz_new, sec_b) .eqv. .true.) then
+        !  print *, 'RUMDEED: Particle inside the cylinder PROPOSED (Metropolis_Hastings_cyl_tip)'
+        !  print *, 'pos_xyz_cur = ', pos_xyz_cur/length_scale
+        !  print *, 'pos_xyz_new = ', pos_xyz_new/length_scale
+        !  print *, 'sec_cur = ', sec_cur
+        !  print *, 'sec_new = ', sec_new
+        !  pause
+        !end if
 
         ! Find the jump probability at the current position
         alpha = Get_Jump_Probability(F_norm_cur, F_new, F_norm_new, pos_new, pos_xyz_new, sec_new)
@@ -982,6 +1086,7 @@ function Image_Charge_cylinder(pos_1, pos_2)
   double precision                 :: Q1, Q2, Q3 ! Charge of the image charges
   double precision, dimension(1:3) :: diff1, diff2, diff3 ! Difference between the position of the particle we are calculating the force/acceleration on from the image charges
   double precision                 :: r1, r2, r3 ! Distance from the particle we are calculating the force/acceleration on to the image charges
+  double precision, parameter      :: max_dist = 10000.0d0*length_scale ! Maximum distance for the image charge model
 
   integer, parameter                        :: nn = 4 ! number of nearest neighbors to find
   type(kdtree2_result)                      :: kd_results(1:nn) ! results from the kd-tree
@@ -997,56 +1102,74 @@ function Image_Charge_cylinder(pos_1, pos_2)
   angle = atan2(pos_2(2), pos_2(1))
   pos_2d(1) = sqrt(pos_2(1)**2 + pos_2(2)**2) ! Cylindrical coordinates
   pos_2d(2) = pos_2(3)
-  !call kdtree2_n_nearest(tp=kd_tree_image(thread)%kd_tree, qv=pos_2d, nn=nn, results=kd_results)
-  !$omp critical (kdtree2)
-  call kdtree2_n_nearest(tp=kd_tree_image_single, qv=pos_2d, nn=nn, results=kd_results)
-  !$omp end critical (kdtree2)
 
-  ! Image charge positions (r and z or x and z)
-  ! r or x
-  pos_1_ic(1) = kd_image_one_pos(1, kd_results(1)%idx)
-  pos_2_ic(1) = kd_image_two_pos(1, kd_results(1)%idx)
-  pos_3_ic(1) = kd_image_three_pos(1, kd_results(1)%idx)
-  ! z
-  pos_1_ic(3) = kd_image_one_pos(2, kd_results(1)%idx)
-  pos_2_ic(3) = kd_image_two_pos(2, kd_results(1)%idx)
-  pos_3_ic(3) = kd_image_three_pos(2, kd_results(1)%idx)
+  ! Check if the charge is outside the range of the image charge model
+  ! Check r and z
+  !
+  !         z
+  !     ___________
+  ! r  /           \   r
+  !    |           |
+  !    |           |
+  !    |           |
+  !    |           |
+  !
+  if ((pos_2d(1) > max_dist) .or. (pos_2(3) > max_dist)) then
+    ! The charge is outside the range of the image charge model
+    Image_Charge_cylinder = 0.0d0
+  else
 
-  ! Image charge data (Q)
-  ! This value should be a fraction of q_2 (charge of particle 2), because later the values are multiplied by q_2 / (4*pi*epsilon)
-  Q1 = kd_image_one_data(kd_results(1)%idx)
-  Q2 = kd_image_two_data(kd_results(1)%idx)
-  Q3 = kd_image_three_data(kd_results(1)%idx)
+    !call kdtree2_n_nearest(tp=kd_tree_image(thread)%kd_tree, qv=pos_2d, nn=nn, results=kd_results)
+    !$omp critical (kdtree2)
+    call kdtree2_n_nearest(tp=kd_tree_image_single, qv=pos_2d, nn=nn, results=kd_results)
+    !$omp end critical (kdtree2)
 
-  ! Rotate the image charges positions
-  r = pos_1_ic(1)
-  pos_1_ic(1) = r * cos(angle)
-  pos_1_ic(2) = r * sin(angle)
-  pos_1_ic(3) = pos_1_ic(3)
+    ! Image charge positions (r and z or x and z)
+    ! r or x
+    pos_1_ic(1) = kd_image_one_pos(1, kd_results(1)%idx)
+    pos_2_ic(1) = kd_image_two_pos(1, kd_results(1)%idx)
+    pos_3_ic(1) = kd_image_three_pos(1, kd_results(1)%idx)
+    ! z
+    pos_1_ic(3) = kd_image_one_pos(2, kd_results(1)%idx)
+    pos_2_ic(3) = kd_image_two_pos(2, kd_results(1)%idx)
+    pos_3_ic(3) = kd_image_three_pos(2, kd_results(1)%idx)
 
-  r = pos_2_ic(1)
-  pos_2_ic(1) = r * cos(angle)
-  pos_2_ic(2) = r * sin(angle)
-  pos_2_ic(3) = pos_2_ic(3)
+    ! Image charge data (Q)
+    ! This value should be a fraction of q_2 (charge of particle 2), because later the values are multiplied by q_2 / (4*pi*epsilon)
+    Q1 = kd_image_one_data(kd_results(1)%idx)
+    Q2 = kd_image_two_data(kd_results(1)%idx)
+    Q3 = kd_image_three_data(kd_results(1)%idx)
 
-  r = pos_3_ic(1)
-  pos_3_ic(1) = r * cos(angle)
-  pos_3_ic(2) = r * sin(angle)
-  pos_3_ic(3) = pos_3_ic(3)
+    ! Rotate the image charges positions
+    r = pos_1_ic(1)
+    pos_1_ic(1) = r * cos(angle)
+    pos_1_ic(2) = r * sin(angle)
+    pos_1_ic(3) = pos_1_ic(3)
 
-  ! Distance from par_1 to the image charges
-  diff1 = pos_1 - pos_1_ic
-  r1 = sqrt( sum(diff1**2) ) + length_scale**2
+    r = pos_2_ic(1)
+    pos_2_ic(1) = r * cos(angle)
+    pos_2_ic(2) = r * sin(angle)
+    pos_2_ic(3) = pos_2_ic(3)
 
-  diff2 = pos_1 - pos_2_ic
-  r2 = sqrt( sum(diff2**2) ) + length_scale**2
+    r = pos_3_ic(1)
+    pos_3_ic(1) = r * cos(angle)
+    pos_3_ic(2) = r * sin(angle)
+    pos_3_ic(3) = pos_3_ic(3)
 
-  diff3 = pos_1 - pos_3_ic
-  r3 = sqrt( sum(diff3**2) ) + length_scale**2
+    ! Distance from par_1 to the image charges
+    diff1 = pos_1 - pos_1_ic
+    r1 = sqrt( sum(diff1**2) ) + length_scale**2
 
-  ! Calculate the force from the image charges
-  ! (-1.0) since the charges are opposite
-  Image_Charge_cylinder = (diff1*Q1/r1**3 + diff2*Q2/r2**3 + diff3*Q3/r3**3)
+    diff2 = pos_1 - pos_2_ic
+    r2 = sqrt( sum(diff2**2) ) + length_scale**2
+
+    diff3 = pos_1 - pos_3_ic
+    r3 = sqrt( sum(diff3**2) ) + length_scale**2
+
+    ! Calculate the force from the image charges
+    ! (-1.0) since the charges are opposite
+    Image_Charge_cylinder = (diff1*Q1/r1**3 + diff2*Q2/r2**3 + diff3*Q3/r3**3)
+  end if
   !Image_Charge_cylinder = 0.0d0
 end function Image_Charge_cylinder
 
@@ -1184,6 +1307,9 @@ subroutine Do_Surface_Integration(N_sup)
 
   !-----------------------------------------------------------------------------
   ! Find a unit vector normal to the surface
+  ! par_pos: Position of the particle in cartesian coordinates
+  ! par_pos_org: Position of the particle in section coordinates
+  ! sec_in: Section the particle is in
   pure function surface_normal(par_pos, par_pos_org, sec_in)
     double precision, dimension(1:3)             :: surface_normal
     double precision, dimension(1:3), intent(in) :: par_pos, par_pos_org
@@ -1191,22 +1317,25 @@ subroutine Do_Surface_Integration(N_sup)
 
     if (sec_in == sec_top) then
         ! Top surface
+        ! Coordinates are cartesian (x, y, z)
         ! The normal vector is (0, 0, 1)
         surface_normal(1) = 0.0d0
         surface_normal(2) = 0.0d0
         surface_normal(3) = 1.0d0
     else if (sec_in == sec_side) then
         ! Side surface
+        ! Coordinates are cylindrical (rho, phi, z)
         ! The normal vector is (cos(phi), sin(phi), 0)
-        surface_normal(1) = cos(par_pos(2))
-        surface_normal(2) = sin(par_pos(2))
+        surface_normal(1) = cos(par_pos_org(2))
+        surface_normal(2) = sin(par_pos_org(2))
         surface_normal(3) = 0.0d0
     else if (sec_in == sec_corner) then
         ! Corner surface
+        ! Coordinates are toroidal (rho, phi, theta)
         ! The normal vector is (cos(phi)*cos(theta), sin(phi)*cos(theta), sin(theta))
-        surface_normal(1) = cos(par_pos(2)) * cos(par_pos(3))
-        surface_normal(2) = sin(par_pos(2)) * cos(par_pos(3))
-        surface_normal(3) = sin(par_pos(3))
+        surface_normal(1) = cos(par_pos_org(2)) * cos(par_pos_org(3))
+        surface_normal(2) = sin(par_pos_org(2)) * cos(par_pos_org(3))
+        surface_normal(3) = sin(par_pos_org(3))
     else
         ! Error
         surface_normal(:) = ieee_value( surface_normal(:), ieee_signaling_nan )
@@ -1733,6 +1862,73 @@ subroutine Do_Surface_Integration(N_sup)
 
 !-------------------------------------------!
 ! Tests
+
+subroutine Calc_E_around_cyl()
+  implicit none
+  integer :: k
+  integer, parameter :: N_p = 100
+
+  real(kdkind), dimension(1:3) :: p, E_vec, E_vec_image
+  double precision :: phi, rho, theta
+  integer :: ud_cyl_around, IFAIL
+  character (len=*), parameter :: filename_cyl_around="cyl_around.dt"
+
+  ! Data arrays
+  double precision, dimension(:, :, :), allocatable :: data_cyl_around
+  double precision, dimension(:, :), allocatable :: p_cyl_around
+  double precision, dimension(:), allocatable    :: len_cyl_around
+
+  print *, 'Calc_E_around_cyl started'
+
+  allocate(data_cyl_around(1:2, 1:3, 1:N_p))
+  allocate(len_cyl_around(1:N_p))
+  allocate(p_cyl_around(1:3, 1:N_p))
+
+  rho = radius_cor
+
+  ! Calculate the electric field around the cylinder
+  print *, 'Calculating the electric field around the cylinder'
+  do k = 1, N_p
+    ! Right corner
+    phi = (k-1)*2.0d0*pi/(N_p-1)
+    theta = pi/4.0d0
+    p(1) = (radius_cyl - radius_cor + rho*cos(theta)) * cos(phi)
+    p(2) = (radius_cyl - radius_cor + rho*cos(theta)) * sin(phi)
+    p(3) = (height_cyl - radius_cor) + rho*sin(theta)
+
+    p_cyl_around(:, k) = p(:)
+    len_cyl_around(k) = phi
+
+    E_vec = field_E_cylinder(p)
+    E_vec_image = Calc_Field_at(p)
+    ! Store data in array
+    data_cyl_around(1, :, k) = E_vec(:)
+    data_cyl_around(2, :, k) = E_vec_image(:)
+  end do
+
+  ! Open data file
+  print *, 'Opening data file'
+  open(newunit=ud_cyl_around, iostat=IFAIL, file=filename_cyl_around, status='REPLACE', action='WRITE')
+  if (IFAIL /= 0) then
+    print '(a)', 'RUMDEED: ERROR UNABLE TO OPEN file ', filename_cyl_around
+    stop
+  end if
+
+  ! Write data to file
+  print *, 'Writing data to file'
+  do k = 1, N_p
+    write(ud_cyl_around, *) data_cyl_around(1, :, k), data_cyl_around(2, :, k), len_cyl_around(k), p_cyl_around(:, k)
+  end do
+
+  ! Close data file
+  close(unit=ud_cyl_around, iostat=IFAIL, status='keep')
+
+  deallocate(data_cyl_around)
+  deallocate(p_cyl_around)
+  deallocate(len_cyl_around)
+
+  print *, 'Calc_E_around_cyl finished'
+end subroutine Calc_E_around_cyl
 
 !-----------------------------------------------------------------------
 ! Calculate the electric field along the edge of the cylinder
