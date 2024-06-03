@@ -1078,18 +1078,30 @@ function Image_Charge_cylinder(pos_1, pos_2)
 
   ! Local variables
   integer :: thread
+  double precision, dimension(1:3) :: pos_11_ic, pos_12_ic, pos_13_ic ! Positions of the image charges
+  double precision, dimension(1:3) :: pos_21_ic, pos_22_ic, pos_23_ic ! Positions of the image charges
+  double precision, dimension(1:3) :: pos_31_ic, pos_32_ic, pos_33_ic ! Positions of the image charges
+  double precision, dimension(1:3) :: pos_41_ic, pos_42_ic, pos_43_ic ! Positions of the image charges
+
+  double precision, dimension(1:3) :: pos_1_int, pos_2_int, pos_3_int ! Positions of the image charges
   double precision, dimension(1:3) :: pos_1_ic, pos_2_ic, pos_3_ic ! Positions of the image charges
-  double precision, dimension(1:2) :: pos_2d ! 2D position of the particle that is acting on the particle at pos_1
-  double precision                 :: data_1_ic, data_2_ic, data_3_ic ! Data for the image charges
+
+  double precision                 :: Q11, Q12, Q13, Q21, Q22, Q23, Q31, Q32, Q33, Q41, Q42, Q43 ! Charge of the image charges
+  double precision                 :: Q1, Q2, Q3 ! Interpolated charge of the image charges
+
+  double precision, dimension(1:2) :: pos_2_rot ! 2D position of the particle that is acting on the particle at pos_1
+  !double precision                 :: data_1_ic, data_2_ic, data_3_ic, data_4_ic ! Data for the image charges
   double precision                 :: angle ! Rotation angle for the image charges
-  double precision                 :: r ! Temporary variable for radius
-  double precision                 :: Q1, Q2, Q3 ! Charge of the image charges
+
   double precision, dimension(1:3) :: diff1, diff2, diff3 ! Difference between the position of the particle we are calculating the force/acceleration on from the image charges
   double precision                 :: r1, r2, r3 ! Distance from the particle we are calculating the force/acceleration on to the image charges
   double precision, parameter      :: max_dist = 10000.0d0*length_scale ! Maximum distance for the image charge model
 
-  integer, parameter                        :: nn = 4 ! number of nearest neighbors to find
-  type(kdtree2_result)                      :: kd_results(1:nn) ! results from the kd-tree
+  integer, parameter               :: nn = 4 ! number of nearest neighbors to find
+  type(kdtree2_result)             :: kd_results(1:nn) ! results from the kd-tree
+  double precision                 :: w, w1, w2, w3, w4 ! Weights for the interpolation
+  double precision, parameter      :: eps = length_scale**3 ! Small number to avoid division by zero
+  integer, parameter               :: p = 1 ! Power for the inverse distance weighting
 
   ! Find the thread number
 !#if defined(_OPENMP)
@@ -1098,10 +1110,17 @@ function Image_Charge_cylinder(pos_1, pos_2)
 !  thread = 1
 !#endif
 
-  ! Get the positions of the image charges from the kd-tree
+  ! Get the positions of the image charges
+
+  ! Rotate the positions of the particle (pos_2) to the x-z plane
+  ! This is because the image charges are calculated in the x-z plane
+  pos_2_rot(1) = sqrt(pos_2(1)**2 + pos_2(2)**2) ! r * cos(angle) = r, in the x-z plane the angle is zero
+  ! y = r * sin(angle) = 0 in the x-z plane, because the angle is zero
+  ! The KD-tree is 2D, so we only need the x and z coordinates
+  pos_2_rot(2) = pos_2(3) ! z is the same
+
+  ! Calculate the angle of the particle (pos_2)
   angle = atan2(pos_2(2), pos_2(1))
-  pos_2d(1) = sqrt(pos_2(1)**2 + pos_2(2)**2) ! Cylindrical coordinates
-  pos_2d(2) = pos_2(3)
 
   ! Check if the charge is outside the range of the image charge model
   ! Check r and z
@@ -1114,47 +1133,128 @@ function Image_Charge_cylinder(pos_1, pos_2)
   !    |           |
   !    |           |
   !
-  if ((pos_2d(1) > max_dist) .or. (pos_2(3) > max_dist)) then
+  if ((pos_2_rot(1) > max_dist) .or. (pos_2_rot(2) > max_dist)) then
     ! The charge is outside the range of the image charge model
     Image_Charge_cylinder = 0.0d0
   else
 
     !call kdtree2_n_nearest(tp=kd_tree_image(thread)%kd_tree, qv=pos_2d, nn=nn, results=kd_results)
     !$omp critical (kdtree2)
-    call kdtree2_n_nearest(tp=kd_tree_image_single, qv=pos_2d, nn=nn, results=kd_results)
+    call kdtree2_n_nearest(tp=kd_tree_image_single, qv=pos_2_rot, nn=nn, results=kd_results)
     !$omp end critical (kdtree2)
 
-    ! Image charge positions (r and z or x and z)
-    ! r or x
-    pos_1_ic(1) = kd_image_one_pos(1, kd_results(1)%idx)
-    pos_2_ic(1) = kd_image_two_pos(1, kd_results(1)%idx)
-    pos_3_ic(1) = kd_image_three_pos(1, kd_results(1)%idx)
-    ! z
-    pos_1_ic(3) = kd_image_one_pos(2, kd_results(1)%idx)
-    pos_2_ic(3) = kd_image_two_pos(2, kd_results(1)%idx)
-    pos_3_ic(3) = kd_image_three_pos(2, kd_results(1)%idx)
+    ! Image charge positions, x and z with y = 0 for the nearest neighbors n = 1
+    pos_11_ic(1) = kd_image_one_pos(1, kd_results(1)%idx)
+    pos_11_ic(2) = 0.0d0
+    pos_11_ic(3) = kd_image_one_pos(2, kd_results(1)%idx)
+    ! Charge
+    Q11 = kd_image_one_data(kd_results(1)%idx)
 
-    ! Image charge data (Q)
-    ! This value should be a fraction of q_2 (charge of particle 2), because later the values are multiplied by q_2 / (4*pi*epsilon)
-    Q1 = kd_image_one_data(kd_results(1)%idx)
-    Q2 = kd_image_two_data(kd_results(1)%idx)
-    Q3 = kd_image_three_data(kd_results(1)%idx)
+    pos_12_ic(1) = kd_image_two_pos(1, kd_results(1)%idx)
+    pos_12_ic(2) = 0.0d0
+    pos_12_ic(3) = kd_image_two_pos(2, kd_results(1)%idx)
+    ! Charge
+    Q12 = kd_image_two_data(kd_results(1)%idx)
+
+    pos_13_ic(1) = kd_image_three_pos(1, kd_results(1)%idx)
+    pos_13_ic(2) = 0.0d0
+    pos_13_ic(3) = kd_image_three_pos(2, kd_results(1)%idx)
+    ! Charge
+    Q13 = kd_image_three_data(kd_results(1)%idx)
+
+    ! Image charge positions, x and z with y = 0 for the nearest neighbors n = 2
+    pos_21_ic(1) = kd_image_one_pos(1, kd_results(2)%idx)
+    pos_21_ic(2) = 0.0d0
+    pos_21_ic(3) = kd_image_one_pos(2, kd_results(2)%idx)
+    ! Charge
+    Q21 = kd_image_one_data(kd_results(2)%idx)
+
+    pos_22_ic(1) = kd_image_two_pos(1, kd_results(2)%idx)
+    pos_22_ic(2) = 0.0d0
+    pos_22_ic(3) = kd_image_two_pos(2, kd_results(2)%idx)
+    ! Charge
+    Q22 = kd_image_two_data(kd_results(2)%idx)
+
+    pos_23_ic(1) = kd_image_three_pos(1, kd_results(2)%idx)
+    pos_23_ic(2) = 0.0d0
+    pos_23_ic(3) = kd_image_three_pos(2, kd_results(2)%idx)
+    ! Charge
+    Q23 = kd_image_three_data(kd_results(2)%idx)
+
+    ! Image charge positions, x and z with y = 0 for the nearest neighbors n = 3
+    pos_31_ic(1) = kd_image_one_pos(1, kd_results(3)%idx)
+    pos_31_ic(2) = 0.0d0
+    pos_31_ic(3) = kd_image_one_pos(2, kd_results(3)%idx)
+    ! Charge
+    Q31 = kd_image_one_data(kd_results(3)%idx)
+
+    pos_32_ic(1) = kd_image_two_pos(1, kd_results(3)%idx)
+    pos_32_ic(2) = 0.0d0
+    pos_32_ic(3) = kd_image_two_pos(2, kd_results(3)%idx)
+    ! Charge
+    Q32 = kd_image_two_data(kd_results(3)%idx)
+
+    pos_33_ic(1) = kd_image_three_pos(1, kd_results(3)%idx)
+    pos_33_ic(2) = 0.0d0
+    pos_33_ic(3) = kd_image_three_pos(2, kd_results(3)%idx)
+    ! Charge
+    Q33 = kd_image_three_data(kd_results(3)%idx)
+
+    ! Image charge positions, x and z with y = 0 for the nearest neighbors n = 4
+    pos_41_ic(1) = kd_image_one_pos(1, kd_results(4)%idx)
+    pos_41_ic(2) = 0.0d0
+    pos_41_ic(3) = kd_image_one_pos(2, kd_results(4)%idx)
+    ! Charge
+    Q41 = kd_image_one_data(kd_results(4)%idx)
+
+    pos_42_ic(1) = kd_image_two_pos(1, kd_results(4)%idx)
+    pos_42_ic(2) = 0.0d0
+    pos_42_ic(3) = kd_image_two_pos(2, kd_results(4)%idx)
+    ! Charge
+    Q42 = kd_image_two_data(kd_results(4)%idx)
+
+    pos_43_ic(1) = kd_image_three_pos(1, kd_results(4)%idx)
+    pos_43_ic(2) = 0.0d0
+    pos_43_ic(3) = kd_image_three_pos(2, kd_results(4)%idx)
+    ! Charge
+    Q43 = kd_image_three_data(kd_results(4)%idx)
+
+    ! Interpolate the position and charge at the point using the nearest neighbors and the inverse distance to each as weights
+    ! Calculate the weights as 1/distance^p
+    w1 = 1.0d0 / (kd_results(1)%dis + eps)**p
+    w2 = 1.0d0 / (kd_results(2)%dis + eps)**p
+    w3 = 1.0d0 / (kd_results(3)%dis + eps)**p
+    w4 = 1.0d0 / (kd_results(4)%dis + eps)**p
+
+    ! Normalize the weights
+    w = w1 + w2 + w3 + w4
+    w1 = w1 / w
+    w2 = w2 / w
+    w3 = w3 / w
+    w4 = w4 / w
+
+    ! Interpolate the position
+    pos_1_int = w1 * pos_11_ic + w2 * pos_21_ic + w3 * pos_31_ic + w4 * pos_41_ic
+    pos_2_int = w1 * pos_12_ic + w2 * pos_22_ic + w3 * pos_32_ic + w4 * pos_42_ic
+    pos_3_int = w1 * pos_13_ic + w2 * pos_23_ic + w3 * pos_33_ic + w4 * pos_43_ic
+
+    ! Interpolate the charge
+    Q1 = w1 * Q11 + w2 * Q21 + w3 * Q31 + w4 * Q41
+    Q2 = w1 * Q12 + w2 * Q22 + w3 * Q32 + w4 * Q42
+    Q3 = w1 * Q13 + w2 * Q23 + w3 * Q33 + w4 * Q43
 
     ! Rotate the image charges positions
-    r = pos_1_ic(1)
-    pos_1_ic(1) = r * cos(angle)
-    pos_1_ic(2) = r * sin(angle)
-    pos_1_ic(3) = pos_1_ic(3)
+    pos_1_ic(1) = pos_1_int(1) * cos(angle) - pos_1_int(2) * sin(angle)
+    pos_1_ic(2) = pos_1_int(1) * sin(angle) + pos_1_int(2) * cos(angle)
+    pos_1_ic(3) = pos_1_int(3)
 
-    r = pos_2_ic(1)
-    pos_2_ic(1) = r * cos(angle)
-    pos_2_ic(2) = r * sin(angle)
-    pos_2_ic(3) = pos_2_ic(3)
+    pos_2_ic(1) = pos_2_int(1) * cos(angle) - pos_2_int(2) * sin(angle)
+    pos_2_ic(2) = pos_2_int(1) * sin(angle) + pos_2_int(2) * cos(angle)
+    pos_2_ic(3) = pos_2_int(3)
 
-    r = pos_3_ic(1)
-    pos_3_ic(1) = r * cos(angle)
-    pos_3_ic(2) = r * sin(angle)
-    pos_3_ic(3) = pos_3_ic(3)
+    pos_3_ic(1) = pos_3_int(1) * cos(angle) - pos_3_int(2) * sin(angle)
+    pos_3_ic(2) = pos_3_int(1) * sin(angle) + pos_3_int(2) * cos(angle)
+    pos_3_ic(3) = pos_3_int(3)
 
     ! Distance from par_1 to the image charges
     diff1 = pos_1 - pos_1_ic
