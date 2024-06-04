@@ -157,9 +157,10 @@ subroutine Init_Cylindrical_Tip()
     ! print *, '? 285521.7478622014 V/m ?'
     ! print *, ''
 
-    !pos_test(1) = 0.0d0
-    !pos_test(2) = 0.0d0
-    !pos_test(3) = 0.0d0
+    ! Test electron at x = 22 um, y = 0 um and z = 92 um
+    !pos_test(1) = 22.0d0*length_scale_cyl
+    !pos_test(2) = 0.0d0*length_scale_cyl
+    !pos_test(3) = 92.0d0*length_scale_cyl
     
     !vel_test = 0.0d0
 
@@ -268,7 +269,7 @@ subroutine Create_KD_Tree()
     ! Read the file into the array and scale the coordinates from mm to m
     do k = 1, n_points
       !print *, 'k = ', k
-      ! Columns: r0, z0, r1, z1, Q1, r2, z2, Q2, r3, z3, Q3
+      ! Columns: x0, z0, x1, z1, Q1, x2, z2, Q2, x3, z3, Q3
       read(ud_imagedata, *) kd_image_elec_pos(1, k), kd_image_elec_pos(2, k), &
                             kd_image_one_pos(1, k), kd_image_one_pos(2, k), kd_image_one_data(k), &
                             kd_image_two_pos(1, k), kd_image_two_pos(2, k), kd_image_two_data(k), &
@@ -1095,7 +1096,7 @@ function Image_Charge_cylinder(pos_1, pos_2)
 
   double precision, dimension(1:3) :: diff1, diff2, diff3 ! Difference between the position of the particle we are calculating the force/acceleration on from the image charges
   double precision                 :: r1, r2, r3 ! Distance from the particle we are calculating the force/acceleration on to the image charges
-  double precision, parameter      :: max_dist = 10000.0d0*length_scale ! Maximum distance for the image charge model
+  double precision, parameter      :: max_dist = 10000.0d0*length_scale_cyl ! Maximum distance for the image charge model
 
   integer, parameter               :: nn = 4 ! number of nearest neighbors to find
   type(kdtree2_result)             :: kd_results(1:nn) ! results from the kd-tree
@@ -1136,6 +1137,7 @@ function Image_Charge_cylinder(pos_1, pos_2)
   if ((pos_2_rot(1) > max_dist) .or. (pos_2_rot(2) > max_dist)) then
     ! The charge is outside the range of the image charge model
     Image_Charge_cylinder = 0.0d0
+    !print *, 'RUMDEED: Charge outside the range of the image charge model'
   else
 
     !call kdtree2_n_nearest(tp=kd_tree_image(thread)%kd_tree, qv=pos_2d, nn=nn, results=kd_results)
@@ -1268,7 +1270,22 @@ function Image_Charge_cylinder(pos_1, pos_2)
 
     ! Calculate the force from the image charges
     ! (-1.0) since the charges are opposite
-    Image_Charge_cylinder = (diff1*Q1/r1**3 + diff2*Q2/r2**3 + diff3*Q3/r3**3)
+    Image_Charge_cylinder = (-1.0d0)*(diff1*Q1/r1**3 + diff2*Q2/r2**3 + diff3*Q3/r3**3)
+
+    ! Print debug information
+    ! print *, 'Image_Charge_cylinder'
+    ! print *, 'pos_1 = ', pos_1 / length_scale_cyl
+    ! print *, 'pos_2 = ', pos_2 / length_scale_cyl
+    ! print *, ''
+    ! print *, 'pos_1_ic = ', pos_1_ic / length_scale_cyl
+    ! print *, 'Q1 = ', Q1
+    ! print *, ''
+    ! print *, 'pos_2_ic = ', pos_2_ic / length_scale_cyl
+    ! print *, 'Q2 = ', Q2
+    ! print *, ''
+    ! print *, 'pos_3_ic = ', pos_3_ic / length_scale_cyl
+    ! print *, 'Q3 = ', Q3
+    ! pause
   end if
   !Image_Charge_cylinder = 0.0d0
 end function Image_Charge_cylinder
