@@ -161,10 +161,20 @@ subroutine Init_Cylindrical_Tip()
     !pos_test(1) = 22.0d0*length_scale_cyl
     !pos_test(2) = 0.0d0*length_scale_cyl
     !pos_test(3) = 92.0d0*length_scale_cyl
+
+    !pos_test(1) = -0.022*1.0e-3
+    !pos_test(2) = 0.0d0
+    !pos_test(3) = 0.088*1.0e-3
     
     !vel_test = 0.0d0
 
     !call Add_Particle(pos_test, vel_test, species_elec, 0, 1, -1, sec_top)
+
+    !pos_test(1) = 11.707106781186548d0*length_scale_cyl
+    !pos_test(2) = 0.0d0*length_scale_cyl
+    !pos_test(3) = 99.70710678118654d0*length_scale_cyl
+    !E_test = Calc_Field_at(pos_test) - field_E_cylinder(pos_test)
+    !print *, 'E_test = ', E_test
 
     !print *, 'Calling Calc_E_edge_cyl'
     !call Calc_E_edge_cyl()
@@ -267,9 +277,12 @@ subroutine Create_KD_Tree()
     allocate(kd_image_three_data(1:n_points))
 
     ! Read the file into the array and scale the coordinates from mm to m
+    !print *, 'Reading image charge data'
+    !print *, 'n_points = ', n_points
     do k = 1, n_points
       !print *, 'k = ', k
       ! Columns: x0, z0, x1, z1, Q1, x2, z2, Q2, x3, z3, Q3
+      !print *, 'k = ', k
       read(ud_imagedata, *) kd_image_elec_pos(1, k), kd_image_elec_pos(2, k), &
                             kd_image_one_pos(1, k), kd_image_one_pos(2, k), kd_image_one_data(k), &
                             kd_image_two_pos(1, k), kd_image_two_pos(2, k), kd_image_two_data(k), &
@@ -277,8 +290,11 @@ subroutine Create_KD_Tree()
 
       !print *, 'kd_image_elec_pos(:, k) = ', kd_image_elec_pos(:, k)
       !print *, 'kd_image_one_pos(:, k) = ', kd_image_one_pos(:, k)
+      !print *, 'kd_image_one_data(k) = ', kd_image_one_data(k)
       !print *, 'kd_image_two_pos(:, k) = ', kd_image_two_pos(:, k)
+      !print *, 'kd_image_two_data(k) = ', kd_image_two_data(k)
       !print *, 'kd_image_three_pos(:, k) = ', kd_image_three_pos(:, k)
+      !print *, 'kd_image_three_data(k) = ', kd_image_three_data(k)
 
       !print *, ''
       
@@ -1983,7 +1999,7 @@ subroutine Do_Surface_Integration(N_sup)
 subroutine Calc_E_around_cyl()
   implicit none
   integer :: k
-  integer, parameter :: N_p = 100
+  integer, parameter :: N_p = 1000
 
   real(kdkind), dimension(1:3) :: p, E_vec, E_vec_image
   double precision :: phi, rho, theta
@@ -2020,7 +2036,7 @@ subroutine Calc_E_around_cyl()
     E_vec_image = Calc_Field_at(p)
     ! Store data in array
     data_cyl_around(1, :, k) = E_vec(:)
-    data_cyl_around(2, :, k) = E_vec_image(:)
+    data_cyl_around(2, :, k) = E_vec_image(:) - E_vec
   end do
 
   ! Open data file
@@ -2054,7 +2070,7 @@ subroutine Calc_E_edge_cyl()
     implicit none
     ! Local
     integer :: k
-    integer, parameter :: N_p = 100
+    integer, parameter :: N_p = 1000
     real(kdkind), dimension(1:3) :: p, E_vec, E_vec_image
     double precision :: phi, rho
     integer :: ud_cyl_side_left, ud_cyl_side_right, IFAIL
@@ -2093,7 +2109,7 @@ subroutine Calc_E_edge_cyl()
         E_vec_image = Calc_Field_at(p)
         ! Store data in array
         data_cyl_side_right(1, :, k) = E_vec(:)
-        data_cyl_side_right(2, :, k) = E_vec_image(:)
+        data_cyl_side_right(2, :, k) = E_vec_image(:) - E_vec
 
         ! Left edge
         phi = pi
@@ -2108,7 +2124,7 @@ subroutine Calc_E_edge_cyl()
         E_vec_image = Calc_Field_at(p)
         ! Store data in array
         data_cyl_side_left(1, :, k) = E_vec(:)
-        data_cyl_side_left(2, :, k) = E_vec_image(:)
+        data_cyl_side_left(2, :, k) = E_vec_image(:) - E_vec
     end do
 
     ! Open data files
@@ -2154,7 +2170,7 @@ subroutine Calc_E_corner_cyl()
     implicit none
     ! Local
     integer :: k
-    integer, parameter :: N_p = 100
+    integer, parameter :: N_p = 1000
     real(kdkind), dimension(1:3) :: p, E_vec, E_vec_image
     double precision :: phi, theta, rho
     integer :: ud_cyl_corner_left, ud_cyl_corner_right, IFAIL
@@ -2192,7 +2208,7 @@ subroutine Calc_E_corner_cyl()
         E_vec_image = Calc_Field_at(p)
         ! Store data in array
         data_cyl_corner_right(1, :, k) = E_vec(:)
-        data_cyl_corner_right(2, :, k) = E_vec_image(:)
+        data_cyl_corner_right(2, :, k) = E_vec_image(:) - E_vec
 
         ! Left corner
         phi = pi
@@ -2208,7 +2224,7 @@ subroutine Calc_E_corner_cyl()
         E_vec_image = Calc_Field_at(p)
         ! Store data in array
         data_cyl_corner_left(1, :, k) = E_vec(:)
-        data_cyl_corner_left(2, :, k) = E_vec_image(:)
+        data_cyl_corner_left(2, :, k) = E_vec_image(:) - E_vec
     end do
 
         ! Open data files
@@ -2250,7 +2266,7 @@ subroutine Calc_E_top_cyl()
     implicit none
     ! Local
     integer :: k
-    integer, parameter :: N_p = 100
+    integer, parameter :: N_p = 1000
     real(kdkind), dimension(1:3) :: p, E_vec, E_vec_image
     double precision :: rho_max
     integer :: ud_cyl_top_left, ud_cyl_top_right, IFAIL
@@ -2274,42 +2290,32 @@ subroutine Calc_E_top_cyl()
     ! Calculate the electric field along the top of the cylinder
     do k = 1, N_p
         ! Right side
-        !phi = 0.0d0
-        !rho = (k-1)*rho_max/(N_p-1)
-        !p(1) = rho*cos(phi)
-        !p(2) = rho*sin(phi)
-        !p(3) = height_cyl
         p(1) = (k-1)*(radius_cyl-radius_cor)/(N_p-1)
         p(2) = 0.0d0
         p(3) = height_cyl
 
         p_cyl_top_right(:, k) = p(:)
-        len_cyl_top_right(k) = (radius_cyl - radius_cor) - p(1)
-
-        E_vec = field_E_cylinder(p)
-        E_vec_image = Calc_Field_at(p)
-        ! Store data in array
-        data_cyl_top_left(1, :, k) = E_vec(:)
-        data_cyl_top_left(2, :, k) = E_vec_image(:)
-
-        ! Left side
-        !phi = pi
-        !rho = (k-1)*rho_max/(N_p-1)
-        !p(1) = rho*cos(phi)
-        !p(2) = rho*sin(phi)
-        !p(3) = height_cyl
-        p(1) = (k-1)*(radius_cyl-radius_cor)/(N_p-1)*(-1.0d0)
-        p(2) = 0.0d0
-        p(3) = height_cyl
-
-        p_cyl_top_left(:, k) = p(:)
-        len_cyl_top_left(k) = abs(p(1))
+        len_cyl_top_right(k) = abs(p(1))
 
         E_vec = field_E_cylinder(p)
         E_vec_image = Calc_Field_at(p)
         ! Store data in array
         data_cyl_top_right(1, :, k) = E_vec(:)
-        data_cyl_top_right(2, :, k) = E_vec_image(:)
+        data_cyl_top_right(2, :, k) = E_vec_image(:) - E_vec
+
+        ! Left side
+        p(1) = (-1.0d0)*((radius_cyl-radius_cor) - (k-1)*(radius_cyl-radius_cor)/(N_p-1))
+        p(2) = 0.0d0
+        p(3) = height_cyl
+
+        p_cyl_top_left(:, k) = p(:)
+        len_cyl_top_left(k) = abs((radius_cyl-radius_cor) - p(1))
+
+        E_vec = field_E_cylinder(p)
+        E_vec_image = Calc_Field_at(p)
+        ! Store data in array
+        data_cyl_top_left(1, :, k) = E_vec(:)
+        data_cyl_top_left(2, :, k) = E_vec_image(:) - E_vec
     end do
 
     ! Open data files
