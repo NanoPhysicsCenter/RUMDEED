@@ -1,22 +1,24 @@
 <!DOCTYPE html>
-<html class="writer-html5" lang="en" >
+<html class="writer-html5" lang="en" data-content_root="./">
 <head>
-  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.18.1: http://docutils.sourceforge.net/" />
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>7. Code description &mdash; RUMDEED  documentation</title>
-      <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
-      <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
-      <link rel="stylesheet" href="_static/css/custom.css" type="text/css" />
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=19f00094" />
+      <link rel="stylesheet" type="text/css" href="_static/css/custom.css?v=f7e3ae64" />
+
+  
   <!--[if lt IE 9]>
     <script src="_static/js/html5shiv.min.js"></script>
   <![endif]-->
   
-        <script src="_static/jquery.js"></script>
-        <script src="_static/_sphinx_javascript_frameworks_compat.js"></script>
-        <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
-        <script src="_static/doctools.js"></script>
-        <script src="_static/sphinx_highlight.js"></script>
+        <script src="_static/jquery.js?v=5d32c60e"></script>
+        <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="_static/documentation_options.js?v=5929fcd5"></script>
+        <script src="_static/doctools.js?v=9a2dae69"></script>
+        <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
         <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
     <script src="_static/js/theme.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
@@ -130,10 +132,10 @@
            <div itemprop="articleBody">
              
   <section id="code-description">
-<h1><span class="section-number">7. </span>Code description<a class="headerlink" href="#code-description" title="Permalink to this heading"></a></h1>
+<h1><span class="section-number">7. </span>Code description<a class="headerlink" href="#code-description" title="Link to this heading"></a></h1>
 <p>Below is a short description of the theory and equations used in the code.</p>
 <section id="verlet">
-<h2><span class="section-number">7.1. </span>Verlet<a class="headerlink" href="#verlet" title="Permalink to this heading"></a></h2>
+<h2><span class="section-number">7.1. </span>Verlet<a class="headerlink" href="#verlet" title="Link to this heading"></a></h2>
 <p>For particle advancement the code uses a variant of the Velocity Verlet algorithm <span id="id1">[<a class="reference internal" href="bib.html#id8" title="Loup Verlet. Computer &quot;experiments&quot; on classical fluids. i. thermodynamical properties of lennard-jones molecules. Phys. Rev., 159:98–103, Jul 1967. URL: https://link.aps.org/doi/10.1103/PhysRev.159.98, doi:10.1103/PhysRev.159.98.">6</a>]</span> called Beeman’s algorithm <span id="id2">[<a class="reference internal" href="bib.html#id9" title="Michael Levitt, Hagai Meirovitch, and R. Huber. Integrating the equations of motion. Journal of Molecular Biology, 168(3):617 - 620, 1983. URL: http://www.sciencedirect.com/science/article/pii/S0022283683803052, doi:https://doi.org/10.1016/S0022-2836(83)80305-2.">7</a>, <a class="reference internal" href="bib.html#id10" title="D. Beeman. Some multistep methods for use in molecular dynamics calculations. Journal of Computational Physics, 20(2):130 - 139, 1976. URL: http://www.sciencedirect.com/science/article/pii/0021999176900590, doi:https://doi.org/10.1016/0021-9991(76)90059-0.">8</a>]</span>. The code for it can be found in <strong>mod_verlet.F90</strong> and the main subroutine is called
 <code class="docutils literal notranslate"><span class="pre">Velocity_Verlet</span></code>.</p>
 <p>The updated positions are calculated with:</p>
@@ -153,7 +155,7 @@ After the force calculate the velocity is update using:</p>
 <p>See the <code class="docutils literal notranslate"><span class="pre">Update_Velocity</span></code> subroutine.</p>
 </section>
 <section id="photo-emission">
-<span id="photo"></span><h2><span class="section-number">7.2. </span>Photo emission<a class="headerlink" href="#photo-emission" title="Permalink to this heading"></a></h2>
+<span id="photo"></span><h2><span class="section-number">7.2. </span>Photo emission<a class="headerlink" href="#photo-emission" title="Link to this heading"></a></h2>
 <p>Photoemission Branch</p>
 <ul>
 <li><p>Photoemission based on Workfunction pattern - see mod_workfunction as well</p>
@@ -205,7 +207,7 @@ After the force calculate the velocity is update using:</p>
 </ul>
 </section>
 <section id="field-emission">
-<span id="field"></span><h2><span class="section-number">7.3. </span>Field emission<a class="headerlink" href="#field-emission" title="Permalink to this heading"></a></h2>
+<span id="field"></span><h2><span class="section-number">7.3. </span>Field emission<a class="headerlink" href="#field-emission" title="Link to this heading"></a></h2>
 <p>The field emission code uses the Fowler-Nordheim equation to calculate the total number of electrons to emit.
 The code for this can be found in <strong>mod_field_emission_v2.F90</strong>.</p>
 <p>The Fowler-Nordheim equation <span id="id3">[<a class="reference internal" href="bib.html#id6" title="Richard G Forbes and Jonathan H.B Deane. Reformulation of the standard theory of fowler–nordheim tunnelling and cold field electron emission. Proceedings of the Royal Society A: Mathematical, Physical and Engineering Science, 463(2087):2907-2927, 2007. URL: http://rspa.royalsocietypublishing.org/content/463/2087/2907.abstract, arXiv:http://rspa.royalsocietypublishing.org/content/463/2087/2907.full.pdf+html, doi:10.1098/rspa.2007.0030.">9</a>]</span> is</p>
@@ -225,7 +227,7 @@ The functions <span class="math notranslate nohighlight">\(\nu(\ell)\)</span> an
 <p id="field-tip">Tip stuff</p>
 </section>
 <section id="thermal-field-emission">
-<span id="thermal-field"></span><h2><span class="section-number">7.4. </span>Thermal-field emission<a class="headerlink" href="#thermal-field-emission" title="Permalink to this heading"></a></h2>
+<span id="thermal-field"></span><h2><span class="section-number">7.4. </span>Thermal-field emission<a class="headerlink" href="#thermal-field-emission" title="Link to this heading"></a></h2>
 <p>Thermo-Field</p>
 <span class="target" id="index-0"></span></section>
 </section>
@@ -241,7 +243,7 @@ The functions <span class="math notranslate nohighlight">\(\nu(\ell)\)</span> an
   <hr/>
 
   <div role="contentinfo">
-    <p>&#169; Copyright 2023, NanoPhysics group.</p>
+    <p>&#169; Copyright 2024, NanoPhysics group.</p>
   </div>
 
   Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a

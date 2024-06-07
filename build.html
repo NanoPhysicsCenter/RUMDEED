@@ -1,22 +1,24 @@
 <!DOCTYPE html>
-<html class="writer-html5" lang="en" >
+<html class="writer-html5" lang="en" data-content_root="./">
 <head>
-  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.18.1: http://docutils.sourceforge.net/" />
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>2. Building the code &mdash; RUMDEED  documentation</title>
-      <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
-      <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
-      <link rel="stylesheet" href="_static/css/custom.css" type="text/css" />
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=19f00094" />
+      <link rel="stylesheet" type="text/css" href="_static/css/custom.css?v=f7e3ae64" />
+
+  
   <!--[if lt IE 9]>
     <script src="_static/js/html5shiv.min.js"></script>
   <![endif]-->
   
-        <script src="_static/jquery.js"></script>
-        <script src="_static/_sphinx_javascript_frameworks_compat.js"></script>
-        <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
-        <script src="_static/doctools.js"></script>
-        <script src="_static/sphinx_highlight.js"></script>
+        <script src="_static/jquery.js?v=5d32c60e"></script>
+        <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="_static/documentation_options.js?v=5929fcd5"></script>
+        <script src="_static/doctools.js?v=9a2dae69"></script>
+        <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="_static/js/theme.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
@@ -129,7 +131,7 @@
            <div itemprop="articleBody">
              
   <section id="building-the-code">
-<span id="build"></span><h1><span class="section-number">2. </span>Building the code<a class="headerlink" href="#building-the-code" title="Permalink to this heading"></a></h1>
+<span id="build"></span><h1><span class="section-number">2. </span>Building the code<a class="headerlink" href="#building-the-code" title="Link to this heading"></a></h1>
 <p>The code has been developed to run specifically on Linux systems. If you are a Windows user,
 it is recommended to utilize the Windows Subsystem for Linux (WSL)
 for running the code. You can find installation instructions for WSL at the following link:
@@ -159,7 +161,7 @@ For instance, if you want to compile using the Intel compilers, utilize the foll
 </div>
 <p>Please refer to the <a class="reference internal" href="run.html#run"><span class="std std-ref">“Input files and running the code”</span></a> in the documentation for further instructions on running the code.</p>
 <section id="cuba-library">
-<h2><span class="section-number">2.1. </span>Cuba library<a class="headerlink" href="#cuba-library" title="Permalink to this heading"></a></h2>
+<h2><span class="section-number">2.1. </span>Cuba library<a class="headerlink" href="#cuba-library" title="Link to this heading"></a></h2>
 <p>The code uses the <a class="reference external" href="https://feynarts.de/cuba/">Cuba library</a> for numerical integration <span id="id2">[<a class="reference internal" href="bib.html#id7" title="T. Hahn. Cuba—a library for multidimensional numerical integration. Computer Physics Communications, 168(2):78-95, 2005. URL: https://www.sciencedirect.com/science/article/pii/S0010465505000792, doi:https://doi.org/10.1016/j.cpc.2005.01.010.">5</a>]</span>.
 When executing the make file, you will be prompted to download and build the Cuba library.
 It is necessary to have <strong>wget</strong> installed on your system to have the make file automatically download and build the library.
@@ -168,7 +170,7 @@ you can obtain the file ‘Cuba-4.2.2.tar.gz’ directly from the Cuba website.
 After acquiring the file, please place it into the cuba folder. To build the library, simply execute the ‘install-cuba.sh’ script.</p>
 </section>
 <section id="documentation">
-<h2><span class="section-number">2.2. </span>Documentation<a class="headerlink" href="#documentation" title="Permalink to this heading"></a></h2>
+<h2><span class="section-number">2.2. </span>Documentation<a class="headerlink" href="#documentation" title="Link to this heading"></a></h2>
 <p>This documentation can also be generate using the make file with the command:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">make docs</span>
 </pre></div>
@@ -189,7 +191,7 @@ To make the pdf file <strong>xelatex</strong> and <strong>xindy</strong> must be
   <hr/>
 
   <div role="contentinfo">
-    <p>&#169; Copyright 2023, NanoPhysics group.</p>
+    <p>&#169; Copyright 2024, NanoPhysics group.</p>
   </div>
 
   Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
