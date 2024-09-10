@@ -162,7 +162,13 @@ subroutine Init_Cylindrical_Tip()
     !pos_test(2) = 0.0d0*length_scale_cyl
     !pos_test(3) = 92.0d0*length_scale_cyl
 
-    !pos_test(1) = -0.022*1.0e-3
+    ! Test electron at x = 15 um, y = 15 um and z = 100 um
+    !pos_test(1) = 15.0d0*length_scale_cyl
+    !pos_test(2) = 15.0d0*length_scale_cyl
+    !pos_test(3) = 100.0d0*length_scale_cyl
+
+    ! Test electron at x = 22 um, y = 0 um and z = 88 um
+    !pos_test(1) = 0.022*1.0e-3
     !pos_test(2) = 0.0d0
     !pos_test(3) = 0.088*1.0e-3
     
@@ -175,6 +181,7 @@ subroutine Init_Cylindrical_Tip()
     !pos_test(3) = 99.70710678118654d0*length_scale_cyl
     !E_test = Calc_Field_at(pos_test) - field_E_cylinder(pos_test)
     !print *, 'E_test = ', E_test
+    !stop
 
     !print *, 'Calling Calc_E_edge_cyl'
     !call Calc_E_edge_cyl()
@@ -359,7 +366,7 @@ function field_E_cylinder(pos) result(field_E)
     do k = 1, nn
         field_E = field_E + w(k) * kd_data(:, kd_results(k)%idx)
     end do
-    field_E = field_E * 0.425d1 ! Debug to make field larger
+    field_E = field_E * 0.125d1 ! Debug to make field larger
 end function field_E_cylinder
 
 subroutine Check_Boundary_Cylinder(i)
@@ -653,7 +660,7 @@ subroutine Metropolis_Hastings_cyl_tip(ndim_in, F_out, F_norm_out, pos_xyz_out, 
             F_cur = F_new
             F_norm_cur = F_norm_new
             
-            write (unit=ud_mh, iostat=IFAIL) cur_time, pos_xyz_cur/length_scale, sec_cur, pos_cur
+            !write (unit=ud_mh, iostat=IFAIL) cur_time, pos_xyz_cur/length_scale, sec_cur, pos_cur
         else
             ! Reject the jump
             rejected = rejected + 1
@@ -671,7 +678,7 @@ subroutine Metropolis_Hastings_cyl_tip(ndim_in, F_out, F_norm_out, pos_xyz_out, 
     sec_out = sec_cur
     n_vec = surface_normal(pos_xyz_cur, pos_cur, sec_cur)
 
-    write(ud_cyl_debug, *) pos_xyz_cur, pos_cur, sec_cur, n_vec
+    !write(ud_cyl_debug, *) pos_xyz_cur, pos_cur, sec_cur, n_vec
 end subroutine Metropolis_Hastings_cyl_tip
 
 subroutine Jump_MH(pos_cur, sec_cur, pos_new, sec_new)
@@ -1289,19 +1296,19 @@ function Image_Charge_cylinder(pos_1, pos_2)
     Image_Charge_cylinder = (-1.0d0)*(diff1*Q1/r1**3 + diff2*Q2/r2**3 + diff3*Q3/r3**3)
 
     ! Print debug information
-    ! print *, 'Image_Charge_cylinder'
-    ! print *, 'pos_1 = ', pos_1 / length_scale_cyl
-    ! print *, 'pos_2 = ', pos_2 / length_scale_cyl
-    ! print *, ''
-    ! print *, 'pos_1_ic = ', pos_1_ic / length_scale_cyl
-    ! print *, 'Q1 = ', Q1
-    ! print *, ''
-    ! print *, 'pos_2_ic = ', pos_2_ic / length_scale_cyl
-    ! print *, 'Q2 = ', Q2
-    ! print *, ''
-    ! print *, 'pos_3_ic = ', pos_3_ic / length_scale_cyl
-    ! print *, 'Q3 = ', Q3
-    ! pause
+    !print *, 'Image_Charge_cylinder'
+    !print *, 'pos_1 = ', pos_1 / length_scale_cyl
+    !print *, 'pos_2 = ', pos_2 / length_scale_cyl
+    !print *, ''
+    !print *, 'pos_1_ic = ', pos_1_ic / length_scale_cyl
+    !print *, 'Q1 = ', Q1
+    !print *, ''
+    !print *, 'pos_2_ic = ', pos_2_ic / length_scale_cyl
+    !print *, 'Q2 = ', Q2
+    !print *, ''
+    !print *, 'pos_3_ic = ', pos_3_ic / length_scale_cyl
+    !print *, 'Q3 = ', Q3
+    !pause
   end if
   !Image_Charge_cylinder = 0.0d0
 end function Image_Charge_cylinder
@@ -1491,6 +1498,7 @@ subroutine Do_Surface_Integration(N_sup)
     !double precision   :: epsrel = 1.0d-4 ! Requested relative error
     !double precision   :: epsabs = 0.25d0 ! Requested absolute error
     integer            :: flags = 0+4 ! Flags
+    ! Set seed to non-zero value based on the current time
     integer            :: seed = 0 ! Seed for the rng. Zero will use Sobol.
     !integer            :: mineval = 75000 ! Minimum number of integrand evaluations
     !integer            :: maxeval = 10000000 ! Maximum number of integrand evaluations
@@ -1563,6 +1571,9 @@ subroutine Do_Surface_Integration(N_sup)
     ! Initialize the average field to zero
     F_avg = 0.0d0
 
+    ! Set seed
+    !seed = my_seed(1)
+
     !-----------------------------------------------------------------------------
     ! Integrate over the top surface
     ! Pass the number of the emitter being integrated over to the integrand as userdata
@@ -1579,6 +1590,8 @@ subroutine Do_Surface_Integration(N_sup)
     if (fail /= 0) then
       if (abs(error(1) - cuba_epsabs) > 1.0d-2) then
         print '(a)', 'RUMDEED: WARNING Cuba did not return 0'
+        print *, 'Top integration'
+        print *, 'time_step = ', time_step
         print *, 'Fail = ', fail
         print *, 'nregions = ', nregions
         print *, 'neval = ', neval, ' max is ', cuba_maxeval
@@ -1613,6 +1626,8 @@ subroutine Do_Surface_Integration(N_sup)
     if (fail /= 0) then
       if (abs(error(1) - cuba_epsabs) > 1.0d-2) then
         print '(a)', 'RUMDEED: WARNING Cuba did not return 0'
+        print *, 'Side integration'
+        print *, 'time_step = ', time_step
         print *, 'Fail = ', fail
         print *, 'nregions = ', nregions
         print *, 'neval = ', neval, ' max is ', cuba_maxeval
@@ -1648,6 +1663,8 @@ subroutine Do_Surface_Integration(N_sup)
     if (fail /= 0) then
       if (abs(error(1) - cuba_epsabs) > 1.0d-2) then
         print '(a)', 'RUMDEED: WARNING Cuba did not return 0'
+        print *, 'Corner integration'
+        print *, 'time_step = ', time_step
         print *, 'Fail = ', fail
         print *, 'nregions = ', nregions
         print *, 'neval = ', neval, ' max is ', cuba_maxeval
@@ -1987,10 +2004,10 @@ subroutine Do_Surface_Integration(N_sup)
     !  print *, 'ff(1) = ', ff(1)
     !end if
 
-    write (ud_field, "(*(E16.8, tr2))", iostat=IFAIL) &
-                                      par_pos(1), par_pos(2), par_pos(3), &
-                                      field(1), field(2), field(3), &
-                                      field_norm
+    !write (ud_field, "(*(E16.8, tr2))", iostat=IFAIL) &
+    !                                  par_pos(1), par_pos(2), par_pos(3), &
+    !                                  field(1), field(2), field(3), &
+    !                                  field_norm
   end function integrand_cuba_cyl
 
 !-------------------------------------------!

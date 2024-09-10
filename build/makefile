@@ -51,7 +51,7 @@ endif
 # ifeq ($(FC),gfortran)
 ifneq (,$(findstring gfortran,$(FC)))
 $(info Using GNU Fortran)
-FFLAGS=-O3 -march=native -flto=auto -fno-strict-aliasing
+FFLAGS=-O3 -march=native -mtune=native -flto=auto -fno-strict-aliasing -fno-math-errno -fno-trapping-math -ffinite-math-only
 #FFLAGS=-g -fcheck=all -Wall -fbacktrace -ffpe-trap=invalid,zero,overflow,underflow,denormal
 ifeq ($(OPENMP),yes)
 FFLAGS+=-fopenmp
