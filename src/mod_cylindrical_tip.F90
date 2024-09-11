@@ -128,7 +128,7 @@ subroutine Init_Cylindrical_Tip()
     ptr_field_E => field_E_cylinder
 
     ! The function that does the emission
-    ptr_Do_Emission => Do_Field_Emission_Cylinder
+    ptr_Do_Emission => Do_Field_Emission_Cylinder_simple
 
     ! The function to do image charge effects
     ptr_Image_Charge_effect => Image_Charge_cylinder ! Force_Image_charges for the cylinder
@@ -418,44 +418,47 @@ logical function Check_Boundary_Cylinder_pos(par_pos, sec, do_pad_in)
   ! Check if the particle should be removed from the system
   ! Check top and bottom plates
   if (z < 0.0d0) then
-      print *, 'RUMDEED: Particle below the bottom plate (Check_Boundary_Cylinder)'
+      !print *, 'RUMDEED: Particle below the bottom plate (Check_Boundary_Cylinder)'
       sec = remove_bot
       Check_Boundary_Cylinder_pos = .true.
   else if (z > box_dim(3)) then
-      print *, 'RUMDEED: Particle above the top plate (Check_Boundary_Cylinder)'
+      !print *, 'RUMDEED: Particle above the top plate (Check_Boundary_Cylinder)'
+      !print *, 'z = ', z
+      !print *, 'box_dim(3) = ', box_dim(3)
+      !print *, ''
       sec = remove_top
       Check_Boundary_Cylinder_pos = .true.
   else if (z > 0.0d0 .and. z < (height_cyl - radius_cor)) then ! Check if the particle is inside the cylinder
     ! Check cylinder
       if (r2 < radius_cyl**2) then
-          print *, 'RUMDEED: Particle inside the cylinder (Check_Boundary_Cylinder)'
-          print *, 'r2 = ', r2
-          print *, 'radius_cyl**2 = ', radius_cyl**2
-          print *, 'x = ', par_pos(1)
-          print *, 'y = ', par_pos(2)
-          print *, 'z = ', par_pos(3)
-          print *, ''
+          !print *, 'RUMDEED: Particle inside the cylinder (Check_Boundary_Cylinder)'
+          !print *, 'r2 = ', r2
+          !print *, 'radius_cyl**2 = ', radius_cyl**2
+          !print *, 'x = ', par_pos(1)
+          !print *, 'y = ', par_pos(2)
+          !print *, 'z = ', par_pos(3)
+          !print *, ''
           sec =  remove_bot
           Check_Boundary_Cylinder_pos = .true.
       end if
   else if (z > (height_cyl - radius_cor) .and. z < height_cyl) then ! Check if the particle is inside the torus (corner)
     ! Check corner
     if ((radius_cyl - radius_cor - sqrt(r2))**2 + (z - (height_cyl - radius_cor))**2 < radius_cor**2) then
-      print *, 'RUMDEED: Particle inside the corner 1 (Check_Boundary_Cylinder)'
-      print *, 'r2 = ', r2
-      print *, 'x = ', par_pos(1)
-      print *, 'y = ', par_pos(2)
-      print *, 'z = ', par_pos(3)
-      print *, ''
+      !print *, 'RUMDEED: Particle inside the corner 1 (Check_Boundary_Cylinder)'
+      !print *, 'r2 = ', r2
+      !print *, 'x = ', par_pos(1)
+      !print *, 'y = ', par_pos(2)
+      !print *, 'z = ', par_pos(3)
+      !print *, ''
       sec =  remove_bot
       Check_Boundary_Cylinder_pos = .true.
     else if (r2 < (radius_cyl - radius_cor)**2) then ! Cylinder inside the torus!
-      print *, 'RUMDEED: Particle inside the torus (Check_Boundary_Cylinder)'
-      print *, 'r2 = ', r2
-      print *, 'x = ', par_pos(1)
-      print *, 'y = ', par_pos(2)
-      print *, 'z = ', par_pos(3)
-      print *, ''
+      !print *, 'RUMDEED: Particle inside the torus (Check_Boundary_Cylinder)'
+      !print *, 'r2 = ', r2
+      !print *, 'x = ', par_pos(1)
+      !print *, 'y = ', par_pos(2)
+      !print *, 'z = ', par_pos(3)
+      !print *, ''
       sec = remove_bot
       Check_Boundary_Cylinder_pos = .true.
     end if
@@ -463,11 +466,11 @@ logical function Check_Boundary_Cylinder_pos(par_pos, sec, do_pad_in)
     ! Check the top of the corner
     RR = radius_cyl - radius_cor + sqrt(radius_cor**2 - (z - (height_cyl - radius_cor))**2)
     if (r2 < RR**2) then
-      print *, 'RUMDEED: Particle inside the corner 2 (Check_Boundary_Cylinder)'
-      print *, 'x = ', par_pos(1)
-      print *, 'y = ', par_pos(2)
-      print *, 'z = ', par_pos(3)
-      print *, ''
+      !print *, 'RUMDEED: Particle inside the corner 2 (Check_Boundary_Cylinder)'
+      !print *, 'x = ', par_pos(1)
+      !print *, 'y = ', par_pos(2)
+      !print *, 'z = ', par_pos(3)
+      !print *, ''
       sec = remove_bot
       Check_Boundary_Cylinder_pos = .true.
     end if
@@ -582,6 +585,72 @@ subroutine Do_Field_Emission_Cylinder(step)
     write (ud_emit, "(E14.6, *(tr8, i6))", iostat=IFAIL) cur_time, step, nrElecEmit, nrElec, &
                                                        & (nrEmitted_emitters(i), i = 1, nrEmit)
 end subroutine Do_Field_Emission_Cylinder
+
+subroutine Do_Field_Emission_Cylinder_simple(step)
+  integer, intent(in) :: step
+  integer             :: i, IFAIL
+  integer, parameter  :: emit = 1
+
+  ! Integration
+  double precision                 :: N_sup
+  integer                          :: N_round
+
+  ! Emission variables
+  double precision                 :: D_f, Df_avg, F_norm, rnd
+  double precision, dimension(1:3) :: F, n_vec
+  integer                          :: s, sec, sec_b
+  integer                          :: nrElecEmit
+  double precision, dimension(1:3) :: par_pos, par_vel, old_pos
+  !logical                          :: to_pause = .false.
+
+  nrEmitted_emitters = 0
+
+  call Do_Surface_Integration_simple(N_sup)
+  N_round = Rand_Poission(N_sup)
+
+  nrElecEmit = 0
+  nrEmitted_emitters(emit) = 0
+
+  Df_avg = 0.0d0
+  i = 0
+  ! Loop over the electrons to be emitted.
+  do s = 1, N_round
+      ! Get the position of the particle
+      ! ndim_in, F_out, F_norm_out, pos_xyz_out, sec_out
+      call Metropolis_Hastings_cyl_tip(N_MH_step, F, F_norm, par_pos, sec, n_vec)
+
+      ! Check if the field is favorable for emission or not
+      if (F_norm >= 0.0d0) then
+        D_f = -huge(1.0d0)
+        print *, 'Warning: F > 0.0d0 (Do_Field_Emission_Cylinder)'
+        print *, 'F_norm = ', F_norm
+        print *, 'F = ', F
+        print *, 'par_pos = ', par_pos
+        print *, 'sec = ', sec
+        stop
+      else
+
+        par_pos = par_pos + n_vec*length_scale
+        call Add_Particle(par_pos, par_vel, species_elec, step, emit, -1, sec)
+
+        nrElecEmit = nrElecEmit + 1
+        nrEmitted_emitters(emit) = nrEmitted_emitters(emit) + 1
+      end if
+    end do
+
+    ! Df_avg = Df_avg / dble(i)
+    ! !print *, 'df_avg = ', Df_avg
+    ! if (Df_avg > 1.0d-4) then
+    !   print *, 'RUMDEED: Df_avg > 1.0d-4 (Do_Field_Emission_Cylinder)'
+    !   print *, step
+    !   write_position_file = .true.
+    !   call Write_Position(0)
+    !   cought_stop_signal = .true.
+    ! end if
+
+  write (ud_emit, "(E14.6, *(tr8, i6))", iostat=IFAIL) cur_time, step, nrElecEmit, nrElec, &
+                                                     & (nrEmitted_emitters(i), i = 1, nrEmit)
+end subroutine Do_Field_Emission_Cylinder_simple
 
 subroutine Metropolis_Hastings_cyl_tip(ndim_in, F_out, F_norm_out, pos_xyz_out, sec_out, n_vec)
     ! Input variables
@@ -1335,6 +1404,23 @@ subroutine Do_Surface_Integration(N_sup)
     end select
   end subroutine Do_Surface_Integration
 
+  subroutine Do_Surface_Integration_simple(N_sup)
+    double precision, intent(out) :: N_sup ! Number of electrons
+
+    SELECT CASE (cuba_method)
+    case(cuba_method_suave)
+      !call Do_Cuba_Suave(N_sup)
+      print '(a)', 'RUMDEED: ERROR SIMPLE METHOD NOT IMPLEMENTED FOR SUAVE'
+      stop
+    case(cuba_method_divonne)
+      call Do_Cuba_Divonne_simple(N_sup)
+    case default
+      print '(a)', 'RUMDEED: ERROR UNKNOWN INTEGRATION METHOD'
+      print *, cuba_method
+      stop
+    end select
+  end subroutine Do_Surface_Integration_simple
+
 !----------------------------------------------------------------------------------------
 ! The functions v_y and t_y are because of the image charge effect in the FN equation.
 ! The approximation for v_y and t_y are taken from
@@ -1704,6 +1790,228 @@ subroutine Do_Surface_Integration(N_sup)
     prob_corner = N_corner / N_sup
   end subroutine Do_Cuba_Divonne
 
+  subroutine Do_Cuba_Divonne_simple(N_sup)
+    implicit none
+    double precision, intent(out) :: N_sup
+    double precision              :: N_top, N_side, N_corner
+    integer                       :: i
+    integer                       :: IFAIL
+  
+    
+    ! Cuba integration variables (common)
+    integer, parameter :: ndim = 2 ! Number of dimensions
+    integer, parameter :: ncomp = 1 ! Number of components in the integrand
+    integer            :: userdata = 0 ! User data passed to the integrand
+    integer, parameter :: nvec = 1 ! Number of points given to the integrand function
+    !double precision   :: epsrel = 1.0d-4 ! Requested relative error
+    !double precision   :: epsabs = 0.25d0 ! Requested absolute error
+    integer            :: flags = 0+4 ! Flags
+    ! Set seed to non-zero value based on the current time
+    integer            :: seed = 0 ! Seed for the rng. Zero will use Sobol.
+    !integer            :: mineval = 75000 ! Minimum number of integrand evaluations
+    !integer            :: maxeval = 10000000 ! Maximum number of integrand evaluations
+  
+    ! Divonne specific
+    integer :: key1 = 47 ! 〈in〉, determines sampling in the partitioning phase:
+                    ! key1 = 7,9,11,13 selects the cubature rule of degree key1.
+                    ! Note that the degree-11 rule is available only in 3 dimensions, the degree-13 rule only in 2 dimensions.
+                    ! For other values of key1, a quasi-random sample of n_1=|key1| points is used,
+                    ! where the sign of key1 determines the type of sample,
+                    ! – key1 > 0, use a Korobov quasi-random sample,
+                    ! – key1 < 0, use a “standard” sample (a Sobol quasi-random sample if seed= 0, otherwise a pseudo-random sample).
+    integer :: key2 = 1 !<in>, determines sampling in the final integration phase:
+                    ! key2 = 7, 9, 11, 13 selects the cubature rule of degree key2. Note that the degree-11
+                    ! rule is available only in 3 dimensions, the degree-13 rule only in 2 dimensions.
+                    ! For other values of key2, a quasi-random sample is used, where the sign of key2
+                    ! determines the type of sample,
+                    ! - key2 > 0, use a Korobov quasi-random sample,
+                    ! - key2 < 0, use a "standard" sample (see description of key1 above),
+                    ! and n_2 = |key2| determines the number of points,
+                    ! - n_2 > 40, sample n2 points,
+                    ! - n_2 < 40, sample n2 nneed points, where nneed is the number of points needed to
+                    ! reach the prescribed accuracy, as estimated by Divonne from the results of the
+                    ! partitioning phase.
+    integer :: key3 = -1 ! <in>, sets the strategy for the refinement phase:
+                    ! key3 = 0, do not treat the subregion any further.
+                    ! key3 = 1, split the subregion up once more.
+                    ! Otherwise, the subregion is sampled a third time with key3 specifying the sampling
+                    ! parameters exactly as key2 above.
+    integer :: maxpass = 2! <in>, controls the thoroughness of the partitioning phase: The
+  ! partitioning phase terminates when the estimated total number of integrand evaluations
+  ! (partitioning plus final integration) does not decrease for maxpass successive iterations.
+  ! A decrease in points generally indicates that Divonne discovered new structures of
+  ! the integrand and was able to find a more effective partitioning. maxpass can be
+  ! understood as the number of `safety' iterations that are performed before the partition
+  ! is accepted as final and counting consequently restarts at zero whenever new structures are found.
+    double precision :: border = 0.0d0 ! <in>, the width of the border of the integration region.
+  ! Points falling into this border region will not be sampled directly, but will be extrapolated
+  ! from two samples from the interior. Use a non-zero border if the integrand
+  ! subroutine cannot produce values directly on the integration boundary.
+    double precision :: maxchisq = 10.0d0 !<in>, the maximum \chi^2 value a single subregion is allowed
+  ! to have in the final integration phase. Regions which fail this \chi^2 test and whose
+  ! sample averages differ by more than mindeviation move on to the refinement phase.
+    double precision :: mindeviation = 0.25d0 !<in>, a bound, given as the fraction of the requested
+  ! error of the entire integral, which determines whether it is worthwhile further
+  ! examining a region that failed the \chi^2 test. Only if the two sampling averages
+  ! obtained for the region differ by more than this bound is the region further treated.
+    integer :: ngiven = 0 ! <in>, the number of points in the xgiven array.
+    integer :: ldxgiven = ndim ! <in>, the leading dimension of xgiven, i.e. the offset between one point and the next in memory.
+    !double precision, allocatable :: xgiven(:,:) ! xgiven(ldxgiven,ngiven) <in>, a list of points where the integrand
+  ! might have peaks. Divonne will consider these points when partitioning the
+  ! integration region. The idea here is to help the integrator find the extrema of the integrand
+  ! in the presence of very narrow peaks. Even if only the approximate location
+  ! of such peaks is known, this can considerably speed up convergence.
+    integer :: nextra = 0 ! <in>, the maximum number of extra points the peak-finder subroutine
+  ! will return. If nextra is zero, peakfinder is not called and an arbitrary object
+  ! may be passed in its place, e.g. just 0.
+  
+  
+    ! Output
+    character          :: statefile = "" ! File to save the state in. Empty string means don't do it.
+    integer            :: spin = -1 ! Spinning cores
+    integer            :: nregions ! <out> The actual number of subregions needed
+    integer            :: neval ! <out> The actual number of integrand evaluations needed
+    integer            :: fail ! <out> Error flag (0 = Success, -1 = Dimension out of range, >0 = Accuracy goal was not met)
+    double precision, dimension(1:ncomp) :: integral ! <out> The integral of the integrand over the unit hybercube
+    double precision, dimension(1:ncomp) :: error ! <out> The presumed absolute error
+    double precision, dimension(1:ncomp) :: prob ! <out> The chi-square probability
+  
+    ! Initialize the average field to zero
+    F_avg = 0.0d0
+
+    ! Set seed
+    !seed = my_seed(1)
+
+    !-----------------------------------------------------------------------------
+    ! Integrate over the top surface
+    ! Pass the number of the emitter being integrated over to the integrand as userdata
+    userdata = sec_top
+   
+    call divonne(ndim, ncomp, integrand_cuba_cyl_simple, userdata, nvec,&
+                cuba_epsrel, cuba_epsabs, flags, seed, cuba_mineval, cuba_maxeval,&
+                key1, key2, key3, maxpass,&
+                border, maxchisq, mindeviation,&
+                ngiven, ldxgiven, 0, nextra, 0,&
+                statefile, spin,&
+                nregions, neval, fail, integral, error, prob)
+  
+    if (fail /= 0) then
+      if (abs(error(1) - cuba_epsabs) > 1.0d-2) then
+        print '(a)', 'RUMDEED: WARNING Cuba did not return 0'
+        print *, 'Top integration'
+        print *, 'time_step = ', time_step
+        print *, 'Fail = ', fail
+        print *, 'nregions = ', nregions
+        print *, 'neval = ', neval, ' max is ', cuba_maxeval
+        print *, 'error(1) = ', error(1)
+        print *, 'integral(1)*epsrel = ', integral(1)*cuba_epsrel
+        print *, 'epsabs = ', cuba_epsabs
+        print *, 'prob(1) = ', prob(1)
+        print *, 'integral(1) = ', integral(1)
+        call Flush_Data()
+      end if
+    end if
+  
+    ! Store the results
+    N_top = integral(1)
+
+    ! Write the output variables of the integration to a file
+    write(ud_integrand, '(i8, tr2, i8, tr2, i4, tr2, ES12.4, tr2, ES12.4, tr2, ES12.4)', iostat=IFAIL) &
+                            & nregions, neval, fail, integral(1), error(1), prob(1)
+
+    !-----------------------------------------------------------------------------
+    ! Integrate over the side surface
+    userdata = sec_side
+   
+    call divonne(ndim, ncomp, integrand_cuba_cyl_simple, userdata, nvec,&
+                 cuba_epsrel, cuba_epsabs, flags, seed, cuba_mineval, cuba_maxeval,&
+                 key1, key2, key3, maxpass,&
+                 border, maxchisq, mindeviation,&
+                 ngiven, ldxgiven, 0, nextra, 0,&
+                 statefile, spin,&
+                 nregions, neval, fail, integral, error, prob)
+   
+    if (fail /= 0) then
+      if (abs(error(1) - cuba_epsabs) > 1.0d-2) then
+        print '(a)', 'RUMDEED: WARNING Cuba did not return 0'
+        print *, 'Side integration'
+        print *, 'time_step = ', time_step
+        print *, 'Fail = ', fail
+        print *, 'nregions = ', nregions
+        print *, 'neval = ', neval, ' max is ', cuba_maxeval
+        print *, 'error(1) = ', error(1)
+        print *, 'integral(1)*epsrel = ', integral(1)*cuba_epsrel
+        print *, 'epsabs = ', cuba_epsabs
+        print *, 'prob(1) = ', prob(1)
+        print *, 'integral(1) = ', integral(1)
+        call Flush_Data()
+      end if
+    end if
+   
+    ! Store the results
+    N_side = integral(1)
+
+    ! Write the output variables of the integration to a file
+    write(ud_integrand, '(i8, tr2, i8, tr2, i4, tr2, ES12.4, tr2, ES12.4, tr2, ES12.4)', iostat=IFAIL) &
+                            & nregions, neval, fail, integral(1), error(1), prob(1)
+
+    !-----------------------------------------------------------------------------
+    ! Integrate over the corner surface
+    userdata = sec_corner
+    !print *, 'Doing corner'
+   
+    call divonne(ndim, ncomp, integrand_cuba_cyl_simple, userdata, nvec,&
+                 cuba_epsrel, cuba_epsabs, flags, seed, cuba_mineval, cuba_maxeval,&
+                 key1, key2, key3, maxpass,&
+                 border, maxchisq, mindeviation,&
+                 ngiven, ldxgiven, 0, nextra, 0,&
+                 statefile, spin,&
+                 nregions, neval, fail, integral, error, prob)
+   
+    if (fail /= 0) then
+      if (abs(error(1) - cuba_epsabs) > 1.0d-2) then
+        print '(a)', 'RUMDEED: WARNING Cuba did not return 0'
+        print *, 'Corner integration'
+        print *, 'time_step = ', time_step
+        print *, 'Fail = ', fail
+        print *, 'nregions = ', nregions
+        print *, 'neval = ', neval, ' max is ', cuba_maxeval
+        print *, 'error(1) = ', error(1)
+        print *, 'integral(1)*epsrel = ', integral(1)*cuba_epsrel
+        print *, 'epsabs = ', cuba_epsabs
+        print *, 'prob(1) = ', prob(1)
+        print *, 'integral(1) = ', integral(1)
+        call Flush_Data()
+      end if
+    end if
+   
+    ! Store the results
+    N_corner = integral(1)
+
+    !print *, 'Done corner'
+    !print 
+    !pause
+
+    ! Finish calculating the average field
+    F_avg = F_avg / neval
+
+    ! Write the output variables of the integration to a file
+    write(ud_integrand, '(i8, tr2, i8, tr2, i4, tr2, ES12.4, tr2, ES12.4, tr2, ES12.4)', iostat=IFAIL) &
+                          & nregions, neval, fail, integral(1), error(1), prob(1)
+
+    ! Calculate the total number of electrons emitted
+    !print *, 'N_top = ', N_top
+    !print *, 'N_side = ', N_side
+    !print *, 'N_corner = ', N_corner
+    N_sup = N_top + N_side + N_corner
+    !print *, 'N_sup = ', N_sup
+    
+    ! Set probabilities of emitting from different surfaces
+    prob_top = N_top / N_sup
+    prob_side = N_side / N_sup
+    prob_corner = N_corner / N_sup
+  end subroutine Do_Cuba_Divonne_simple
+
   subroutine Do_Cuba_Suave(N_sup)
     implicit none
    ! Input / output variables
@@ -2009,6 +2317,170 @@ subroutine Do_Surface_Integration(N_sup)
     !                                  field(1), field(2), field(3), &
     !                                  field_norm
   end function integrand_cuba_cyl
+
+!-----------------------------------------------------------------------------
+  ! ----------------------------------------------------------------------------
+  ! The integration function for the Cuba library
+  !
+  integer function integrand_cuba_cyl_simple(ndim, xx, ncomp, ff, userdata)
+    ! Input / output variables
+    integer, intent(in) :: ndim ! Number of dimensions (Should be 2)
+    integer, intent(in) :: ncomp ! Number of vector-components in the integrand (Always 1 here)
+    integer, intent(in) :: userdata ! Additional data passed to the integral function (In our case the number of the emitter)
+    double precision, intent(in), dimension(1:ndim)   :: xx ! Integration points, between 0 and 1
+    double precision, intent(out), dimension(1:ncomp) :: ff ! Results of the integrand function
+
+    ! Variables used for calculations
+    double precision, dimension(1:3) :: par_pos, par_pos_org, field
+    double precision                 :: field_norm
+
+    ! Variables used for the transformation from the hypercube to the surface
+    double precision, dimension(1:2) :: upper, lower, range
+    double precision                 :: jacobian ! Jacobian of the transformation from the hypercube to the surface
+
+    ! Other variables
+    integer :: IFAIL
+
+    !print *, 'Integrand called'
+    ! Surface position
+    ! Cuba does the integration over the hybercube.
+    ! It gives us coordinates between 0 and 1.
+    ! Check which section the emitter is in
+    if (userdata == sec_top) then
+      !print *, 'Top surface'
+        ! Use cylindrical coordinates for the top surface here to avoid rejecting points
+        ! r [0, radius_cyl - radius_cor]
+        ! phi [0, 2*pi]
+        upper(1:2) = (/radius_cyl - radius_cor, 2.0d0*pi/)
+        lower(1:2) = (/0.0d0, 0.0d0/)
+
+        !upper(1:2) = 1.0d0*(radius_cyl - radius_cor)/length_scale
+        !lower(1:2) = -1.0d0*(radius_cyl - radius_cor)/length_scale
+
+        ! Range
+        range(1:2) = upper(1:2) - lower(1:2)
+
+        ! r and phi coordinates of the point on the surface
+        par_pos_org(1:2) = lower(1:2) + xx(1:2)*range(1:2)
+        par_pos_org(3) = height_cyl ! z
+
+        ! Convert to cartesian coordinates
+        par_pos(1) = xx(1)*upper(1)*cos(xx(2)*upper(2))
+        par_pos(2) = xx(1)*(radius_cyl-radius_cor)*sin(xx(2)*2.0d0*pi)
+        par_pos(3) = height_cyl
+
+        ! Jacobian of the transformation from the hypercube
+        jacobian = par_pos_org(1)*range(1)*range(2) ! dx dy = r dr dphi
+        
+        !ff(1) = 1.0d0 ! Integrand results debug
+        
+        ! ! Check if the point is inside the circle on the top surface
+        ! if ((scaledx(1)**2 + scaledx(2)**2) <= ((radius_cyl-radius_cor)/length_scale)**2) then
+        !     ff(1) = 1.0d0
+        ! else
+        !     ff(1) = 0.0d0 ! Point is outside the circle reject it
+        ! end if
+        integrand_cuba_cyl_simple = 0 ! Return value to Cuba, 0 = success
+
+        !write(ud_cyl_debug, *) par_pos(1:3), par_pos_org(1:3), userdata
+    else if (userdata == sec_side) then
+      !print *, 'Side surface'
+        ! Use cylindrical coordinates for the side surface
+        ! phi [0, 2*pi]
+        ! z [0, height_cyl - radius_cor]
+        upper(1:2) = (/2.0d0*pi, height_cyl - radius_cor/)
+        lower(1:2) = (/0.0d0, 0.0d0/)
+
+        ! Range
+        range(1:2) = upper(1:2) - lower(1:2)
+
+        ! rho, phi and z coordinates of the point on the surface
+        par_pos_org(1) = radius_cyl
+        par_pos_org(2:3) = lower(1:2) + xx(1:2)*range(1:2)
+
+        ! Convert to cartesian coordinates
+        par_pos(1) = radius_cyl*cos(par_pos_org(2))
+        par_pos(2) = radius_cyl*sin(par_pos_org(2))
+        par_pos(3) = par_pos_org(3)
+
+        ! Jacobian of the transformation from the hypercube
+        jacobian = radius_cyl*range(1)*range(2) ! r dphi dz
+
+        !ff(1) = 1.0d0 ! Integrand results debug
+
+        integrand_cuba_cyl_simple = 0 ! Return value to Cuba, 0 = success
+
+        !write(ud_cyl_debug, *) par_pos(1:3), par_pos_org(1:3), userdata
+    else if (userdata == sec_corner) then
+      !print *, 'Corner surface'
+        ! Use toroidal coordinates for the corner surface
+        ! phi [0, 2*pi]
+        ! theta [0, pi/2]
+        upper(1:2) = (/2.0d0*pi, pi/2.0d0/)
+        lower(1:2) = (/0.0d0, 0.0d0/)
+
+        ! Range
+        range(1:2) = upper(1:2) - lower(1:2)
+
+        ! rho, phi and theta coordinates of the point on the surface
+        par_pos_org(1) = radius_cor
+        par_pos_org(2:3) = lower(1:2) + xx(1:2)*range(1:2)
+
+        ! Convert to cartesian coordinates
+        par_pos(1) = (radius_cyl - radius_cor + radius_cor*cos(par_pos_org(3)))*cos(par_pos_org(2))
+        par_pos(2) = (radius_cyl - radius_cor + radius_cor*cos(par_pos_org(3)))*sin(par_pos_org(2))
+        par_pos(3) = (height_cyl - radius_cor) + radius_cor*sin(par_pos_org(3))
+
+        ! Jacobian of the transformation from the hypercube
+        jacobian = radius_cor*(radius_cyl - radius_cor + radius_cor*cos(par_pos_org(3)))*range(1)*range(2) ! rho*(R_0 + rho*cos(theta)) dphi dtheta
+
+        !ff(1) = 1.0d0 ! Integrand results debug
+
+        integrand_cuba_cyl_simple = 0 ! Return value to Cuba, 0 = success
+
+        !write(ud_cyl_debug, *) par_pos(1:3), par_pos_org(1:3), userdata
+    else
+        integrand_cuba_cyl_simple = 100 ! Error
+        !print *, 'RUMDEED: Error Unknown section (integrand_cuba)'
+        !stop
+    end if
+
+    ! Calculate the electric field on the surface
+    field = Calc_Field_at(par_pos)
+    field_norm = Field_normal(par_pos, par_pos_org, field, userdata)
+
+    ! Add to the average field
+    F_avg = F_avg + field
+
+    ! Check if the field is favorable for emission
+    if (field_norm < 0.0d0) then
+      ! The field is favorable for emission
+      ! Calculate the electron supply at this point
+      ff(1) = Elec_Supply_V2(field_norm, par_pos)*Escape_Prob(field_norm, par_pos)
+      !print *, 'Electron supply = ', ff(1)
+    else
+    !   ! The field is NOT favorable for emission
+    !   ! This point does not contribute
+      !print *, 'Field not favorable for emission'
+      !print *, 'field_norm = ', field_norm
+      !print *, 'par_pos = ', par_pos/length_scale_cyl
+
+      ff(1) = 0.0d0
+      !pause
+    end if
+
+    ! We multiply with the jacobian because Cuba does the 
+    ! integration over the hybercube, i.e. from 0 to 1.
+    ff(1) = jacobian*ff(1)
+    !if (userdata == sec_corner) then
+    !  print *, 'ff(1) = ', ff(1)
+    !end if
+
+    !write (ud_field, "(*(E16.8, tr2))", iostat=IFAIL) &
+    !                                  par_pos(1), par_pos(2), par_pos(3), &
+    !                                  field(1), field(2), field(3), &
+    !                                  field_norm
+  end function integrand_cuba_cyl_simple
 
 !-------------------------------------------!
 ! Tests
