@@ -588,7 +588,7 @@ end subroutine Do_Field_Emission_Cylinder
 
 subroutine Do_Field_Emission_Cylinder_simple(step)
   integer, intent(in) :: step
-  integer             :: i, IFAIL
+  integer             :: i, IFAIL, per
   integer, parameter  :: emit = 1
 
   ! Integration
@@ -604,6 +604,21 @@ subroutine Do_Field_Emission_Cylinder_simple(step)
   !logical                          :: to_pause = .false.
 
   nrEmitted_emitters = 0
+
+  ! Check if the step is 10%, 20%, 30%, 40%, 50%, 60%, 70%, 80%, 90% or 100% of the total steps
+  if (mod(step, steps/10) == 0) then
+    per = nint(dble(step)/dble(steps)*100.0d0) ! Calculate the percentage of the simulation
+    print *, 'Step = ', step
+    print *, 'Percentage = ', per, '%'
+
+    ! Calculate the field at the surface
+    print *, 'Calling Calc_E_edge_cyl'
+    call Calc_E_edge_cyl(per)
+    print *, 'Calling Calc_E_side_cyl'
+    call Calc_E_top_cyl(per)
+    print *, 'Calling Calc_E_top_cyl'
+    call Calc_E_corner_cyl(per)
+  end if
 
   call Do_Surface_Integration_simple(N_sup)
   N_round = Rand_Poission(N_sup)
@@ -2555,16 +2570,18 @@ end subroutine Calc_E_around_cyl
 !-----------------------------------------------------------------------
 ! Calculate the electric field along the edge of the cylinder
 ! Coordinates are cylindrical (rho, phi, z)
-subroutine Calc_E_edge_cyl()
+subroutine Calc_E_edge_cyl(per)
     implicit none
+    integer, intent(in), optional :: per
     ! Local
     integer :: k
     integer, parameter :: N_p = 1000
     real(kdkind), dimension(1:3) :: p, E_vec, E_vec_image
     double precision :: phi, rho
     integer :: ud_cyl_side_left, ud_cyl_side_right, IFAIL
-    character (len=*), parameter :: filename_cyl_side_left="cyl_side_left.dt"
-    character (len=*), parameter :: filename_cyl_side_right="cyl_side_right.dt"
+
+    character (len=100) :: filename_cyl_side_left
+    character (len=100) :: filename_cyl_side_right
 
     ! Data arrays
     double precision, dimension(:, :, :), allocatable :: data_cyl_side_left, data_cyl_side_right
@@ -2618,6 +2635,15 @@ subroutine Calc_E_edge_cyl()
 
     ! Open data files
     print *, 'Opening data files'
+    ! If per variable is present, then append the percentage to the file name
+    if (present(per)) then
+      write(filename_cyl_side_left, '(a, i3, a)') "out/cyl_side_left_", per, ".dt"
+      write(filename_cyl_side_right, '(a, i3, a)') "out/cyl_side_right_", per, ".dt"
+    else
+      filename_cyl_side_left = "out/cyl_side_left.dt"
+      filename_cyl_side_right = "out/cyl_side_right.dt"
+    end if
+
     open(newunit=ud_cyl_side_left, iostat=IFAIL, file=filename_cyl_side_left, status='REPLACE', action='WRITE')
     if (IFAIL /= 0) then
       print '(a)', 'RUMDEED: ERROR UNABLE TO OPEN file ', filename_cyl_side_left
@@ -2655,8 +2681,9 @@ end subroutine Calc_E_edge_cyl
     !-----------------------------------------------------------------------
     ! Calculate the electric field along the corner of the cylinder
     ! Coordinates are torodial (rho, phi, theta)
-subroutine Calc_E_corner_cyl()
+subroutine Calc_E_corner_cyl(per)
     implicit none
+    integer, intent(in), optional :: per
     ! Local
     integer :: k
     integer, parameter :: N_p = 1000
@@ -2664,8 +2691,8 @@ subroutine Calc_E_corner_cyl()
     double precision :: phi, theta, rho
     integer :: ud_cyl_corner_left, ud_cyl_corner_right, IFAIL
     
-    character (len=*), parameter :: filename_cyl_corner_left="cyl_corner_left.dt"
-    character (len=*), parameter :: filename_cyl_corner_right="cyl_corner_right.dt"
+    character (len=100) :: filename_cyl_corner_left
+    character (len=100) :: filename_cyl_corner_right
 
     ! Data arrays
     double precision, dimension(:, :, :), allocatable :: data_cyl_corner_left, data_cyl_corner_right
@@ -2716,7 +2743,16 @@ subroutine Calc_E_corner_cyl()
         data_cyl_corner_left(2, :, k) = E_vec_image(:) - E_vec
     end do
 
-        ! Open data files
+    ! Open data files
+    ! If per variable is present, then append the percentage to the file name
+    if (present(per)) then
+      write(filename_cyl_corner_left, '(a, i3, a)') "out/cyl_corner_left_", per, ".dt"
+      write(filename_cyl_corner_right, '(a, i3, a)') "out/cyl_corner_right_", per, ".dt"
+    else
+      filename_cyl_corner_left = "out/cyl_corner_left.dt"
+      filename_cyl_corner_right = "out/cyl_corner_right.dt"
+    end if
+
     open(newunit=ud_cyl_corner_left, iostat=IFAIL, file=filename_cyl_corner_left, status='REPLACE', action='WRITE')
     if (IFAIL /= 0) then
       print '(a)', 'RUMDEED: ERROR UNABLE TO OPEN file ', filename_cyl_corner_left
@@ -2751,16 +2787,18 @@ end subroutine Calc_E_corner_cyl
 !-----------------------------------------------------------------------
 ! Calculate the electric field along the top of the cylinder
 ! Coordinates are cylindrical (rho, phi, z)
-subroutine Calc_E_top_cyl()
+subroutine Calc_E_top_cyl(per)
     implicit none
+    integer, intent(in), optional :: per
     ! Local
     integer :: k
     integer, parameter :: N_p = 1000
     real(kdkind), dimension(1:3) :: p, E_vec, E_vec_image
     double precision :: rho_max
     integer :: ud_cyl_top_left, ud_cyl_top_right, IFAIL
-    character (len=*), parameter :: filename_cyl_top_left="cyl_top_left.dt"
-    character (len=*), parameter :: filename_cyl_top_right="cyl_top_right.dt"
+
+    character (len=100) :: filename_cyl_top_left
+    character (len=100) :: filename_cyl_top_right
 
     ! Data arrays
     double precision, dimension(:, :, :), allocatable :: data_cyl_top_left, data_cyl_top_right
@@ -2808,6 +2846,15 @@ subroutine Calc_E_top_cyl()
     end do
 
     ! Open data files
+    ! If per variable is present, then append the percentage to the file name
+    if (present(per)) then
+      write(filename_cyl_top_left, '(a, i3, a)') "out/cyl_top_left_", per, ".dt"
+      write(filename_cyl_top_right, '(a, i3, a)') "out/cyl_top_right_", per, ".dt"
+    else
+      filename_cyl_top_left = "out/cyl_top_left.dt"
+      filename_cyl_top_right = "out/cyl_top_right.dt"
+    end if
+
     open(newunit=ud_cyl_top_left, iostat=IFAIL, file=filename_cyl_top_left, status='REPLACE', action='WRITE')
     if (IFAIL /= 0) then
       print '(a)', 'RUMDEED: ERROR UNABLE TO OPEN file ', filename_cyl_top_left
