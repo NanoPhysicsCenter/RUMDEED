@@ -143,7 +143,7 @@ subroutine Init_Cylindrical_Tip()
     call Create_KD_Tree()
 
     ! ! Open the file for debugging
-    open(newunit=ud_cyl_debug, file='cyl_debug.dt', status='replace', action='write')
+    !open(newunit=ud_cyl_debug, file='cyl_debug.dt', status='replace', action='write')
 
     ! ! Debugging the kd-tree, its data and interpolation
     ! pos_test(1) = -0.011920996665774017d0*1.0d-3
@@ -191,6 +191,9 @@ subroutine Init_Cylindrical_Tip()
     !call Calc_E_corner_cyl()
 
     !call Calc_E_around_cyl()
+
+    call Calc_E_cyl()
+    stop
 
     ! ! Debugging the integration
     ! print *, 'Calling Do_Cuba_Suave'
@@ -2885,5 +2888,120 @@ subroutine Calc_E_top_cyl(per)
     deallocate(len_cyl_top_left)
     deallocate(len_cyl_top_right)
 end subroutine Calc_E_top_cyl
+
+subroutine Calc_E_cyl(per)
+    implicit none
+    integer, intent(in), optional :: per
+
+    ! Data arrays
+    double precision, dimension(:, :, :), allocatable :: data_cyl
+    double precision, dimension(:, :), allocatable :: p_cyl
+    double precision, dimension(:), allocatable    :: len_cyl
+
+    ! Local
+    integer :: i
+    double precision :: theta
+    integer, parameter :: N_p = 1000
+    integer :: ud_cyl, IFAIL
+
+    ! Allocate arrays
+    allocate(data_cyl(1:2, 1:3, 1:5*N_p))
+    allocate(p_cyl(1:3, 1:5*N_p))
+    allocate(len_cyl(1:5*N_p))
+
+    ! Calculate the electric field along the left edge of the cylinder
+    do i = 1, N_p
+        ! Left edge
+        p_cyl(:, i) = (/ -1.0d0*radius_cyl, 0.0d0, (i-1)*(height_cyl-radius_cor)/(N_p-1) /)
+        if (i == 1) then
+            len_cyl(i) = 0.0d0
+        else
+            ! Calculate the distance from the previous point and add to the total length
+            len_cyl(i) = len_cyl(i-1) + sqrt((p_cyl(1, i) - p_cyl(1, i-1))**2 + &
+                                             (p_cyl(2, i) - p_cyl(2, i-1))**2 + &
+                                             (p_cyl(3, i) - p_cyl(3, i-1))**2)
+        end if
+
+        data_cyl(1, :, i) = field_E_cylinder(p_cyl(:, i))
+        data_cyl(2, :, i) = Calc_Field_at(p_cyl(:, i)) - data_cyl(1, :, i)
+    end do
+
+    ! Calculate the electric field along the left corner of the cylinder in continuation of the left edge
+    do i = 1, N_p
+        ! Left corner
+        theta = (i-1)*pi/(2.0d0*(N_p-1))
+        p_cyl(:, i+N_p) = (/ (radius_cyl - radius_cor + radius_cor*cos(theta))*-1.0d0, &
+                             0.0d0, height_cyl - radius_cor + radius_cor*sin(theta) /)
+        ! Calculate the distance from the previous point and add to the total length
+        len_cyl(i+N_p) = len_cyl(i-1+N_p) + sqrt((p_cyl(1, i+N_p) - p_cyl(1, i-1+N_p))**2 + &
+                                                 (p_cyl(2, i+N_p) - p_cyl(2, i-1+N_p))**2 + &
+                                                 (p_cyl(3, i+N_p) - p_cyl(3, i-1+N_p))**2)
+
+        data_cyl(1, :, i+N_p) = field_E_cylinder(p_cyl(:, i+N_p))
+        data_cyl(2, :, i+N_p) = Calc_Field_at(p_cyl(:, i+N_p)) - data_cyl(1, :, i+N_p)
+    end do
+    
+    ! Calculate the electric field along the top of the cylinder in continuation of the left corner
+    do i = 1, N_p
+        ! Top from -(radius_cyl - radius_cor) to +(radius_cyl - radius_cor)
+        p_cyl(:, i+2*N_p) = (/ -1.0d0*(radius_cyl - radius_cor) + (i-1)*(2.0d0*(radius_cyl-radius_cor))/(N_p-1), &
+                                0.0d0, height_cyl /)
+        ! Calculate the distance from the previous point
+        len_cyl(i+2*N_p) = len_cyl(i-1+2*N_p) + sqrt((p_cyl(1, i+2*N_p) - p_cyl(1, i-1+2*N_p))**2 + &
+                                                     (p_cyl(2, i+2*N_p) - p_cyl(2, i-1+2*N_p))**2 + &
+                                                      (p_cyl(3, i+2*N_p) - p_cyl(3, i-1+2*N_p))**2)
+
+        data_cyl(1, :, i+2*N_p) = field_E_cylinder(p_cyl(:, i+2*N_p))
+        data_cyl(2, :, i+2*N_p) = Calc_Field_at(p_cyl(:, i+2*N_p)) - data_cyl(1, :, i+2*N_p)
+    end do
+
+    ! Calculate the electric field along the right corner of the cylinder in continuation of the top
+    do i = 1, N_p
+        ! Right corner
+        theta = pi/2.0d0 - (i-1)*pi/(2.0d0*(N_p-1))
+        p_cyl(:, i+3*N_p) = (/ radius_cyl - radius_cor + radius_cor*cos(theta), &
+                               0.0d0, height_cyl - radius_cor + radius_cor*sin(theta) /)
+        ! Calculate the distance from the previous point
+        len_cyl(i+3*N_p) = len_cyl(i-1+3*N_p) + sqrt((p_cyl(1, i+3*N_p) - p_cyl(1, i-1+3*N_p))**2 + &
+                                                     (p_cyl(2, i+3*N_p) - p_cyl(2, i-1+3*N_p))**2 + &
+                                                     (p_cyl(3, i+3*N_p) - p_cyl(3, i-1+3*N_p))**2)
+
+        data_cyl(1, :, i+3*N_p) = field_E_cylinder(p_cyl(:, i+3*N_p))
+        data_cyl(2, :, i+3*N_p) = Calc_Field_at(p_cyl(:, i+3*N_p)) - data_cyl(1, :, i+3*N_p)
+    end do
+
+    ! Calculate the electric field along the right edge of the cylinder in continuation of the right corner
+    do i = 1, N_p
+        ! Right edge
+        p_cyl(:, i+4*N_p) = (/ 1.0d0*radius_cyl, 0.0d0, (height_cyl-radius_cor) - (i-1)*(height_cyl-radius_cor)/(N_p-1) /)
+        ! Calculate the distance from the previous point
+        len_cyl(i+4*N_p) = len_cyl(i-1+4*N_p) + sqrt((p_cyl(1, i+4*N_p) - p_cyl(1, i-1+4*N_p))**2 + &
+                                                     (p_cyl(2, i+4*N_p) - p_cyl(2, i-1+4*N_p))**2 + &
+                                                     (p_cyl(3, i+4*N_p) - p_cyl(3, i-1+4*N_p))**2)
+
+        data_cyl(1, :, i+4*N_p) = field_E_cylinder(p_cyl(:, i+4*N_p))
+        data_cyl(2, :, i+4*N_p) = Calc_Field_at(p_cyl(:, i+4*N_p)) - data_cyl(1, :, i+4*N_p)
+    end do
+
+    ! Open data file
+    open(newunit=ud_cyl, iostat=IFAIL, file="out/cyl_E.dt", status='REPLACE', action='WRITE')
+    if (IFAIL /= 0) then
+        print '(a)', 'RUMDEED: ERROR UNABLE TO OPEN file out/cyl_E.dt'
+        stop
+    end if
+
+    ! Write data to file
+    do i = 1, 5*N_p
+        write(ud_cyl, *) data_cyl(1, :, i), data_cyl(2, :, i), len_cyl(i), p_cyl(:, i)
+    end do
+
+    ! Close data file
+    close(unit=ud_cyl, iostat=IFAIL, status='keep')
+
+    deallocate(data_cyl)
+    deallocate(p_cyl)
+    deallocate(len_cyl)
+    
+end subroutine Calc_E_cyl
 
 end module mod_cylindrical_tip
