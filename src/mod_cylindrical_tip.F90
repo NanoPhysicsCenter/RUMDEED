@@ -192,8 +192,8 @@ subroutine Init_Cylindrical_Tip()
 
     !call Calc_E_around_cyl()
 
-    call Calc_E_cyl()
-    stop
+    !call Calc_E_cyl()
+    !stop
 
     ! ! Debugging the integration
     ! print *, 'Calling Do_Cuba_Suave'
@@ -369,7 +369,7 @@ function field_E_cylinder(pos) result(field_E)
     do k = 1, nn
         field_E = field_E + w(k) * kd_data(:, kd_results(k)%idx)
     end do
-    field_E = field_E * 0.125d1 ! Debug to make field larger
+    !field_E = field_E * 0.125d1 ! Debug to make field larger
 end function field_E_cylinder
 
 subroutine Check_Boundary_Cylinder(i)
@@ -615,12 +615,14 @@ subroutine Do_Field_Emission_Cylinder_simple(step)
     print *, 'Percentage = ', per, '%'
 
     ! Calculate the field at the surface
-    print *, 'Calling Calc_E_edge_cyl'
-    call Calc_E_edge_cyl(per)
-    print *, 'Calling Calc_E_side_cyl'
-    call Calc_E_top_cyl(per)
-    print *, 'Calling Calc_E_top_cyl'
-    call Calc_E_corner_cyl(per)
+    !print *, 'Calling Calc_E_edge_cyl'
+    !call Calc_E_edge_cyl(per)
+    !print *, 'Calling Calc_E_side_cyl'
+    !call Calc_E_top_cyl(per)
+    !print *, 'Calling Calc_E_top_cyl'
+    !call Calc_E_corner_cyl(per)
+
+    call Calc_E_cyl(per)
   end if
 
   call Do_Surface_Integration_simple(N_sup)
@@ -2903,6 +2905,7 @@ subroutine Calc_E_cyl(per)
     double precision :: theta
     integer, parameter :: N_p = 1000
     integer :: ud_cyl, IFAIL
+    character (len=100) :: filename_cyl
 
     ! Allocate arrays
     allocate(data_cyl(1:2, 1:3, 1:5*N_p))
@@ -2984,7 +2987,13 @@ subroutine Calc_E_cyl(per)
     end do
 
     ! Open data file
-    open(newunit=ud_cyl, iostat=IFAIL, file="out/cyl_E.dt", status='REPLACE', action='WRITE')
+    ! If per variable is present, then append the percentage to the file name
+    if (present(per)) then
+      write(filename_cyl, '(a, i3, a)') "out/cyl_E_", per, ".dt"
+    else
+      filename_cyl = "out/cyl_E.dt"
+    end if
+    open(newunit=ud_cyl, iostat=IFAIL, file=filename_cyl, status='REPLACE', action='WRITE')
     if (IFAIL /= 0) then
         print '(a)', 'RUMDEED: ERROR UNABLE TO OPEN file out/cyl_E.dt'
         stop
