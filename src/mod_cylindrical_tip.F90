@@ -192,8 +192,8 @@ subroutine Init_Cylindrical_Tip()
 
     !call Calc_E_around_cyl()
 
-    call Calc_E_cyl()
-    stop
+    !call Calc_E_cyl()
+    !stop
 
     ! ! Debugging the integration
     ! print *, 'Calling Do_Cuba_Suave'
@@ -2903,9 +2903,10 @@ subroutine Calc_E_cyl(per)
     double precision :: theta
     integer, parameter :: N_p = 1000
     integer :: ud_cyl, IFAIL
+    character (len=100) :: filename_cyl
 
     ! Allocate arrays
-    allocate(data_cyl(1:2, 1:3, 1:5*N_p))
+    allocate(data_cyl(1:3, 1:3, 1:5*N_p))
     allocate(p_cyl(1:3, 1:5*N_p))
     allocate(len_cyl(1:5*N_p))
 
@@ -2922,8 +2923,9 @@ subroutine Calc_E_cyl(per)
                                              (p_cyl(3, i) - p_cyl(3, i-1))**2)
         end if
 
-        data_cyl(1, :, i) = field_E_cylinder(p_cyl(:, i))
-        data_cyl(2, :, i) = Calc_Field_at(p_cyl(:, i)) - data_cyl(1, :, i)
+        data_cyl(1, :, i) = Calc_Field_at(p_cyl(:, i))
+        data_cyl(2, :, i) = field_E_cylinder(p_cyl(:, i))
+        data_cyl(3, :, i) = Calc_Field_at(p_cyl(:, i)) - data_cyl(2, :, i)
     end do
 
     ! Calculate the electric field along the left corner of the cylinder in continuation of the left edge
@@ -2937,8 +2939,9 @@ subroutine Calc_E_cyl(per)
                                                  (p_cyl(2, i+N_p) - p_cyl(2, i-1+N_p))**2 + &
                                                  (p_cyl(3, i+N_p) - p_cyl(3, i-1+N_p))**2)
 
-        data_cyl(1, :, i+N_p) = field_E_cylinder(p_cyl(:, i+N_p))
-        data_cyl(2, :, i+N_p) = Calc_Field_at(p_cyl(:, i+N_p)) - data_cyl(1, :, i+N_p)
+        data_cyl(1, :, i+N_p) = Calc_Field_at(p_cyl(:, i+N_p))
+        data_cyl(2, :, i+N_p) = field_E_cylinder(p_cyl(:, i+N_p))
+        data_cyl(3, :, i+N_p) = Calc_Field_at(p_cyl(:, i+N_p)) - data_cyl(2, :, i+N_p)
     end do
     
     ! Calculate the electric field along the top of the cylinder in continuation of the left corner
@@ -2949,10 +2952,11 @@ subroutine Calc_E_cyl(per)
         ! Calculate the distance from the previous point
         len_cyl(i+2*N_p) = len_cyl(i-1+2*N_p) + sqrt((p_cyl(1, i+2*N_p) - p_cyl(1, i-1+2*N_p))**2 + &
                                                      (p_cyl(2, i+2*N_p) - p_cyl(2, i-1+2*N_p))**2 + &
-                                                      (p_cyl(3, i+2*N_p) - p_cyl(3, i-1+2*N_p))**2)
+                                                     (p_cyl(3, i+2*N_p) - p_cyl(3, i-1+2*N_p))**2)
 
-        data_cyl(1, :, i+2*N_p) = field_E_cylinder(p_cyl(:, i+2*N_p))
-        data_cyl(2, :, i+2*N_p) = Calc_Field_at(p_cyl(:, i+2*N_p)) - data_cyl(1, :, i+2*N_p)
+        data_cyl(1, :, i+2*N_p) = Calc_Field_at(p_cyl(:, i+2*N_p))
+        data_cyl(2, :, i+2*N_p) = field_E_cylinder(p_cyl(:, i+2*N_p))
+        data_cyl(3, :, i+2*N_p) = Calc_Field_at(p_cyl(:, i+2*N_p)) - data_cyl(2, :, i+2*N_p)
     end do
 
     ! Calculate the electric field along the right corner of the cylinder in continuation of the top
@@ -2965,9 +2969,10 @@ subroutine Calc_E_cyl(per)
         len_cyl(i+3*N_p) = len_cyl(i-1+3*N_p) + sqrt((p_cyl(1, i+3*N_p) - p_cyl(1, i-1+3*N_p))**2 + &
                                                      (p_cyl(2, i+3*N_p) - p_cyl(2, i-1+3*N_p))**2 + &
                                                      (p_cyl(3, i+3*N_p) - p_cyl(3, i-1+3*N_p))**2)
-
-        data_cyl(1, :, i+3*N_p) = field_E_cylinder(p_cyl(:, i+3*N_p))
-        data_cyl(2, :, i+3*N_p) = Calc_Field_at(p_cyl(:, i+3*N_p)) - data_cyl(1, :, i+3*N_p)
+        
+        data_cyl(1, :, i+3*N_p) = Calc_Field_at(p_cyl(:, i+3*N_p))
+        data_cyl(2, :, i+3*N_p) = field_E_cylinder(p_cyl(:, i+3*N_p))
+        data_cyl(3, :, i+3*N_p) = Calc_Field_at(p_cyl(:, i+3*N_p)) - data_cyl(2, :, i+3*N_p)
     end do
 
     ! Calculate the electric field along the right edge of the cylinder in continuation of the right corner
@@ -2979,12 +2984,22 @@ subroutine Calc_E_cyl(per)
                                                      (p_cyl(2, i+4*N_p) - p_cyl(2, i-1+4*N_p))**2 + &
                                                      (p_cyl(3, i+4*N_p) - p_cyl(3, i-1+4*N_p))**2)
 
-        data_cyl(1, :, i+4*N_p) = field_E_cylinder(p_cyl(:, i+4*N_p))
-        data_cyl(2, :, i+4*N_p) = Calc_Field_at(p_cyl(:, i+4*N_p)) - data_cyl(1, :, i+4*N_p)
+        data_cyl(1, :, i+4*N_p) = Calc_Field_at(p_cyl(:, i+4*N_p))
+        data_cyl(2, :, i+4*N_p) = field_E_cylinder(p_cyl(:, i+4*N_p))
+        data_cyl(3, :, i+4*N_p) = Calc_Field_at(p_cyl(:, i+4*N_p)) - data_cyl(2, :, i+4*N_p)
     end do
 
     ! Open data file
-    open(newunit=ud_cyl, iostat=IFAIL, file="out/cyl_E.dt", status='REPLACE', action='WRITE')
+    ! If per variable is present, then append the percentage to the file name
+    if (present(per)) then
+      write(filename_cyl, '(a, i0, a)') "out/cyl_E_", per, ".dt"
+      write(filename_cyl, '(a, i0, a)') "out/cyl_E_", per, ".dt"
+    else
+      filename_cyl = "out/cyl_E.dt"
+      filename_cyl = "out/cyl_E.dt"
+    end if
+
+    open(newunit=ud_cyl, iostat=IFAIL, file=filename_cyl, status='REPLACE', action='WRITE')
     if (IFAIL /= 0) then
         print '(a)', 'RUMDEED: ERROR UNABLE TO OPEN file out/cyl_E.dt'
         stop
@@ -2992,7 +3007,7 @@ subroutine Calc_E_cyl(per)
 
     ! Write data to file
     do i = 1, 5*N_p
-        write(ud_cyl, *) data_cyl(1, :, i), data_cyl(2, :, i), len_cyl(i), p_cyl(:, i)
+        write(ud_cyl, *) data_cyl(1, :, i), data_cyl(2, :, i), data_cyl(3, :, i), len_cyl(i), p_cyl(:, i)
     end do
 
     ! Close data file
