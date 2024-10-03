@@ -257,13 +257,13 @@ subroutine Create_KD_Tree()
     end do
 
     ! Find the maximum z-coordinate
-    max_z = maxval(kd_mesh(3, :))*1.0d-3 ! Convert to m
+    max_z = maxval(kd_mesh(3, :))
 
     ! Compare with the height of the simulation box
     if (abs(max_z - box_dim(3))/length_scale > 1.0d-6) then
       print *, 'RUMDEED: ERROR The maximum z-coordinate in the mesh data is not equal to the height of the simulation box'
-      print *, 'max_z = ', max_z
-      print *, 'box_dim(3) = ', box_dim(3)
+      print *, 'max_z = ', max_z, ' m'
+      print *, 'box_dim(3) = ', box_dim(3), ' m'
       stop
     end if
 
