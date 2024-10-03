@@ -639,8 +639,8 @@ subroutine Do_Field_Emission_Cylinder_simple(step)
     !print *, 'Calling Calc_E_top_cyl'
     !call Calc_E_corner_cyl(per)
 
-    !call Calc_E_cyl(per)
-    !call Calc_E_circle_cyl(per)
+    call Calc_E_cyl(per)
+    call Calc_E_circle_cyl(per)
   end if
 
   call Do_Surface_Integration_simple(N_sup)
