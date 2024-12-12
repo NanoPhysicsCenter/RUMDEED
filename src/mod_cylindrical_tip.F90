@@ -329,7 +329,7 @@ subroutine Create_KD_Tree()
       kd_image_elec_pos(:, k) = kd_image_elec_pos(:, k) * 1.0d-3
       kd_image_one_pos(:, k) = kd_image_one_pos(:, k) * 1.0d-3
       kd_image_two_pos(:, k) = kd_image_two_pos(:, k) * 1.0d-3
-      kd_image_three_pos(:, k) = kd_image_three_pos(:, k) * 1.0d-3
+      kd_image_three_pos(:, k) = kd_image_three_pos(:, k) * 1.0d-3      
     end do
 
     ! Close the file
@@ -1244,14 +1244,14 @@ function Image_Charge_cylinder(pos_1, pos_2)
   ! Get the positions of the image charges
 
   ! Rotate the positions of the particle (pos_2) to the x-z plane
-  ! This is because the image charges are calculated in the x-z plane
-  pos_2_rot(1) = sqrt(pos_2(1)**2 + pos_2(2)**2) ! r * cos(angle) = r, in the x-z plane the angle is zero
+  ! This is because the image charges are calculated in the x-z plane with the x-coordinate negative
+  pos_2_rot(1) = -1.0d0*sqrt(pos_2(1)**2 + pos_2(2)**2) ! r * cos(angle) = r, in the x-z plane the angle is zero
   ! y = r * sin(angle) = 0 in the x-z plane, because the angle is zero
   ! The KD-tree is 2D, so we only need the x and z coordinates
   pos_2_rot(2) = pos_2(3) ! z is the same
 
   ! Calculate the angle of the particle (pos_2)
-  angle = atan2(pos_2(2), pos_2(1))
+  angle = atan2(pos_2(2), pos_2(1)) + pi
 
   ! Check if the charge is outside the range of the image charge model
   ! Check r and z
