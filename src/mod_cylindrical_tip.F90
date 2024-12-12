@@ -1371,9 +1371,9 @@ function Image_Charge_cylinder(pos_1, pos_2)
     pos_3_int = w1 * pos_13_ic + w2 * pos_23_ic + w3 * pos_33_ic + w4 * pos_43_ic
 
     ! Interpolate the charge
-    Q1 = w1 * Q11 + w2 * Q21 + w3 * Q31 + w4 * Q41
-    Q2 = w1 * Q12 + w2 * Q22 + w3 * Q32 + w4 * Q42
-    Q3 = w1 * Q13 + w2 * Q23 + w3 * Q33 + w4 * Q43
+    Q1 = w1 * Q11 + w2 * Q21 + w3 * Q31 + w4 * Q41 ! Left corner
+    Q2 = w1 * Q12 + w2 * Q22 + w3 * Q32 + w4 * Q42 ! Right corner
+    Q3 = w1 * Q13 + w2 * Q23 + w3 * Q33 + w4 * Q43 ! Center / Middle
 
     ! Rotate the image charges positions
     pos_1_ic(1) = pos_1_int(1) * cos(angle) - pos_1_int(2) * sin(angle)
