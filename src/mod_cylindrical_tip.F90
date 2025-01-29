@@ -43,12 +43,16 @@ Module mod_cylindrical_tip
     double precision, dimension(:, :), allocatable :: kd_image_one_pos ! Data for image charge 1
     double precision, dimension(:, :), allocatable :: kd_image_two_pos ! Data for image charge 2
     double precision, dimension(:, :), allocatable :: kd_image_three_pos ! Data for image charge 3
+    double precision, dimension(:, :), allocatable :: kd_image_four_pos ! Data for image charge 4
+    double precision, dimension(:, :), allocatable :: kd_image_five_pos ! Data for image charge 5
 
     ! Data for the image charges
     ! (G, F) see notes for details
     double precision, dimension(:), allocatable :: kd_image_one_data ! Data for image charge 1
     double precision, dimension(:), allocatable :: kd_image_two_data ! Data for image charge 2
     double precision, dimension(:), allocatable :: kd_image_three_data ! Data for image charge 3
+    double precision, dimension(:), allocatable :: kd_image_four_data ! Data for image charge 4
+    double precision, dimension(:), allocatable :: kd_image_five_data ! Data for image charge 5
 
     ! ----------------------------------------------------------------------------
     ! Variables
@@ -295,25 +299,32 @@ subroutine Create_KD_Tree()
     rewind(ud_meshdata)
 
     ! Allocate the arrays to hold the file
-    allocate(kd_image_elec_pos(1:2, 1:n_points))
-    allocate(kd_image_one_pos(1:2, 1:n_points))
-    allocate(kd_image_two_pos(1:2, 1:n_points))
-    allocate(kd_image_three_pos(1:2, 1:n_points))
+    allocate(kd_image_elec_pos(1:3, 1:n_points))
+    allocate(kd_image_one_pos(1:3, 1:n_points))
+    allocate(kd_image_two_pos(1:3, 1:n_points))
+    allocate(kd_image_three_pos(1:3, 1:n_points))
+    allocate(kd_image_four_pos(1:3, 1:n_points))
+    allocate(kd_image_five_pos(1:3, 1:n_points))
+
     allocate(kd_image_one_data(1:n_points))
     allocate(kd_image_two_data(1:n_points))
     allocate(kd_image_three_data(1:n_points))
+    allocate(kd_image_four_data(1:n_points))
+    allocate(kd_image_five_data(1:n_points))
 
     ! Read the file into the array and scale the coordinates from mm to m
     !print *, 'Reading image charge data'
     !print *, 'n_points = ', n_points
     do k = 1, n_points
       !print *, 'k = ', k
-      ! Columns: x0, z0, x1, z1, Q1, x2, z2, Q2, x3, z3, Q3
+      ! Columns: x0, y0, z0, x1, y1, z1, Q1, x2, y2, z2, Q2, x3, y3, z3, Q3, x4, y4 z4, Q4, x5, y5, z5, Q5
       !print *, 'k = ', k
-      read(ud_imagedata, *) kd_image_elec_pos(1, k), kd_image_elec_pos(2, k), &
-                            kd_image_one_pos(1, k), kd_image_one_pos(2, k), kd_image_one_data(k), &
-                            kd_image_two_pos(1, k), kd_image_two_pos(2, k), kd_image_two_data(k), &
-                            kd_image_three_pos(1, k), kd_image_three_pos(2, k), kd_image_three_data(k)
+      read(ud_imagedata, *) kd_image_elec_pos(1, k) , kd_image_elec_pos(2, k) , kd_image_elec_pos(3, k) , &
+                            kd_image_one_pos(1, k)  , kd_image_one_pos(2, k)  , kd_image_one_pos(3, k)  , kd_image_one_data(k), &
+                            kd_image_two_pos(1, k)  , kd_image_two_pos(2, k)  , kd_image_two_pos(3, k)  , kd_image_two_data(k), &
+                            kd_image_three_pos(1, k), kd_image_three_pos(2, k), kd_image_three_pos(3, k), kd_image_three_data(k), &
+                            kd_image_four_pos(1, k) , kd_image_four_pos(2, k) , kd_image_four_pos(3, k) , kd_image_four_data(k), &
+                            kd_image_five_pos(1, k) , kd_image_five_pos(2, k) , kd_image_five_pos(3, k) , kd_image_five_data(k)
 
       !print *, 'kd_image_elec_pos(:, k) = ', kd_image_elec_pos(:, k)
       !print *, 'kd_image_one_pos(:, k) = ', kd_image_one_pos(:, k)
@@ -326,10 +337,12 @@ subroutine Create_KD_Tree()
       !print *, ''
       
       ! Convert from mm to m
-      kd_image_elec_pos(:, k) = kd_image_elec_pos(:, k) * 1.0d-3
-      kd_image_one_pos(:, k) = kd_image_one_pos(:, k) * 1.0d-3
-      kd_image_two_pos(:, k) = kd_image_two_pos(:, k) * 1.0d-3
+      kd_image_elec_pos(:, k)  = kd_image_elec_pos(:, k)  * 1.0d-3
+      kd_image_one_pos(:, k)   = kd_image_one_pos(:, k)   * 1.0d-3
+      kd_image_two_pos(:, k)   = kd_image_two_pos(:, k)   * 1.0d-3
       kd_image_three_pos(:, k) = kd_image_three_pos(:, k) * 1.0d-3      
+      kd_image_four_pos(:, k)  = kd_image_four_pos(:, k)  * 1.0d-3
+      kd_image_five_pos(:, k)  = kd_image_five_pos(:, k)  * 1.0d-3
     end do
 
     ! Close the file
@@ -1209,23 +1222,26 @@ function Image_Charge_cylinder(pos_1, pos_2)
 
   ! Local variables
   integer :: thread
-  double precision, dimension(1:3) :: pos_11_ic, pos_12_ic, pos_13_ic ! Positions of the image charges
-  double precision, dimension(1:3) :: pos_21_ic, pos_22_ic, pos_23_ic ! Positions of the image charges
-  double precision, dimension(1:3) :: pos_31_ic, pos_32_ic, pos_33_ic ! Positions of the image charges
-  double precision, dimension(1:3) :: pos_41_ic, pos_42_ic, pos_43_ic ! Positions of the image charges
+  double precision, dimension(1:3) :: pos_11_ic, pos_12_ic, pos_13_ic, pos_14_ic, pos_15_ic ! Positions of the image charges
+  double precision, dimension(1:3) :: pos_21_ic, pos_22_ic, pos_23_ic, pos_24_ic, pos_25_ic  ! Positions of the image charges
+  double precision, dimension(1:3) :: pos_31_ic, pos_32_ic, pos_33_ic, pos_34_ic, pos_35_ic  ! Positions of the image charges
+  double precision, dimension(1:3) :: pos_41_ic, pos_42_ic, pos_43_ic, pos_44_ic, pos_45_ic ! Positions of the image charges
 
-  double precision, dimension(1:3) :: pos_1_int, pos_2_int, pos_3_int ! Positions of the image charges
-  double precision, dimension(1:3) :: pos_1_ic, pos_2_ic, pos_3_ic ! Positions of the image charges
+  double precision, dimension(1:3) :: pos_1_int, pos_2_int, pos_3_int, pos_4_int, pos_5_int ! Positions of the image charges
+  double precision, dimension(1:3) :: pos_1_ic, pos_2_ic, pos_3_ic, pos_4_ic, pos_5_ic ! Positions of the image charges
 
-  double precision                 :: Q11, Q12, Q13, Q21, Q22, Q23, Q31, Q32, Q33, Q41, Q42, Q43 ! Charge of the image charges
-  double precision                 :: Q1, Q2, Q3 ! Interpolated charge of the image charges
+  double precision                 :: Q11, Q12, Q13, Q14, Q15 ! Charge of the image charges
+  double precision                 :: Q21, Q22, Q23, Q24, Q25
+  double precision                 :: Q31, Q32, Q33, Q34, Q35
+  double precision                 :: Q41, Q42, Q43, Q44, Q45 
+  double precision                 :: Q1, Q2, Q3, Q4, Q5 ! Interpolated charge of the image charges
 
-  double precision, dimension(1:2) :: pos_2_rot ! 2D position of the particle that is acting on the particle at pos_1
+  double precision, dimension(1:3) :: pos_2_rot ! 2D position of the particle that is acting on the particle at pos_1
   !double precision                 :: data_1_ic, data_2_ic, data_3_ic, data_4_ic ! Data for the image charges
   double precision                 :: angle ! Rotation angle for the image charges
 
-  double precision, dimension(1:3) :: diff1, diff2, diff3 ! Difference between the position of the particle we are calculating the force/acceleration on from the image charges
-  double precision                 :: r1, r2, r3 ! Distance from the particle we are calculating the force/acceleration on to the image charges
+  double precision, dimension(1:3) :: diff1, diff2, diff3, diff4, diff5 ! Difference between the position of the particle we are calculating the force/acceleration on from the image charges
+  double precision                 :: r1, r2, r3, r4, r5 ! Distance from the particle we are calculating the force/acceleration on to the image charges
   double precision, parameter      :: max_dist = 10000.0d0*length_scale_cyl ! Maximum distance for the image charge model
 
   integer, parameter               :: nn = 4 ! number of nearest neighbors to find
@@ -1246,9 +1262,8 @@ function Image_Charge_cylinder(pos_1, pos_2)
   ! Rotate the positions of the particle (pos_2) to the x-z plane
   ! This is because the image charges are calculated in the x-z plane with the x-coordinate negative
   pos_2_rot(1) = -1.0d0*sqrt(pos_2(1)**2 + pos_2(2)**2) ! r * cos(angle) = r, in the x-z plane the angle is zero
-  ! y = r * sin(angle) = 0 in the x-z plane, because the angle is zero
-  ! The KD-tree is 2D, so we only need the x and z coordinates
-  pos_2_rot(2) = pos_2(3) ! z is the same
+  pos_2_rot(2) = 0.0d0 ! y = r * sin(angle) = 0 in the x-z plane, because the angle is zero
+  pos_2_rot(3) = pos_2(3) ! z is the same
 
   ! Calculate the angle of the particle (pos_2)
   angle = atan2(pos_2(2), pos_2(1)) + pi
@@ -1275,81 +1290,112 @@ function Image_Charge_cylinder(pos_1, pos_2)
     call kdtree2_n_nearest(tp=kd_tree_image_single, qv=pos_2_rot, nn=nn, results=kd_results)
     !$omp end critical (kdtree2)
 
-    ! Image charge positions, x and z with y = 0 for the nearest neighbors n = 1
-    pos_11_ic(1) = kd_image_one_pos(1, kd_results(1)%idx)
-    pos_11_ic(2) = 0.0d0
-    pos_11_ic(3) = kd_image_one_pos(2, kd_results(1)%idx)
+    ! Image charge positions, for the nearest neighbors n = 1
+    ! Positions
+    pos_11_ic(:) = kd_image_one_pos(:, kd_results(1)%idx)
     ! Charge
     Q11 = kd_image_one_data(kd_results(1)%idx)
 
-    pos_12_ic(1) = kd_image_two_pos(1, kd_results(1)%idx)
-    pos_12_ic(2) = 0.0d0
-    pos_12_ic(3) = kd_image_two_pos(2, kd_results(1)%idx)
+    ! Positions
+    pos_12_ic(:) = kd_image_two_pos(:, kd_results(1)%idx)
     ! Charge
     Q12 = kd_image_two_data(kd_results(1)%idx)
 
-    pos_13_ic(1) = kd_image_three_pos(1, kd_results(1)%idx)
-    pos_13_ic(2) = 0.0d0
-    pos_13_ic(3) = kd_image_three_pos(2, kd_results(1)%idx)
+    ! Positions
+    pos_13_ic(:) = kd_image_three_pos(:, kd_results(1)%idx)
     ! Charge
     Q13 = kd_image_three_data(kd_results(1)%idx)
 
-    ! Image charge positions, x and z with y = 0 for the nearest neighbors n = 2
-    pos_21_ic(1) = kd_image_one_pos(1, kd_results(2)%idx)
-    pos_21_ic(2) = 0.0d0
-    pos_21_ic(3) = kd_image_one_pos(2, kd_results(2)%idx)
+    ! Positions
+    pos_14_ic(:) = kd_image_four_pos(:, kd_results(1)%idx)
+    ! Charge
+    Q14 = kd_image_four_data(kd_results(1)%idx)
+
+    ! Positions
+    pos_15_ic(:) = kd_image_five_pos(:, kd_results(1)%idx)
+    ! Charge
+    Q15 = kd_image_five_data(kd_results(1)%idx)
+
+    ! ------------------------------------------------------------------
+    ! Image charge positions, for the nearest neighbors n = 2
+    ! Positions
+    pos_21_ic(:) = kd_image_one_pos(:, kd_results(2)%idx)
     ! Charge
     Q21 = kd_image_one_data(kd_results(2)%idx)
 
-    pos_22_ic(1) = kd_image_two_pos(1, kd_results(2)%idx)
-    pos_22_ic(2) = 0.0d0
-    pos_22_ic(3) = kd_image_two_pos(2, kd_results(2)%idx)
+    ! Positions
+    pos_22_ic(:) = kd_image_two_pos(:, kd_results(2)%idx)
     ! Charge
     Q22 = kd_image_two_data(kd_results(2)%idx)
 
-    pos_23_ic(1) = kd_image_three_pos(1, kd_results(2)%idx)
-    pos_23_ic(2) = 0.0d0
-    pos_23_ic(3) = kd_image_three_pos(2, kd_results(2)%idx)
+    ! Positions
+    pos_23_ic(:) = kd_image_three_pos(:, kd_results(2)%idx)
     ! Charge
     Q23 = kd_image_three_data(kd_results(2)%idx)
 
-    ! Image charge positions, x and z with y = 0 for the nearest neighbors n = 3
-    pos_31_ic(1) = kd_image_one_pos(1, kd_results(3)%idx)
-    pos_31_ic(2) = 0.0d0
-    pos_31_ic(3) = kd_image_one_pos(2, kd_results(3)%idx)
+    ! Positions
+    pos_24_ic(:) = kd_image_four_pos(:, kd_results(2)%idx)
+    ! Charge
+    Q24 = kd_image_four_data(kd_results(2)%idx)
+
+    ! Positions
+    pos_25_ic(:) = kd_image_five_pos(:, kd_results(2)%idx)
+    ! Charge
+    Q25 = kd_image_five_data(kd_results(2)%idx)
+
+    ! ------------------------------------------------------------------
+    ! Image charge positions, for the nearest neighbors n = 3
+    ! Positions
+    pos_31_ic(:) = kd_image_one_pos(:, kd_results(3)%idx)
     ! Charge
     Q31 = kd_image_one_data(kd_results(3)%idx)
 
-    pos_32_ic(1) = kd_image_two_pos(1, kd_results(3)%idx)
-    pos_32_ic(2) = 0.0d0
-    pos_32_ic(3) = kd_image_two_pos(2, kd_results(3)%idx)
+    ! Positions
+    pos_32_ic(:) = kd_image_two_pos(:, kd_results(3)%idx)
     ! Charge
     Q32 = kd_image_two_data(kd_results(3)%idx)
 
-    pos_33_ic(1) = kd_image_three_pos(1, kd_results(3)%idx)
-    pos_33_ic(2) = 0.0d0
-    pos_33_ic(3) = kd_image_three_pos(2, kd_results(3)%idx)
+    ! Positions
+    pos_33_ic(:) = kd_image_three_pos(:, kd_results(3)%idx)
     ! Charge
     Q33 = kd_image_three_data(kd_results(3)%idx)
 
-    ! Image charge positions, x and z with y = 0 for the nearest neighbors n = 4
-    pos_41_ic(1) = kd_image_one_pos(1, kd_results(4)%idx)
-    pos_41_ic(2) = 0.0d0
-    pos_41_ic(3) = kd_image_one_pos(2, kd_results(4)%idx)
+    ! Positions
+    pos_34_ic(:) = kd_image_four_pos(:, kd_results(3)%idx)
+    ! Charge
+    Q34 = kd_image_four_data(kd_results(3)%idx)
+
+    ! Positions
+    pos_35_ic(:) = kd_image_five_pos(:, kd_results(3)%idx)
+    ! Charge
+    Q35 = kd_image_five_data(kd_results(3)%idx)
+
+    ! ------------------------------------------------------------------
+    ! Image charge positions, for the nearest neighbors n = 4
+    ! Positions
+    pos_41_ic(:) = kd_image_one_pos(:, kd_results(4)%idx)
     ! Charge
     Q41 = kd_image_one_data(kd_results(4)%idx)
 
-    pos_42_ic(1) = kd_image_two_pos(1, kd_results(4)%idx)
-    pos_42_ic(2) = 0.0d0
-    pos_42_ic(3) = kd_image_two_pos(2, kd_results(4)%idx)
+    ! Positions
+    pos_42_ic(:) = kd_image_two_pos(:, kd_results(4)%idx)
     ! Charge
     Q42 = kd_image_two_data(kd_results(4)%idx)
 
-    pos_43_ic(1) = kd_image_three_pos(1, kd_results(4)%idx)
-    pos_43_ic(2) = 0.0d0
-    pos_43_ic(3) = kd_image_three_pos(2, kd_results(4)%idx)
+    ! Positions
+    pos_43_ic(:) = kd_image_three_pos(:, kd_results(4)%idx)
     ! Charge
     Q43 = kd_image_three_data(kd_results(4)%idx)
+
+    ! Positions
+    pos_44_ic(:) = kd_image_four_pos(:, kd_results(4)%idx)
+    ! Charge
+    Q44 = kd_image_four_data(kd_results(4)%idx)
+
+    ! Positions
+    pos_45_ic(:) = kd_image_five_pos(:, kd_results(4)%idx)
+    ! Charge
+    Q45 = kd_image_five_data(kd_results(4)%idx)
 
     ! Interpolate the position and charge at the point using the nearest neighbors and the inverse distance to each as weights
     ! Calculate the weights as 1/distance^p
@@ -1369,11 +1415,15 @@ function Image_Charge_cylinder(pos_1, pos_2)
     pos_1_int = w1 * pos_11_ic + w2 * pos_21_ic + w3 * pos_31_ic + w4 * pos_41_ic
     pos_2_int = w1 * pos_12_ic + w2 * pos_22_ic + w3 * pos_32_ic + w4 * pos_42_ic
     pos_3_int = w1 * pos_13_ic + w2 * pos_23_ic + w3 * pos_33_ic + w4 * pos_43_ic
+    pos_4_int = w1 * pos_14_ic + w2 * pos_24_ic + w3 * pos_34_ic + w4 * pos_44_ic
+    pos_5_int = w1 * pos_15_ic + w2 * pos_25_ic + w3 * pos_35_ic + w4 * pos_45_ic
 
     ! Interpolate the charge
     Q1 = w1 * Q11 + w2 * Q21 + w3 * Q31 + w4 * Q41 ! Left corner
     Q2 = w1 * Q12 + w2 * Q22 + w3 * Q32 + w4 * Q42 ! Right corner
     Q3 = w1 * Q13 + w2 * Q23 + w3 * Q33 + w4 * Q43 ! Center / Middle
+    Q4 = w1 * Q14 + w2 * Q24 + w3 * Q34 + w4 * Q44 ! Left side
+    Q5 = w1 * Q15 + w2 * Q25 + w3 * Q35 + w4 * Q45 ! Right side
 
     ! Rotate the image charges positions
     pos_1_ic(1) = pos_1_int(1) * cos(angle) - pos_1_int(2) * sin(angle)
@@ -1388,6 +1438,14 @@ function Image_Charge_cylinder(pos_1, pos_2)
     pos_3_ic(2) = pos_3_int(1) * sin(angle) + pos_3_int(2) * cos(angle)
     pos_3_ic(3) = pos_3_int(3)
 
+    pos_4_ic(1) = pos_4_int(1) * cos(angle) - pos_4_int(2) * sin(angle)
+    pos_4_ic(2) = pos_4_int(1) * sin(angle) + pos_4_int(2) * cos(angle)
+    pos_4_ic(3) = pos_4_int(3)
+
+    pos_5_ic(1) = pos_5_int(1) * cos(angle) - pos_5_int(2) * sin(angle)
+    pos_5_ic(2) = pos_5_int(1) * sin(angle) + pos_5_int(2) * cos(angle)
+    pos_5_ic(3) = pos_5_int(3)
+
     ! Distance from par_1 to the image charges
     diff1 = pos_1 - pos_1_ic
     r1 = sqrt( sum(diff1**2) ) + length_scale**2
@@ -1398,9 +1456,15 @@ function Image_Charge_cylinder(pos_1, pos_2)
     diff3 = pos_1 - pos_3_ic
     r3 = sqrt( sum(diff3**2) ) + length_scale**2
 
+    diff4 = pos_1 - pos_4_ic
+    r4 = sqrt( sum(diff4**2) ) + length_scale**2
+
+    diff5 = pos_1 - pos_5_ic
+    r5 = sqrt( sum(diff5**2) ) + length_scale**2
+
     ! Calculate the force from the image charges
     ! (-1.0) since the charges are opposite
-    Image_Charge_cylinder = (-1.0d0)*(diff1*Q1/r1**3 + diff2*Q2/r2**3 + diff3*Q3/r3**3)
+    Image_Charge_cylinder = (-1.0d0)*(diff1*Q1/r1**3 + diff2*Q2/r2**3 + diff3*Q3/r3**3 + diff4*Q4/r4**3 + diff5*Q5/r5**3)
 
     ! Print debug information
     !print *, 'Image_Charge_cylinder'
