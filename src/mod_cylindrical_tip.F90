@@ -2602,7 +2602,7 @@ subroutine Do_Surface_Integration(N_sup)
 subroutine Calc_E_circle_cyl(per)
   implicit none
   integer :: k
-  integer, parameter :: N_p = 1000
+  integer, parameter :: N_p = 10000
   integer, intent(in), optional :: per
 
   real(kdkind), dimension(1:3) :: p, E_vec, E_vec_image
@@ -2686,7 +2686,7 @@ subroutine Calc_E_edge_cyl(per)
     integer, intent(in), optional :: per
     ! Local
     integer :: k
-    integer, parameter :: N_p = 1000
+    integer, parameter :: N_p = 10000
     real(kdkind), dimension(1:3) :: p, E_vec, E_vec_image
     double precision :: phi, rho
     integer :: ud_cyl_side_left, ud_cyl_side_right, IFAIL
@@ -2797,7 +2797,7 @@ subroutine Calc_E_corner_cyl(per)
     integer, intent(in), optional :: per
     ! Local
     integer :: k
-    integer, parameter :: N_p = 1000
+    integer, parameter :: N_p = 10000
     real(kdkind), dimension(1:3) :: p, E_vec, E_vec_image
     double precision :: phi, theta, rho
     integer :: ud_cyl_corner_left, ud_cyl_corner_right, IFAIL
@@ -2903,7 +2903,7 @@ subroutine Calc_E_top_cyl(per)
     integer, intent(in), optional :: per
     ! Local
     integer :: k
-    integer, parameter :: N_p = 1000
+    integer, parameter :: N_p = 10000
     real(kdkind), dimension(1:3) :: p, E_vec, E_vec_image
     double precision :: rho_max
     integer :: ud_cyl_top_left, ud_cyl_top_right, IFAIL
@@ -3009,7 +3009,7 @@ subroutine Calc_E_cyl(per)
     ! Local
     integer :: i
     double precision :: theta
-    integer, parameter :: N_p = 1000
+    integer, parameter :: N_p = 10000
     integer :: ud_cyl, IFAIL
     character (len=100) :: filename_cyl
 
