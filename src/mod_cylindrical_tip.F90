@@ -640,9 +640,9 @@ subroutine Do_Field_Emission_Cylinder_simple(step)
 
   ! Check if the step is 10%, 20%, 30%, 40%, 50%, 60%, 70%, 80%, 90% or 100% of the total steps
   if (mod(step, steps/10) == 0) then
-    per = nint(dble(step)/dble(steps)*100.0d0) ! Calculate the percentage of the simulation
-    print *, 'Step = ', step
-    print *, 'Percentage = ', per, '%'
+    !per = nint(dble(step)/dble(steps)*100.0d0) ! Calculate the percentage of the simulation
+    !print *, 'Step = ', step
+    !print *, 'Percentage = ', per, '%'
 
     ! Calculate the field at the surface
     !print *, 'Calling Calc_E_edge_cyl'
