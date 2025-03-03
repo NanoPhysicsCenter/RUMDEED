@@ -90,7 +90,7 @@ contains
 
     !$OMP PARALLEL DO PRIVATE(i) &
     !$OMP& SHARED(particles_prev_pos, particles_cur_pos, particles_cur_vel, particles_cur_accel) &
-    !$OMP& SHARED(time_step, time_step2, particles_prev2_accel, particles_species, particles_prev_accel) &
+    !$OMP& SHARED(time_step, time_step2, particles_prev2_accel, particles_species, particles_prev_accel)
 
     do i = 1, nrPart
       if ((particles_species(i) /= species_atom) .and. (particles_species(i) /= species_ion)) then
@@ -223,13 +223,15 @@ contains
     integer                          :: i, k, emit, sec
     double precision                 :: q
 
-    avg_vel(:) = 0.0d0
+    avg_part_vel(:) = 0.0d0
+    avg_elec_vel(:) = 0.0d0
+    avg_ion_vel(:)  = 0.0d0
 
     !$OMP PARALLEL DO DEFAULT(NONE) PRIVATE(i, q, k, emit, sec) &
     !$OMP& SHARED(nrPart, particles_cur_vel, particles_prev_accel, particles_cur_accel, time_step) &
     !$OMP& SHARED(ramo_current, ramo_current_emit, E_zunit, particles_section, particles_charge) &
-    !$OMP& SHARED(particles_species, particles_emitter, particles_prev2_accel, particles_species) &
-    !$OMP& REDUCTION(+:avg_vel)
+    !$OMP& SHARED(particles_species, particles_emitter, particles_prev2_accel, collisions) &
+    !$OMP& REDUCTION(+:avg_part_vel, avg_elec_vel, avg_ion_vel)
     do i = 1, nrPart
       if ((particles_species(i) /= species_atom) .and. (particles_species(i) /= species_ion)) then
         ! Verlet
@@ -297,7 +299,7 @@ contains
     !$OMP PARALLEL DO DEFAULT(NONE) PRIVATE(i, j, k_1, k_2, pos_1, pos_2, diff, r, pos_ic) &
     !$OMP& PRIVATE(force_E, force_c, force_ic, force_ic_N, force_ic_self, im_1, q_1, im_2, q_2, pre_fac_c) &
     !$OMP SHARED(nrPart, particles_cur_pos, particles_mass, particles_species, ptr_field_E, box_dim) &
-    !$OMP SHARED(ptr_Image_Charge_effect, particles_charge, d, particles_species) &
+    !$OMP SHARED(ptr_Image_Charge_effect, particles_charge, d) &
     !$OMP& SCHEDULE(DYNAMIC, 1) &
     !$OMP& REDUCTION(+:particles_cur_accel)
     do i = 1, nrPart
@@ -462,6 +464,7 @@ contains
 
     !$OMP PARALLEL DO DEFAULT(NONE) PRIVATE(j, pos_2, diff, r, force_c, force_ic, q_2, pre_fac_c) &
     !$OMP& SHARED(nrPart, particles_cur_pos, particles_charge, ptr_Image_Charge_effect, pos_1, box_dim) &
+    !$OMP& SHARED(particles_species) &
     !$OMP& REDUCTION(+:force_tot)
     do j = 1, nrPart
       if (particles_species(j) /= species_atom) then
