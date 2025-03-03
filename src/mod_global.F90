@@ -37,13 +37,30 @@ module mod_global
   !double precision, parameter :: m_e = m_eeff * m_0 ! m_e* Effective electron mass (kg)
   !double precision, parameter :: m_h = m_heff * m_0! m_h* Effective hole mass (kg)
 
-  double precision, parameter :: m_N2p = 14.0067d0*m_u - m_0 ! Mass of N_2^+ ion (kg)
 
   double precision, parameter :: q_0 = 1.6021766208d-19 ! Elementary charge (C)
   double precision, parameter :: q_02 = q_0**2 ! Elementary charge squared (C)
+  double precision, parameter :: r_0 = 1.0d0/(4.0d0*pi*epsilon_0)*(q_0**2/m_0*c**2) ! Classical electron radius (m)
 
   double precision, parameter :: T_ntp = 293.15d0 ! Normal temperature in Kelvin (NIST)
   double precision, parameter :: P_ntp = 101325.0d0 ! Normal pressure in Pa (NIST)
+
+  ! Rydberg constants
+  double precision, parameter :: R_inf = m_0*q_0**4/(8.0d0*epsilon_0**2*h**3*c) ! Rydberg constant (m^-1)
+  double precision, parameter :: Ryd = h*c*R_inf/q_0 ! Rydberg energy (eV)
+
+  ! N2
+  double precision, parameter :: m_N2 = 28.0134d0*m_u ! Mass of N_2 molecule (kg)
+  double precision, parameter :: m_N2p = n_N2 - m_0 ! Mass of N_2^+ ion (kg)
+  double precision, parameter :: N_r = 0.185d-9 ! N2- radius
+  double precision, parameter :: Z_i = 1.0d0 ! Charge of N2- ion
+  double precision, parameter :: Z_i2 = Z_i**2 ! Charge of N2- ion squared
+  double precision, parameter :: Z_c = 7.0d0 ! Nuclear core charge of nitrogen
+  double precision, parameter :: Z_eff = sqrt(Z_i*Z_c) ! Effective charge of N2- ion
+  double precision, parameter :: Z_eff2 = Z_eff**2 ! Effective charge of N2- ion squared
+  double precision, parameter :: N_n = 2.0d0 ! Principal quantum number of nitrogen
+  double precision, parameter :: CS_RR_NUM = 2.105d-26*Ryd**2*(Z_eff**4) ! Numerator of Kramers cross section
+  double precision, parameter :: N_bind = Z_c**2 / N_n**2 * Ryd ! Nitrogen binding energy
 
   
   ! ----------------------------------------------------------------------------
@@ -74,10 +91,11 @@ module mod_global
 
   ! ----------------------------------------------------------------------------
   ! Define the particle species
-  integer, parameter :: species_unkown   = 0 ! Unknown particle
-  integer, parameter :: species_elec     = 1 ! Electron
-  integer, parameter :: species_ion      = 2 ! Ion
-  integer, parameter :: nrSpecies        = 2 ! 2 = Elec or Ion
+  integer, parameter :: species_unkown    = 0 ! Unknown particle
+  integer, parameter :: species_elec      = 1 ! Electron
+  integer, parameter :: species_ion       = 2 ! Ion
+  integer, parameter :: species_atom      = 3 ! Atom
+  integer, parameter :: nrSpecies         = 3 ! 2 = Elec, Ion, or Atom
 
 
   ! ----------------------------------------------------------------------------
@@ -85,6 +103,14 @@ module mod_global
   integer, parameter :: remove_unknown = 0
   integer, parameter :: remove_top     = 1
   integer, parameter :: remove_bot     = 2
+  integer, parameter :: remove_recom   = 3
+  integer, parameter :: remove_ion     = 4
+
+  ! ----------------------------------------------------------------------------
+  ! Ion emission
+  integer, parameter :: ion_emitter = 2
+  integer, parameter :: recom_emitter = 3
+  integer, parameter :: atom_emitter = 4
 
   ! ----------------------------------------------------------------------------
   ! Define storage arrays for particles
@@ -110,9 +136,19 @@ module mod_global
                                                                          ! .false. means it is inactive and should be removed
   integer         , dimension(:)   , allocatable :: particles_id         ! ID to track the particle
 
+  ! Collision data
+  double precision, dimension(:), allocatable :: particles_cur_energy 
+  double precision, dimension(:), allocatable :: particles_recom_cross_rad
+  double precision, dimension(:), allocatable :: particles_ion_cross_rad
+
+  
   ! Cross Sections
   double precision, allocatable, target, dimension(:, :) :: N2_tot_cross ! Total cross section of N2
   double precision, allocatable, target, dimension(:, :) :: N2_ion_cross ! Ioniaztion cross section of N2
+
+  ! Laplace
+  double precision, dimension(:), allocatable :: valA, b, iCharge, oCharge
+  integer, dimension(:), allocatable :: colA, rowA, linkA, gridPoints, gridPointsActive
 
 
   ! ----------------------------------------------------------------------------
@@ -120,6 +156,7 @@ module mod_global
   ! Fyrst dimension is x,y,z, second one is the number of the emitter
   double precision, dimension(:, :), allocatable :: emitters_pos         ! Position of the emitters (1:3, 1:MAX_EMITTERS)
   double precision, dimension(:, :), allocatable :: emitters_dim         ! Dimensions of the emitters
+  double precision, dimension(:, :), allocatable :: emitters_ring        ! Outer radius, inner radius, thickness
   ! Dimension is the number of emitters
   integer,          dimension(:),    allocatable :: emitters_Type        ! The type of emitter
   integer,          dimension(:),    allocatable :: emitters_delay       ! The time step the emitters become active
@@ -159,6 +196,7 @@ module mod_global
   integer :: nrPart ! Number of particles in the system (nrPart = nrElec + nrIon + nrFixedPart)
   integer :: nrElec ! Number of electrons in the system
   integer :: nrIon ! Number of ion's in the system
+  integer :: nrAtom ! Number of atoms in the system
   integer :: nrElecIon
   integer :: nrEmit ! Number of emitters in the system
   integer :: nrID   ! Number for the current id
@@ -183,6 +221,7 @@ module mod_global
   ! Emitter types
   integer, parameter :: EMIT_UNKNOWN         = 0
   integer, parameter :: EMIT_CIRCLE          = 1
+  integer, parameter :: EMIT_RING            = 2
   integer, parameter :: EMIT_RECTANGLE       = 2
   integer, parameter :: EMIT_RECTANGLE_SPOTS = 3
 
@@ -251,6 +290,20 @@ module mod_global
   ! Other stuff
   logical            :: write_ramo_sec = .False. ! Write out the ramo current for each section.
   logical            :: write_position_file = .False. ! Write data to the particle position information.
+  logical            :: write_recombination_file = .False.
+  logical            :: write_particle_data_file = .false.
+  logical            :: write_electron_data_file = .false.
+  logical            :: write_ion_data_file = .false.
+  logical            :: sample_atom_file = .false.
+  integer            :: sample_atom_rate = 500
+  logical            :: sample_elec_file = .false.
+  integer            :: sample_elec_rate = 500
+  double precision   :: ion_atom_ratio = 1.0d0
+     
+  ! Laplace solver
+  logical            :: laplace = .false.
+  double precision, dimension(3) :: laplace_dim, laplace_pos
+  integer, dimension(3) :: laplace_intervals
 
 
   ! ----------------------------------------------------------------------------
@@ -301,8 +354,14 @@ module mod_global
                    nrEmit, emitters_pos, emitters_dim, &
                    emitters_type, emitters_delay, EMISSION_MODE, &
                    image_charge, N_ic_max, collisions, T_temp, P_abs, &
-                   write_ramo_sec, write_position_file, R_s, &
-                   R_p, L_p, C_p, ion_life_time, &
+                   write_ramo_sec, write_position_file, &
+                   write_recombination_file, write_particle_data_file, &
+                   write_electron_data_file, write_ion_data_file, &
+                   sample_atom_file, sample_atom_rate, &
+                   sample_elec_file, sample_elec_rate, &
+                   ion_atom_ratio, &
+                   laplace, laplace_dim, laplace_pos, laplace_intervals, &
+                   R_s, R_p, L_p, C_p, ion_life_time, &
                    planes_N, planes_z
 
   ! ----------------------------------------------------------------------------
