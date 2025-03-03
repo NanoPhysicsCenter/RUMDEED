@@ -51,7 +51,7 @@ module mod_global
 
   ! N2
   double precision, parameter :: m_N2 = 28.0134d0*m_u ! Mass of N_2 molecule (kg)
-  double precision, parameter :: m_N2p = n_N2 - m_0 ! Mass of N_2^+ ion (kg)
+  double precision, parameter :: m_N2p = m_N2 - m_0 ! Mass of N_2^+ ion (kg)
   double precision, parameter :: N_r = 0.185d-9 ! N2- radius
   double precision, parameter :: Z_i = 1.0d0 ! Charge of N2- ion
   double precision, parameter :: Z_i2 = Z_i**2 ! Charge of N2- ion squared
@@ -139,7 +139,8 @@ module mod_global
   ! Collision data
   double precision, dimension(:), allocatable :: particles_cur_energy 
   double precision, dimension(:), allocatable :: particles_recom_cross_rad
-  double precision, dimension(:), allocatable :: particles_ion_cross_rad
+  double precision, dimension(:), allocatable :: particles_ion_cross_sec
+  double precision, dimension(:), allocatable :: particles_tot_cross_sec
 
   
   ! Cross Sections
@@ -203,16 +204,23 @@ module mod_global
 
   integer :: nrPart_remove_top
   integer :: nrPart_remove_bot
+  integer :: nrPart_remove_recom
+  integer :: nrPart_remove_ion
 
   integer :: nrElec_remove_top
   integer :: nrElec_remove_bot
+  integer :: nrElec_remove_recom
 
   integer :: nrIon_remove_top
   integer :: nrIon_remove_bot
+  integer :: nrIon_remove_recom
+
+  integer :: nrAtom_remove_ion
 
   integer :: nrPart_remove ! Number of particles to be removed
   integer :: nrElec_remove ! Number of electrons to be removed
   integer :: nrIon_remove ! Number of ion's to be removed
+  integer :: nrAtom_remove ! Number of atoms to be removed
 
   integer, dimension(:), allocatable :: nrElec_remove_top_emit
 
@@ -230,7 +238,9 @@ module mod_global
   double precision, dimension(:, :), allocatable :: ramo_current_emit
 
   double precision                 :: avg_mob ! Average mobility
-  double precision, dimension(1:3) :: avg_vel ! Average speed
+  double precision, dimension(1:3) :: avg_part_vel ! Average particle speed
+  double precision, dimension(1:3) :: avg_elec_vel ! Average electron speed
+  double precision, dimension(1:3) :: avg_ion_vel  ! Average ion speed
 
   double precision :: cur_time ! This is updated in the main loop, given in ps
   integer, parameter :: MAX_LIFE_TIME = 1000
