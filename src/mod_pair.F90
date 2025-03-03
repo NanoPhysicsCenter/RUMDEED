@@ -70,8 +70,9 @@ contains
       particles_life(nrPart+1)            = life
       particles_id(nrPart+1)              = nrID ! ID is updated near the end
       particles_cur_energy(nrPart+1)      = 0.0d0
-      particles_ion_cross_rad(nrPart+1)   = 0.0d0
       particles_ion_cross_sec(nrPart+1)   = 0.0d0
+      particles_recom_cross_rad(nrPart+1) = 0.0d0
+      particles_tot_cross_sec(nrPart+1)   = 0.0d0
 
       if (par_species == species_elec) then ! Electron
         particles_charge(nrPart+1) = -1.0d0*q_0
@@ -278,7 +279,8 @@ contains
         !$OMP& SHARED(particles_mask, particles_cur_pos, particles_prev_pos, particles_last_col_pos) &
         !$OMP& SHARED(particles_cur_vel, particles_cur_accel, particles_prev_accel, particles_prev2_accel) &
         !$OMP& SHARED(particles_step, particles_species, step, particles_mass, particles_charge) &
-        !$OMP& SHARED(particles_emitter, particles_section, particles_life, particles_id, nrPart, life_time)
+        !$OMP& SHARED(particles_emitter, particles_section, particles_life, particles_id, nrPart, life_time) &
+        !$OMP& SHARED(particles_cur_energy, particles_ion_cross_sec, particles_tot_cross_sec, particles_recom_cross_rad)
         !$OMP SINGLE
 
         k = 1
@@ -346,8 +348,12 @@ contains
         call compact_array(particles_cur_energy, particles_mask, k, m)
         !$OMP END TASK
 
-        !$OMP TASK FIRSTPRIVATE(k, m) SHARED(particles_ion_cross_rad, particles_mask)
-        call compact_array(particles_ion_cross_rad, particles_mask, k, m)
+        !$OMP TASK FIRSTPRIVATE(k, m) SHARED(particles_ion_cross_sec, particles_mask)
+        call compact_array(particles_ion_cross_sec, particles_mask, k, m)
+        !$OMP END TASK
+
+        !$OMP TASK FIRSTPRIVATE(k, m) SHARED(particles_tot_cross_sec, particles_mask)
+        call compact_array(particles_tot_cross_sec, particles_mask, k, m)
         !$OMP END TASK
 
         !$OMP TASK FIRSTPRIVATE(k, m) SHARED(particles_recom_cross_rad, particles_mask)
