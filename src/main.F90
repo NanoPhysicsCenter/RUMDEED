@@ -351,8 +351,9 @@ contains
     allocate(particles_life(1:MAX_PARTICLES))
     allocate(particles_id(1:MAX_PARTICLES))
     allocate(particles_cur_energy(1:MAX_PARTICLES))
-    allocate(particles_ion_cross_rad(1:MAX_PARTICLES))
+    allocate(particles_ion_cross_sec(1:MAX_PARTICLES))
     allocate(particles_recom_cross_rad(1:MAX_PARTICLES))
+    allocate(particles_tot_cross_sec(1:MAX_PARTICLES))
 
     allocate(life_time(1:MAX_LIFE_TIME, 1:2))
     allocate(ramo_current(1:nrSpecies))
@@ -834,8 +835,9 @@ contains
     deallocate(particles_id)
     deallocate(particles_step)
     deallocate(particles_cur_energy)
-    deallocate(particles_ion_cross_rad)
+    deallocate(particles_ion_cross_sec)
     deallocate(particles_recom_cross_rad)
+    deallocate(particles_tot_cross_sec)
 
     deallocate(emitters_pos)
     deallocate(emitters_dim)
