@@ -69,6 +69,9 @@ contains
       particles_section(nrPart+1)         = sec
       particles_life(nrPart+1)            = life
       particles_id(nrPart+1)              = nrID ! ID is updated near the end
+      particles_cur_energy(nrPart+1)      = 0.0d0
+      particles_ion_cross_rad(nrPart+1)   = 0.0d0
+      particles_ion_cross_sec(nrPart+1)   = 0.0d0
 
       if (par_species == species_elec) then ! Electron
         particles_charge(nrPart+1) = -1.0d0*q_0
@@ -77,13 +80,18 @@ contains
         ! Write out the x and y position of the emitted particle
         ! along with which emitter and section it came from.
         !if (abs(par_pos(3) - 1.0d0*length_scale) < 1.0E-3) then
-          write(unit=ud_density_emit) (par_pos(1) / length_scale), (par_pos(2) / length_scale), emit, sec, nrID
+          write(unit=ud_density_emit) par_pos(:)/ length_scale, emit, sec, nrID
         !end if
       else if (par_species == species_ion) then ! Ion
         particles_charge(nrPart+1) = +1.0d0*q_0
         particles_mass(nrPart+1) = m_N2p
         nrIon = nrIon + 1
-        write(unit=ud_density_ion) (par_pos(1) / length_scale), (par_pos(2) / length_scale), (par_pos(3) / length_scale), nrID
+        write(unit=ud_density_emit_ion) par_pos(:)/length_scale, emit, sec, nrID
+      else if (par_species == species_atom) then
+        particles_charge(nrPart+1) = 0.0d0
+        particles_mass(nrPart+1) = m_N2
+        nrAtom = nrAtom + 1
+        write(unit=ud_density_emit_atom) par_pos(:)/length_scale, emit, sec, nrID 
       else
         print *, 'ERROR UNKNOWN PARTICLE TYPE'
         stop
@@ -91,7 +99,7 @@ contains
 
       ! Update the number of particles in the system
       nrElecIon = nrElec + nrIon
-      nrPart = nrElecIon
+      nrPart = nrElecIon + nrAtom
 
       nrID = nrID + 1
     end if
@@ -160,6 +168,26 @@ contains
           write(unit=ud_density_absorb_bot) particles_cur_pos(1, i)/length_scale, particles_cur_pos(2, i)/length_scale, &
                                           & particles_emitter(i), particles_section(i), particles_id(i)
           !$OMP END CRITICAL(DENSITY_ABSORB_BOT)
+        CASE (remove_recom) ! Recombination
+          !$OMP ATOMIC UPDATE
+          nrPart_remove_recom = nrPart_remove_recom + 1
+
+          !$OMP ATOMIC UPDATE
+          nrElec_remove_recom = nrElec_remove_recom + 1
+
+          ! Write out the x and y position of the particle along with which emitter it came from.
+          !$OMP CRITICAL(DENSITY_ABSORB_RECOM)
+          write(unit=ud_density_absorb_recom) &
+            & particles_cur_pos(1,i), particles_cur_pos(2,i), particles_cur_pos(3,i), &
+            & particles_emitter(i), particles_section(i),  particles_id(i), species_elec, &
+            & cur_time/time_step*time_scale
+          !$OMP END CRITICAL(DENSITY_ABSORB_RECOM)
+        CASE (remove_ion) ! Ionization
+          !$OMP ATOMIC UPDATE
+          nrPart_remove_ion = nrPart_remove_ion + 1
+
+          !$OMP ATOMIC UPDATE
+          nrAtom_remove_ion = nrAtom_remove_ion + 1
         CASE DEFAULT
           print *, 'Error unkown remove case ', m
       END SELECT
@@ -182,6 +210,39 @@ contains
 
           !$OMP ATOMIC UPDATE
           nrIon_remove_bot = nrIon_remove_bot + 1
+
+        CASE (remove_recom) ! Recombination
+          !$OMP ATOMIC UPDATE
+          nrPart_remove_recom = nrPart_remove_recom + 1
+
+          !$OMP ATOMIC UPDATE
+          nrIon_remove_recom = nrIon_remove_recom + 1
+
+          ! Write out the x,y,z position of the particle along with which "emitter" it came from.
+          !$OMP CRITICAL(DENSITY_ABSORB_RECOM)
+          write(unit=ud_density_absorb_recom) &
+          & particles_cur_pos(1,i), particles_cur_pos(2,i), particles_cur_pos(3,i), &
+          & particles_emitter(i), particles_section(i),  particles_id(i), species_ion, &
+          & cur_time/time_step*time_scale
+          !$OMP END CRITICAL(DENSITY_ABSORB_RECOM)
+
+        CASE DEFAULT
+          print *, 'Error unkown remove case ', m
+      END SELECT
+
+    else if (particles_species(i) == species_atom) then
+
+      !$OMP ATOMIC UPDATE
+      nrAtom_remove = nrAtom_remove + 1
+
+      SELECT CASE (m)        
+        CASE (remove_ion) ! Recombination
+          !$OMP ATOMIC UPDATE
+          nrPart_remove_ion = nrPart_remove_ion + 1
+
+          !$OMP ATOMIC UPDATE
+          nrAtom_remove_ion = nrAtom_remove_ion + 1
+
         CASE DEFAULT
           print *, 'Error unkown remove case ', m
       END SELECT
@@ -281,6 +342,18 @@ contains
         call compact_array(particles_id, particles_mask, k, m)
         !$OMP END TASK
 
+        !$OMP TASK FIRSTPRIVATE(k, m) SHARED(particles_cur_energy, particles_mask)
+        call compact_array(particles_cur_energy, particles_mask, k, m)
+        !$OMP END TASK
+
+        !$OMP TASK FIRSTPRIVATE(k, m) SHARED(particles_ion_cross_rad, particles_mask)
+        call compact_array(particles_ion_cross_rad, particles_mask, k, m)
+        !$OMP END TASK
+
+        !$OMP TASK FIRSTPRIVATE(k, m) SHARED(particles_recom_cross_rad, particles_mask)
+        call compact_array(particles_recom_cross_rad, particles_mask, k, m)
+        !$OMP END TASK
+
         !$OMP END SINGLE NOWAIT
 
         ! Wait for all tasks to finish
@@ -308,13 +381,14 @@ contains
       !nrPart = nrPart - nrPart_remove
       nrElec = nrElec - nrElec_remove
       nrIon = nrIon - nrIon_remove
+      nrAtom = nrAtom - nrAtom_remove
 
       ! This should not happen, but just in case.
       if (nrElec < 0) nrElec = 0
       if (nrIon < 0) nrIon = 0
 
       nrElecIon = nrElec + nrIon
-      nrPart = nrElecIon
+      nrPart = nrElecIon + nrAtom
 
       particles_mask = .true. ! Reset the mask. .true. means all particles are active.
 
@@ -322,13 +396,19 @@ contains
       nrPart_remove = 0
       nrElec_remove = 0
       nrIon_remove = 0
+      nrAtom_remove = 0
 
       nrPart_remove_top = 0
       nrPart_remove_bot = 0
+      nrPart_remove_recom = 0
+      nrPart_remove_ion = 0
       nrElec_remove_top = 0
       nrElec_remove_bot = 0
+      nrElec_remove_recom = 0
       nrIon_remove_top = 0
       nrIon_remove_bot = 0
+      nrIon_remove_recom = 0
+      nrAtom_remove_ion = 0
 
       nrElec_remove_top_emit(1:MAX_EMITTERS) = 0
     end if
@@ -365,6 +445,9 @@ contains
 
     write (ud_absorb_bot, "(ES12.4, *(tr2, i8))", iostat=IFAIL) cur_time, step, &
     & nrPart_remove_bot, nrElec_remove_bot, nrIon_remove_bot
+
+    write (ud_absorb_recom, "(ES12.4, *(tr2, i8))", iostat=IFAIL) cur_time, step, &
+    & nrPart_remove_bot, nrElec_remove_recom, nrIon_remove_recom
   end subroutine Write_Absorbed
 
   ! ----------------------------------------------------------------------------
@@ -376,9 +459,11 @@ contains
     integer, intent(in) :: step
     integer             :: IFAIL, i
     double precision    :: ramo_cur
-    double precision    :: avg_speed
+    double precision    :: avg_part_speed, avg_elec_speed, avg_ion_speed
 
-    avg_speed = sqrt(avg_vel(1)**2 + avg_vel(2)**2 + avg_vel(3)**2)
+    avg_part_speed = norm2(avg_part_vel)
+    avg_elec_speed = norm2(avg_elec_vel)
+    avg_ion_speed = norm2(avg_ion_vel)
 
     ! Write out the current for each emitter and section
     if (write_ramo_sec .eqv. .true.) then
@@ -389,9 +474,11 @@ contains
     ! Write the total current along with other data
     ramo_cur = sum(ramo_current) / cur_scale
     write(unit=ud_ramo, &
-    & fmt="(ES12.4, tr2, i8, tr2, ES12.4, tr2, ES12.4, tr2, i6, tr2, i6, tr2, i6, tr2, ES12.4, tr2, ES12.4, *(tr2, ES12.4))", &
+    & fmt="(ES12.4, tr2, i8, tr2, ES12.4, tr2, ES12.4, tr2, i6, tr2, i6, tr2, i6, tr2, ES12.4, tr2, &
+    & ES12.4, tr2, ES12.4, tr2, ES12.4, *(tr2, ES12.4))", &
     & iostat=IFAIL) &
-    & cur_time, step, ramo_cur, V_d, nrPart, nrElec, nrIon, avg_mob, avg_speed, (ramo_current(i), i = 1, nrSpecies)
+    & cur_time, step, ramo_cur, V_d, nrPart, nrElec, nrIon, avg_mob, avg_part_speed, &
+    & avg_elec_speed, avg_ion_speed, (ramo_current(i), i = 1, nrSpecies)
 
   end subroutine Write_Ramo_current
 
@@ -419,7 +506,7 @@ contains
           par_pos(:) = particles_cur_pos(:, i) ! Position of the particle
 
           ! Write out x, y, z and which emitter the particle came from
-          write(unit=ud_pos) par_pos(1), par_pos(2), par_pos(3), particles_emitter(i), particles_section(i), particles_id(i)
+          write(unit=ud_pos) par_pos(:), particles_emitter(i), particles_section(i), particles_id(i)
         end do
       end if
     end if
@@ -473,39 +560,177 @@ contains
   end subroutine
 
   !-----------------------------------------------------------------------------
+  ! Write recombination data
+  subroutine Write_Recombination_Data(step, ionPos, elecVel, dist, elecKramers, elecID, ionID, elecEmit)
+    integer, intent(in)           :: step, elecEmit, elecID, ionID
+    double precision, intent(in)  ::  elecVel, dist, elecKramers
+    double precision, dimension(1:3), intent(in) :: ionPos
+    integer                       :: ionLife
+    ionLife = step - particles_step(ionID)
+    write(unit = ud_recombination_data) step, ionPos, elecVel, dist, elecKramers, elecID, ionID, elecEmit, ionLife
+  end subroutine Write_Recombination_Data
+
+  !-----------------------------------------------------------------------------
+  ! Write ionization data
+  subroutine Write_Ionization_Data(step,ionPos,inSpeed,outSpeed,newSpeed,ion_dist,ion_rad,inID,newID,ionID,elecEmit)
+    integer, intent(in)           :: step, elecEmit, inID, newID, ionID
+    double precision, intent(in)  ::  inSpeed, outSpeed, newSpeed, ion_dist, ion_rad
+    double precision, dimension(1:3), intent(in) :: ionPos
+    write(unit = ud_ionization_data) step,ionPos,inSpeed,outSpeed,newSpeed,ion_dist,ion_rad,inID,newID,ionID,elecEmit
+  end subroutine Write_Ionization_Data
+
+  !-----------------------------------------------------------------------------
+  ! Sample ion positions
+  subroutine Sample_Atom_Position(step)
+    integer, intent(in) :: step
+    integer             :: IFAIL, i, ud_atom_pos, species
+    character(len=128)  :: filename
+
+    if (sample_atom_file .eqv. .true.) then
+      if (mod(step,sample_atom_rate) == 0) then
+        ! Create the file
+        write(filename, '(a9, i0, a4)') 'out/atom-', step, '.bin'
+        ! Open the file
+        open(newunit=ud_atom_pos, iostat=IFAIL, file=filename, status='REPLACE', action='WRITE', access='STREAM')
+        if (IFAIL /= 0) then
+          print *, 'RUMDEED: Failed to open the atom position file.'
+          return 
+        end if
+        ! Write data
+        do i = 1, nrPart
+          species = particles_species(i)
+          if ((species == species_ion) .or. (species == species_atom)) then
+            ! print*,'Start writing'
+            write(unit=ud_atom_pos, iostat=IFAIL) particles_cur_pos(:,i), species
+            ! print*,'Stop writing'
+          end if
+        end do
+        ! Close the file
+        close(unit=ud_atom_pos, iostat=IFAIL, status='keep')
+      end if
+    end if
+  end subroutine Sample_Atom_Position 
+
+  subroutine Sample_Elec_Position(step)
+    integer, intent(in) :: step
+    integer             :: IFAIL, i, ud_elec_pos, species
+    character(len=128)  :: filename
+
+    if (sample_elec_file .eqv. .true.) then
+      if (mod(step,sample_elec_rate) == 0) then
+        ! Create the file
+        write(filename, '(a9, i0, a4)') 'out/elec-', step, '.bin'
+        ! Open the file
+        open(newunit=ud_elec_pos, iostat=IFAIL, file=filename, status='REPLACE', action='WRITE', access='STREAM')
+        if (IFAIL /= 0) then
+          print *, 'RUMDEED: Failed to open the electron position file.'
+          return 
+        end if
+        ! Write data
+        do i = 1, nrPart
+          species = particles_species(i)
+          if (species == species_elec) then
+            ! print*,'Start writing'
+            write(unit=ud_elec_pos, iostat=IFAIL) particles_cur_pos(1,i), particles_cur_pos(2,i), particles_cur_pos(3,i)
+            ! print*,'Stop writing'
+          end if
+        end do
+        ! Close the file
+        close(unit=ud_elec_pos, iostat=IFAIL, status='keep')
+      end if
+    end if
+  end subroutine Sample_Elec_Position
+
+  !-----------------------------------------------------------------------------
   ! Write out the positions
   ! Keyword arguments:
   ! step -- The current time step
   subroutine Write_Particle_Data(step)
     integer, intent(in) :: step
-    integer             :: i, IFAIL, ud_data
+    integer             :: i, IFAIL, ud_part_data, ud_elec_data, ud_ion_data
     character(len=128)  :: filename
+    double precision    :: cur_speed, cur_energy
 
-    ! Prepare the name of the output file
-    ! each file is named particles-0.dt where the number
-    ! represents the current time step.
-    write(filename, '(a14, i0, a3)') 'out/particles-', step, '.dt'
+    ! Write a data file containing position, velocity, acceleration, and emitter
+    ! Writes one file for all particles, or one file for either electrons or ions, never two files
+    if (write_particle_data_file .eqv. .true.) then
+      write(filename, '(a14, i0, a3)') 'out/particles-', step, '.dt'
 
-    ! Open the output file
-    open(newunit=ud_data, iostat=IFAIL, file=filename, status='REPLACE', action='write')
-    if (IFAIL /= 0) then
-      print *, 'RUMDEED: Failed to open the data file.'
-      return
+      ! Open the output file
+      open(newunit=ud_part_data, iostat=IFAIL, file=filename, status='REPLACE', action='write')
+      if (IFAIL /= 0) then
+        print *, 'RUMDEED: Failed to open the particle data file.'
+        return
+      end if
+
+      ! The first line in the file is the number of particles
+      write(unit=ud_part_data, fmt="(i8)", iostat=IFAIL) nrElec
+
+      ! All the other lines are data about the particles, with each particle on its
+      ! own line.
+      ! Position, Velocity, Acceleration
+      do i = 1, nrPart
+        write(unit=ud_part_data, fmt='(i8,ES12.4,ES12.4,ES12.4,i8,i8)', iostat=IFAIL) &
+            & particles_id(i), particles_cur_pos(:,i)/length_scale, particles_emitter(i), particles_step(i)
+      end do
+
+      ! Close the file
+      close(unit=ud_part_data, iostat=IFAIL, status='keep')
+    else
+      if (write_electron_data_file .eqv. .true.) then
+        write(filename, '(a14, i0, a3)') 'out/electrons-', step, '.dt'
+
+        ! Open the output file
+        open(newunit=ud_elec_data, iostat=IFAIL, file=filename, status='REPLACE', action='write')
+        if (IFAIL /= 0) then
+          print *, 'RUMDEED: Failed to open the electron data file.'
+          return
+        end if
+
+        ! The first line in the file is the number of particles
+        write(unit=ud_elec_data, fmt="(i8)", iostat=IFAIL) nrElec
+
+        ! All the other lines are data about the particles, with each particle on its
+        ! own line.
+        ! Position, Velocity, Acceleration
+        do i = 1, nrPart
+          if (particles_species(i) == species_elec) then
+            write(unit=ud_elec_data, fmt='(i8,ES12.4,ES12.4,ES12.4,i8,i8)', iostat=IFAIL) &
+            & particles_id(i), particles_cur_pos(:,i), particles_emitter(i), particles_step(i)
+          end if
+        end do
+
+        ! Close the file
+        close(unit=ud_elec_data, iostat=IFAIL, status='keep')
+      end if
+
+      if (write_ion_data_file .eqv. .true.) then
+        write(filename, '(a9 i0, a3)') 'out/ions-', step, '.dt'
+
+        ! Open the output file
+        open(newunit=ud_ion_data, iostat=IFAIL, file=filename, status='REPLACE', action='write')
+        if (IFAIL /= 0) then
+          print *, 'RUMDEED: Failed to open the ion file.'
+          return
+        end if
+
+        ! The first line in the file is the number of particles
+        write(unit=ud_ion_data, fmt="(i8)", iostat=IFAIL) nrIon
+
+        ! All the other lines are data about the particles, with each particle on its
+        ! own line.
+        ! Position, Velocity, Acceleration
+        do i = 1, nrPart
+          if (particles_species(i) == species_ion) then
+            write(unit=ud_ion_data, fmt='(i8,ES12.4,ES12.4,ES12.4,i8,i8)', iostat=IFAIL) &
+            & particles_id(i), particles_cur_pos(:,i), particles_emitter(i), particles_step(i)
+          end if
+        end do
+
+        ! Close the file
+        close(unit=ud_ion_data, iostat=IFAIL, status='keep')
+      end if
     end if
-
-    ! The first line in the file is the number of particles
-    write(unit=ud_data, fmt="(i8)", iostat=IFAIL) nrPart
-
-    ! All the other lines are data about the particles, with each particle on its
-    ! own line.
-    ! Position, Velocity, Acceleration
-    do i = 1, nrPart
-      write(unit=ud_data, fmt="(*(ES12.4))", iostat=IFAIL) &
-        particles_cur_pos(:, i), particles_cur_vel(:, i), particles_cur_accel(:, i)
-    end do
-
-    ! Close the file
-    close(unit=ud_data, iostat=IFAIL, status='keep')
   end subroutine
 
   ! ----------------------------------------------------------------------------
