@@ -313,6 +313,7 @@ module mod_global
   integer :: ud_absorb ! File for absorbed electrons and ion's
   integer :: ud_absorb_top ! File for absorbed electrons and ion's
   integer :: ud_absorb_bot ! File for absorbed electrons and ion's
+  integer :: ud_absorb_recom ! File for absorbed electrons and ions during recombination
   integer :: ud_ramo ! File for the Ramo current
   integer :: ud_volt ! Voltage in the system
   integer :: ud_debug ! File for debuging and testing
@@ -324,14 +325,20 @@ module mod_global
 
   ! unit descriptors for data files (binary files)
   integer :: ud_ramo_sec ! File for the ramo current broken down into emitters and sections
+  integer :: ud_ionization_data
+  integer :: ud_recombination_data
 
   ! Emission density (binary files)
   integer :: ud_density_emit
   integer :: ud_density_ion
+  integer :: ud_density_emit_elec
+  integer :: ud_density_emit_ion
+  integer :: ud_density_emit_atom
 
   ! Absorption density (binary files)
   integer :: ud_density_absorb_top
   integer :: ud_density_absorb_bot
+  integer :: ud_density_absorb_recom
 
   !-----------------------------------------------------------------------------
   ! Nodal Analysis
