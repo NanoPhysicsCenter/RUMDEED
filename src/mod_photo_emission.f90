@@ -357,6 +357,10 @@ contains
           !print *, 'Doing spots'
           !call Do_Photo_Emission_Rectangle_Spot(step, i)
           call Do_Photo_Emission_Spot(step, i)
+        
+        case (EMIT_RING)
+          ! print *, 'Doing Ring'
+          call Do_Photo_Emission_Ring(step, i)
           
         case default
           print *, 'RUMDEED: ERROR unknown emitter type!!'
@@ -461,6 +465,111 @@ contains
     posInit   = posInit   + nrElecEmit
     nrEmitted = nrEmitted + nrElecEmit
   end subroutine Do_Photo_Emission_Circle
+
+  subroutine Do_Photo_Emission_Ring(step, emit)
+    integer, intent(in)              :: step,       emit
+    integer                          :: nrElecEmit, nrTry
+    double precision, dimension(1:3) :: par_pos, par_vel, field
+    !double precision                :: r_e, theta_e
+    double precision                 :: oR_e, oR_e2, iR_e, iR_e2, t_e, r2, p_eV, schk_wf, schk_red
+    
+    ! Get Energy distribution of the photons
+    p_eV = ptr_Get_Photo_Emission_Energy()
+    par_pos = 0.0d0
+    nrTry = 0
+    nrElecEmit = 0
+    nrEmitted_emitters(emit) = 0
+
+    do while (nrTry <= MAX_EMISSION_TRY)
+      ! Check if we have reached the max number of electrons to be emitted,
+      ! if we are using Gaussian limited emission.
+      if ((nrElecEmit >= maxElecEmit) .and. (EmitGauss .eqv. .True.)) then
+       exit
+      end if
+
+      ! Check if we have reached the maximum number of electrons.
+      ! If this happends then the parameter MAX_PARTICLES (in mod_gobal)
+      ! needs to be increased and the code recompiled.
+      if (nrElec == MAX_PARTICLES-1) then
+       print *, 'WARNING: Reached maximum number of electrons!!!'
+       exit
+      end if
+
+      ! Set radii and thickness
+      if (emitters_dim(3,emit) == 0.0d0) then
+        ! print *, 'q_0 = ', q_0
+        ! print *, 'box_dim(3) = ', box_dim(3)
+        ! print *, 'V_s = ', V_s
+        ! print *, 'epsilon_0 = ', epsilon_0
+        ! print *, 'V_s = ', V_s
+        t_e = sqrt((q_0*box_dim(3))/(pi*epsilon_0*V_s)) ! Thickness of emitter
+        ! print * , 't_e = ', t_e
+      else
+        t_e = emitters_dim(3,emit) ! Thickness of emitter
+      end if
+      oR_e = emitters_dim(1, emit) ! Outer radius of emitter
+      ! print *, 'oR_e = ', oR_e
+      iR_e = oR_e - t_e ! Inner radius of emitter
+      oR_e2 = oR_e**2 ! Outer radius of emitter squared
+      iR_e2 = iR_e**2 ! Inner radius of emitter squared
+      r2 = oR_e2 + 1.0d0 ! Must be larger then r_e2 for the do while loop to run
+      
+      ! Find a random spot on the cathode.
+      do while (r2 > oR_e2 .or. r2 < iR_e2)
+        call random_number(par_pos(1:2)) ! Gives a random number [0,1]
+
+        par_pos(1:2) = 2.0d0*(par_pos(1:2) - 0.5d0)*oR_e ! Range is -r_e to +r_e
+        r2 = par_pos(1)**2 + par_pos(2)**2 ! Radius squared of our random point
+      end do
+      ! Shifting position to comply with checkerboard workfunction location function
+      par_pos(1:2) = emitters_pos(1:2, emit) + par_pos(1:2) + emitters_dim(1:2, emit)
+
+      nrTry = nrTry + 1 ! Add one more try
+      par_pos(3) = 0.0d0 * length_scale ! Check in plane
+      
+      ! Schottkey Effect, reduction of workfunction due to electric field
+      ! Workfunction_reduction = sqrt ( (electron_charge^3 * electric_fielc)/(4 * pi * epsilon_0) )
+      
+      field = Calc_Field_at(par_pos)  
+      if (field(3) < 0.0d0) then
+        schk_red = sqrt( ( -field(3) *  (q_0**3)) / (4 * pi * epsilon_0)) / q_0
+        schk_wf = w_theta_xy(par_pos, emit) - schk_red
+        if (schk_wf <= p_eV) then
+          par_pos(3) = 1.0d0 * length_scale ! Above plane
+          field = Calc_Field_at(par_pos)
+
+          if (field(3) < 0.0d0) then
+            par_pos(3) = 1.0d0 * length_scale ! Place above plane
+                        
+            if (PHOTON_MODE == 1) then
+              par_vel = 0.0d0
+            else if (PHOTON_MODE == 2) then
+              par_vel(1:2) = 0.0d0 ! Set x and y components to zero
+              par_vel(3) = sqrt((2.0d0 * ((p_eV - schk_wf)*q_0))/m_0) ! <-- Newtonian
+            else
+              print *, "WARNING: Unknown photon velocity mode!"
+            end if
+
+            ! Escape velocity from image charge partner
+            !par_vel(3) = q_0 / sqrt(8.0d0*pi*epsilon_0*epsilon_r*m_0*par_pos(3)) 
+            
+            ! Speed needed to reach over the gap spacing. Includes image charge partners behind the cathode and annode but not the electric field.
+            !par_vel(3) = q_0/(4.0d0*sqrt(pi*epsilon_0*epsilon_r*m_0))*(d-2.0d0*par_pos(3))/sqrt(d*par_pos(3)*(d-par_pos(3)))
+          
+            call Add_Particle(par_pos, par_vel, species_elec, step, emit, -1)
+
+            nrElecEmit = nrElecEmit + 1
+            nrEmitted_emitters(emit) = nrEmitted_emitters(emit) + 1
+            nrTry = 0
+          end if
+        end if
+      end if
+    
+    end do
+
+    posInit   = posInit   + nrElecEmit
+    nrEmitted = nrEmitted + nrElecEmit
+  end subroutine Do_Photo_Emission_Ring
 
   subroutine Do_Photo_Emission_Rectangle(step, emit)
     integer, intent(in)              :: step,       emit
