@@ -33,17 +33,17 @@ FFLAGS=-O2 -xHost -ip -ipo #-fp-model precise -g
 #-prec-div -prec-sqrt
 #-fp-model precise
 #FFLAGS=-check all -g -warn interfaces -warn all -traceback -ftrapuv
-ifeq ($(OPENMP),yes)
-FFLAGS+=-qopenmp
+ifneq (,$(findstring yes,$(OPENMP)))
+FFLAGS += -qopenmp
 endif
 endif
 
 # NEW INTEL FORTRAN
 ifeq ($(FC),ifx)
 $(info Using New Intel Fortran Compiler)
-FFLAGS=-O2 -xHost -ipo
-ifeq ($(OPENMP),yes)
-FFLAGS+=-qopenmp
+FFLAGS = -O2 -xHost -ipo -i8
+ifneq (,$(findstring yes,$(OPENMP)))
+FFLAGS += -qopenmp
 endif
 endif
 
@@ -51,10 +51,10 @@ endif
 # ifeq ($(FC),gfortran)
 ifneq (,$(findstring gfortran,$(FC)))
 $(info Using GNU Fortran)
-FFLAGS=-O3 -march=native -flto=auto
+FFLAGS = -O3 -march=native -flto=auto
 #FFLAGS=-g -fcheck=all -Wall -fbacktrace -ffpe-trap=invalid,zero,overflow,underflow
-ifeq ($(OPENMP),yes)
-FFLAGS+=-fopenmp
+ifneq (,$(findstring yes,$(OPENMP)))
+FFLAGS += -fopenmp
 endif
 endif
 
@@ -108,6 +108,7 @@ $(PROJECT_NAME).out: ../src/main.F90 ../cuba/lib/libcuba.a \
 			mod_field_thermo_emission.mod mod_field_thermo_emission.o \
 			mod_field_emission_2D.mod mod_field_emission_2D.o \
 			mod_work_function.mod mod_work_function.o \
+			mod_polynomialroots.mod mod_polynomialroots.o \
 			mod_collisions.mod mod_collisions.o \
 			mod_kevin_rjgtf.mod mod_kevin_rjgtf.o \
 			mod_velocity.mod mod_velocity.o \
@@ -117,6 +118,7 @@ $(PROJECT_NAME).out: ../src/main.F90 ../cuba/lib/libcuba.a \
 			mod_tests.o mod_photo_emission.o mod_field_emission.o mod_field_emission_v2.o \
 			mod_field_thermo_emission.o mod_kevin_rjgtf.o \
 			mod_emission_tip.o mod_hyperboloid_tip.o mod_field_emission_2D.o \
+			mod_polynomialroots.o \
 			mod_work_function.o mod_collisions.o \
 			mod_velocity.o mod_manual_emission.o \
 			$(CUBA_LIB) -lpthread -lm -ldl -o $(PROJECT_NAME).out
@@ -175,10 +177,13 @@ mod_manual_emission.mod mod_manual_emission.o: ../src/mod_manual_emission.f90 mo
 mod_work_function.mod mod_work_function.o: ../src/mod_work_function.F90
 		$(FC) -c $(FFLAGS) ../src/mod_work_function.F90
 
+mod_polynomialroots.mod mod_polynomialroots.o: ../src/mod_polynomialroots.F90
+		$(FC) -c $(FFLAGS) ../src/mod_polynomialroots.F90
+
 mod_velocity.mod mod_velocity.o: ../src/mod_velocity.f90
 		$(FC) -c $(FFLAGS) ../src/mod_velocity.f90
 
-mod_collisions.mod mod_collisions.o: ../src/mod_collisions.F90 mod_global.mod mod_pair.mod mod_velocity.mod
+mod_collisions.mod mod_collisions.o: ../src/mod_collisions.F90 mod_global.mod mod_pair.mod mod_velocity.mod mod_polynomialroots.mod
 		$(FC) -c $(FFLAGS) ../src/mod_collisions.F90
 
 clean:
