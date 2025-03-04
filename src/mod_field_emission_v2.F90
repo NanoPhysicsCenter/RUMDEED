@@ -146,18 +146,18 @@ contains
 
       ! Check the type of the emitter CIRCLE / RECTANGLE
       if (emitters_delay(i) < step) then
-        !select case (emitters_type(i))
-        !case (EMIT_CIRCLE)
-          !print *, 'Doing Circle'
-        !  call Do_Photo_Emission_Circle(step, i)
-        !case (EMIT_RECTANGLE)
-          !print *, 'Doing Rectangle'
-          call Do_Field_Emission_Planar_rectangle(step, i)
-          !call Do_Field_Emission_Planar_simple(step, i)
-        !case default
-        !  print *, 'RUMDEED: WARNING unknown emitter type!!'
-        !  print *, emitters_type(i)
-        !end select
+        select case (emitters_type(i))
+          case (EMIT_RING)
+            ! print *, 'Doing Ring'
+            call Do_Field_Emission_Planar_ring(step, i)
+          case (EMIT_RECTANGLE)
+            ! print *, 'Doing Rectangle'
+            call Do_Field_Emission_Planar_rectangle(step, i)
+            ! call Do_Field_Emission_Planar_simple(step, i)
+          case default
+            print *, 'RUMDEED: WARNING unknown emitter type!!'
+            print *, emitters_type(i)
+        end select
       end if
     end do
 
@@ -311,6 +311,107 @@ contains
     !nrEmitted = nrEmitted + nrElecEmit
   end subroutine Do_Field_Emission_Planar_rectangle
 
+!-----------------------------------------------------------------------------
+
+  subroutine Do_Field_Emission_Planar_ring(step, emit)
+    integer, intent(in)              :: step, emit
+
+    ! Integration
+    double precision                 :: N_sup
+    integer                          :: N_round, i
+
+    ! Emission variables
+    double precision                 :: D_f, Df_avg, F, rnd
+    integer                          :: s, sec, IFAIL
+    integer                          :: nrElecEmit
+    double precision, dimension(1:3) :: par_pos, par_vel
+
+    ! print *, 'Do_Field_Emission_Planar_ring'
+
+    call Do_Surface_Integration_FE(emit, N_sup)
+    N_round = nint(N_sup + residual)
+    residual = N_sup - N_round
+
+    !call Calc_Field_old_method(step, emit)
+
+    !print *, 'V_2'
+    !print *, N_sup_db
+    !print *, N_sup
+    !print *, mc_err
+    !print *, N_mc
+    !pause
+
+    !---------------------------------------------------------------------------
+    ! Loop over the supply of electrons and place them on the emitter.
+    ! Then test the emission probability if we emit them.
+
+    nrElecEmit = 0
+    nrEmitted_emitters(emit) = 0
+
+    ! Set the average escape probability to zero.
+    df_avg = 0.0d0
+
+    ! Loop over the electrons to be emitted.
+    !!$OMP PARALLEL DO DEFAULT(NONE) PRIVATE(s, par_pos, F, D_f, rnd, par_vel) REDUCTION(+:df_avg) SCHEDULE(GUIDED, CHUNK_SIZE)
+    do s = 1, N_round
+
+      !call Metropolis_Hastings_rectangle_v2(N_MH_step, emit, D_f, F, par_pos)
+      i = N_MH_step
+      call Metropolis_Hastings_ring_J(i, emit, D_f, F, par_pos)
+      !call Metropolis_Hastings_rectangle_v2_field(N_MH_step, emit, D_f, F, par_pos)
+      !print *, 'D_f = ', D_f
+      !print *, 'F = ', F
+      !print *, ''
+      !pause
+
+      ! Check if the field is favourable for emission or not
+      if (F >= 0.0d0) then
+        D_f = -huge(1.0d0)
+        print *, 'Warning: F > 0.0d0'
+      !else
+      !  if (D_f > 1.0d0) then
+      !    print *, 'Warning D_f > 1.0d0'
+      !    print *, 'D_f = ', D_f
+      !  end if
+      end if
+      df_avg = df_avg + exp(D_f)
+
+      CALL RANDOM_NUMBER(rnd)
+      if (log(rnd) <= D_f) then
+        !par_vel(1:2) = box_muller((/1.0d0, 1.0d0/), (/0.25d0, 0.25d0/))
+        !if (par_vel(1) < 0.0d0) then
+        !  if (par_vel(2) < 0.0d0) then
+        !    par_pos(3) = 0.0d-6 * length_scale
+        !  else
+        !    par_pos(3) = par_vel(2) * length_scale
+        !  end if
+        !else
+        !  par_pos(3) = par_vel(1) * length_scale
+        !end if
+        par_pos(3) = 1.0d0*length_scale
+        par_vel = 0.0d0
+        rnd = w_theta_xy(par_pos, emit, sec) ! Get the section
+        !!$OMP CRITICAL(EMIT_PAR)
+
+          ! Add a particle to the system
+          call Add_Particle(par_pos, par_vel, species_elec, step, emit, -1, sec)
+
+          nrElecEmit = nrElecEmit + 1
+          nrEmitted_emitters(emit) = nrEmitted_emitters(emit) + 1
+        !!$OMP END CRITICAL(EMIT_PAR)
+      end if
+    end do
+    !!$OMP END PARALLEL DO
+
+    df_avg = df_avg / N_sup
+
+    write (ud_field, "(i8, tr2, E16.8, tr2, E16.8, tr2, E16.8, tr2, E16.8, tr2, E16.8, tr2, E16.8, tr2, E16.8)", iostat=IFAIL) &
+                                      step, F_avg(1), F_avg(2), F_avg(3), N_sup, df_avg, a_rate, MH_std
+
+    nrElecEmitAll = nrElecEmitAll + nrElecEmit
+    !nrEmitted = nrEmitted + nrElecEmit
+  end subroutine Do_Field_Emission_Planar_ring
+
 !----------------------------------------------------------------------------------------
 ! The functions v_y and t_y are because of the image charge effect in the FN equation.
 ! The approximation for v_y and t_y are taken from
@@ -432,16 +533,24 @@ end function Escape_Prob_log
 
     ! Variables used for calculations
     double precision, dimension(1:3) :: par_pos, field
-    double precision                 :: A ! Emitter area
+    double precision                 :: A, angle, radius
 
-    ! Emitter area
-    A = emitters_dim(1, userdata)*emitters_dim(2, userdata)
-
-    ! Surface position
-    ! Cuba does the intergration over the hybercube.
-    ! It gives us coordinates between 0 and 1.
-    par_pos(1:2) = emitters_pos(1:2, userdata) + xx(1:2)*emitters_dim(1:2, userdata) ! x and y position on the surface
-    par_pos(3) = 0.0d0 ! Height, i.e. on the surface
+    select case (emitters_Type(userdata))
+      case (EMIT_RECTANGLE)
+        par_pos(1:2) = emitters_pos(1:2, userdata) + xx(1:2)*emitters_dim(1:2, userdata) ! x and y position on the surface
+        par_pos(3) = 0.0d0 ! Height, i.e. on the surface
+        A = emitters_dim(1, userdata)*emitters_dim(2, userdata)
+      case (EMIT_RING)
+        angle = xx(1)*2.0d0*pi
+        radius = emitters_ring(2,userdata) + xx(2)*emitters_ring(3,userdata)
+        par_pos(1) = radius*cos(angle)
+        par_pos(2) = radius*sin(angle)
+        par_pos(3) = 0.0d0 ! Height, i.e. on the surface
+        A = 2.0d0*pi*emitters_ring(3,userdata)*radius
+      case default
+        print *, 'RUMDEED: ERROR UNKNOWN EMITTER TYPE'
+        stop
+    end select
 
     ! Calculate the electric field on the surface
     field = Calc_Field_at(par_pos)
@@ -1314,6 +1423,245 @@ end function Escape_Prob_log
       end if
     end if
   end subroutine check_limits_metro_rec
+
+! ----------------------------------------------------------------------------
+! --------------------- Ring Emitter -----------------------------------------
+! ----------------------------------------------------------------------------
+  subroutine Metropolis_Hastings_ring_J(ndim_in, emit, df_out, F_out, pos_out)
+    integer, intent(inout)                        :: ndim_in
+    integer, intent(in)                           :: emit
+    double precision, intent(out)                 :: df_out, F_out
+    integer                                       :: ndim, ndim_first
+    double precision, intent(out), dimension(1:3) :: pos_out
+    integer                                       :: count, i
+    double precision                              :: rnd, alpha
+    double precision, dimension(1:2)              :: std
+    double precision, dimension(1:3)              :: cur_pos, new_pos, field
+    double precision                              :: df_cur, df_new
+    double precision                              :: cur_w, new_w
+    double precision                              :: angle, radius
+
+    !jump_a = 0
+    !jump_r = 0
+    !ndim = ndim_in
+    ndim_in = 0
+
+    !ndim = nint( 2.0d0/(MH_std*sqrt(2.0d0/pi)) )
+    ndim = 25*8
+
+    ! Get a random initial position on the surface.
+    ! We pick this location from a uniform distribution.
+    count = 0
+    do ! Infinite loop, we try to find a favourable position to start from
+      call random_number(cur_pos(1:2))
+      angle = cur_pos(1)*2.0d0*pi
+      radius = emitters_ring(2,emit) + cur_pos(2)*emitters_ring(3,emit)
+      cur_pos(1) = radius*cos(angle)
+      cur_pos(2) = radius*sin(angle)
+      cur_pos(3) = 0.0d0 ! On the surface
+
+      ! Calculate the electric field at this position
+      ! print *, 'Metropolis: Calc_field_at'
+      field = Calc_Field_at(cur_pos)
+      ! print *, 'Metropolis: w_theta_xy'
+      cur_w = w_theta_xy(cur_pos, emit)
+
+      if (field(3) < 0.0d0) then
+        exit ! We found a nice spot so we exit the loop
+      else
+        count = count + 1
+        if (count > 10000) then ! The loop is infnite, must stop it at some point.
+        ! In field emission it is rare the we reach the CL limit.
+          ndim_in = -1
+          print *, 'Failed to find spot for emission'
+          return ! Exit the function
+        end if
+      end if
+    end do
+
+    F_out = field(3)
+
+    ! Calculate the escape probability at this location
+    if (field(3) < 0.0d0) then
+      !df_cur = Get_Kevin_Jgtf(field(3), T_temp, cur_w)
+      ! print *, 'Metropolis: Escape_Prob_log'
+      df_cur = Escape_Prob_log(field(3), cur_pos, emit)
+    else
+      df_cur = -huge(1.0d0)! Zero escape probabilty if field is not favourable
+    end if
+
+    !write(unit=ud_mh) ndim
+    !print *, ndim
+    !write(unit=ud_mh) cur_pos(1), cur_pos(2), std(1), std(2)
+    !print *, 0, cur_pos(1)/1.0d-9, cur_pos(2)/1.0d-9, std(1)/1.0d-9, std(2)/1.0d-9
+
+    ndim_first = nint(ndim*0.25d0)
+
+    !---------------------------------------------------------------------------
+    ! We now pick a random distance and direction to jump to from our
+    ! current location. We do this ndim times.
+    do i = 1, ndim
+
+      ! Make first 25% of jumps with std as 5% of emitter length.
+      if (i > ndim_first) then
+
+        ! Try to keep the acceptance ratio around 25% by
+        ! changing the standard deviation.
+        CALL RANDOM_NUMBER(rnd) ! Change be a random number
+        if (a_rate < 0.2525d0) then
+          MH_std = MH_std * (1.0d0 - rnd*0.00025d0)
+        else
+          MH_std = MH_std * (1.0d0 + rnd*0.00025d0)
+        end if
+        ! Limits on how big or low the standard deviation can be.
+        if (MH_std > 0.1250d0) then
+          MH_std = 0.1250d0
+        else if (MH_std < 0.00005d0) then
+          MH_std = 0.00005d0
+        end if
+
+        std(1:2) = emitters_ring(3,emit)*MH_std ! Standard deviation for the normal distribution is 0.075% of the emitter length.
+        ! This means that 68% of jumps are less than this value.
+        ! The expected value of the absolute value of the normal distribution is std*sqrt(2/pi).
+      end if
+
+      ! Find a new position using a normal distribution.
+      !new_pos(1:2) = box_muller(cur_pos(1:2)/length_scale, std)*length_scale
+      new_pos(1:2) = box_muller(cur_pos(1:2), std)
+      angle = new_pos(1)*2.0d0*pi
+      radius = emitters_ring(2,emit) + new_pos(2)*emitters_ring(3,emit)
+      new_pos(1) = radius*cos(angle)
+      new_pos(2) = radius*sin(angle)
+      new_pos(3) = 0.0d0 ! On the surface
+
+      ! Make sure that the new position is within the limits of the emitter area.
+      call check_limits_metro_ring(new_pos,emit)
+
+      ! Calculate the field at the new position
+      ! print *, 'Metropolis: Calc_Field_at 2'
+      field = Calc_Field_at(new_pos)
+      ! print *, 'Metropolis: w_theta_xy 2'
+      new_w = w_theta_xy(new_pos, emit)
+
+      ! Check if the field is favourable for emission at the new position.
+      ! If it is not then cycle, i.e. we reject this location and
+      ! pick another one.
+      if (field(3) >= 0.0d0) then
+        !write(unit=ud_mh) cur_pos(1), cur_pos(2), std(1), std(2)
+        !print *, i, cur_pos(1)/1.0d-9, cur_pos(2)/1.0d-9, std(1)/1.0d-9, std(2)/1.0d-9
+        !print *, 'WARNING UNFAVOURABLE FIELD'
+        !print *, field
+        !print *, new_pos/1.0E-9
+        !print *, nrPart
+        !print *, i
+        !pause
+        if (i > ndim_first) then
+          jump_r = jump_r + 1
+        end if
+        cycle ! Do the next loop iteration, i.e. find a new position.
+      end if
+
+      ! Calculate the escape probability at the new position, to compair with
+      ! the current position.
+      !df_new = Get_Kevin_Jgtf(field(3), T_temp, new_w)
+      ! print *, 'Metropolis: Escape_Prob_log 2'
+      df_new = Escape_Prob_log(field(3), cur_pos, emit)
+
+      ! if (abs(cur_w - new_w) > 0.25) then
+      !   print *, df_new / df_cur
+      !   print *, cur_w
+      !   print *, df_cur
+      !   print *, new_w
+      !   print *, df_new
+      !   print *, ''
+      !   pause
+      ! end if
+
+      alpha = df_new - df_cur
+
+      if (df_new >= df_cur ) then
+        cur_pos = new_pos
+        df_cur = df_new
+        cur_w = new_w
+        F_out = field(3)
+        if (i > ndim_first) then
+          jump_a = jump_a + 1
+        end if
+      else
+        CALL RANDOM_NUMBER(rnd)
+        if (log(rnd) <= alpha) then
+          cur_pos = new_pos
+          df_cur = df_new
+          cur_w = new_w
+          F_out = field(3)
+          if (i > ndim_first) then
+            jump_a = jump_a + 1
+          end if
+        else
+          if (i > ndim_first) then
+            jump_r = jump_r + 1
+          end if
+        end if
+      end if
+
+      !write(unit=ud_mh) cur_pos(1), cur_pos(2), std(1), std(2)
+      !print *, i, cur_pos(1)/1.0d-9, cur_pos(2)/1.0d-9, std(1)/1.0d-9, std(2)/1.0d-9
+    end do
+
+    ! Acceptance rate
+    ! print *, 'Metropolis: DBLE'
+    a_rate = DBLE(jump_a) / DBLE(jump_r + jump_a)
+    !print *, jump_a
+    !print *, jump_r
+    !print *, a_rate
+    !print *, MH_std
+    !print *, std(1:2)/length_scale
+    !print *, ''
+
+    ! Return the current position
+    pos_out = cur_pos
+    df_out = df_cur
+
+    !close(unit=ud_mh)
+    !stop
+  end subroutine Metropolis_Hastings_ring_J
+
+  ! ----------------------------------------------------------------------------
+  ! Checks the limits of the rectangular region of the emitter
+  subroutine check_limits_metro_ring(par_pos, emit)
+    double precision, dimension(1:3), intent(inout) :: par_pos
+    integer, intent(in)                             :: emit
+    double precision                                :: max_rad,min_rad,max_x,min_x,max_y,min_y,cur_rad,rnd
+
+
+    max_rad = emitters_ring(1,emit)
+    min_rad = emitters_ring(2,emit)
+
+    max_x = max_rad
+    min_x = -max_rad
+
+    max_y = max_rad
+    min_y = -max_rad
+
+    cur_rad = sqrt(par_pos(1)**2 + par_pos(2)**2)
+
+
+    if ((cur_rad > max_rad) .or. (cur_rad < min_rad)) then
+      call random_number(rnd) ! Random number between 0 and 1 will tell us which component goes to max
+
+      if (rnd <= 0.5) then ! x
+        if (par_pos(1)>max_x) then
+          par_pos(1) = max_x
+        end if
+        par_pos(2) = sqrt(max_rad**2 - par_pos(1)**2)
+      else ! y
+        if (par_pos(2)>max_y) then
+          par_pos(2) = max_y
+        end if
+        par_pos(1) = sqrt(max_rad**2 - par_pos(2)**2)
+      end if
+    end if
+  end subroutine check_limits_metro_ring
 
   ! Adaptive Metropolis algorithm is log space
   ! See: Haario, Heikki, Eero Saksman, and Johanna Tamminen. "An adaptive Metropolis algorithm." Bernoulli 7.2 (2001): 223-242.
