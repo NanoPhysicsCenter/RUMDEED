@@ -16,6 +16,7 @@ program RUMDEED
   use mod_emission_tip
   use mod_field_emission_2D
   use mod_field_thermo_emission
+  use mod_laplace_solver
   !use mod_therminoic_emission
   use mod_pair
   use mod_tests
@@ -123,6 +124,11 @@ program RUMDEED
     call Run_Tests()
   else
 
+    if (laplace .eqv. .true.) then
+      print '(a)', 'RUMDEED: Using Laplace solver'
+      call Init_Laplace_Solver()
+    end if
+
     print '(a)', 'RUMDEED: Starting main loop'
     print '(tr1, a, i0, a, ES12.4, a)', 'Doing ', steps, ' time steps of size ', time_step/1.0E-12, ' ps'
 
@@ -132,6 +138,10 @@ program RUMDEED
     call Set_Voltage(0) ! Set voltage for time step 0
 
     do i = 1, steps
+
+      if (laplace .eqv. .true.) then
+        call Calculate_Laplace_Field()
+      end if
 
       ! Do Emission
       !print *, 'Emission'
