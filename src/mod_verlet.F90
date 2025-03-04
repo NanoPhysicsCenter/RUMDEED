@@ -299,9 +299,8 @@ contains
     !$OMP PARALLEL DO DEFAULT(NONE) PRIVATE(i, j, k_1, k_2, pos_1, pos_2, diff, r, pos_ic) &
     !$OMP& PRIVATE(force_E, force_c, force_ic, force_ic_N, force_ic_self, im_1, q_1, im_2, q_2, pre_fac_c) &
     !$OMP SHARED(nrPart, particles_cur_pos, particles_mass, particles_species, ptr_field_E, box_dim) &
-    !$OMP SHARED(ptr_Image_Charge_effect, particles_charge, d) &
-    !$OMP& SCHEDULE(DYNAMIC, 1) &
-    !$OMP& REDUCTION(+:particles_cur_accel)
+    !$OMP SHARED(ptr_Image_Charge_effect, particles_charge, particles_cur_accel, d) &
+    !$OMP& SCHEDULE(DYNAMIC, 1)
     do i = 1, nrPart
       if (particles_species(i) == species_elec) then
         ! Information about the particle we are calculating the force/acceleration on
@@ -386,16 +385,18 @@ contains
             ! force_ic = force_ic + (-1.0d0)*pre_fac_c * diff / r**3
 
 
-            !!!$OMP CRITICAL(ACCEL_UPDATE)
+            !$OMP CRITICAL
             particles_cur_accel(:, j) = particles_cur_accel(:, j) - force_c * im_2 + force_ic_N * im_2
+            !$OMP END CRITICAL
+            !$OMP CRITICAL
             particles_cur_accel(:, i) = particles_cur_accel(:, i) + force_c * im_1 + force_ic   * im_1
-            !!!$OMP END CRITICAL(ACCEL_UPDATE)
+            !$OMP END CRITICAL
           end if
         end do
 
-        !!!$OMP CRITICAL(ACCEL_UPDATE)
+        !$OMP CRITICAL
         particles_cur_accel(:, i) = particles_cur_accel(:, i) + force_E * im_1 + force_ic_self * im_1
-        !!!$OMP END CRITICAL(ACCEL_UPDATE)
+        !$OMP END CRITICAL
       end if
     end do
     !$OMP END PARALLEL DO

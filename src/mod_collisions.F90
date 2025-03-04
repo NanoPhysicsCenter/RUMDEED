@@ -53,7 +53,6 @@ contains
     integer, intent(out)              ::  nrRecombinations
     ! Ion and electron
     double precision, dimension(1:3)  ::  ion_cur_pos, elec_cur_pos, elec_cur_vel, elec_cur_acc, elec_next_pos, rel_pos
-    double precision, dimension(1:3)  ::  atom_pos, atom_vel
     double precision                  ::  cur_dist2, elec_cur_speed, dist
     ! Kramers
     double precision, parameter       ::  multiplicator = 1000.0d0
@@ -73,7 +72,7 @@ contains
     !$OMP& PRIVATE(i, k, ion_cur_pos, elec_cur_pos, elec_cur_vel, elec_cur_acc, elec_next_pos, rel_pos, cur_dist2) &
     !$OMP& PRIVATE(elec_cur_speed, dist, recom_rad2, recom_rad) &
     !$OMP& PRIVATE(a, b, cc, dd, e, t, t1_r, t1_i, t2_r, t2_i, t3_r, t3_i, t4_r, t4_i, code, root1, root2, root3, root4) &
-    !$OMP& PRIVATE(coll_happens, atom_pos, atom_vel) &
+    !$OMP& PRIVATE(coll_happens) &
     !$OMP& SHARED(step, nrPart, particles_species, particles_life, particles_cur_pos, particles_mask, particles_step) &
     !$OMP& SHARED(particles_cur_vel, particles_cur_accel, time_step, particles_emitter, n_d) &
     !$OMP& SHARED(particles_cur_energy, particles_recom_cross_rad) &
@@ -166,13 +165,6 @@ contains
                 ! Remove electron
                 call Mark_Particles_Remove(k, remove_recom)
 
-                ! Add atom
-                atom_pos = ion_cur_pos
-                atom_vel = (/0.0d0,0.0d0,0.0d0/)
-                !$OMP CRITICAL
-                call Add_Particle(atom_pos,atom_vel,species_atom,step,recom_emitter,-1)
-                !$OMP END CRITICAL
-
                 ! Write recombination data
                 call Write_Recombination_Data(step, ion_cur_pos, elec_cur_speed, dist, recom_rad, k, i, particles_emitter(k))
                 exit       
@@ -220,7 +212,7 @@ contains
     !$OMP& PRIVATE(cross_tot,cross_ion,mean_path,mean_path_avg,i,rnd,alpha) &
     !$OMP& SHARED(particles_species,particles_mask,particles_cur_pos,particles_prev_pos,particles_cur_vel) &
     !$OMP& SHARED(particles_cur_energy,particles_ion_cross_sec,particles_tot_cross_sec,nrID,step) &
-    !$OMP& SHARED(n_d,ion_life_time,particles_emitter,emitters_dim) &
+    !$OMP& SHARED(n_d,nrPart,ion_life_time,particles_emitter,emitters_dim) &
     !$OMP& REDUCTION(+:nrIonizations,nrCollisions,count_n)
 
     do i=1,nrPart
