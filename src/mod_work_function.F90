@@ -429,11 +429,14 @@ contains
       !w_theta_arr(4, 1:4) = (/ 4.70d0, 4.70d0, 4.70d0, 4.70d0 /)
 
       ! Scale x, y to unit square
-      if (emitters_Type(emit) == 1) then ! Check if circle or rectange
-        pos_scaled(1:2) = (pos(1:2) - emitters_pos(1:2, emit)) / (2.0d0 * emitters_dim(1:2, emit)) ! Circle
-      else
-        pos_scaled(1:2) = (pos(1:2) - emitters_pos(1:2, emit)) / emitters_dim(1:2, emit) ! Rectange
-      end if
+      select case (emitters_Type(emit))
+        case (EMIT_RECTANGLE)
+          pos_scaled(1:2) = (pos(1:2) - emitters_pos(1:2, emit)) / emitters_dim(1:2, emit) ! Rectange
+        case (EMIT_CIRCLE)
+          pos_scaled(1:2) = (pos(1:2) - emitters_pos(1:2, emit)) / (2.0d0 * emitters_dim(1:2, emit)) ! Circle
+        case (EMIT_RING)
+          pos_scaled(1:2) = (pos(1:2) - emitters_pos(1:2, emit)) / (2.0d0 * emitters_dim(1:2, emit))
+      end select
       
       x = pos_scaled(1)
       y = pos_scaled(2)

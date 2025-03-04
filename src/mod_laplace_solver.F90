@@ -428,7 +428,16 @@ contains
         end do
         ! $OMP END PARALLEL DO  
         ! print *, 'Laplace: creating COO'
-        stat = mkl_sparse_d_create_coo(cooA, SPARSE_INDEX_BASE_ONE, nrGridActive, nrGridActive, nnz, nnz_rowA, nnz_colA, nnz_valA)
+        print *, 'Laplace: nrGridActive=',nrGridActive
+        print *, 'Laplace: nnz=',nnz
+        ! print *, 'Laplace: size of nnz_rowA=',size(nnz_rowA)
+        ! print *, 'Laplace: size of nnz_colA=',size(nnz_colA)
+        ! print *, 'Laplace: size of nnz_valA=',size(nnz_valA)
+        ! print *, 'Laplace: max of nnz_rowA=',maxval(nnz_rowA)
+        ! print *, 'Laplace: max of nnz_colA=',maxval(nnz_colA)
+        ! print *, 'Laplace: min of nnz_rowA=',minval(nnz_rowA)
+        ! print *, 'Laplace: min of nnz_colA=',minval(nnz_colA)
+        ! stat = mkl_sparse_d_create_coo(cooA, SPARSE_INDEX_BASE_ONE, nrGridActive, nrGridActive, nnz, nnz_rowA, nnz_colA, nnz_valA)
 
     end subroutine create_coo
 
