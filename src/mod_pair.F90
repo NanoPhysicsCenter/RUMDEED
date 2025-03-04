@@ -81,18 +81,18 @@ contains
         ! Write out the x and y position of the emitted particle
         ! along with which emitter and section it came from.
         !if (abs(par_pos(3) - 1.0d0*length_scale) < 1.0E-3) then
-          write(unit=ud_density_emit) par_pos(:)/ length_scale, emit, sec, nrID
+          write(unit=ud_density_emit_elec) par_pos(:)/length_scale, emit, nrID
         !end if
       else if (par_species == species_ion) then ! Ion
         particles_charge(nrPart+1) = +1.0d0*q_0
         particles_mass(nrPart+1) = m_N2p
         nrIon = nrIon + 1
-        write(unit=ud_density_emit_ion) par_pos(:)/length_scale, emit, sec, nrID
+        write(unit=ud_density_emit_ion) par_pos(:)/length_scale, emit, nrID
       else if (par_species == species_atom) then
         particles_charge(nrPart+1) = 0.0d0
         particles_mass(nrPart+1) = m_N2
         nrAtom = nrAtom + 1
-        write(unit=ud_density_emit_atom) par_pos(:)/length_scale, emit, sec, nrID 
+        write(unit=ud_density_emit_atom) par_pos(:)/length_scale, emit, nrID 
       else
         print *, 'ERROR UNKNOWN PARTICLE TYPE'
         stop

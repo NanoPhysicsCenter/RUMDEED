@@ -754,7 +754,7 @@ end function Escape_Prob_log
     integer            :: spin = -1 ! Spinning cores
     integer            :: nregions ! <out> The actual number of subregions nedded
     integer            :: neval ! <out> The actual number of integrand evaluations needed
-    integer            :: fail ! <out> Error flag (0 = Success, -1 = Dimension out of range, >0 = Accuracy goal was not met)
+    integer(4)            :: fail ! <out> Error flag (0 = Success, -1 = Dimension out of range, >0 = Accuracy goal was not met)
     double precision, dimension(1:ncomp) :: integral ! <out> The integral of the integrand over the unit hybercube
     double precision, dimension(1:ncomp) :: error ! <out> The presumed absolute error
     double precision, dimension(1:ncomp) :: prob ! <out> The chi-square probability
@@ -1527,7 +1527,8 @@ end function Escape_Prob_log
 
       ! Find a new position using a normal distribution.
       !new_pos(1:2) = box_muller(cur_pos(1:2)/length_scale, std)*length_scale
-      new_pos(1:2) = box_muller(cur_pos(1:2), std)
+      ! new_pos(1:2) = box_muller(cur_pos(1:2), std)
+      call random_number(new_pos(1:2))
       angle = new_pos(1)*2.0d0*pi
       radius = emitters_ring(2,emit) + new_pos(2)*emitters_ring(3,emit)
       new_pos(1) = radius*cos(angle)
