@@ -18,6 +18,7 @@ program RUMDEED
   use mod_field_thermo_emission
   !use mod_therminoic_emission
   use mod_cylindrical_tip
+  use mod_torus
   use mod_pair
   use mod_tests
   use mod_manual_emission
@@ -127,6 +128,9 @@ program RUMDEED
   case(EMISSION_FIELD_CYL_TIP)
     print '(a)', 'RUMDEED: Doing Field emission from a cylindrical tip'
     call Init_Cylindrical_Tip()
+  case(EMISSION_FIELD_TORUS)
+    print '(a)', 'RUMDEED: Doing Field emission from a torus'
+    call Init_Torus()
   case(EMISSION_MANUAL)
     print '(a)', 'Vacuum: Doing manual emission'
     call Init_Manual()
@@ -220,6 +224,8 @@ program RUMDEED
     call Clean_Up_Field_Emission_v2()
   case(EMISSION_FIELD_CYL_TIP)
     call Clean_Up_Cylindrical_Tip()
+  case (EMISSION_FIELD_TORUS)
+    call Clean_Up_Torus()
   case(EMISSION_MANUAL)
     call Clean_Up_Manual()
   END SELECT
