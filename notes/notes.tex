@@ -1024,5 +1024,22 @@ The scale factors for the cylindrical coordinate system are
   h_z    & = 1
 \end{align}
 %
+%
+\section{Curved CNT}
+\subsection{Geometry}
+The geometry of the curved CNT is a torus with a major radius of \(R\) and a minor radius of \(\rho\). The torus is rotated around the \(x\)-axis.
+\begin{align}
+x &= \left(R + \rho\cos\theta\right)\cos(\phi)\\
+y &= \rho\sin(\theta)\\
+z &= \left(R + \rho\cos\theta\right)\sin(\phi)
+\end{align}
+Where \(\theta \in [0, 2\pi]\) and \(\phi \in [0, \pi]\). The torus is cut in half by the \(xy\) plane.
+The top half is the CNT fiber as can be seen in Figure~\ref{fig:curved_cnt}.
+\begin{figure}
+  \centering
+  \includegraphics[scale=0.4]{figures/curved_cnt.png}
+  \caption{Curved CNT\label{fig:curved_cnt}}
+\end{figure}
+
 \cleardoublepage\printbibliography
 \end{document}

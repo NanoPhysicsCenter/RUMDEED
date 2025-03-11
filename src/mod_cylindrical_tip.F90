@@ -2618,7 +2618,7 @@ subroutine Calc_E_circle_cyl(per)
 
   !print *, 'Calc_E_circle_cyl started'
 
-  allocate(data_cyl_around(1:2, 1:3, 1:N_p))
+  allocate(data_cyl_around(1:3, 1:3, 1:N_p))
   allocate(len_cyl_around(1:N_p))
   allocate(p_cyl_around(1:3, 1:N_p))
 
