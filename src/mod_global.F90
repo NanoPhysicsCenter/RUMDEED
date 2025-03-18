@@ -122,6 +122,8 @@ module mod_global
   double precision, dimension(:, :), allocatable :: particles_cur_accel  ! Current acceleration
   double precision, dimension(:, :), allocatable :: particles_prev_accel ! Previous acceleration
   double precision, dimension(:, :), allocatable :: particles_prev2_accel ! Previous acceleration
+  double precision, dimension(:)   , allocatable :: particles_nearest_dist ! Distance from nearest particle
+  integer         , dimension(:)   , allocatable :: particles_nearest_id ! ID of nearest particle
 
   ! Other information about particles, the dimension is the number of particles
   double precision, dimension(:)   , allocatable :: particles_charge     ! Charge

@@ -296,10 +296,12 @@ contains
     integer                          :: i, j, k_1, k_2
 
     ! We do not use GUIDED scheduling in OpenMP here because the inner loop changes size.
-    !$OMP PARALLEL DO DEFAULT(NONE) PRIVATE(i, j, k_1, k_2, pos_1, pos_2, diff, r, pos_ic) &
+    !$OMP PARALLEL DO DEFAULT(NONE) &
+    !$OMP& PRIVATE(i, j, k_1, k_2, pos_1, pos_2, diff, r, pos_ic) &
     !$OMP& PRIVATE(force_E, force_c, force_ic, force_ic_N, force_ic_self, im_1, q_1, im_2, q_2, pre_fac_c) &
-    !$OMP SHARED(nrPart, particles_cur_pos, particles_mass, particles_species, ptr_field_E, box_dim) &
-    !$OMP SHARED(ptr_Image_Charge_effect, particles_charge, particles_cur_accel, d) &
+    !$OMP& SHARED(nrPart, particles_cur_pos, particles_mass, particles_species, ptr_field_E, box_dim) &
+    !$OMP& SHARED(ptr_Image_Charge_effect, particles_charge, particles_cur_accel, d) &
+    !$OMP& SHARED(particles_nearest_dist, particles_nearest_id) &
     !$OMP& SCHEDULE(DYNAMIC, 1)
     do i = 1, nrPart
       if (particles_species(i) == species_elec) then
@@ -391,12 +393,9 @@ contains
             !$OMP CRITICAL
             particles_cur_accel(:, i) = particles_cur_accel(:, i) + force_c * im_1 + force_ic   * im_1
             !$OMP END CRITICAL
+
           end if
         end do
-
-        !$OMP CRITICAL
-        particles_cur_accel(:, i) = particles_cur_accel(:, i) + force_E * im_1 + force_ic_self * im_1
-        !$OMP END CRITICAL
       end if
     end do
     !$OMP END PARALLEL DO
@@ -704,5 +703,19 @@ contains
     !   print *, (1.0d0 + time_step/(R*C))
     ! end if
   end function Parallel_RLC_FD
+
+  subroutine Nearest_Neighbor(i, j, r)
+    integer, intent(in) :: i, j
+    double precision, intent(in) :: r
+
+    if (r < particles_nearest_dist(i)) then
+      particles_nearest_dist(i) = r
+      particles_nearest_id(i) = j
+    end if
+    if (r < particles_nearest_dist(j)) then
+      particles_nearest_dist(j) = r
+      particles_nearest_id(j) = i
+    end if
+  end subroutine Nearest_Neighbor
 
 end module mod_verlet

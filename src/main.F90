@@ -351,6 +351,8 @@ contains
     allocate(particles_cur_accel(1:3, 1:MAX_PARTICLES))
     allocate(particles_prev_accel(1:3, 1:MAX_PARTICLES))
     allocate(particles_prev2_accel(1:3, 1:MAX_PARTICLES))
+    allocate(particles_nearest_dist(1:MAX_PARTICLES))
+    allocate(particles_nearest_id(1:MAX_PARTICLES))
     allocate(particles_charge(1:MAX_PARTICLES))
     allocate(particles_species(1:MAX_PARTICLES))
     allocate(particles_mass(1:MAX_PARTICLES))

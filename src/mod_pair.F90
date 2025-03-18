@@ -619,8 +619,41 @@ contains
 
   subroutine Sample_Elec_Position(step)
     integer, intent(in) :: step
-    integer             :: IFAIL, i, ud_elec_pos, species
+    integer             :: IFAIL, i, j, ud_elec_pos, species
     character(len=128)  :: filename
+    double precision    :: dist
+
+    particles_nearest_dist = 1000.0d0
+    !$OMP PARALLEL DO DEFAULT(NONE) &
+    !$OMP& PRIVATE(i, j, dist) &
+    !$OMP& SHARED(particles_nearest_dist, particles_nearest_id, particles_cur_pos, particles_species, nrPart) &
+    !$OMP& SCHEDULE(DYNAMIC, 1)
+    do i = 1, nrPart
+      if (particles_species(i) == species_elec) then
+        do j = i+1, nrPart
+          if (particles_species(j) == species_elec) then
+            dist = norm2(particles_cur_pos(:,i) - particles_cur_pos(:,j))
+            if (dist < particles_nearest_dist(i)) then
+              !$OMP CRITICAL
+              particles_nearest_dist(i) = dist
+              !$OMP END CRITICAL
+              !$OMP CRITICAL
+              particles_nearest_id(i) = j
+              !$OMP END CRITICAL
+            end if
+            if (dist < particles_nearest_dist(j)) then
+              !$OMP CRITICAL
+              particles_nearest_dist(j) = dist
+              !$OMP END CRITICAL
+              !$OMP CRITICAL
+              particles_nearest_id(j) = i
+              !$OMP END CRITICAL
+            end if
+          end if
+        end do
+      end if
+    end do
+    !$OMP END PARALLEL DO
 
     if (sample_elec_file .eqv. .true.) then
       if (mod(step,sample_elec_rate) == 0) then
@@ -637,7 +670,7 @@ contains
           species = particles_species(i)
           if (species == species_elec) then
             ! print*,'Start writing'
-            write(unit=ud_elec_pos, iostat=IFAIL) particles_cur_pos(1,i), particles_cur_pos(2,i), particles_cur_pos(3,i)
+            write(unit=ud_elec_pos, iostat=IFAIL) particles_cur_pos(1,i), particles_cur_pos(2,i), particles_cur_pos(3,i), particles_nearest_dist(i)
             ! print*,'Stop writing'
           end if
         end do
