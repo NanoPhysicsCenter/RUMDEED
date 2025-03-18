@@ -93,7 +93,7 @@ contains
     !$OMP& SHARED(time_step, time_step2, particles_prev2_accel, particles_species, particles_prev_accel)
 
     do i = 1, nrPart
-      if ((particles_species(i) /= species_atom) .and. (particles_species(i) /= species_ion)) then
+      if (particles_species(i) == species_elec) then
         ! Verlet
         !particles_prev_pos(:, i) = particles_cur_pos(:, i) ! Store the previous position
         !particles_cur_pos(:, i)  = particles_cur_pos(:, i) + particles_cur_vel(:, i)*time_step &
@@ -233,7 +233,7 @@ contains
     !$OMP& SHARED(particles_species, particles_emitter, particles_prev2_accel, collisions) &
     !$OMP& REDUCTION(+:avg_part_vel, avg_elec_vel, avg_ion_vel)
     do i = 1, nrPart
-      if ((particles_species(i) /= species_atom) .and. (particles_species(i) /= species_ion)) then
+      if (particles_species(i) == species_elec) then
         ! Verlet
         !particles_cur_vel(:, i) = particles_cur_vel(:, i) &
         !                      & + 0.5d0*( particles_prev_accel(:, i) &
@@ -259,12 +259,8 @@ contains
         ramo_current_emit(sec, emit) = ramo_current_emit(sec, emit) + q * E_zunit * particles_cur_vel(3, i)
 
         ! avg_part_vel(:) = avg_part_vel(:) + particles_cur_vel(:, i) ! Calculate the sum for the average
-        avg_part_vel(:) = avg_part_vel
-        if (k == species_elec) then
-          avg_elec_vel(:) = avg_elec_vel(:) + particles_cur_vel(:, i) ! Calculate the sum for the average
-        else if (k == species_ion) then
-          avg_ion_vel(:)  = avg_ion_vel(:)  + particles_cur_vel(:, i) ! Calculate the sum for the average
-        end if
+        avg_elec_vel(:) = avg_elec_vel(:) + particles_cur_vel(:, i) ! Calculate the sum for the average
+        avg_part_vel(:) = avg_part_vel + particles_cur_vel(:, i) ! Calculate the sum for the average
       end if
     end do
     !$OMP END PARALLEL DO
@@ -300,9 +296,8 @@ contains
     !$OMP& PRIVATE(i, j, k_1, k_2, pos_1, pos_2, diff, r, pos_ic) &
     !$OMP& PRIVATE(force_E, force_c, force_ic, force_ic_N, force_ic_self, im_1, q_1, im_2, q_2, pre_fac_c) &
     !$OMP& SHARED(nrPart, particles_cur_pos, particles_mass, particles_species, ptr_field_E, box_dim) &
-    !$OMP& SHARED(ptr_Image_Charge_effect, particles_charge, particles_cur_accel, d) &
-    !$OMP& SHARED(particles_nearest_dist, particles_nearest_id) &
-    !$OMP& SCHEDULE(DYNAMIC, 1)
+    !$OMP& SHARED(ptr_Image_Charge_effect, particles_charge, particles_cur_accel, d)
+
     do i = 1, nrPart
       if (particles_species(i) == species_elec) then
         ! Information about the particle we are calculating the force/acceleration on
@@ -390,12 +385,16 @@ contains
             !$OMP CRITICAL
             particles_cur_accel(:, j) = particles_cur_accel(:, j) - force_c * im_2 + force_ic_N * im_2
             !$OMP END CRITICAL
+
             !$OMP CRITICAL
             particles_cur_accel(:, i) = particles_cur_accel(:, i) + force_c * im_1 + force_ic   * im_1
             !$OMP END CRITICAL
 
           end if
         end do
+        !$OMP CRITICAL
+        particles_cur_accel(:, i) = particles_cur_accel(:, i) + force_E * im_1 + force_ic_self * im_1
+        !$OMP END CRITICAL
       end if
     end do
     !$OMP END PARALLEL DO
