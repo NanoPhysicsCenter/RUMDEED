@@ -5,7 +5,7 @@
 # Compiler to use
 # Override default values if nothing else is set
 ifeq ($(origin FC),default)
-FC = gfortran
+FC = ifx
 endif
 ifeq ($(origin CC),default)
 CC = gcc
@@ -18,6 +18,12 @@ CUBA_LIB=../cuba/lib/libcuba.a
 OPENMP ?= yes # Set to something else to disable OpenMP
 
 TESTING_MODE ?= 2 # Set to 1 to enable testing mode
+
+# MKL
+MKLROOT = /opt/intel/oneapi/mkl/2025.0
+MKL_LIBS = -qmkl-ilp64=parallel $(MKLROOT)/lib/libmkl_blas95_ilp64.a $(MKLROOT)/lib/libmkl_lapack95_ilp64.a 
+FFLAGS += -I$(MKLROOT)/include/mkl/intel64/ilp64 -i8 -qmkl-ilp64=parallel
+
 
 # Compile flags
 # UNKNOWN COMPILERS
@@ -112,7 +118,10 @@ $(PROJECT_NAME).out: ../src/main.F90 ../cuba/lib/libcuba.a \
 			mod_collisions.mod mod_collisions.o \
 			mod_kevin_rjgtf.mod mod_kevin_rjgtf.o \
 			mod_velocity.mod mod_velocity.o \
-			mod_manual_emission.mod mod_manual_emission.o
+			mod_manual_emission.mod mod_manual_emission.o \
+			mod_laplace_solver.mod mod_laplace_solver.o \
+			mkl_pardiso.mod mkl_pardiso.o \
+			mkl_spblas.mod mkl_spblas.o
 		$(FC) $(FFLAGS) -D_GIT_VERSION_=\"${GIT_VERSION}\" -D_TESTING_MODE_=${TESTING_MODE} \
 		    ../src/main.F90 mod_global.o mod_verlet.o mod_pair.o \
 			mod_tests.o mod_photo_emission.o mod_field_emission.o mod_field_emission_v2.o \
@@ -121,7 +130,8 @@ $(PROJECT_NAME).out: ../src/main.F90 ../cuba/lib/libcuba.a \
 			mod_polynomialroots.o \
 			mod_work_function.o mod_collisions.o \
 			mod_velocity.o mod_manual_emission.o \
-			$(CUBA_LIB) -lpthread -lm -ldl -o $(PROJECT_NAME).out
+			mod_laplace_solver.o \
+			$(CUBA_LIB) $(MKL_LIBS) -lpthread -lm -ldl -o $(PROJECT_NAME).out
 
 ../cuba/Cuba-4.2.2.tar.gz:
 		cd ../cuba/; ./get-cuba.sh; md5sum -c md5hash.md5
@@ -180,11 +190,23 @@ mod_work_function.mod mod_work_function.o: ../src/mod_work_function.F90
 mod_polynomialroots.mod mod_polynomialroots.o: ../src/mod_polynomialroots.F90
 		$(FC) -c $(FFLAGS) ../src/mod_polynomialroots.F90
 
+mod_laplace_solver.mod mod_laplace_solver.o: ../src/mod_laplace_solver.F90 mod_global.mod mkl_spblas.mod mkl_pardiso.mod
+		$(FC) -c $(FFLAGS) $(MKL_LIBS) ../src/mod_laplace_solver.F90
+
 mod_velocity.mod mod_velocity.o: ../src/mod_velocity.f90
 		$(FC) -c $(FFLAGS) ../src/mod_velocity.f90
 
 mod_collisions.mod mod_collisions.o: ../src/mod_collisions.F90 mod_global.mod mod_pair.mod mod_velocity.mod mod_polynomialroots.mod
 		$(FC) -c $(FFLAGS) ../src/mod_collisions.F90
+
+# mkl
+mkl_pardiso.mod mkl_pardiso.o: $(MKLROOT)/include/mkl_pardiso.f90
+		$(FC) -c $(FFLAGS) -I$(MKLROOT)/include $< -o mkl_pardiso.o
+		cp mkl_pardiso.mod ../src/ 
+
+mkl_spblas.mod mkl_spblas.o: $(MKLROOT)/include/mkl_spblas.f90
+		$(FC) -c $(FFLAGS) -I$(MKLROOT)/include $< -o mkl_spblas.o
+		cp mkl_spblas.mod ../src/
 
 clean:
 		rm -f *.o
