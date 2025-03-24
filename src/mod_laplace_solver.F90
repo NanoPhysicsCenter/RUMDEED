@@ -18,7 +18,7 @@ module mod_laplace_solver
     public :: Init_Laplace_Solver, Calculate_Laplace_Field, Clean_Up_Laplace
 
     ! Local variables
-    integer, dimension(64) :: pt
+    type(MKL_PARDISO_HANDLE), dimension(64) :: pt
     integer, dimension(64) :: iparm
 
     double precision :: hx, hy, hz, emitter_radius
@@ -40,27 +40,62 @@ contains
         print *, 'Laplace: updating matrix'
         call update_matrix()
         print *, 'Laplace: solving matrix'
-        call solve_matrix(x)
+        call solve_matrix_v2(x)
         
     end subroutine Calculate_Laplace_Field
 
-    subroutine solve_matrix(x) ! TODO
-        ! Solve the system
-        type(sparse_matrix_t) :: cooA
-        ! type(sparse_matrix_t) :: csrA
+    ! subroutine solve_matrix(x) ! TODO
+    !     ! Solve the system
+    !     type(sparse_matrix_t) :: cooA
+    !     type(sparse_matrix_t) :: csrA
+    !     double precision, dimension(nrGridActive), intent(out) :: x
+    !     integer, dimension(nrGridActive) :: perm
+    !     integer :: maxfct=1,mnum=1,mtype=11,phase=11
+    !     integer :: msglvl, error
+    !     x = 0.0d0
+    !     print *, 'Laplace: creating COO'
+    !     call create_coo(cooA)
+    !     print *, 'Laplace: converting COO to CSR'
+    !     call coo_to_csr(cooA,csrA)
+
+    !     temp_iA = csrA%ia
+    !     temp_jA = csrA%ja
+    !     temp_aA = csrA%a
+
+    !     ! ! print *, 'Laplace: solving matrix'
+    !     ! call pardiso_d(pt,maxfct,mnum,mtype,phase,nrGridActive,temp_aA, temp_iA, temp_jA, perm,nrGridActive,iparm,msglvl,b,x,error)
+    ! end subroutine solve_matrix
+
+    subroutine solve_matrix_v2(x)
+        integer :: i, index
         double precision, dimension(nrGridActive), intent(out) :: x
+        integer, dimension(nnz) :: nnz_rowA, nnz_colA
+        double precision, dimension(nnz) :: nnz_valA
         integer, dimension(nrGridActive) :: perm
         integer :: maxfct=1,mnum=1,mtype=11,phase=11
         integer :: msglvl, error
         x = 0.0d0
-        print *, 'Laplace: creating COO'
-        call create_coo(cooA)
-        print *, 'Laplace: converting COO to CSR'
-        ! call coo_to_csr(cooA,csrA)
 
-        ! ! print *, 'Laplace: solving matrix'
-        ! call pardiso_d(pt,maxfct,mnum,mtype,phase,nrGridActive,csrA, perm,nrGridActive,iparm,msglvl,b,x,error)
-    end subroutine solve_matrix
+        print *, 'Laplace: aggregating COO'
+        i = 1
+        index = 1
+        ! $OMP PARALLEL DO DEFAULT(NONE) &
+        ! $OMP& SHARED(nnz, nnz_rowA, nnz_colA, nnz_valA, rowA, colA, valA, linkA) &
+        ! $OMP& PRIVATE(i,index)
+        do i=1,nnz
+            if (index > 7*nrGridActive) then
+                print *, 'Laplace: index out of bounds'
+                print *, 'Laplace: index=',index
+                exit
+            end if
+            nnz_rowA(i) = rowA(index)
+            nnz_colA(i) = colA(index)
+            nnz_valA(i) = valA(index)
+            index = linkA(index)
+        end do
+
+        call pardiso_d(pt,maxfct,mnum,mtype,phase,nrGridActive,nnz_valA, nnz_rowA, nnz_colA, perm,nrGridActive,iparm,msglvl,b,x,error)
+    end subroutine solve_matrix_v2
 
 ! -----------------------------------------------------------------------------
 ! ----- Initialization --------------------------------------------------------
@@ -109,7 +144,7 @@ contains
 
     subroutine init_pardiso()
         integer :: mtype=11
-        ! call pardisoinit(pt,mtype,iparm)
+        call pardisoinit(pt,mtype,iparm)
     end subroutine init_pardiso
 
     subroutine init_grid()
@@ -437,7 +472,7 @@ contains
         ! print *, 'Laplace: max of nnz_colA=',maxval(nnz_colA)
         ! print *, 'Laplace: min of nnz_rowA=',minval(nnz_rowA)
         ! print *, 'Laplace: min of nnz_colA=',minval(nnz_colA)
-        ! stat = mkl_sparse_d_create_coo(cooA, SPARSE_INDEX_BASE_ONE, nrGridActive, nrGridActive, nnz, nnz_rowA, nnz_colA, nnz_valA)
+        stat = mkl_sparse_d_create_coo(cooA, SPARSE_INDEX_BASE_ONE, nrGridActive, nrGridActive, nnz, nnz_rowA, nnz_colA, nnz_valA)
 
     end subroutine create_coo
 

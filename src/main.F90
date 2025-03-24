@@ -269,7 +269,7 @@ contains
     ! nrEmit: Number of emitters
     ! emitters_pos: Positions of emitters (x and y, z is ignored)
     ! emitters_dim: Dimensions of emitters (x and y, z is ignored)
-    ! emitters_type: Type of emitter (Circle or square)
+    ! emittersf_type: Type of emitter (Circle or square)
     ! emitters_delay: When the emitter should start emitting ()
     ! EMISSION_MODE: What emission to do (Photo/CL, Field emission, e.t.c)
     read(ud_input, NML=input)
