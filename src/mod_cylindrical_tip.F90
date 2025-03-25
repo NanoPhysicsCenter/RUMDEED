@@ -611,7 +611,7 @@ subroutine Do_Field_Emission_Cylinder(step)
         print *, 'RUMDEED: Df_avg > 1.0d-4 (Do_Field_Emission_Cylinder)'
         print *, step
         write_position_file = .true.
-        call Write_Position(0)
+        !call Write_Position(0)
         cought_stop_signal = .true.
       end if
 
@@ -640,7 +640,7 @@ subroutine Do_Field_Emission_Cylinder_simple(step)
 
   ! Check if the step is 10%, 20%, 30%, 40%, 50%, 60%, 70%, 80%, 90% or 100% of the total steps
   if (mod(step, steps/10) == 0) then
-    !per = nint(dble(step)/dble(steps)*100.0d0) ! Calculate the percentage of the simulation
+    per = nint(dble(step)/dble(steps)*100.0d0) ! Calculate the percentage of the simulation
     !print *, 'Step = ', step
     !print *, 'Percentage = ', per, '%'
 
@@ -652,6 +652,7 @@ subroutine Do_Field_Emission_Cylinder_simple(step)
     !print *, 'Calling Calc_E_top_cyl'
     !call Calc_E_corner_cyl(per)
 
+    
     call Calc_E_cyl(per)
     call Calc_E_circle_cyl(per)
   end if
@@ -681,7 +682,7 @@ subroutine Do_Field_Emission_Cylinder_simple(step)
         stop
       else
 
-        par_pos = par_pos + n_vec*length_scale
+        par_pos = par_pos + n_vec*length_scale_cyl
         call Add_Particle(par_pos, par_vel, species_elec, step, emit, -1, sec)
 
         nrElecEmit = nrElecEmit + 1
@@ -2637,12 +2638,12 @@ subroutine Calc_E_circle_cyl(per)
     p_cyl_around(:, k) = p(:)
     len_cyl_around(k) = phi
 
-    E_vec = field_E_cylinder(p)
-    E_vec_image = Calc_Field_at(p)
+    E_vec = field_E_cylinder(p) ! Vacuum field 
+    E_vec_image = Calc_Field_at(p) ! Total field
     ! Store data in array
-    data_cyl_around(1, :, k) = E_vec_image
-    data_cyl_around(2, :, k) = E_vec(:)
-    data_cyl_around(3, :, k) = E_vec_image(:) - E_vec
+    data_cyl_around(1, :, k) = E_vec_image ! Total field
+    data_cyl_around(2, :, k) = E_vec(:) ! Vacuum field
+    data_cyl_around(3, :, k) = E_vec_image(:) - E_vec ! Electric field due to the image charges and electrons
   end do
 
   ! Open data file
@@ -2650,7 +2651,7 @@ subroutine Calc_E_circle_cyl(per)
 
   ! If per variable is present, then append the percentage to the file name
   if (present(per)) then
-    write(filename_cyl_circle, '(a, i0, a)') "out/cyl_E_circle_", per, ".dt"
+    write(filename_cyl_circle, '(a17, i0, a3)') "out/cyl_E_circle_", per, ".dt"
   else
     filename_cyl_circle = "out/cyl_E_circle.dt"
   end if
@@ -3097,8 +3098,14 @@ subroutine Calc_E_cyl(per)
         data_cyl(3, :, i+4*N_p) = Calc_Field_at(p_cyl(:, i+4*N_p)) - data_cyl(2, :, i+4*N_p)
     end do
 
+    if (present(per)) then
+      write(filename_cyl, '(a10, i0, a3)') "out/cyl_E_", per, ".dt"
+    else
+      filename_cyl = "out/cyl_E.dt"
+    end if
+
     ! Open data file
-    open(newunit=ud_cyl, iostat=IFAIL, file="out/cyl_E.dt", status='REPLACE', action='WRITE')
+    open(newunit=ud_cyl, iostat=IFAIL, file=filename_cyl, status='REPLACE', action='WRITE')
     if (IFAIL /= 0) then
         print '(a)', 'RUMDEED: ERROR UNABLE TO OPEN file out/cyl_E.dt'
         stop
