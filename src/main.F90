@@ -44,6 +44,8 @@ program RUMDEED
   integer, dimension(1:9) :: progress
   integer, dimension(8)   :: values ! Date and time
 
+  double precision, dimension(3) :: par_pos, par_vel
+
   call date_and_time(VALUES=values)
 
   print '(a)', 'Reykjavík University Molecular Dynamics code for Electron Emission and Dynamics'
@@ -140,7 +142,9 @@ program RUMDEED
     do i = 1, steps
 
       if (laplace .eqv. .true.) then
-        call Calculate_Laplace_Field()
+        call Place_Electron(i)
+        call Calculate_Laplace_Field(i)
+        call Write_Laplace_Data()
       end if
 
       ! Do Emission
@@ -293,6 +297,8 @@ contains
     ! Emitters position and dimensions are given in length_scale (nm)
     emitters_dim = emitters_dim * length_scale
     emitters_pos = emitters_pos * length_scale
+    laplace_dim = laplace_dim * length_scale
+    laplace_pos = laplace_pos * length_scale
     do emit=1,nrEmit
       emitters_ring(1,emit) = emitters_dim(1,emit)
       if (emitters_dim(3,emit) == 0.0d0) then
@@ -524,6 +530,18 @@ contains
     open(newunit=ud_field, iostat=IFAIL, file='out/field.dt', status='replace', action='write')
     if (IFAIL /= 0) then
       print '(a)', 'RUMDEED: ERROR UNABLE TO OPEN file field.dt'
+      stop
+    end if
+
+    open(newunit=ud_laplace_average_field, iostat=IFAIL, file='out/laplace_average_field.dt', status='replace', action='write')
+    if (IFAIL /= 0) then
+      print '(a)', 'RUMDEED: ERROR UNABLE TO OPEN file laplace_average_field.dt'
+      stop
+    end if
+
+    open(newunit=ud_grid, iostat=IFAIL, file='out/laplace_grid.dt', status='replace', action='write')
+    if (IFAIL /= 0) then
+      print '(a)', 'RUMDEED: ERROR UNABLE TO OPEN file laplace_grid.dt'
       stop
     end if
 
@@ -810,6 +828,8 @@ contains
     close(unit=ud_recombination_data, status='keep')
     close(unit=ud_volt, status='keep')
     close(unit=ud_field,status='keep')
+    close(unit=ud_laplace_average_field,status='keep')
+    close(unit=ud_grid,status='keep')
     close(unit=ud_coll,status='keep')
     close(unit=ud_integrand, status='keep')
     close(unit=ud_gauss, status='keep')
@@ -863,7 +883,7 @@ contains
 
     deallocate(my_seed)
 
-    deallocate(linkA, valA, rowA, colA, b, iCharge, oCharge, gridPoints, gridPointsActive)
+    call Clean_Up_Laplace()
 
   end subroutine Clean_up
 end program RUMDEED
