@@ -315,7 +315,7 @@ module mod_global
   ! Laplace solver
   logical            :: laplace = .false.
   double precision, dimension(3) :: laplace_dim, laplace_pos
-  integer, dimension(3) :: laplace_intervals
+  integer(kind=8), dimension(3) :: laplace_intervals
 
 
   ! ----------------------------------------------------------------------------
@@ -330,6 +330,8 @@ module mod_global
   integer :: ud_volt ! Voltage in the system
   integer :: ud_debug ! File for debuging and testing
   integer :: ud_field ! File for surface field
+  integer :: ud_laplace_average_field
+  integer :: ud_grid
   integer :: ud_coll ! Collisions
   integer :: ud_integrand ! Information about the surface integration
   integer :: ud_mh ! Information about MH
@@ -436,6 +438,8 @@ contains
    flush(ud_volt)
    flush(ud_debug)
    flush(ud_field)
+   flush(ud_laplace_average_field)
+   flush(ud_grid)
    flush(ud_coll)
    flush(ud_integrand)
    flush(ud_mh)

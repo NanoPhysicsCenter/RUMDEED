@@ -518,7 +518,6 @@ contains
     end if
   end subroutine Write_Position
 
-  
 
   !-----------------------------------------------------------------------------
   ! Write the current position of all particles to a files.
