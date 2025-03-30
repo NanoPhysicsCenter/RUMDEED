@@ -35,9 +35,9 @@ module mod_laplace_solver
 
     ! System parameters
     double precision :: hx, hy, hz, emitter_radius
-    double precision, dimension(3) :: div_h2
+    double precision, dimension(3) :: div_h2, div_h3
     double precision, dimension(2) :: lim_x, lim_y, lim_z
-    integer(kind=8) :: Nx, Ny, Nz, nrGrid, nrGridActive, NxNy, n7, n13, nnz
+    integer(kind=8) :: Nx, Ny, Nz, nrGrid, nrGridActive, NxNy, n7, n19, nnz
 
 contains
 
@@ -233,17 +233,18 @@ contains
     end subroutine calculate_field
 
     function average_field()
-        integer(kind=8) :: i, num
+        integer(kind=8) :: i, j, k, num
         double precision :: sum, average_field
 
         sum = 0.0d0
         num = 0
-        do i=1,nrGrid
-            if (is_first_layer(i) == 1) then
-                ! print *, 'Laplace: average_field: i=',i
-                sum = sum + laplace_field(i)
+
+        do i=0,Nx-1
+            do j=0,Ny-1
+                k = i + j*Nx+1
+                sum = sum + laplace_field(k)
                 num = num + 1
-            end if
+            end do
         end do
 
         if (num > 0) then
@@ -293,6 +294,7 @@ contains
         hy = Ly / (Ny-1)
         hz = Lz / (Nz-1)
         div_h2 = (/1.0d0 / (hx**2), 1.0d0 / (hy**2), 1.0d0 / (hz**2)/)
+        div_h3 = (/1.0d0 / (hx**3), 1.0d0 / (hy**3), 1.0d0 / (hz**3)/)
 
         lim_x = (/laplace_pos(1), laplace_pos(1)+Lx/)
         lim_y = (/laplace_pos(2), laplace_pos(2)+Ly/)
@@ -305,11 +307,12 @@ contains
         allocate(gridPoints(nrGrid), gridPointsActive(nrGrid))
         print *, 'Laplace: initializing gridpoints'
         call init_grid()
+
         n7 = 7*nrGridActive
-        n13 = 13*nrGridActive
+        n19 = 19*nrGridActive
 
         print *, 'Laplace: allocating arrays'
-        allocate(values(n13), col_index(n13), rows_start(nrGridActive), rows_end(nrGridActive), b(nrGridActive), iCharge(nrGridActive), oCharge(nrGridActive))
+        allocate(values(n19), col_index(n19), rows_start(nrGridActive), rows_end(nrGridActive), b(nrGridActive), iCharge(nrGridActive), oCharge(nrGridActive))
 
         allocate(voltage(nrGrid), laplace_field(nrGrid))
 
@@ -361,28 +364,33 @@ contains
         ! Initialize matrix without boundary conditions
         integer(kind=8) :: g, i, a, center
         integer(kind=8), dimension(3) :: boundaries
-        integer(kind=8) :: next, next_next, prev, prev_prev
+        integer(kind=8) :: next, next_next, next_next_next, prev, prev_prev, prev_prev_prev
 
         values = values*0.0d0
         b = b*0.0d0
         ocharge = 0.0d0
         icharge = 0.0d0
 
-        center = 7
+        center = 10
 
         do g=1,nrGridActive
 
             col_index(center) = g
             do a=1,3
-                next = center + (a-1)*2 + 1
+                next = center + (a-1)*3 + 1
                 next_next = next + 1
-                prev = center - (a-1)*2 - 1
-                prev_prev = prev - 1
+                next_next_next = next + 2
 
+                prev = center - (a-1)*3 - 1
+                prev_prev = prev - 1
+                prev_prev_prev = prev - 2
+
+                col_index(prev_prev_prev) = move(g,-3,a)
                 col_index(prev_prev) = move(g,-2,a)
                 col_index(prev) = move(g,-1,a)
                 col_index(next) = move(g,1,a)
                 col_index(next_next) = move(g,2,a)
+                col_index(next_next_next) = move(g,3,a)
             end do
 
             rows_start(g) = g
@@ -392,13 +400,11 @@ contains
             
             if (is_emitter(i) == 1) then
                 call insert_emitter_boundary(g)
-                nnz = nnz + 1
             else
                 call insert_finite_difference(g)
-                nnz = nnz + 7
             end if
 
-            center = center+13
+            center = center+19
 
         end do
     end subroutine init_matrix
@@ -413,20 +419,17 @@ contains
 
         do g=1,nrGridActive
             if (oCharge(g) /= 0.0d0) then
-                b(g) = 0.0d0
+
+                call remove_electron_boundary(g)
+
                 if (iCharge(g) == 0.0d0) then
-
                     call insert_finite_difference(g)
-                    nnz = nnz + 6
-
                 end if
+
                 oCharge(g) = 0.0d0
             else
                 if (iCharge(g) /= 0.0d0) then
-
                     call remove_finite_difference(g)
-                    nnz = nnz - 6
-
                 end if
             end if
 
@@ -454,7 +457,7 @@ contains
             ! if (g>100 .and. g<=200) then
             !     print *, 'Laplace: reduce_matrix: g=',g
             ! end if
-            do j=1,13
+            do j=1,19
                 cur_ind = cur_ind + 1
                 cur_col = col_index(cur_ind)
                 ! if (g>100 .and. g<=200) then
@@ -491,31 +494,48 @@ contains
         integer(kind=8), intent(in) :: g
         integer(kind=8) :: center
 
-        center = (g-1)*13 + 7
+        center = (g-1)*19 + 10
 
         values(center) = 1.0d0
         b(g) = iCharge(g)
-    end subroutine
+
+        nnz = nnz + 1
+    end subroutine insert_electron_boundary
+
+    subroutine remove_electron_boundary(g)
+        integer(kind=8), intent(in) :: g
+        integer(kind=8) :: center
+
+        center = (g-1)*19 + 10
+
+        if (values(center) /= 0.0d0) then
+            values(center) = 0.0d0
+            nnz = nnz - 1
+        end if
+
+        b(g) = 0.0d0
+    end subroutine remove_electron_boundary
 
     subroutine insert_emitter_boundary(g)
         integer(kind=8), intent(in) :: g
         integer(kind=8) :: center
 
-        center = (g-1)*13 + 7
+        center = (g-1)*19 + 10
 
         values(center) = 1.0d0
         b(g) = 0.0d0
 
-    end subroutine
+        nnz = nnz + 1
+    end subroutine insert_emitter_boundary
 
     subroutine insert_finite_difference(g) ! DONE
         ! Insert finite difference equation into matrix
         integer(kind=8), intent(in) :: g
         integer(kind=8) :: center
         integer(kind=8), dimension(3) :: boundaries
-        integer(kind=8) :: i, a, next, next_next, prev, prev_prev
+        integer(kind=8) :: i, a, next, next_next, next_next_next, prev, prev_prev, prev_prev_prev
 
-        center = (g-1)*13 + 7
+        center = (g-1)*19 + 10
 
         i = gridPointsActive(g)
 
@@ -524,10 +544,12 @@ contains
         ! Insert finite difference equation for each axis
         do a=1,3
 
-            next = center + (a-1)*2 + 1
+            next = center + (a-1)*3 + 1
             next_next = next + 1
-            prev = center - (a-1)*2 - 1
+            next_next_next = next + 2
+            prev = center - (a-1)*3 - 1
             prev_prev = prev - 1
+            prev_prev_prev = prev - 2
 
             select case (boundaries(a))
                 case (0) ! Inner point (values for central difference)
@@ -538,29 +560,39 @@ contains
 
                     values(next) = values(next) + div_h2(a)
 
+                    nnz = nnz + 2 ! prev and next
+
                 case (1) ! Startpoint (values for forward difference)
 
-                    values(center) = values(center) + div_h2(a)
+                    values(center) = values(center) + 2.0d0*div_h3(a)
 
-                    values(next) = values(next) - 2.0d0*div_h2(a)
+                    values(next) = values(next) - 5.0d0*div_h3(a)
 
-                    values(next_next) = values(next_next) + div_h2(a)
+                    values(next_next) = values(next_next) + 4.0d0*div_h3(a)
+
+                    values(next_next_next) = values(next_next_next) - div_h3(a)
+
+                    nnz = nnz + 3 ! three next
 
                 case (2) ! Endpoint (values for backward difference)
 
-                    values(prev_prev) = values(prev_prev) + div_h2(a)
+                    values(prev_prev_prev) = values(prev_prev_prev) - div_h3(a)
 
-                    values(prev) = values(prev) - 2.0d0*div_h2(a)
+                    values(prev_prev) = values(prev_prev) + 4.0d0*div_h3(a)
 
-                    values(center) = values(center) + div_h2(a)
+                    values(prev) = values(prev) - 5.0d0*div_h3(a)
+
+                    values(center) = values(center) + 2.0d0*div_h3(a)
+
+                    nnz = nnz + 3 ! three prev
 
             end select
         end do
 
         b(g) = 0.0d0
 
-        if (values(center) == 0.0d0) then
-            nnz = nnz - 1
+        if (values(center) /= 0.0d0) then
+            nnz = nnz + 1 ! center
         end if
     end subroutine insert_finite_difference
 
@@ -570,16 +602,22 @@ contains
         integer(kind=8), dimension(3) :: boundaries
         integer(kind=8) :: i, center
 
-        center = (g-1)*13 + 7
+        center = (g-1)*19 + 10
 
-        if (values(center) == 0.0d0) then
-            nnz = nnz + 1
+        if (values(center) /= 0.0d0) then
+            values(center) = 0.0d0
+            nnz = nnz - 1
         end if
 
-        values(center) = 0.0d0
-        do i=1,6
-            values(center+i) = 0.0d0
-            values(center-i) = 0.0d0
+        do i=1,8
+            if (values(center+i) /= 0.0d0) then
+                values(center+i) = 0.0d0
+                nnz = nnz - 1
+            end if
+            if (values(center-i) /= 0.0d0) then
+                values(center-i) = 0.0d0
+                nnz = nnz - 1
+            end if
         end do
 
     end subroutine remove_finite_difference
@@ -600,16 +638,16 @@ contains
         central_difference = (array(index_next) - array(index_prev))/(2.0d0*hz)
     end function central_difference
 
-    function forward_difference(array,index)
-        double precision, dimension(nrGrid), intent(in) :: array
-        integer(kind=8), intent(in) :: index
-        integer(kind=8) :: index_next, index_next_next
+    function forward_difference(f,x)
+        double precision, dimension(nrGrid), intent(in) :: f
+        integer(kind=8), intent(in) :: x
+        integer(kind=8) :: x_1h, x_2h
         double precision :: forward_difference
 
-        index_next = move(index,1,3)
-        index_next_next = move(index,2,3)
+        x_1h = move(x,1,3)
+        x_2h = move(x,2,3)
 
-        forward_difference = (-3.0d0*array(index)+4.0d0*array(index_next)-array(index_next_next))/(2.0d0*hz)
+        forward_difference = (-3.0d0*f(x)+4.0d0*f(x_1h)-f(x_2h))/(2.0d0*hz)
     end function forward_difference
 
     function backward_difference(array,index)
@@ -623,8 +661,6 @@ contains
 
         backward_difference = (array(index_prev_prev)-4.0d0*array(index_prev)+3.0d0*array(index))/(2.0d0*hz)
     end function backward_difference
-
-
 
 ! -----------------------------------------------------------------------------
 ! ----- Boundary conditions ---------------------------------------------------
@@ -670,7 +706,7 @@ contains
                     .and. (lim_y(1)<=elec_pos(2)) .and. (elec_pos(2)<=lim_y(2)) &
                     .and. (lim_z(1)<=elec_pos(3)) .and. (elec_pos(3)<=lim_z(2))) then
 
-                    ! print *, 'Laplace: old particle position: x=',elec_pos(1), ' y=',elec_pos(2), ' z=',elec_pos(3)
+                    ! print *, 'Laplace: particle position: x=',elec_pos(1), ' y=',elec_pos(2), ' z=',elec_pos(3)
                     i = disc_coord(elec_pos(1), elec_pos(2), elec_pos(3))
                     ! print *, 'Laplace: particle index: i=',i
                     ! new_pos = cart_coord2(i)
@@ -1016,54 +1052,56 @@ contains
         double precision, dimension(3) :: par_pos, par_vel
 
         if (step == 1) then
-            par_pos(1) = 5.5d0*length_scale
-            par_pos(2) = 5.0d0*length_scale
-            par_pos(3) = 1.0d0*length_scale 
+            par_pos(1) = -2.0d0*length_scale
+            par_pos(2) = -2.0d0*length_scale
+            par_pos(3) = 4.0d0*length_scale 
             par_vel = 0.0d0
             call Add_Particle(par_pos,par_vel,species_elec,step,1,-1)
-            par_pos(1) = -5.5d0*length_scale
-            par_pos(2) = -5.5d0*length_scale
-            par_pos(3) = 1.0d0*length_scale 
-            par_vel = 0.0d0
-            call Add_Particle(par_pos,par_vel,species_elec,step,1,-1)
+            ! par_pos(1) = 4.0d0*length_scale
+            ! par_pos(2) = 4.0d0*length_scale
+            ! par_pos(3) = 1.5d0*length_scale 
+            ! par_vel = 0.0d0
+            ! call Add_Particle(par_pos,par_vel,species_elec,step,1,-1)
         end if
     end subroutine Place_Electron
 
     subroutine Write_Laplace_Data()
-        integer :: ud_laplace_voltage, ud_laplace_field, IFAIL, i, j, k
+        integer :: ud_laplace_voltage, ud_laplace_field, IFAIL, lvl, i, j, k
         character(len=128) :: filename_field, filename_voltage
         integer :: x, y
         double precision, dimension(3) :: test_pos
         
-        write(filename_voltage, '(a23)') 'out/laplace_voltage.bin'
-        write(filename_field, '(a21)') 'out/laplace_field.bin'
+        do lvl=0,2
+            write(filename_voltage, '(a20,i0,a4)') 'out/laplace_voltage_',lvl,'.bin'
+            write(filename_field, '(a18,i0,a4)') 'out/laplace_field_',lvl,'.bin'
 
-        ! Open the voltage file
-        open(newunit=ud_laplace_voltage, iostat=IFAIL, file=filename_voltage, status='REPLACE', action='WRITE', access='STREAM')
-        if (IFAIL /= 0) then
-            print *, 'RUMDEED: Failed to open the laplace voltage file.'
-            return 
-        end if
+            ! Open the voltage file
+            open(newunit=ud_laplace_voltage, iostat=IFAIL, file=filename_voltage, status='REPLACE', action='WRITE', access='STREAM')
+            if (IFAIL /= 0) then
+                print *, 'RUMDEED: Failed to open the laplace voltage file.'
+                return 
+            end if
 
-        ! Open the field file
-        open(newunit=ud_laplace_field, iostat=IFAIL, file=filename_field, status='REPLACE', action='WRITE', access='STREAM')
-        if (IFAIL /= 0) then
-            print *, 'RUMDEED: Failed to open the laplace field file.'
-            return 
-        end if
+            ! Open the field file
+            open(newunit=ud_laplace_field, iostat=IFAIL, file=filename_field, status='REPLACE', action='WRITE', access='STREAM')
+            if (IFAIL /= 0) then
+                print *, 'RUMDEED: Failed to open the laplace field file.'
+                return 
+            end if
 
-        do i=0,Nx-1
-            do j=0,Ny-1
-                k = i + j*Nx+1
-                test_pos = cart_coord(k)
-                ! print *, 'Laplace: writing: x=',test_pos(1), ' y=',test_pos(2), ' z=',test_pos(3)
-                write(unit=ud_laplace_voltage,iostat=IFAIL) i, j, voltage(k), is_emitter(k)
-                write(unit=ud_laplace_field,iostat=IFAIL) i, j, laplace_field(k), is_emitter(k)
+            do i=0,Nx-1
+                do j=0,Ny-1
+                    k = i + j*Nx+1 + lvl*NxNy
+                    test_pos = cart_coord(k)
+                    ! print *, 'Laplace: writing: x=',test_pos(1), ' y=',test_pos(2), ' z=',test_pos(3)
+                    write(unit=ud_laplace_voltage,iostat=IFAIL) i, j, voltage(k), is_emitter(k)
+                    write(unit=ud_laplace_field,iostat=IFAIL) i, j, laplace_field(k), is_emitter(k)
+                end do
             end do
-        end do
 
-        close(unit=ud_laplace_voltage, iostat=IFAIL, status='keep')
-        close(unit=ud_laplace_field, iostat=IFAIL, status='keep')
+            close(unit=ud_laplace_voltage, iostat=IFAIL, status='keep')
+            close(unit=ud_laplace_field, iostat=IFAIL, status='keep')
+        end do
         
     end subroutine Write_Laplace_Data
 
