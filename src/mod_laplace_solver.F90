@@ -8,6 +8,7 @@ module mod_laplace_solver
     
     ! Dependencies
     use mod_global
+    use mod_verlet
     use mod_pair
     use mkl_pardiso ! Required for pardiso solver
     use mkl_spblas  ! Required for sparse matrices
@@ -19,10 +20,12 @@ module mod_laplace_solver
     private
     public :: Init_Laplace_Solver, Calculate_Laplace_Field, Clean_Up_Laplace, Place_Electron, Write_Laplace_Data
 
-    ! Local variables
+    ! Pardiso variables
     type(MKL_PARDISO_HANDLE), dimension(64) :: pt
-    ! integer*8, dimension(64) :: pt
-    integer, dimension(64) :: iparm
+    integer(kind=8), dimension(64) :: iparm
+    integer(kind=8), allocatable, dimension(:) :: perm
+    integer(kind=8) :: maxfct=1, mnum=1, mtype=11, phase, n, nrhs=1
+    integer(kind=8) :: msglvl=0, error, analysis=11, factorization=12, solving=33
 
     double precision, allocatable, dimension(:) :: voltage, laplace_field
 
@@ -61,7 +64,7 @@ contains
         call calculate_field()
         print *, 'Laplace: done'
 
-        call write_average_field()
+        ! call write_average_field()
         
     end subroutine Calculate_Laplace_Field
 
@@ -70,23 +73,14 @@ contains
         integer :: i
         double precision, dimension(nrGridActive), intent(inout) :: x
         double precision, dimension(nrGridActive) :: ddum
-        integer(kind=8), dimension(nrGridActive) :: perm
-        integer(kind=8) :: maxfct,mnum,mtype,phase, n, nrhs
-        integer(kind=8) :: msglvl, error, reordering, factorization, solving
 
-        ! Matrix parameters
-        n = nrGridActive
-        nrhs = 1
-        maxfct = 1
-        mnum = 1
-        mtype = 11
         ! Solver parameters
-        msglvl = 0
-        reordering = 11
-        factorization = 12
-        solving = 33
-
-        iparm(27) = 1
+        iparm(2) = 3 ! parallel nested dissection algorithm
+        iparm(10) = 10 ! parallel factorization
+        iparm(31) = 2 ! perm(i) = 1 if b(i) is nonzero
+        iparm(35) = 0 ! one-based indexing
+        iparm(37) = 0 ! CSR format
+        iparm(60) = 1 ! use in-core memory when possible, out-of-core memory when necessary
 
 
         allocate(nnz_values(nnz), nnz_col_index(nnz), nnz_ia(nrGridActive+1), nnz_rows_start(nrGridActive+1), nnz_rows_end(nrGridActive+1))
@@ -95,17 +89,19 @@ contains
         ! call check_matrix()
 
 
-        print *, '  Laplace: solve_matrix: reordering and symbolic factorization'
-        phase = reordering  
+        ! Analysis ----------------------------
+        print *, '  Laplace: solve_matrix: analysis'
+        phase = analysis  
+        iparm(27) = 1 ! Check matrix on for analysis
         call pardiso_d(pt,maxfct,mnum,mtype,phase,n,nnz_values,nnz_ia,nnz_col_index,perm,nrhs,iparm,msglvl,ddum,ddum,error)
+        iparm(27) = 0 ! Check matrix off for factorization and solving
         if (error == 0) then
-            print *, '  Laplace: solve_matrix: symbolic factorization successful'
+            print *, '  Laplace: solve_matrix: analysis successful'
         else
-            print *, '  Laplace: solve_matrix: symbolic factorization failed with error code ', error
+            print *, '  Laplace: solve_matrix: analysis with error code ', error
         end if
 
-        iparm(27) = 0
-
+        ! Factorization ----------------------------
         print *, '  Laplace: solve_matrix: factorization'
         phase = factorization     
         call pardiso_d(pt,maxfct,mnum,mtype,phase,n,nnz_values,nnz_ia,nnz_col_index,perm,nrhs,iparm,msglvl,ddum,ddum,error)
@@ -115,43 +111,15 @@ contains
             print *, '  Laplace: solve_matrix: factorization failed with error code ', error
         end if
 
+        ! Solving ----------------------------
         print *, '  Laplace: solve_matrix: solving'
         phase = solving    
         call pardiso_d(pt,maxfct,mnum,mtype,phase,nrGridActive,nnz_values,nnz_ia,nnz_col_index,perm,nrhs,iparm,msglvl,b,x,error)
-        
-
-        select case (error)
-            case (0)
-                print *, '  Laplace: solve_matrix: solving successful'
-            case (-1)
-                print *, 'Laplace: solve_matrix: input inconsistent'
-            case (-2)
-                print *, 'Laplace: solve_matrix: not enough memory'
-            case (-3)
-                print *, 'Laplace: solve_matrix: reordering problem'
-            case (-4)
-                print *, 'Laplace: solve_matrix: zero pivot'
-            case (-5)
-                print *, 'Laplace: solve_matrix: unclassified error'
-            case (-6)
-                print *, 'Laplace: solve_matrix: reordering failed'
-            case (-7)
-                print *, 'Laplace: solve_matrix: diagonal matrix is singular'
-            case (-8)
-                print *, 'Laplace: solve_matrix: 32-bit overflow'
-            case (-9)
-                print *, 'Laplace: solve_matrix: not enough memory for OOC'
-            case (-10)
-                print *, 'Laplace: solve_matrix: error opening OOC files'
-            case (-11)
-                print *, 'Laplace: solve_matrix: read/write error with OOC files'
-            case (-12)
-                print *, 'Laplace: solve_matrix: pardiso_64 called from 32-bit library'
-            case (-13)
-                print *, 'Laplace: solve_matrix: interrupted by the mkl_progress function'
-            case (-15)
-                print *, 'Laplace: solve_matrix: internal error'
-        end select
+        if (error == 0) then
+            print *, '  Laplace: solve_matrix: solving successful'
+        else
+            print *, '  Laplace: solve_matrix: solving failed with error code ', error
+        end if
 
         if (norm2(x)==0.0d0) then
             print *, 'Laplace: solve_matrix: x is zero'
@@ -160,47 +128,31 @@ contains
             print *, 'Laplace: solve_matrix: b is zero'
         end if
 
+        ! Clear memory ----------------------------
+        print *, '  Laplace: solve_matrix: clearing memory'
+        phase = -1
+        call pardiso_d(pt,maxfct,mnum,mtype,phase,n,nnz_values,nnz_ia,nnz_col_index,perm,nrhs,iparm,msglvl,ddum,ddum,error)
+        if (error == 0) then
+            print *, '  Laplace: solve_matrix: clearing memory successful'
+        else
+            print *, '  Laplace: solve_matrix: clearing memory failed with error code ', error
+        end if
         deallocate(nnz_values, nnz_ia, nnz_col_index, nnz_rows_start, nnz_rows_end) 
     end subroutine solve_matrix
 
-    ! subroutine solve_matrix_v2(x)
-    !     integer :: i, index
-    !     double precision, dimension(nrGridActive), intent(out) :: x
-    !     integer, dimension(nnz) :: nnz_rowA, nnz_colA
-    !     double precision, dimension(nnz) :: nnz_valA
-    !     integer, dimension(nrGridActive) :: perm
-    !     integer :: maxfct=1,mnum=1,mtype=11,phase
-    !     integer :: msglvl, error
-    !     x = 0.0d0
+! -------------------------------------------------------------------------------------------------------------
+! ----- Voltage and field calculations ------------------------------------------------------------------------
+! -------------------------------------------------------------------------------------------------------------
 
-    !     i = 1
-    !     index = 1
-    !     ! $OMP PARALLEL DO DEFAULT(NONE) &
-    !     ! $OMP& SHARED(nnz, nnz_rowA, nnz_colA, nnz_valA, rowA, colA, valA, linkA) &
-    !     ! $OMP& PRIVATE(i,index)
-    !     do i=1,nnz
-    !         if (index > 7*nrGridActive) then
-    !             print *, 'Laplace: index out of bounds'
-    !             print *, 'Laplace: index=',index
-    !             exit
-    !         end if
-    !         nnz_rowA(i) = rowA(index)
-    !         nnz_colA(i) = colA(index)
-    !         nnz_valA(i) = valA(index)
-    !         index = linkA(index)
-    !     end do
-    !     phase = 23
-
-    !     call pardiso_d(pt,maxfct,mnum,mtype,phase,nrGridActive,nnz_valA, nnz_rowA, nnz_colA, perm,nrGridActive,iparm,msglvl,b,x,error)
-        
-        
-    ! end subroutine solve_matrix_v2
-
-    subroutine allocate_voltage(x)
+    subroutine allocate_voltage(x) ! DONE & PARALLEL
         double precision, dimension(nrGridActive), intent(in) :: x
         integer(kind=8) :: i, g
 
         voltage = 0.0d0
+
+        !$OMP PARALLEL DO DEFAULT(NONE) &
+        !$OMP& SHARED(nrGrid, voltage, x, gridPoints) &
+        !$OMP& PRIVATE(i, g)
 
         do i=1,nrGrid
             if (gridPoints(i) /= 0) then
@@ -208,13 +160,19 @@ contains
                 voltage(i) = x(g)
             end if
         end do
+
+        !$OMP END PARALLEL DO
     end subroutine allocate_voltage
 
-    subroutine calculate_field()
-        integer(kind=8) :: i, g, boundary
+    subroutine calculate_field() ! DONE & PARALLEL
+        integer(kind=8) :: i, boundary
         integer(kind=8), dimension(3) :: boundaries
 
         laplace_field = 0.0d0
+
+        !$OMP PARALLEL DO DEFAULT(NONE) &
+        !$OMP& SHARED(nrGrid, voltage, laplace_field) &
+        !$OMP& PRIVATE(i, boundaries, boundary)
 
         do i=1,nrGrid
             boundaries = is_boundary(i)
@@ -230,14 +188,21 @@ contains
             end select
         end do
 
+        !$OMP END PARALLEL DO
+
     end subroutine calculate_field
 
-    function average_field()
+    function average_field() ! DONE & PARALLEL
         integer(kind=8) :: i, j, k, num
         double precision :: sum, average_field
 
         sum = 0.0d0
         num = 0
+
+        !$OMP PARALLEL DO DEFAULT(NONE) &
+        !$OMP& SHARED(Nx, Ny, laplace_field) &
+        !$OMP& PRIVATE(i, j, k) &
+        !$OMP& REDUCTION(+:sum, num)
 
         do i=0,Nx-1
             do j=0,Ny-1
@@ -247,6 +212,8 @@ contains
             end do
         end do
 
+        !$OMP END PARALLEL DO
+
         if (num > 0) then
             average_field = sum / num
         else
@@ -254,7 +221,7 @@ contains
         end if
     end function average_field
 
-    subroutine write_average_field()
+    subroutine write_average_field() ! DONE
         integer(kind=8) :: IFAIL
         double precision :: avg_field
 
@@ -263,7 +230,7 @@ contains
         write (ud_laplace_average_field, "(E16.8)", iostat=IFAIL) avg_field
     end subroutine write_average_field
 
-    subroutine write_grid()
+    subroutine write_grid() ! DONE
         integer(kind=8) :: IFAIL, i
 
         do i=1,NxNy
@@ -308,13 +275,14 @@ contains
         print *, 'Laplace: initializing gridpoints'
         call init_grid()
 
+        n = nrGridActive
         n7 = 7*nrGridActive
         n19 = 19*nrGridActive
 
         print *, 'Laplace: allocating arrays'
         allocate(values(n19), col_index(n19), rows_start(nrGridActive), rows_end(nrGridActive), b(nrGridActive), iCharge(nrGridActive), oCharge(nrGridActive))
-
         allocate(voltage(nrGrid), laplace_field(nrGrid))
+        allocate(perm(nrGridActive))
 
         print *, 'Laplace: initializing matrix'
         call init_matrix()
@@ -326,19 +294,20 @@ contains
         
     end subroutine Init_Laplace_Solver
 
-    subroutine init_pardiso()
-        integer :: mtype=11
+    subroutine init_pardiso() ! DONE
         call pardisoinit(pt,mtype,iparm)
     end subroutine init_pardiso
 
-    subroutine init_grid()
+    subroutine init_grid() ! DONE
         ! Store points that are outside of the emitter or one layer within it
         integer(kind=8) :: i
+
+
         do i=1,nrGrid
-            ! print *, 'Laplace: gridpoint'
+            ! print *, 'Laplace: gridpoint nr', i
             ! print *, '      coord=', cart_coord(i)
             if (is_emitter(i) == 1) then
-                ! print *, '      it is emitter'
+                ! print *, '  it is emitter'
                 if (is_first_layer(i) == 1) then
                     ! print *, '      it is first_layer'
                     nrGridActive = nrGridActive + 1
@@ -349,6 +318,7 @@ contains
                     gridPoints(i) = 0
                 end if
             else
+                ! print *, '  it is not emitter'
                 ! print *, 'Laplace: checking not emitter'
                 ! print *, 'Laplace: updating nrGridActive'
                 nrGridActive = nrGridActive + 1
@@ -358,6 +328,7 @@ contains
                 gridPoints(i) = nrGridActive
             end if
         end do
+
     end subroutine init_grid
 
     subroutine init_matrix() ! DONE
@@ -413,9 +384,13 @@ contains
 ! ----- Matrix operations -----------------------------------------------------
 ! -----------------------------------------------------------------------------
 
-    subroutine update_matrix() ! DONE
+    subroutine update_matrix() ! DONE & PARALLEL
         ! Update boundary conditions in matrix
         integer(kind=8) :: g
+
+        !$OMP PARALLEL DO DEFAULT(NONE) &
+        !$OMP& SHARED(nrGridActive, iCharge, oCharge) &
+        !$OMP& PRIVATE(g)
 
         do g=1,nrGridActive
             if (oCharge(g) /= 0.0d0) then
@@ -438,6 +413,8 @@ contains
                 oCharge(g) = iCharge(g)
             end if
         end do
+
+        !$OMP END PARALLEL DO
     end subroutine update_matrix
 
     subroutine reduce_matrix()
@@ -450,6 +427,12 @@ contains
 
         index = 0
         cur_ind = 0
+
+        ! $OMP PARALLEL DO DEFAULT(NONE) &
+        ! $OMP& SHARED(nrGridActive, values, col_index, nnz_values, nnz_col_index, nnz_ia, nnz_rows_start, nnz_rows_end) &
+        ! $OMP& PRIVATE(g, j, cur_col, start) &
+        ! $OMP& REDUCTION(+:index, cur_ind)
+
      
         do g=1,nrGridActive
             start = .true.
@@ -486,7 +469,10 @@ contains
             ! end if
         end do
 
+        ! $OMP END PARALLEL DO
+
         nnz_ia(nrGridActive+1) = nnz
+
 
     end subroutine reduce_matrix
 
@@ -498,6 +484,7 @@ contains
 
         values(center) = 1.0d0
         b(g) = iCharge(g)
+        perm(g) = 1
 
         nnz = nnz + 1
     end subroutine insert_electron_boundary
@@ -514,6 +501,7 @@ contains
         end if
 
         b(g) = 0.0d0
+        perm(g) = 0
     end subroutine remove_electron_boundary
 
     subroutine insert_emitter_boundary(g)
@@ -524,6 +512,7 @@ contains
 
         values(center) = 1.0d0
         b(g) = 0.0d0
+        perm(g) = 0
 
         nnz = nnz + 1
     end subroutine insert_emitter_boundary
@@ -564,25 +553,25 @@ contains
 
                 case (1) ! Startpoint (values for forward difference)
 
-                    values(center) = values(center) + 2.0d0*div_h3(a)
+                    values(center) = values(center) + 2.0d0*div_h2(a)
 
-                    values(next) = values(next) - 5.0d0*div_h3(a)
+                    values(next) = values(next) - 5.0d0*div_h2(a)
 
-                    values(next_next) = values(next_next) + 4.0d0*div_h3(a)
+                    values(next_next) = values(next_next) + 4.0d0*div_h2(a)
 
-                    values(next_next_next) = values(next_next_next) - div_h3(a)
+                    values(next_next_next) = values(next_next_next) - 1.0d0*div_h2(a)
 
                     nnz = nnz + 3 ! three next
 
                 case (2) ! Endpoint (values for backward difference)
 
-                    values(prev_prev_prev) = values(prev_prev_prev) - div_h3(a)
+                    values(prev_prev_prev) = values(prev_prev_prev) - 1.0d0*div_h2(a)
 
-                    values(prev_prev) = values(prev_prev) + 4.0d0*div_h3(a)
+                    values(prev_prev) = values(prev_prev) + 4.0d0*div_h2(a)
 
-                    values(prev) = values(prev) - 5.0d0*div_h3(a)
+                    values(prev) = values(prev) - 5.0d0*div_h2(a)
 
-                    values(center) = values(center) + 2.0d0*div_h3(a)
+                    values(center) = values(center) + 2.0d0*div_h2(a)
 
                     nnz = nnz + 3 ! three prev
 
@@ -590,6 +579,7 @@ contains
         end do
 
         b(g) = 0.0d0
+        perm(g) = 0
 
         if (values(center) /= 0.0d0) then
             nnz = nnz + 1 ! center
@@ -641,13 +631,16 @@ contains
     function forward_difference(f,x)
         double precision, dimension(nrGrid), intent(in) :: f
         integer(kind=8), intent(in) :: x
-        integer(kind=8) :: x_1h, x_2h
+        integer(kind=8) :: x_1h, x_2h, x_3h, x_4h
         double precision :: forward_difference
 
         x_1h = move(x,1,3)
         x_2h = move(x,2,3)
+        x_3h = move(x,3,3)
+        x_4h = move(x,4,3)
 
         forward_difference = (-3.0d0*f(x)+4.0d0*f(x_1h)-f(x_2h))/(2.0d0*hz)
+        ! forward_difference = (-25.0d0*f(x)+48.0d0*f(x_1h)-36*f(x_2h)+16.0d0*f(x_3h)-3.0d0*f(x_4h))/(12.0d0*hz)
     end function forward_difference
 
     function backward_difference(array,index)
@@ -1052,55 +1045,66 @@ contains
         double precision, dimension(3) :: par_pos, par_vel
 
         if (step == 1) then
-            par_pos(1) = -2.0d0*length_scale
-            par_pos(2) = -2.0d0*length_scale
-            par_pos(3) = 4.0d0*length_scale 
+            par_pos(1) = 0.0d0*length_scale
+            par_pos(2) = 0.0d0*length_scale
+            par_pos(3) = 1.0d0*length_scale 
             par_vel = 0.0d0
             call Add_Particle(par_pos,par_vel,species_elec,step,1,-1)
-            ! par_pos(1) = 4.0d0*length_scale
-            ! par_pos(2) = 4.0d0*length_scale
-            ! par_pos(3) = 1.5d0*length_scale 
+            ! par_pos(1) = 3.0d0*length_scale
+            ! par_pos(2) = 3.0d0*length_scale
+            ! par_pos(3) = 1.0d0*length_scale 
             ! par_vel = 0.0d0
             ! call Add_Particle(par_pos,par_vel,species_elec,step,1,-1)
         end if
     end subroutine Place_Electron
 
     subroutine Write_Laplace_Data()
-        integer :: ud_laplace_voltage, ud_laplace_field, IFAIL, lvl, i, j, k
-        character(len=128) :: filename_field, filename_voltage
+        integer :: ud_lp_voltage, ud_lp_field, ud_ic_field, IFAIL, lvl, i, j, k
+        character(len=128) :: filename_lp_voltage, filename_lp_field, filename_ic_field
         integer :: x, y
-        double precision, dimension(3) :: test_pos
+        double precision, dimension(3) :: ic_pos, ic_field
         
         do lvl=0,2
-            write(filename_voltage, '(a20,i0,a4)') 'out/laplace_voltage_',lvl,'.bin'
-            write(filename_field, '(a18,i0,a4)') 'out/laplace_field_',lvl,'.bin'
+            write(filename_lp_voltage, '(a15,i0,a4)') 'out/lp_voltage_',lvl,'.bin'
+            write(filename_lp_field, '(a13,i0,a4)') 'out/lp_field_',lvl,'.bin'
+            write(filename_ic_field, '(a13,i0,a4)') 'out/ic_field_',lvl,'.bin'
 
             ! Open the voltage file
-            open(newunit=ud_laplace_voltage, iostat=IFAIL, file=filename_voltage, status='REPLACE', action='WRITE', access='STREAM')
+            open(newunit=ud_lp_voltage, iostat=IFAIL, file=filename_lp_voltage, status='REPLACE', action='WRITE', access='STREAM')
             if (IFAIL /= 0) then
                 print *, 'RUMDEED: Failed to open the laplace voltage file.'
                 return 
             end if
 
             ! Open the field file
-            open(newunit=ud_laplace_field, iostat=IFAIL, file=filename_field, status='REPLACE', action='WRITE', access='STREAM')
+            open(newunit=ud_lp_field, iostat=IFAIL, file=filename_lp_field, status='REPLACE', action='WRITE', access='STREAM')
             if (IFAIL /= 0) then
                 print *, 'RUMDEED: Failed to open the laplace field file.'
+                return 
+            end if
+
+            ! Open the field file
+            open(newunit=ud_ic_field, iostat=IFAIL, file=filename_ic_field, status='REPLACE', action='WRITE', access='STREAM')
+            if (IFAIL /= 0) then
+                print *, 'RUMDEED: Failed to open the image charge field file.'
                 return 
             end if
 
             do i=0,Nx-1
                 do j=0,Ny-1
                     k = i + j*Nx+1 + lvl*NxNy
-                    test_pos = cart_coord(k)
+                    ic_pos = cart_coord(k)
+                    ic_field = Calc_Field_at(ic_pos)
                     ! print *, 'Laplace: writing: x=',test_pos(1), ' y=',test_pos(2), ' z=',test_pos(3)
-                    write(unit=ud_laplace_voltage,iostat=IFAIL) i, j, voltage(k), is_emitter(k)
-                    write(unit=ud_laplace_field,iostat=IFAIL) i, j, laplace_field(k), is_emitter(k)
+                    write(unit=ud_lp_voltage,iostat=IFAIL) i, j, voltage(k), is_emitter(k)
+                    write(unit=ud_lp_field,iostat=IFAIL) i, j, laplace_field(k), is_emitter(k)
+                    write(unit=ud_ic_field,iostat=IFAIL) i, j, ic_field(3), is_emitter(k)
                 end do
             end do
 
-            close(unit=ud_laplace_voltage, iostat=IFAIL, status='keep')
-            close(unit=ud_laplace_field, iostat=IFAIL, status='keep')
+            close(unit=ud_lp_voltage, iostat=IFAIL, status='keep')
+            close(unit=ud_lp_field, iostat=IFAIL, status='keep')
+            close(unit=ud_ic_field, iostat=IFAIL, status='keep')
         end do
         
     end subroutine Write_Laplace_Data
