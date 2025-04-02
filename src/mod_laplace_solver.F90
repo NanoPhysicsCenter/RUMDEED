@@ -18,23 +18,23 @@ module mod_laplace_solver
 
     ! Accessibility
     private
-    public :: Init_Laplace_Solver, Calculate_Laplace_Field, Clean_Up_Laplace, Place_Electron, Write_Laplace_Data
+    public :: Init_Laplace_Solver, Calculate_Laplace_Field, Calculate_Laplace_Field_at, Clean_Up_Laplace, Place_Electron, Write_Laplace_Data
 
     ! Pardiso variables
     type(MKL_PARDISO_HANDLE), dimension(64) :: pt
     integer(kind=8), dimension(64) :: iparm
     integer(kind=8), allocatable, dimension(:) :: perm
     integer(kind=8) :: maxfct=1, mnum=1, mtype=11, phase, n, nrhs=1
-    integer(kind=8) :: msglvl=0, error, analysis=11, factorization=12, solving=33
+    integer(kind=8) :: msglvl=0, error, analysis=11, factorization=22, solving=33, solving1=331, solving2=333
 
-    double precision, allocatable, dimension(:) :: voltage, laplace_field
+    double precision, allocatable, dimension(:) :: voltage, laplace_field, x
 
     ! Matrix arrays
     double precision, allocatable, dimension(:) :: values, iCharge, oCharge, b
-    integer(kind=8), allocatable, dimension(:) :: rows_start, rows_end, col_index
+    integer(kind=8), allocatable, dimension(:) :: col_index
 
     double precision, allocatable, dimension(:) :: nnz_values
-    integer(kind=8), allocatable, dimension(:) :: nnz_rows_start, nnz_rows_end, nnz_col_index, nnz_ia
+    integer(kind=8), allocatable, dimension(:) :: nnz_col_index, nnz_ia
 
     ! System parameters
     double precision :: hx, hy, hz, emitter_radius
@@ -49,7 +49,6 @@ contains
 ! -----------------------------------------------------------------------------
 
     subroutine Calculate_Laplace_Field(step) ! TODO
-        double precision, dimension(nrGridActive) :: x
         integer(kind=8), intent(in) :: step
         ! Calculate the electric field
         print *, 'Laplace: finding electrons'
@@ -57,9 +56,9 @@ contains
         print *, 'Laplace: updating matrix'
         call update_matrix()
         print *, 'Laplace: solving matrix'
-        call solve_matrix(x)
+        call solve_matrix()
         print *, 'Laplace: allocate voltage'
-        call allocate_voltage(x)
+        call allocate_voltage()
         print *, 'Laplace: calculating field'
         call calculate_field()
         print *, 'Laplace: done'
@@ -68,57 +67,105 @@ contains
         
     end subroutine Calculate_Laplace_Field
 
-    subroutine solve_matrix(x) ! TODO
+    subroutine solve_matrix() ! TODO
         ! Solve the system
         integer :: i
-        double precision, dimension(nrGridActive), intent(inout) :: x
-        double precision, dimension(nrGridActive) :: ddum
+        ! double precision, dimension(nrGridActive) :: ddum
 
+        print *, '  Laplace: solve_matrix: start'
         ! Solver parameters
-        iparm(2) = 3 ! parallel nested dissection algorithm
-        iparm(10) = 10 ! parallel factorization
-        iparm(31) = 2 ! perm(i) = 1 if b(i) is nonzero
-        iparm(35) = 0 ! one-based indexing
-        iparm(37) = 0 ! CSR format
-        iparm(60) = 1 ! use in-core memory when possible, out-of-core memory when necessary
+        ! iparm(2) = 3 ! parallel nested dissection algorithm
+        ! iparm(24) = 1 ! 10 = parallel factorization
+        ! iparm(25) = 0 ! 2 = parallel solve; must be coupled with iparm(60)=0
+        ! iparm(31) = 1 ! 0 = use all rhs; 2 = use sparsity of rhs
+        ! iparm(35) = 0 ! one-based indexing (required)
+        ! iparm(37) = 0 ! CSR format (required)
+        ! iparm(60) = 1 ! 0 = in-core-memory (fast); 1 = mix as necessary; 2 = out-of-core memory (slow)
+
+        ! iparm(1) = 1 ! Use customized iparm
+        ! iparm(2) = 3 ! Use parallel METIS algorithm
+        ! iparm(10) = 13 ! Perturb pivots
+        ! iparm(11) = 1 ! Enable scaling
+        ! iparm(24) = 1 ! Two-level parallel factorization
+        ! iparm(31) = 0 ! perm(i) = 1 if b(i) is nonzero
+        ! iparm(35) = 0 ! one-based indexing
+        ! iparm(37) = 0 ! CSR format
+        iparm(60) = 1 ! 0 = in-core-memory (fast); 1 = mix as necessary; 2 = out-of-core memory (slow)
+
+        ! iparm(31) = 1 ! perm(i) = 1 if b(i) is nonzero
+        ! iparm(35) = 0 ! one-based indexing
+        ! iparm(37) = 0 ! CSR format
+        ! iparm(60) = 1 ! 0 = in-core-memory; 1 = mix as necessary; 2 = out-of-core memory
 
 
-        allocate(nnz_values(nnz), nnz_col_index(nnz), nnz_ia(nrGridActive+1), nnz_rows_start(nrGridActive+1), nnz_rows_end(nrGridActive+1))
+        print *, '  Laplace: allocating reduced CSR memory'
+        deallocate(laplace_field)
+        allocate(nnz_values(nnz), nnz_col_index(nnz), nnz_ia(nrGridActive+1), x(nrGridActive))
+        print *, '  Laplace: allocating reduced CSR memory successful'
+        print *, '  Laplace: reducing matrix'
         call reduce_matrix()
+        print *, '  Laplace: reducing matrix successful'
+
+        ! print *, '  Laplace: solve_matrix: nnz=',nnz
+        ! print *, '  Laplace: solve_matrix: size(nnz_values)=',size(nnz_values)
+        ! print *, '  Laplace: solve_matrix: size(nnz_col_index)=',size(nnz_col_index)
+        ! print *, '  Laplace: solve_matrix: size(nnz_ia)=',size(nnz_ia)
+
 
         ! call check_matrix()
 
 
         ! Analysis ----------------------------
-        print *, '  Laplace: solve_matrix: analysis'
+        print *, '  Laplace: solve_matrix: analysis and symbolic factorization'
         phase = analysis  
         iparm(27) = 1 ! Check matrix on for analysis
-        call pardiso_d(pt,maxfct,mnum,mtype,phase,n,nnz_values,nnz_ia,nnz_col_index,perm,nrhs,iparm,msglvl,ddum,ddum,error)
+        call pardiso_64(pt,maxfct,mnum,mtype,phase,n,nnz_values,nnz_ia,nnz_col_index,perm,nrhs,iparm,msglvl,b,x,error)
         iparm(27) = 0 ! Check matrix off for factorization and solving
         if (error == 0) then
-            print *, '  Laplace: solve_matrix: analysis successful'
+            print *, '  Laplace: solve_matrix: analysis and symbolic factorization successful'
         else
-            print *, '  Laplace: solve_matrix: analysis with error code ', error
+            print *, '  Laplace: solve_matrix: analysis and symbolic factorization with error code ', error
         end if
+        print *, '  Laplace: solve_matrix:', iparm(17)*1e-6, 'Gb needed for numerical factorization'
 
         ! Factorization ----------------------------
-        print *, '  Laplace: solve_matrix: factorization'
+        print *, '  Laplace: solve_matrix: numerical factorization'
         phase = factorization     
-        call pardiso_d(pt,maxfct,mnum,mtype,phase,n,nnz_values,nnz_ia,nnz_col_index,perm,nrhs,iparm,msglvl,ddum,ddum,error)
+        call pardiso_64(pt,maxfct,mnum,mtype,phase,n,nnz_values,nnz_ia,nnz_col_index,perm,nrhs,iparm,msglvl,b,x,error)
         if (error == 0) then
-            print *, '  Laplace: solve_matrix: factorization successful'
+            print *, '  Laplace: solve_matrix: numerical factorization successful'
         else
-            print *, '  Laplace: solve_matrix: factorization failed with error code ', error
+            print *, '  Laplace: solve_matrix: numerical factorization failed with error code ', error
         end if
 
         ! Solving ----------------------------
-        print *, '  Laplace: solve_matrix: solving'
-        phase = solving    
-        call pardiso_d(pt,maxfct,mnum,mtype,phase,nrGridActive,nnz_values,nnz_ia,nnz_col_index,perm,nrhs,iparm,msglvl,b,x,error)
-        if (error == 0) then
-            print *, '  Laplace: solve_matrix: solving successful'
+        if (solving /= 0) then
+            print *, '  Laplace: solve_matrix: solving'
+            phase = solving    
+            call pardiso_64(pt,maxfct,mnum,mtype,phase,nrGridActive,nnz_values,nnz_ia,nnz_col_index,perm,nrhs,iparm,msglvl,b,x,error)
+            if (error == 0) then
+                print *, '  Laplace: solve_matrix: solving successful'
+            else
+                print *, '  Laplace: solve_matrix: solving failed with error code ', error
+            end if
         else
-            print *, '  Laplace: solve_matrix: solving failed with error code ', error
+            print *, '  Laplace: solve_matrix: forward substitution'
+            phase = solving1    
+            call pardiso_64(pt,maxfct,mnum,mtype,phase,nrGridActive,nnz_values,nnz_ia,nnz_col_index,perm,nrhs,iparm,msglvl,b,x,error)
+            if (error == 0) then
+                print *, '  Laplace: solve_matrix: forward substitution successful'
+            else
+                print *, '  Laplace: solve_matrix: forward substitution failed with error code ', error
+            end if
+
+            print *, '  Laplace: solve_matrix: backward substitution'
+            phase = solving2
+            call pardiso_64(pt,maxfct,mnum,mtype,phase,nrGridActive,nnz_values,nnz_ia,nnz_col_index,perm,nrhs,iparm,msglvl,b,x,error)
+            if (error == 0) then
+                print *, '  Laplace: solve_matrix: backward substitution successful'
+            else
+                print *, '  Laplace: solve_matrix: backward substitution failed with error code ', error
+            end if
         end if
 
         if (norm2(x)==0.0d0) then
@@ -131,21 +178,24 @@ contains
         ! Clear memory ----------------------------
         print *, '  Laplace: solve_matrix: clearing memory'
         phase = -1
-        call pardiso_d(pt,maxfct,mnum,mtype,phase,n,nnz_values,nnz_ia,nnz_col_index,perm,nrhs,iparm,msglvl,ddum,ddum,error)
+        call pardiso_64(pt,maxfct,mnum,mtype,phase,n,nnz_values,nnz_ia,nnz_col_index,perm,nrhs,iparm,msglvl,b,x,error)
         if (error == 0) then
             print *, '  Laplace: solve_matrix: clearing memory successful'
         else
             print *, '  Laplace: solve_matrix: clearing memory failed with error code ', error
         end if
-        deallocate(nnz_values, nnz_ia, nnz_col_index, nnz_rows_start, nnz_rows_end) 
+
+        ! Deallocate the reduced CSR matrix
+        deallocate(nnz_values)
+        deallocate(nnz_ia)
+        deallocate(nnz_col_index) 
     end subroutine solve_matrix
 
 ! -------------------------------------------------------------------------------------------------------------
 ! ----- Voltage and field calculations ------------------------------------------------------------------------
 ! -------------------------------------------------------------------------------------------------------------
 
-    subroutine allocate_voltage(x) ! DONE & PARALLEL
-        double precision, dimension(nrGridActive), intent(in) :: x
+    subroutine allocate_voltage() ! DONE & PARALLEL
         integer(kind=8) :: i, g
 
         voltage = 0.0d0
@@ -162,11 +212,16 @@ contains
         end do
 
         !$OMP END PARALLEL DO
+
+        ! Deallocate the solution vector
+        deallocate(x)
     end subroutine allocate_voltage
 
     subroutine calculate_field() ! DONE & PARALLEL
         integer(kind=8) :: i, boundary
         integer(kind=8), dimension(3) :: boundaries
+
+        allocate(laplace_field(nrGrid))
 
         laplace_field = 0.0d0
 
@@ -189,6 +244,9 @@ contains
         end do
 
         !$OMP END PARALLEL DO
+
+        ! Deallocate the voltage vector
+        deallocate(voltage)
 
     end subroutine calculate_field
 
@@ -242,9 +300,10 @@ contains
 ! ----- Initialization --------------------------------------------------------
 ! -----------------------------------------------------------------------------
 
-    subroutine Init_Laplace_Solver() ! DONE
+    subroutine Init_Laplace_Solver(nthreads) ! DONE
         ! Initialize environment based on input file
         double precision :: Lx, Ly, Lz
+        integer(kind=8), intent(in) :: nthreads
 
         ! print *, 'Laplace: initializing solver'
 
@@ -267,7 +326,6 @@ contains
         lim_y = (/laplace_pos(2), laplace_pos(2)+Ly/)
         lim_z = (/laplace_pos(3), laplace_pos(3)+Lz/)
 
-        print *, 'Laplace: limits: x=',lim_x(1),lim_x(2), ' y=',lim_y(1),lim_y(2), ' z=',lim_z(1),lim_z(2)
 
         emitter_radius = emitters_dim(1,1)
 
@@ -280,7 +338,7 @@ contains
         n19 = 19*nrGridActive
 
         print *, 'Laplace: allocating arrays'
-        allocate(values(n19), col_index(n19), rows_start(nrGridActive), rows_end(nrGridActive), b(nrGridActive), iCharge(nrGridActive), oCharge(nrGridActive))
+        allocate(values(n19), col_index(n19), b(nrGridActive), oCharge(nrGridActive))
         allocate(voltage(nrGrid), laplace_field(nrGrid))
         allocate(perm(nrGridActive))
 
@@ -288,13 +346,15 @@ contains
         call init_matrix()
 
         print *, 'Laplace: initializing Pardiso'
-        call init_pardiso()
+        call init_pardiso(nthreads)
 
         call write_grid()
         
     end subroutine Init_Laplace_Solver
 
-    subroutine init_pardiso() ! DONE
+    subroutine init_pardiso(nthreads) ! DONE
+        integer(kind=8), intent(in) :: nthreads
+        ! call mkl_set_num_threads(nthreads)
         call pardisoinit(pt,mtype,iparm)
     end subroutine init_pardiso
 
@@ -364,8 +424,8 @@ contains
                 col_index(next_next_next) = move(g,3,a)
             end do
 
-            rows_start(g) = g
-            rows_end(g) = g
+            ! rows_start(g) = g
+            ! rows_end(g) = g
 
             i = gridPointsActive(g)
             
@@ -415,6 +475,9 @@ contains
         end do
 
         !$OMP END PARALLEL DO
+
+        ! iCharge has been written in oCharge and is no longer needed
+        deallocate(iCharge)
     end subroutine update_matrix
 
     subroutine reduce_matrix()
@@ -422,8 +485,8 @@ contains
         integer(kind=8) :: cur_ind, cur_col
         logical :: start
 
-        nnz_rows_start = [rows_start, nnz]
-        nnz_rows_end = [rows_end, nnz]
+        ! nnz_rows_start = [rows_start, nnz]
+        ! nnz_rows_end = [rows_end, nnz]
 
         index = 0
         cur_ind = 0
@@ -433,7 +496,6 @@ contains
         ! $OMP& PRIVATE(g, j, cur_col, start) &
         ! $OMP& REDUCTION(+:index, cur_ind)
 
-     
         do g=1,nrGridActive
             start = .true.
 
@@ -456,12 +518,12 @@ contains
                         start = .false.
                     end if
                     
-                    if (cur_col < nnz_rows_start(g)) then
-                        nnz_rows_start(g) = cur_col
-                    end if
-                    if (cur_col > nnz_rows_end(g)) then
-                        nnz_rows_end(g) = cur_col
-                    end if
+                    ! if (cur_col < nnz_rows_start(g)) then
+                    !     nnz_rows_start(g) = cur_col
+                    ! end if
+                    ! if (cur_col > nnz_rows_end(g)) then
+                    !     nnz_rows_end(g) = cur_col
+                    ! end if
                 end if
             end do
             ! if (g>100 .and. g<=200) then
@@ -685,6 +747,8 @@ contains
         double precision, dimension(3) :: elec_pos, new_pos
         integer(kind=8) :: g, i, k, u
         double precision :: boundary_voltage
+
+        allocate(iCharge(nrGridActive))
         
         iCharge = 0.0d0
 
@@ -1004,41 +1068,85 @@ contains
 
     end function is_first_layer
 
+    function is_inside(pos)
+        double precision, dimension(3), intent(in) :: pos
+        integer(kind=8) :: is_inside
+
+        if (lim_x(1) <= pos(1) .and. pos(1) <= lim_x(2) &
+            .and. lim_y(1) <= pos(2) .and. pos(2) <= lim_y(2) &
+            .and. lim_z(1) <= pos(3) .and. pos(3) <= lim_z(2)) then
+            is_inside = 1
+        else
+            is_inside = 0
+        end if
+    end function
+
 ! -----------------------------------------------------------------------------
 ! ----- Clean Up --------------------------------------------------------------
 ! -----------------------------------------------------------------------------
     
     subroutine Clean_Up_Laplace() ! DONE
         ! Clean up memory
-        deallocate(values, col_index, rows_start, rows_end, b, iCharge, oCharge, gridPoints, gridPointsActive)
-        deallocate(voltage, laplace_field)
+        print '(a)', 'Laplace: Clean up'
+        ! Deallocate CSR matrix
+        deallocate(values)
+        deallocate(col_index)
+        deallocate(b)
+        ! Deallocate other arrays
+        deallocate(oCharge)
+        deallocate(gridPoints)
+        deallocate(gridPointsActive)
+        deallocate(perm)
+
+        ! These should have been deallocated already in the last iteration
+        if (allocated(iCharge)) then 
+            deallocate(iCharge)
+        end if
+        if (allocated(laplace_field)) then
+            deallocate(laplace_field) 
+        end if
+        if (allocated(nnz_values)) then
+            deallocate(nnz_values)
+        end if
+        if (allocated(nnz_col_index)) then
+            deallocate(nnz_col_index)
+        end if
+        if (allocated(nnz_ia)) then
+            deallocate(nnz_ia)
+        end if
+        if (allocated(voltage)) then
+            deallocate(voltage)
+        end if
+        if (allocated(x)) then
+            deallocate(x)
+        end if
     end subroutine Clean_Up_Laplace
 
-    subroutine check_matrix()
-        integer(kind=8) :: i,count,low,high,col,index
+    ! subroutine check_matrix()
+    !     integer(kind=8) :: i,count,low,high,col,index
 
 
-        index = 1
-        do i=1,nrGridActive
-            count = 0
-            low = nnz_rows_start(i)
-            high = nnz_rows_end(i)
-            col = nnz_col_index(index)
+    !     index = 1
+    !     do i=1,nrGridActive
+    !         count = 0
+    !         low = nnz_rows_start(i)
+    !         high = nnz_rows_end(i)
+    !         col = nnz_col_index(index)
 
-            do while ((low <= col) .and. (col < high))
-                index = index + 1
-                col = nnz_col_index(index)
-                count = count + 1
-            end do
-            count  = count + 1
-            index = index + 1
+    !         do while ((low <= col) .and. (col < high))
+    !             index = index + 1
+    !             col = nnz_col_index(index)
+    !             count = count + 1
+    !         end do
+    !         count  = count + 1
+    !         index = index + 1
 
-            print *, 'Laplace: row=',i,' count=',count
+    !         print *, 'Laplace: row=',i,' count=',count
 
-        end do
+    !     end do
 
 
-    end subroutine check_matrix
+    ! end subroutine check_matrix
 
     subroutine Place_Electron(step)
         integer(kind=8), intent(in) :: step
@@ -1047,11 +1155,11 @@ contains
         if (step == 1) then
             par_pos(1) = 0.0d0*length_scale
             par_pos(2) = 0.0d0*length_scale
-            par_pos(3) = 1.0d0*length_scale 
+            par_pos(3) = 0.5d0*length_scale 
             par_vel = 0.0d0
             call Add_Particle(par_pos,par_vel,species_elec,step,1,-1)
             ! par_pos(1) = 3.0d0*length_scale
-            ! par_pos(2) = 3.0d0*length_scale
+            ! par_pos(2) = 0.0d0*length_scale
             ! par_pos(3) = 1.0d0*length_scale 
             ! par_vel = 0.0d0
             ! call Add_Particle(par_pos,par_vel,species_elec,step,1,-1)
@@ -1059,22 +1167,21 @@ contains
     end subroutine Place_Electron
 
     subroutine Write_Laplace_Data()
-        integer :: ud_lp_voltage, ud_lp_field, ud_ic_field, IFAIL, lvl, i, j, k
-        character(len=128) :: filename_lp_voltage, filename_lp_field, filename_ic_field
-        integer :: x, y
+        integer :: ud_lp_field, ud_ic_field, IFAIL, lvl, i, j, k
+        character(len=128) :: filename_lp_field, filename_ic_field
         double precision, dimension(3) :: ic_pos, ic_field
         
         do lvl=0,2
-            write(filename_lp_voltage, '(a15,i0,a4)') 'out/lp_voltage_',lvl,'.bin'
+            ! write(filename_lp_voltage, '(a15,i0,a4)') 'out/lp_voltage_',lvl,'.bin'
             write(filename_lp_field, '(a13,i0,a4)') 'out/lp_field_',lvl,'.bin'
             write(filename_ic_field, '(a13,i0,a4)') 'out/ic_field_',lvl,'.bin'
 
-            ! Open the voltage file
-            open(newunit=ud_lp_voltage, iostat=IFAIL, file=filename_lp_voltage, status='REPLACE', action='WRITE', access='STREAM')
-            if (IFAIL /= 0) then
-                print *, 'RUMDEED: Failed to open the laplace voltage file.'
-                return 
-            end if
+            ! ! Open the voltage file
+            ! open(newunit=ud_lp_voltage, iostat=IFAIL, file=filename_lp_voltage, status='REPLACE', action='WRITE', access='STREAM')
+            ! if (IFAIL /= 0) then
+            !     print *, 'RUMDEED: Failed to open the laplace voltage file.'
+            !     return 
+            ! end if
 
             ! Open the field file
             open(newunit=ud_lp_field, iostat=IFAIL, file=filename_lp_field, status='REPLACE', action='WRITE', access='STREAM')
@@ -1096,17 +1203,85 @@ contains
                     ic_pos = cart_coord(k)
                     ic_field = Calc_Field_at(ic_pos)
                     ! print *, 'Laplace: writing: x=',test_pos(1), ' y=',test_pos(2), ' z=',test_pos(3)
-                    write(unit=ud_lp_voltage,iostat=IFAIL) i, j, voltage(k), is_emitter(k)
+                    ! write(unit=ud_lp_voltage,iostat=IFAIL) i, j, voltage(k), is_emitter(k)
                     write(unit=ud_lp_field,iostat=IFAIL) i, j, laplace_field(k), is_emitter(k)
                     write(unit=ud_ic_field,iostat=IFAIL) i, j, ic_field(3), is_emitter(k)
                 end do
             end do
 
-            close(unit=ud_lp_voltage, iostat=IFAIL, status='keep')
+            ! close(unit=ud_lp_voltage, iostat=IFAIL, status='keep')
             close(unit=ud_lp_field, iostat=IFAIL, status='keep')
             close(unit=ud_ic_field, iostat=IFAIL, status='keep')
         end do
         
     end subroutine Write_Laplace_Data
+
+    function Calculate_Laplace_Field_at(pos)
+        double precision, dimension(3), intent(in) :: pos
+        double precision, dimension(3) :: Calculate_Laplace_Field_at
+        double precision, dimension(3) :: pos_bot1, pos_bot2, pos_bot3, pos_bot4, pos_top1, pos_top2, pos_top3, pos_top4
+        double precision, dimension(3) :: field_bot1, field_bot2, field_bot3, field_bot4, field_top1, field_top2, field_top3, field_top4
+        double precision, dimension(3) :: field_bot5, field_bot6, field_bot, field_top5, field_top6, field_top
+        integer(kind=8) :: i,k
+
+        if (is_inside(pos) == 0) then
+            Calculate_Laplace_Field_at = (/0.0d0,0.0d0,0.0d0/)
+            return
+        end if
+
+        ! i = disc_coord(pos(1), pos(2), pos(3))
+
+        ! pos_bot1 = cart_coord(k)
+        ! field_bot1 = laplace_field(k)
+        ! k = move(i,1,1)
+        ! pos_bot2 = cart_coord(k)
+        ! field_bot2 = laplace_field(k)
+        ! k = move(i,1,2)
+        ! pos_bot3 = cart_coord(k)
+        ! field_bot3 = laplace_field(k)
+        ! i = move(move(i,1,2),1,1)
+        ! pos_bot4 = cart_coord(k)
+        ! field_bot4 = laplace_field(k)
+
+        ! k = move(i,1,3)
+        ! pos_top1 = cart_coord(k)
+        ! field_top1 = laplace_field(k)
+        ! k = move(move(i,1,3),1,1)
+        ! pos_top2 = cart_coord(k)
+        ! field_top2 = laplace_field(k)
+        ! k = move(move(i,1,3),1,2)
+        ! pos_top3 = cart_coord(k)
+        ! field_top3 = laplace_field(k)
+        ! k = move(move(move(i,1,3),1,2),1,1)
+        ! pos_top4 = cart_coord(k)
+        ! field_top4 = laplace_field(k)
+
+        ! ! Bottom interpolation
+
+        ! field_bot5 = linear_interpolate_3d(pos_bot1(1),pos_bot2(1),pos(1),field_bot1,field_bot2)
+        ! field_bot6 = linear_interpolate_3d(pos_bot3(1),pos_bot4(1),pos(1),field_bot3,field_bot4)
+        ! field_bot = linear_interpolate_3d(pos_bot5(2),pos_bot6(2),pos(2),field_bot5,field_bot6)
+
+        ! ! Top interpolation
+        ! field_top5 = linear_interpolate_3d(pos_top1(1),pos_top2(1),pos(1),field_top1,field_top2)
+        ! field_top6 = linear_interpolate_3d(pos_top3(1),pos_top4(1),pos(1),field_top3,field_top4)
+        ! field_top = linear_interpolate_3d(pos_top5(2),pos_top6(2),pos(2),field_top5,field_top6)
+
+        ! ! Final interpolation
+        ! Calculate_Laplace_Field_at = linear_interpolate_3d(pos_bot(3),pos_top(3),pos(3),field_bot,field_top)
+
+    end function Calculate_Laplace_Field_at
+
+    function linear_interpolate_3d(x1,x2,xi,f1,f2)
+        double precision, intent(in) :: x1,x2,xi
+        double precision, dimension(3), intent(in) :: f1, f2
+        double precision, dimension(3) :: linear_interpolate_3d
+        integer(kind=8) :: i
+
+        do i=1,3
+            linear_interpolate_3d(i) = f1(i) + (f2(i)-f1(i))/(x2-x1)*(xi-x1)
+        end do
+
+    end function linear_interpolate_3d
 
 end module mod_laplace_solver
