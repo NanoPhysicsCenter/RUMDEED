@@ -88,8 +88,8 @@ contains
         ! iparm(11) = 1 ! Enable scaling
         ! iparm(24) = 1 ! Two-level parallel factorization
         ! iparm(31) = 0 ! perm(i) = 1 if b(i) is nonzero
-        ! iparm(35) = 0 ! one-based indexing
-        ! iparm(37) = 0 ! CSR format
+        iparm(35) = 0 ! one-based indexing
+        iparm(37) = 0 ! CSR format
         iparm(60) = 1 ! 0 = in-core-memory (fast); 1 = mix as necessary; 2 = out-of-core memory (slow)
 
         ! iparm(31) = 1 ! perm(i) = 1 if b(i) is nonzero
