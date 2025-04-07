@@ -128,7 +128,7 @@ program RUMDEED
 
     if (laplace .eqv. .true.) then
       print '(a)', 'RUMDEED: Using Laplace solver'
-      call Init_Laplace_Solver()
+      call Init_Laplace_Solver(nthreads)
     end if
 
     print '(a)', 'RUMDEED: Starting main loop'

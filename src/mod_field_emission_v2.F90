@@ -307,6 +307,7 @@ contains
     write (ud_field, "(i8, tr2, E16.8, tr2, E16.8, tr2, E16.8, tr2, E16.8, tr2, E16.8, tr2, E16.8, tr2, E16.8)", iostat=IFAIL) &
                                       step, F_avg(1), F_avg(2), F_avg(3), N_sup, df_avg, a_rate, MH_std
 
+    ! write (ud_field, "(i8, tr2, E16.8)", iostat=IFAIL) step, df_avg
     nrElecEmitAll = nrElecEmitAll + nrElecEmit
     !nrEmitted = nrEmitted + nrElecEmit
   end subroutine Do_Field_Emission_Planar_rectangle
@@ -794,6 +795,8 @@ end function Escape_Prob_log
      ! Write the output variables of the integration to a file
      write(ud_integrand, '(i3, tr2, i8, tr2, i8, tr2, i4, tr2, ES12.4, tr2, ES12.4, tr2, ES12.4)', iostat=IFAIL) &
                           & emit, nregions, neval, fail, integral(1), error(1), prob(1)
+
+      ! write (ud_field, "(E16.8)", iostat=IFAIL) F_avg(3)
   end subroutine Do_Cuba_Suave_FE
 
   ! ----------------------------------------------------------------------------
