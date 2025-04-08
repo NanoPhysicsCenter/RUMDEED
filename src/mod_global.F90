@@ -149,10 +149,6 @@ module mod_global
   double precision, allocatable, target, dimension(:, :) :: N2_tot_cross ! Total cross section of N2
   double precision, allocatable, target, dimension(:, :) :: N2_ion_cross ! Ioniaztion cross section of N2
 
-  ! Laplace
-  double precision, dimension(:), allocatable :: valA, b, iCharge, oCharge
-  integer, dimension(:), allocatable :: colA, rowA, linkA, gridPoints, gridPointsActive
-
 
   ! ----------------------------------------------------------------------------
   ! Define storage arrays for emitters

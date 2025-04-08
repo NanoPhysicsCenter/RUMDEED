@@ -12,7 +12,7 @@ module mod_laplace_solver
     use mod_pair
     use mkl_pardiso ! Required for pardiso solver
     use mkl_spblas  ! Required for sparse matrices
-    use iso_c_binding, only: c_int, c_ptr, c_f_pointer
+    ! use iso_c_binding, only: c_int, c_ptr, c_f_pointer
 
     implicit none
 
@@ -23,30 +23,49 @@ module mod_laplace_solver
     ! Pardiso variables
     type(MKL_PARDISO_HANDLE), dimension(64) :: pt
     integer(kind=8), dimension(64) :: iparm
-    integer(kind=8), allocatable, dimension(:) :: perm
-    integer(kind=8) :: maxfct=1, mnum=1, mtype=11, phase, n, nrhs=1
-    integer(kind=8) :: msglvl=0, error, analysis=11, factorization=22, solving=33, solving1=331, solving2=333
 
+    integer(kind=8), parameter :: maxfct=1, mnum=1, mtype=11, nrhs=1, msglvl=0
+    integer(kind=8), parameter :: analysis=11, factorization=22, solving=33, solving1=331, solving2=333
+
+    integer(kind=8) :: ndiff
+    integer(kind=8), allocatable, dimension(:) :: perm, permdiff
+
+    ! Matrix
+    double precision, allocatable, dimension(:) :: nnz_values
+    integer(kind=8), allocatable, dimension(:) :: nnz_col_index, nnz_ia, nnz_center
+    integer(kind=8) :: nnz
+
+    ! System
+    double precision, allocatable, dimension(:) :: b
+    double precision, allocatable, dimension(:) :: iCharge, oCharge
+
+    ! Solution
     double precision, allocatable, dimension(:) :: voltage, laplace_field, x
 
-    ! Matrix arrays
-    double precision, allocatable, dimension(:) :: values, iCharge, oCharge, b
-    integer(kind=8), allocatable, dimension(:) :: col_index
-
-    double precision, allocatable, dimension(:) :: nnz_values
-    integer(kind=8), allocatable, dimension(:) :: nnz_col_index, nnz_ia
-
-    ! System parameters
+    ! Discretization
+    integer(kind=8), allocatable, dimension(:) :: gridPoints, gridPointsActive
     double precision :: hx, hy, hz, emitter_radius
     double precision, dimension(3) :: div_h2, div_h3
     double precision, dimension(2) :: lim_x, lim_y, lim_z
-    integer(kind=8) :: Nx, Ny, Nz, nrGrid, nrGridActive, NxNy, n7, n19, nnz
+    integer(kind=8) :: Nx, Ny, Nz, nrGrid, nrGridActive, NxNy
 
 contains
 
-! -----------------------------------------------------------------------------
-! ----- Solver ----------------------------------------------------------------
-! -----------------------------------------------------------------------------
+    subroutine Init_Laplace_Solver() ! DONE
+        ! Initialize environment based on input file
+
+        print *, 'Laplace: initializing grid'
+        call init_grid()
+
+        print *, 'Laplace: initializing matrix'
+        call init_matrix()
+
+        print *, 'Laplace: initializing pardiso'
+        call init_pardiso()
+
+        ! call write_grid()
+
+    end subroutine Init_Laplace_Solver
 
     subroutine Calculate_Laplace_Field(step) ! TODO
         integer(kind=8), intent(in) :: step
@@ -56,7 +75,7 @@ contains
         print *, 'Laplace: updating matrix'
         call update_matrix()
         print *, 'Laplace: solving matrix'
-        call solve_matrix()
+        call solve_system()
         print *, 'Laplace: allocate voltage'
         call allocate_voltage()
         print *, 'Laplace: calculating field'
@@ -67,129 +86,356 @@ contains
         
     end subroutine Calculate_Laplace_Field
 
-    subroutine solve_matrix() ! TODO
+! ------------------------------------------------------------------------------
+! ----- Solution ---------------------------------------------------------------
+! ------------------------------------------------------------------------------
+
+    subroutine solve_system() ! TODO
         ! Solve the system
-        integer :: i
-        ! double precision, dimension(nrGridActive) :: ddum
+        integer(kind=8) :: i
+        double precision :: start, end
 
-        print *, '  Laplace: solve_matrix: start'
+        if (allocated(laplace_field)) then
+            deallocate(laplace_field)
+        end if
+
+        ! if (ndiff /= 0) then ! only update LU if matrix changed
+        !     if (2*ndiff < nnz) then
+        !         iparm(4) = 11
+        !         ! iparm(11) = 0
+        !         ! iparm(13) = 0
+        !         iparm(39) = 0 ! 0 = full factorization; 1 = low-rank update
+        !         print *, 'Laplace: doing low-rank update'
+        !     else
+        !         iparm(39) = 0
+        !         print *, 'Laplace: doing full factorization'
+        !     end if
+        !     ! call symbolic_factorization()
+        !     call numerical_factorization()
+        !     ! print *, 'Laplace: numerical factorization error', iparm(20)
+        ! end if
+
+        ! iparm(4) = 31
+        ! iparm(5) = 1
+        ! iparm(39) = 1
+        ! call cpu_time(start)
+        call symbolic_factorization()
+        call numerical_factorization()
+        call solution()
+        ! call cpu_time(end)
+
+        ! print *, 'Laplace: iterative solving time:', end-start
+
+        ! print*, 'Laplace: solve_system', iparm(20)
+
+    end subroutine solve_system
+
+! -------------------------------------------------------------------------------------------------------------
+! ----- Initialization ----------------------------------------------------------------------------------------
+! -------------------------------------------------------------------------------------------------------------
+
+    subroutine init_grid() ! DONE
+        ! Initialize parameters and store points that are outside of the emitter or one layer within it
+        integer(kind=8) :: i, a
+        integer(kind=8), dimension(3) :: boundaries
+        double precision :: Lx, Ly, Lz
+
+        Nx = laplace_intervals(1); Ny = laplace_intervals(2); Nz = laplace_intervals(3)
+
+        Lx = laplace_dim(1); Ly = laplace_dim(2); Lz = laplace_dim(3)
+
+        NxNy = Nx*Ny
+
+        nrGrid = Nx*Ny*Nz
+
+        hx = Lx / (Nx-1)
+        hy = Ly / (Ny-1)
+        hz = Lz / (Nz-1)
+
+        div_h2 = (/1.0d0 / (hx**2), 1.0d0 / (hy**2), 1.0d0 / (hz**2)/)
+        div_h3 = (/1.0d0 / (hx**3), 1.0d0 / (hy**3), 1.0d0 / (hz**3)/)
+
+        lim_x = (/laplace_pos(1), laplace_pos(1)+Lx/)
+        lim_y = (/laplace_pos(2), laplace_pos(2)+Ly/)
+        lim_z = (/laplace_pos(3), laplace_pos(3)+Lz/)
+
+        emitter_radius = emitters_dim(1,1)
+
+        allocate(gridPoints(nrGrid), gridPointsActive(nrGrid))
+
+        nrGridActive = 0
+        nnz = 0
+
+        do i=1,nrGrid
+            if (is_emitter(i) == 1) then
+                if (is_first_layer(i) == 1) then
+                    nrGridActive = nrGridActive + 1
+                    gridPointsActive(nrGridActive) = i
+                    gridPoints(i) = nrGridActive
+
+                    nnz = nnz + 1
+                else
+                    gridPoints(i) = 0
+                end if
+            else
+                nrGridActive = nrGridActive + 1
+                gridPointsActive(nrGridActive) = i
+                gridPoints(i) = nrGridActive
+
+                boundaries = is_boundary(i)
+
+                nnz = nnz+1
+
+                do a=1,3
+                    select case (boundaries(a))
+                        case (0)
+                            nnz = nnz+2
+                        case (1)
+                            nnz = nnz+3
+                        case (2)
+                            nnz = nnz+3
+                    end select
+                end do
+            end if
+        end do
+
+        allocate(oCharge(nrGridActive), x(nrGridActive))
+
+    end subroutine init_grid
+
+    subroutine init_matrix() ! DONE
+        ! Initialize matrix without boundary conditions
+        integer(kind=8) :: g, i, a, center, next_center
+        integer(kind=8), dimension(3) :: boundaries
+        integer(kind=8), dimension(3,3) :: indices
+        integer(kind=8) :: next, next_next, next_next_next, prev, prev_prev, prev_prev_prev
+
+        allocate(nnz_values(nnz), nnz_col_index(nnz), nnz_ia(nrGridActive+1))
+        allocate(b(nrGridActive), nnz_center(nrGridActive))
+
+        nnz_values = nnz_values*0.0d0
+        b = b*0.0d0
+
+        center = 1
+
+        do g=1,nrGridActive
+
+            i = gridPointsActive(g)
+
+            if (is_emitter(i) == 1) then
+
+                ! Place the center
+                nnz_center(g) = center
+                next_center = center + 1
+
+                ! Place the column indices
+                nnz_ia(g) = center
+                nnz_col_index(center) = g
+
+                ! Place the values
+                call insert_emitter_boundary(g)
+
+            else
+
+                boundaries = is_boundary(i)
+
+                ! Place the center
+                do a=1,3
+                    select case (boundaries(a))
+                        case (0)
+                            center = center + 1 ! make space for one to the left
+                        case (1)
+                            center = center ! do nothing
+                        case (2)
+                            center = center + 3 ! make space for three to the left
+                    end select
+                end do
+                nnz_center(g) = center
+                next_center = center + 1
+                nnz_ia(g) = center
+
+                ! Place the column indices
+                nnz_col_index(center) = g
+
+                call get_finite_indices(g,indices)
+            
+                do a=1,3
+                    select case (boundaries(a))
+                        case (0)
+                            prev = indices(a,1)
+                            next = indices(a,3)
+
+                            nnz_col_index(prev) = move(g,-1,a)
+                            nnz_col_index(next) = move(g,1,a)
+
+                            next_center = next + 1
+                            nnz_ia(g) = prev
+                        case (1)
+                            next = indices(a,1)
+                            next_next = indices(a,2)
+                            next_next_next = indices(a,3)
+
+                            nnz_col_index(next) = move(g,1,a)
+                            nnz_col_index(next_next) = move(g,2,a)
+                            nnz_col_index(next_next_next) = move(g,3,a)
+
+                            next_center = next_next_next + 1
+                        case (2)
+                            prev = indices(a,3)
+                            prev_prev = indices(a,2)
+                            prev_prev_prev = indices(a,1)
+
+                            nnz_col_index(prev) = move(g,-1,a)
+                            nnz_col_index(prev_prev) = move(g,-2,a)
+                            nnz_col_index(prev_prev_prev) = move(g,-3,a)      
+                            
+                            nnz_ia(g) = prev_prev_prev
+                    end select
+                end do
+
+                ! Place the values
+                call insert_finite_difference(g)
+            end if
+
+            center = next_center
+
+        end do
+
+        nnz_ia(nrGridActive+1) = nnz+1
+    end subroutine init_matrix
+
+    subroutine init_pardiso() ! DONE
+        double precision :: start, end
+
+        ! Initialize pardiso solver and do analysis, symbolic factorization, and numerical factorization
+        call pardisoinit(pt,mtype,iparm)
         ! Solver parameters
-        ! iparm(2) = 3 ! parallel nested dissection algorithm
-        ! iparm(24) = 1 ! 10 = parallel factorization
-        ! iparm(25) = 0 ! 2 = parallel solve; must be coupled with iparm(60)=0
-        ! iparm(31) = 1 ! 0 = use all rhs; 2 = use sparsity of rhs
-        ! iparm(35) = 0 ! one-based indexing (required)
-        ! iparm(37) = 0 ! CSR format (required)
-        ! iparm(60) = 1 ! 0 = in-core-memory (fast); 1 = mix as necessary; 2 = out-of-core memory (slow)
+        iparm(1) = 1 ! use user-defined parameters
+        iparm(2) = 3 ! 1 = minimum degree algorithm, 2 = metis, 3 = parallel metis
+        ! iparm(3) = 0 ! reserved
+        iparm(4) = 0 ! >0 = preconditioned CGS
+        iparm(5) = 0 ! 0 = ignored; 1 = user supplied fill-in permutation; 2 = returns permutation
+        iparm(6) = 0 ! 0 = write solution on x; 1 = write solution on b
+        ! iparm(7) = 0 ! output number of iterative refinement steps
+        ! iparm(8) = 100 ! maximum number of iterative refinement steps
+        ! iparm(9) = 6 ! tolerance = 10^(-iparm(9))	
+        iparm(10) = 13 ! pivoting perturbation: 13 = 10^-13; 8 = 10^-8
+        iparm(11) = 1 ! 0 = no scaling; 1 = scaling
+        iparm(12) = 0 ! 0 = solve linear system; 1 = solve conjugate transposed system, 2 = solve transposed system
+        iparm(13) = 1 ! 0 = no weighted matching; 1 = weighted matching
+        ! iparm(14) = 0 ! output number of perturbed pivots
+        ! iparm(15) = 0 ! output peak memory on symbolic factorization
+        ! iparm(16) = 0 ! output permanent memory on symbolic factorization
+        ! iparm(17) = 0 ! output size of factors on numerical factorization and solving
+        ! iparm(18) = 0 ! output number of non-zero elements in the factors
+        ! iparm(19) = 0 ! output number of floating point operations in factorization
+        ! iparm(20) = 0 ! output cgs diagnostics
+        iparm(21) = 0 ! 0 = 1x1 diagonal pivoting; 1 = 1x1 and 2x2 pivoting
+        ! iparm(22) = 0 ! output
+        ! iparm(23) = 0 ! output
+        iparm(24) = 0 ! 0 = classic factorization algorithm; 1 = two-level factorization; 10 = improved two-level factorization
+        iparm(25) = 0 ! 0 = parallel forward/backward solve; 1 = sequential forward/backward solve
+        ! iparm(26) = 0 ! reserved
+        iparm(27) = 1 ! 0 = check matrix off; 1 = check matrix on
+        iparm(28) = 0 ! 0 = double precision; 1 = single precision
+        ! iparm(29) = 0 ! reserved
+        ! iparm(30) = 0 ! output
+        iparm(31) = 0 ! 0 = no partial solve
+        ! iparm(32) = 0 ! reserved
+        ! iparm(33) = 0 ! reserved
+        ! iparm(34) = 0 ! 0 = CNR mode and oneapi determines optimal number of threads; 1 = CNR mode and user determines number of threads; 2 = CNR mode and user determines number of threads; 3 = CNR mode and user determines number of threads
+        iparm(35) = 0 ! 0 = one-based indexing; 1 = zero-based indexing
+        iparm(36) = 0 ! 0 = not compute shur; 1 = compute shur
+        iparm(37) = 0 ! 0 = CSR format; 1 = BSR format
+        ! iparm(38) = 0 ! reserved
+        iparm(39) = 0 ! 0 = full factorization; 1 = low-rank update
+        ! iparm(40) = 0 ! reserved
+        ! iparm(41) = 0 ! reserved
+        ! iparm(42) = 0 ! reserved
+        ! iparm(43) = 0 ! 0 = do not compute diagonal inverse; 1 = compute diagonal inverse
+        ! iparm(44) = 0 ! reserved
+        ! iparm(45) = 0 ! reserved
+        ! iparm(46) = 0 ! reserved
+        ! iparm(47) = 0 ! reserved
+        ! iparm(48) = 0 ! reserved
+        ! iparm(49) = 0 ! reserved
+        ! iparm(50) = 0 ! reserved
+        ! iparm(51) = 0 ! reserved
+        ! iparm(52) = 0 ! reserved
+        ! iparm(53) = 0 ! reserved
+        ! iparm(54) = 0 ! reserved
+        ! iparm(55) = 0 ! reserved
+        iparm(56) = 0 ! 0 = internal function used to work with pivot; 1 = use mkl_pardiso_pivot callback routine
+        ! iparm(57) = 0 ! reserved
+        ! iparm(58) = 0 ! reserved
+        ! iparm(59) = 0 ! reserved
+        iparm(60) = 0 ! 0 = in-core-memory; 1 = mix; 2 = out-of-core memory
+        ! iparm(61) = 0 ! reserved
+        ! iparm(62) = 0 ! reserved
+        ! iparm(63) = 0 ! size of the minimum OOC memory for numerical factorization
+        ! iparm(64) = 0 ! reserved
 
-        ! iparm(1) = 1 ! Use customized iparm
-        ! iparm(2) = 3 ! Use parallel METIS algorithm
-        ! iparm(10) = 13 ! Perturb pivots
-        ! iparm(11) = 1 ! Enable scaling
-        ! iparm(24) = 1 ! Two-level parallel factorization
-        ! iparm(31) = 0 ! perm(i) = 1 if b(i) is nonzero
-        iparm(35) = 0 ! one-based indexing
-        iparm(37) = 0 ! CSR format
-        iparm(60) = 1 ! 0 = in-core-memory (fast); 1 = mix as necessary; 2 = out-of-core memory (slow)
+        allocate(perm(nrGridActive))
 
-        ! iparm(31) = 1 ! perm(i) = 1 if b(i) is nonzero
-        ! iparm(35) = 0 ! one-based indexing
-        ! iparm(37) = 0 ! CSR format
-        ! iparm(60) = 1 ! 0 = in-core-memory; 1 = mix as necessary; 2 = out-of-core memory
+        ! call cpu_time(start)
+        call symbolic_factorization()
+        call numerical_factorization()
+        call solution()
+        ! call cpu_time(end)
 
+        ! print *, 'Laplace: pardiso initialization time:', end-start
 
-        print *, '  Laplace: allocating reduced CSR memory'
-        deallocate(laplace_field)
-        allocate(nnz_values(nnz), nnz_col_index(nnz), nnz_ia(nrGridActive+1), x(nrGridActive))
-        print *, '  Laplace: allocating reduced CSR memory successful'
-        print *, '  Laplace: reducing matrix'
-        call reduce_matrix()
-        print *, '  Laplace: reducing matrix successful'
+        ! deallocate(perm)
 
-        ! print *, '  Laplace: solve_matrix: nnz=',nnz
-        ! print *, '  Laplace: solve_matrix: size(nnz_values)=',size(nnz_values)
-        ! print *, '  Laplace: solve_matrix: size(nnz_col_index)=',size(nnz_col_index)
-        ! print *, '  Laplace: solve_matrix: size(nnz_ia)=',size(nnz_ia)
+        
+    end subroutine init_pardiso
 
+    subroutine symbolic_factorization()
+        double precision, dimension(nrGridActive) :: ddum
+        integer(kind=8) :: error, phase
 
-        ! call check_matrix()
-
-
-        ! Analysis ----------------------------
-        print *, '  Laplace: solve_matrix: analysis and symbolic factorization'
         phase = analysis  
-        iparm(27) = 1 ! Check matrix on for analysis
-        call pardiso_64(pt,maxfct,mnum,mtype,phase,n,nnz_values,nnz_ia,nnz_col_index,perm,nrhs,iparm,msglvl,b,x,error)
-        iparm(27) = 0 ! Check matrix off for factorization and solving
-        if (error == 0) then
-            print *, '  Laplace: solve_matrix: analysis and symbolic factorization successful'
-        else
-            print *, '  Laplace: solve_matrix: analysis and symbolic factorization with error code ', error
-        end if
-        print *, '  Laplace: solve_matrix:', iparm(17)*1e-6, 'Gb needed for numerical factorization'
 
-        ! Factorization ----------------------------
-        print *, '  Laplace: solve_matrix: numerical factorization'
+        ! print *, '  Laplace: analysis and symbolic factorization'
+        call pardiso_64(pt,maxfct,mnum,mtype,phase,nrGridActive,nnz_values,nnz_ia,nnz_col_index,perm,nrhs,iparm,msglvl,ddum,ddum,error)
+        if (error == 0) then
+            ! print *, '  Laplace: analysis and symbolic factorization successful'
+        else
+            print *, '  Laplace: analysis and symbolic factorization with error code ', error
+        end if
+        ! print *, '  Laplace:', iparm(17)*1e-6, 'Gb needed for numerical factorization'
+
+    end subroutine symbolic_factorization
+
+    subroutine numerical_factorization()
+        double precision, dimension(nrGridActive) :: ddum
+        integer(kind=8) :: error, phase
+
         phase = factorization     
-        call pardiso_64(pt,maxfct,mnum,mtype,phase,n,nnz_values,nnz_ia,nnz_col_index,perm,nrhs,iparm,msglvl,b,x,error)
+
+        ! print *, '  Laplace: numerical factorization'
+        call pardiso_64(pt,maxfct,mnum,mtype,phase,nrGridActive,nnz_values,nnz_ia,nnz_col_index,perm,nrhs,iparm,msglvl,ddum,ddum,error)
         if (error == 0) then
-            print *, '  Laplace: solve_matrix: numerical factorization successful'
+            ! print *, '  Laplace: numerical factorization successful'
         else
-            print *, '  Laplace: solve_matrix: numerical factorization failed with error code ', error
+            print *, '  Laplace: numerical factorization failed with error code ', error
         end if
 
-        ! Solving ----------------------------
-        if (solving /= 0) then
-            print *, '  Laplace: solve_matrix: solving'
-            phase = solving    
-            call pardiso_64(pt,maxfct,mnum,mtype,phase,nrGridActive,nnz_values,nnz_ia,nnz_col_index,perm,nrhs,iparm,msglvl,b,x,error)
-            if (error == 0) then
-                print *, '  Laplace: solve_matrix: solving successful'
-            else
-                print *, '  Laplace: solve_matrix: solving failed with error code ', error
-            end if
-        else
-            print *, '  Laplace: solve_matrix: forward substitution'
-            phase = solving1    
-            call pardiso_64(pt,maxfct,mnum,mtype,phase,nrGridActive,nnz_values,nnz_ia,nnz_col_index,perm,nrhs,iparm,msglvl,b,x,error)
-            if (error == 0) then
-                print *, '  Laplace: solve_matrix: forward substitution successful'
-            else
-                print *, '  Laplace: solve_matrix: forward substitution failed with error code ', error
-            end if
+    end subroutine numerical_factorization
 
-            print *, '  Laplace: solve_matrix: backward substitution'
-            phase = solving2
-            call pardiso_64(pt,maxfct,mnum,mtype,phase,nrGridActive,nnz_values,nnz_ia,nnz_col_index,perm,nrhs,iparm,msglvl,b,x,error)
-            if (error == 0) then
-                print *, '  Laplace: solve_matrix: backward substitution successful'
-            else
-                print *, '  Laplace: solve_matrix: backward substitution failed with error code ', error
-            end if
-        end if
+    subroutine solution()
+        integer(kind=8) :: error, phase
 
-        if (norm2(x)==0.0d0) then
-            print *, 'Laplace: solve_matrix: x is zero'
-        end if
-        if (norm2(b)==0.0d0) then
-            print *, 'Laplace: solve_matrix: b is zero'
-        end if
+        phase = solving
 
-        ! Clear memory ----------------------------
-        print *, '  Laplace: solve_matrix: clearing memory'
-        phase = -1
-        call pardiso_64(pt,maxfct,mnum,mtype,phase,n,nnz_values,nnz_ia,nnz_col_index,perm,nrhs,iparm,msglvl,b,x,error)
+        ! print *, '  Laplace: solve_matrix: solving'
+        call pardiso_64(pt,maxfct,mnum,mtype,phase,nrGridActive,nnz_values,nnz_ia,nnz_col_index,perm,nrhs,iparm,msglvl,b,x,error)
         if (error == 0) then
-            print *, '  Laplace: solve_matrix: clearing memory successful'
+            ! print *, '  Laplace: solve_matrix: solving successful'
         else
-            print *, '  Laplace: solve_matrix: clearing memory failed with error code ', error
+            print *, '  Laplace: solve_matrix: solving failed with error code ', error
         end if
-
-        ! Deallocate the reduced CSR matrix
-        deallocate(nnz_values)
-        deallocate(nnz_ia)
-        deallocate(nnz_col_index) 
-    end subroutine solve_matrix
+    end subroutine solution
 
 ! -------------------------------------------------------------------------------------------------------------
 ! ----- Voltage and field calculations ------------------------------------------------------------------------
@@ -198,11 +444,13 @@ contains
     subroutine allocate_voltage() ! DONE & PARALLEL
         integer(kind=8) :: i, g
 
+        allocate(voltage(nrGrid))
+
         voltage = 0.0d0
 
-        !$OMP PARALLEL DO DEFAULT(NONE) &
-        !$OMP& SHARED(nrGrid, voltage, x, gridPoints) &
-        !$OMP& PRIVATE(i, g)
+        ! $OMP PARALLEL DO DEFAULT(NONE) &
+        ! $OMP& SHARED(nrGrid, voltage, x, gridPoints) &
+        ! $OMP& PRIVATE(i, g)
 
         do i=1,nrGrid
             if (gridPoints(i) /= 0) then
@@ -211,10 +459,8 @@ contains
             end if
         end do
 
-        !$OMP END PARALLEL DO
+        ! $OMP END PARALLEL DO
 
-        ! Deallocate the solution vector
-        deallocate(x)
     end subroutine allocate_voltage
 
     subroutine calculate_field() ! DONE & PARALLEL
@@ -225,9 +471,9 @@ contains
 
         laplace_field = 0.0d0
 
-        !$OMP PARALLEL DO DEFAULT(NONE) &
-        !$OMP& SHARED(nrGrid, voltage, laplace_field) &
-        !$OMP& PRIVATE(i, boundaries, boundary)
+        ! $OMP PARALLEL DO DEFAULT(NONE) &
+        ! $OMP& SHARED(nrGrid, voltage, laplace_field) &
+        ! $OMP& PRIVATE(i, boundaries, boundary)
 
         do i=1,nrGrid
             boundaries = is_boundary(i)
@@ -243,7 +489,7 @@ contains
             end select
         end do
 
-        !$OMP END PARALLEL DO
+        ! $OMP END PARALLEL DO
 
         ! Deallocate the voltage vector
         deallocate(voltage)
@@ -257,10 +503,10 @@ contains
         sum = 0.0d0
         num = 0
 
-        !$OMP PARALLEL DO DEFAULT(NONE) &
-        !$OMP& SHARED(Nx, Ny, laplace_field) &
-        !$OMP& PRIVATE(i, j, k) &
-        !$OMP& REDUCTION(+:sum, num)
+        ! $OMP PARALLEL DO DEFAULT(NONE) &
+        ! $OMP& SHARED(Nx, Ny, laplace_field) &
+        ! $OMP& PRIVATE(i, j, k) &
+        ! $OMP& REDUCTION(+:sum, num)
 
         do i=0,Nx-1
             do j=0,Ny-1
@@ -270,7 +516,7 @@ contains
             end do
         end do
 
-        !$OMP END PARALLEL DO
+        ! $OMP END PARALLEL DO
 
         if (num > 0) then
             average_field = sum / num
@@ -296,287 +542,117 @@ contains
         end do
     end subroutine write_grid
 
-! -----------------------------------------------------------------------------
-! ----- Initialization --------------------------------------------------------
-! -----------------------------------------------------------------------------
-
-    subroutine Init_Laplace_Solver(nthreads) ! DONE
-        ! Initialize environment based on input file
-        double precision :: Lx, Ly, Lz
-        integer(kind=8), intent(in) :: nthreads
-
-        ! print *, 'Laplace: initializing solver'
-
-        Nx = laplace_intervals(1); Ny = laplace_intervals(2); Nz = laplace_intervals(3)
-        Lx = laplace_dim(1); Ly = laplace_dim(2); Lz = laplace_dim(3)
-        ! print *, '  Nx=',Nx,'   Ny=',Ny,'   Nz=',Nz
-
-        NxNy = Nx*Ny
-        nrGrid = Nx * Ny * Nz
-        nrGridActive = 0
-
-
-        hx = Lx / (Nx-1)
-        hy = Ly / (Ny-1)
-        hz = Lz / (Nz-1)
-        div_h2 = (/1.0d0 / (hx**2), 1.0d0 / (hy**2), 1.0d0 / (hz**2)/)
-        div_h3 = (/1.0d0 / (hx**3), 1.0d0 / (hy**3), 1.0d0 / (hz**3)/)
-
-        lim_x = (/laplace_pos(1), laplace_pos(1)+Lx/)
-        lim_y = (/laplace_pos(2), laplace_pos(2)+Ly/)
-        lim_z = (/laplace_pos(3), laplace_pos(3)+Lz/)
-
-
-        emitter_radius = emitters_dim(1,1)
-
-        allocate(gridPoints(nrGrid), gridPointsActive(nrGrid))
-        print *, 'Laplace: initializing gridpoints'
-        call init_grid()
-
-        n = nrGridActive
-        n7 = 7*nrGridActive
-        n19 = 19*nrGridActive
-
-        print *, 'Laplace: allocating arrays'
-        allocate(values(n19), col_index(n19), b(nrGridActive), oCharge(nrGridActive))
-        allocate(voltage(nrGrid), laplace_field(nrGrid))
-        allocate(perm(nrGridActive))
-
-        print *, 'Laplace: initializing matrix'
-        call init_matrix()
-
-        print *, 'Laplace: initializing Pardiso'
-        call init_pardiso(nthreads)
-
-        call write_grid()
-        
-    end subroutine Init_Laplace_Solver
-
-    subroutine init_pardiso(nthreads) ! DONE
-        integer(kind=8), intent(in) :: nthreads
-        ! call mkl_set_num_threads(nthreads)
-        call pardisoinit(pt,mtype,iparm)
-    end subroutine init_pardiso
-
-    subroutine init_grid() ! DONE
-        ! Store points that are outside of the emitter or one layer within it
-        integer(kind=8) :: i
-
-
-        do i=1,nrGrid
-            ! print *, 'Laplace: gridpoint nr', i
-            ! print *, '      coord=', cart_coord(i)
-            if (is_emitter(i) == 1) then
-                ! print *, '  it is emitter'
-                if (is_first_layer(i) == 1) then
-                    ! print *, '      it is first_layer'
-                    nrGridActive = nrGridActive + 1
-                    gridPointsActive(nrGridActive) = i
-                    gridPoints(i) = nrGridActive
-                else
-                    ! print *, 'Laplace: checking not first layer'
-                    gridPoints(i) = 0
-                end if
-            else
-                ! print *, '  it is not emitter'
-                ! print *, 'Laplace: checking not emitter'
-                ! print *, 'Laplace: updating nrGridActive'
-                nrGridActive = nrGridActive + 1
-                ! print *, 'Laplace: updating gridPointsActive at i=',nrGridActive
-                gridPointsActive(nrGridActive) = i
-                ! print *, 'Laplace: updating gridPoints at i=', i
-                gridPoints(i) = nrGridActive
-            end if
-        end do
-
-    end subroutine init_grid
-
-    subroutine init_matrix() ! DONE
-        ! Initialize matrix without boundary conditions
-        integer(kind=8) :: g, i, a, center
+    subroutine get_finite_indices(g,indices)
+        integer(kind=8), intent(in) :: g
+        integer(kind=8), dimension(3,3), intent(out) :: indices
+        integer(kind=8) :: i, a, center, start, end
         integer(kind=8), dimension(3) :: boundaries
-        integer(kind=8) :: next, next_next, next_next_next, prev, prev_prev, prev_prev_prev
 
-        values = values*0.0d0
-        b = b*0.0d0
-        ocharge = 0.0d0
-        icharge = 0.0d0
+        i = gridPointsActive(g)
+        boundaries = is_boundary(i)
+        center = nnz_center(g)
 
-        center = 10
+        start = center
+        end = center
 
-        do g=1,nrGridActive
-
-            col_index(center) = g
-            do a=1,3
-                next = center + (a-1)*3 + 1
-                next_next = next + 1
-                next_next_next = next + 2
-
-                prev = center - (a-1)*3 - 1
-                prev_prev = prev - 1
-                prev_prev_prev = prev - 2
-
-                col_index(prev_prev_prev) = move(g,-3,a)
-                col_index(prev_prev) = move(g,-2,a)
-                col_index(prev) = move(g,-1,a)
-                col_index(next) = move(g,1,a)
-                col_index(next_next) = move(g,2,a)
-                col_index(next_next_next) = move(g,3,a)
-            end do
-
-            ! rows_start(g) = g
-            ! rows_end(g) = g
-
-            i = gridPointsActive(g)
-            
-            if (is_emitter(i) == 1) then
-                call insert_emitter_boundary(g)
-            else
-                call insert_finite_difference(g)
-            end if
-
-            center = center+19
-
+        do a=1,3
+            select case (boundaries(a))
+                case (0)
+                    start = start - 1
+                    end = end + 1
+                    indices(a,1) = start
+                    indices(a,3) = end
+                case (1)
+                    end = end + 1
+                    indices(a,1) = end
+                    end = end + 1
+                    indices(a,2) = end
+                    end = end + 1
+                    indices(a,3) = end
+                case (2)
+                    start = start - 1
+                    indices(a,3) = start
+                    start = start - 1
+                    indices(a,2) = start
+                    start = start - 1
+                    indices(a,1) = start
+            end select
         end do
-    end subroutine init_matrix
+
+    end subroutine
 
 ! -----------------------------------------------------------------------------
 ! ----- Matrix operations -----------------------------------------------------
 ! -----------------------------------------------------------------------------
 
-    subroutine update_matrix() ! DONE & PARALLEL
-        ! Update boundary conditions in matrix
+    subroutine update_matrix()
         integer(kind=8) :: g
 
-        !$OMP PARALLEL DO DEFAULT(NONE) &
-        !$OMP& SHARED(nrGridActive, iCharge, oCharge) &
-        !$OMP& PRIVATE(g)
+        ! allocate(permdiff(nrGridActive*9))
+        ! ndiff = 0
 
         do g=1,nrGridActive
-            if (oCharge(g) /= 0.0d0) then
-
-                call remove_electron_boundary(g)
-
+            if (oCharge(g) /= iCharge(g)) then
                 if (iCharge(g) == 0.0d0) then
+                    call remove_electron_boundary(g)
                     call insert_finite_difference(g)
-                end if
-
-                oCharge(g) = 0.0d0
-            else
-                if (iCharge(g) /= 0.0d0) then
+                else if (oCharge(g) == 0.0d0) then
                     call remove_finite_difference(g)
+                    call insert_electron_boundary(g)
+                else
+                    call remove_electron_boundary(g)
+                    call insert_electron_boundary(g)
+                    if (allocated(permdiff)) then
+                        ndiff = ndiff + 1
+                        permdiff((ndiff-1)*2+1) = g
+                        permdiff((ndiff-1)*2+2) = g
+                    end if
                 end if
-            end if
 
-            if (iCharge(g) /= 0.0d0) then
-                call insert_electron_boundary(g)
                 oCharge(g) = iCharge(g)
             end if
         end do
 
-        !$OMP END PARALLEL DO
+        ! print *, 'Laplace: number of changes:', ndiff
 
-        ! iCharge has been written in oCharge and is no longer needed
         deallocate(iCharge)
+
+        ! allocate(perm(1+2*ndiff))
+        ! call reduce_perm()
+        ! deallocate(permdiff)
+
+        ! print *, 'Laplace: perm:', perm(2:ndiff*2+1)
+
     end subroutine update_matrix
-
-    subroutine reduce_matrix()
-        integer(kind=8) :: g, j, index
-        integer(kind=8) :: cur_ind, cur_col
-        logical :: start
-
-        ! nnz_rows_start = [rows_start, nnz]
-        ! nnz_rows_end = [rows_end, nnz]
-
-        index = 0
-        cur_ind = 0
-
-        ! $OMP PARALLEL DO DEFAULT(NONE) &
-        ! $OMP& SHARED(nrGridActive, values, col_index, nnz_values, nnz_col_index, nnz_ia, nnz_rows_start, nnz_rows_end) &
-        ! $OMP& PRIVATE(g, j, cur_col, start) &
-        ! $OMP& REDUCTION(+:index, cur_ind)
-
-        do g=1,nrGridActive
-            start = .true.
-
-            ! if (g>100 .and. g<=200) then
-            !     print *, 'Laplace: reduce_matrix: g=',g
-            ! end if
-            do j=1,19
-                cur_ind = cur_ind + 1
-                cur_col = col_index(cur_ind)
-                ! if (g>100 .and. g<=200) then
-                !     print *, '  	values(cur_ind)=',values(cur_ind), ' cur_col=',cur_col, ' index=',index+1
-                ! end if
-                if ((values(cur_ind) < 0.0d0) .or. (values(cur_ind) > 0.0d0)) then
-                    index = index+1
-                    nnz_values(index) = values(cur_ind)
-                    nnz_col_index(index) = cur_col
-
-                    if (start .eqv. .true.) then
-                        nnz_ia(g) = index
-                        start = .false.
-                    end if
-                    
-                    ! if (cur_col < nnz_rows_start(g)) then
-                    !     nnz_rows_start(g) = cur_col
-                    ! end if
-                    ! if (cur_col > nnz_rows_end(g)) then
-                    !     nnz_rows_end(g) = cur_col
-                    ! end if
-                end if
-            end do
-            ! if (g>100 .and. g<=200) then
-            !     print *, '   nnz_ia(g)=', nnz_ia(g)
-            ! end if
-        end do
-
-        ! $OMP END PARALLEL DO
-
-        nnz_ia(nrGridActive+1) = nnz
-
-
-    end subroutine reduce_matrix
 
     subroutine insert_electron_boundary(g)
         integer(kind=8), intent(in) :: g
         integer(kind=8) :: center
 
-        center = (g-1)*19 + 10
+        center = nnz_center(g)
 
-        values(center) = 1.0d0
+        nnz_values(center) = 1.0d0
         b(g) = iCharge(g)
-        perm(g) = 1
-
-        nnz = nnz + 1
     end subroutine insert_electron_boundary
 
     subroutine remove_electron_boundary(g)
         integer(kind=8), intent(in) :: g
         integer(kind=8) :: center
 
-        center = (g-1)*19 + 10
+        center = nnz_center(g)
 
-        if (values(center) /= 0.0d0) then
-            values(center) = 0.0d0
-            nnz = nnz - 1
-        end if
-
+        nnz_values(center) = 0.0d0
         b(g) = 0.0d0
-        perm(g) = 0
     end subroutine remove_electron_boundary
 
     subroutine insert_emitter_boundary(g)
         integer(kind=8), intent(in) :: g
         integer(kind=8) :: center
 
-        center = (g-1)*19 + 10
+        center = nnz_center(g)
 
-        values(center) = 1.0d0
+        nnz_values(center) = 1.0d0
         b(g) = 0.0d0
-        perm(g) = 0
-
-        nnz = nnz + 1
     end subroutine insert_emitter_boundary
 
     subroutine insert_finite_difference(g) ! DONE
@@ -584,95 +660,180 @@ contains
         integer(kind=8), intent(in) :: g
         integer(kind=8) :: center
         integer(kind=8), dimension(3) :: boundaries
+        integer(kind=8), dimension(3,3) :: indices
         integer(kind=8) :: i, a, next, next_next, next_next_next, prev, prev_prev, prev_prev_prev
 
-        center = (g-1)*19 + 10
+        center = nnz_center(g)
 
         i = gridPointsActive(g)
-
         boundaries = is_boundary(i)
+        call get_finite_indices(g,indices)
 
         ! Insert finite difference equation for each axis
-        do a=1,3
-
-            next = center + (a-1)*3 + 1
-            next_next = next + 1
-            next_next_next = next + 2
-            prev = center - (a-1)*3 - 1
-            prev_prev = prev - 1
-            prev_prev_prev = prev - 2
-
+        do a=1,3          
             select case (boundaries(a))
                 case (0) ! Inner point (values for central difference)
+                    prev = indices(a,1)
+                    next = indices(a,3)
 
-                    values(prev) = values(prev) + div_h2(a)
+                    nnz_values(prev) = nnz_values(prev) + div_h2(a)
+                    nnz_values(center) = nnz_values(center) - 2.0d0*div_h2(a)
+                    nnz_values(next) = nnz_values(next) + div_h2(a)
 
-                    values(center) = values(center) - 2.0d0*div_h2(a)
-
-                    values(next) = values(next) + div_h2(a)
-
-                    nnz = nnz + 2 ! prev and next
-
+                    if (allocated(permdiff)) then
+                        ndiff = ndiff + 1
+                        permdiff((ndiff-1)*2+1) = g
+                        permdiff((ndiff-1)*2+2) = prev
+                        ndiff = ndiff + 1
+                        permdiff((ndiff-1)*2+1) = g
+                        permdiff((ndiff-1)*2+2) = next
+                    end if
                 case (1) ! Startpoint (values for forward difference)
+                    next = indices(a,1)
+                    next_next = indices(a,2)
+                    next_next_next = indices(a,3)
 
-                    values(center) = values(center) + 2.0d0*div_h2(a)
+                    nnz_values(center) = nnz_values(center) + 2.0d0*div_h2(a)
+                    nnz_values(next) = nnz_values(next) - 5.0d0*div_h2(a)
+                    nnz_values(next_next) = nnz_values(next_next) + 4.0d0*div_h2(a)
+                    nnz_values(next_next_next) = nnz_values(next_next_next) - 1.0d0*div_h2(a)
 
-                    values(next) = values(next) - 5.0d0*div_h2(a)
-
-                    values(next_next) = values(next_next) + 4.0d0*div_h2(a)
-
-                    values(next_next_next) = values(next_next_next) - 1.0d0*div_h2(a)
-
-                    nnz = nnz + 3 ! three next
-
+                    if (allocated(permdiff)) then
+                        ndiff = ndiff + 1
+                        permdiff((ndiff-1)*2+1) = g
+                        permdiff((ndiff-1)*2+2) = next
+                        ndiff = ndiff + 1
+                        permdiff((ndiff-1)*2+1) = g
+                        permdiff((ndiff-1)*2+2) = next_next
+                        ndiff = ndiff + 1
+                        permdiff((ndiff-1)*2+1) = g
+                        permdiff((ndiff-1)*2+2) = next_next_next
+                    end if
                 case (2) ! Endpoint (values for backward difference)
+                    prev = indices(a,3)
+                    prev_prev = indices(a,2)
+                    prev_prev_prev = indices(a,1)
 
-                    values(prev_prev_prev) = values(prev_prev_prev) - 1.0d0*div_h2(a)
+                    nnz_values(prev_prev_prev) = nnz_values(prev_prev_prev) - 1.0d0*div_h2(a)
+                    nnz_values(prev_prev) = nnz_values(prev_prev) + 4.0d0*div_h2(a)
+                    nnz_values(prev) = nnz_values(prev) - 5.0d0*div_h2(a)
+                    nnz_values(center) = nnz_values(center) + 2.0d0*div_h2(a)
 
-                    values(prev_prev) = values(prev_prev) + 4.0d0*div_h2(a)
-
-                    values(prev) = values(prev) - 5.0d0*div_h2(a)
-
-                    values(center) = values(center) + 2.0d0*div_h2(a)
-
-                    nnz = nnz + 3 ! three prev
-
+                    if (allocated(permdiff)) then
+                        ndiff = ndiff + 1
+                        permdiff((ndiff-1)*2+1) = g
+                        permdiff((ndiff-1)*2+2) = prev
+                        ndiff = ndiff + 1
+                        permdiff((ndiff-1)*2+1) = g
+                        permdiff((ndiff-1)*2+2) = prev_prev
+                        ndiff = ndiff + 1
+                        permdiff((ndiff-1)*2+1) = g
+                        permdiff((ndiff-1)*2+2) = prev_prev_prev
+                    end if
             end select
         end do
 
-        b(g) = 0.0d0
-        perm(g) = 0
-
-        if (values(center) /= 0.0d0) then
-            nnz = nnz + 1 ! center
+        if (allocated(permdiff)) then
+            ndiff = ndiff + 1
+            permdiff((ndiff-1)*2+1) = g
+            permdiff((ndiff-1)*2+2) = center
         end if
+
+        b(g) = 0.0d0
     end subroutine insert_finite_difference
 
     subroutine remove_finite_difference(g) ! DONE
         ! Remove finite difference equation from matrix
         integer(kind=8), intent(in) :: g
         integer(kind=8), dimension(3) :: boundaries
-        integer(kind=8) :: i, center
+        integer(kind=8), dimension(3,3) :: indices
+        integer(kind=8) :: i, a, center
+        integer(kind=8) :: prev_prev_prev, prev_prev, prev, next, next_next, next_next_next
 
-        center = (g-1)*19 + 10
+        center = nnz_center(g)
+        i = gridPointsActive(g)
+        boundaries = is_boundary(i)	
+        call get_finite_indices(g,indices)
 
-        if (values(center) /= 0.0d0) then
-            values(center) = 0.0d0
-            nnz = nnz - 1
-        end if
+        nnz_values(center) = 0.0d0
+        do a=1,3
+            select case (boundaries(a))
+                case (0)
+                    prev = indices(a,1)
+                    next = indices(a,3)
 
-        do i=1,8
-            if (values(center+i) /= 0.0d0) then
-                values(center+i) = 0.0d0
-                nnz = nnz - 1
-            end if
-            if (values(center-i) /= 0.0d0) then
-                values(center-i) = 0.0d0
-                nnz = nnz - 1
-            end if
+                    nnz_values(prev) = 0.0d0
+                    nnz_values(next) = 0.0d0
+
+                    if (allocated(permdiff)) then
+                        ndiff = ndiff + 1
+                        permdiff((ndiff-1)*2+1) = g
+                        permdiff((ndiff-1)*2+2) = prev
+                        ndiff = ndiff + 1
+                        permdiff((ndiff-1)*2+1) = g
+                        permdiff((ndiff-1)*2+2) = next
+                    end if
+                case (1)
+                    next = indices(a,1)
+                    next_next = indices(a,2)
+                    next_next_next = indices(a,3)
+
+                    nnz_values(next) = 0.0d0
+                    nnz_values(next_next) = 0.0d0
+                    nnz_values(next_next_next) = 0.0d0
+
+                    if (allocated(permdiff)) then
+                        ndiff = ndiff + 1
+                        permdiff((ndiff-1)*2+1) = g
+                        permdiff((ndiff-1)*2+2) = next
+                        ndiff = ndiff + 1
+                        permdiff((ndiff-1)*2+1) = g
+                        permdiff((ndiff-1)*2+2) = next_next
+                        ndiff = ndiff + 1
+                        permdiff((ndiff-1)*2+1) = g
+                        permdiff((ndiff-1)*2+2) = next_next_next
+                    end if
+                case (2)
+                    prev = indices(a,3)
+                    prev_prev = indices(a,2)
+                    prev_prev_prev = indices(a,1)
+
+                    nnz_values(prev) = 0.0d0
+                    nnz_values(prev_prev) = 0.0d0
+                    nnz_values(prev_prev_prev) = 0.0d0
+
+                    if (allocated(permdiff)) then
+                        ndiff = ndiff + 1
+                        permdiff((ndiff-1)*2+1) = g
+                        permdiff((ndiff-1)*2+2) = prev
+                        ndiff = ndiff + 1
+                        permdiff((ndiff-1)*2+1) = g
+                        permdiff((ndiff-1)*2+2) = prev_prev
+                        ndiff = ndiff + 1
+                        permdiff((ndiff-1)*2+1) = g
+                        permdiff((ndiff-1)*2+2) = prev_prev_prev
+                    end if
+            end select
         end do
 
+        if (allocated(permdiff)) then
+            ndiff = ndiff + 1
+            permdiff((ndiff-1)*2+1) = g
+            permdiff((ndiff-1)*2+2) = center
+        end if
+
+        b(g) = 0.0d0
     end subroutine remove_finite_difference
+
+    subroutine reduce_perm()
+        integer(kind=8) :: i
+
+        perm(1) = ndiff
+        do i=1,ndiff*2
+            perm(i+1) = permdiff(i) - 1
+        end do
+
+    end subroutine reduce_perm
 
 ! -----------------------------------------------------------------------------
 ! ----- Finite difference -----------------------------------------------------
@@ -721,7 +882,7 @@ contains
 ! ----- Boundary conditions ---------------------------------------------------
 ! -----------------------------------------------------------------------------
 
-    function applied_field(i)
+    function applied_field(i) ! DONE
         integer(kind=8), intent(in) :: i
         double precision, dimension(3) :: grid_coord
         double precision :: applied_field
@@ -731,16 +892,16 @@ contains
         applied_field = -V_d / abs(emitters_pos(3,1)+box_dim(3)-grid_coord(3))
     end function applied_field
 
-    function elec_voltage(elec_pos, i) ! DONE
+    function charge_voltage(charge_pos, i) ! DONE
         ! Calculate the boundary value for an electron
-        double precision, dimension(3), intent(in) :: elec_pos
+        double precision, dimension(3), intent(in) :: charge_pos
         integer(kind=8), intent(in) :: i
         double precision, dimension(3) :: grid_coord
-        double precision :: elec_voltage
+        double precision :: charge_voltage
         
         grid_coord = cart_coord(i)
-        elec_voltage = -q_0 / ((4.0d0*pi*epsilon_0) * norm2(grid_coord - elec_pos))
-    end function elec_voltage
+        charge_voltage = -q_0 / ((4.0d0*pi*epsilon_0) * norm2(grid_coord - charge_pos))
+    end function charge_voltage
 
     subroutine find_electrons() ! DONE
         ! Aggregate boundary values from electrons
@@ -781,7 +942,7 @@ contains
                             ! new_pos = cart_coord(u)
                             ! print *, 'Laplace: adding boundary: x=',new_pos(1), ' y=',new_pos(2), ' z=',new_pos(3)
                             ! $OMP CRITICAL
-                            boundary_voltage = elec_voltage(elec_pos,u) 
+                            boundary_voltage = charge_voltage(elec_pos,u) 
                             ! print *, 'Laplace: adding boundary voltage:', boundary_voltage
                             iCharge(g) = iCharge(g) + boundary_voltage
                             ! $OMP END CRITICAL
@@ -799,7 +960,7 @@ contains
                             ! new_pos = cart_coord(u)
                             ! print *, 'Laplace: adding boundary: x=',new_pos(1), ' y=',new_pos(2), ' z=',new_pos(3)
                             ! $OMP CRITICAL
-                            boundary_voltage = elec_voltage(elec_pos,u) 
+                            boundary_voltage = charge_voltage(elec_pos,u) 
                             ! print *, 'Laplace: adding boundary voltage:', boundary_voltage
                             iCharge(g) = iCharge(g) + boundary_voltage
                             ! $OMP END CRITICAL
@@ -817,7 +978,7 @@ contains
                             ! new_pos = cart_coord(u)
                             ! print *, 'Laplace: adding boundary: x=',new_pos(1), ' y=',new_pos(2), ' z=',new_pos(3)
                             ! $OMP CRITICAL
-                            boundary_voltage = elec_voltage(elec_pos,u) 
+                            boundary_voltage = charge_voltage(elec_pos,u) 
                             ! print *, 'Laplace: adding boundary voltage:', boundary_voltage
                             iCharge(g) = iCharge(g) + boundary_voltage
                             ! $OMP END CRITICAL
@@ -835,7 +996,7 @@ contains
                             ! new_pos = cart_coord(u)
                             ! print *, 'Laplace: adding boundary: x=',new_pos(1), ' y=',new_pos(2), ' z=',new_pos(3)
                             ! $OMP CRITICAL
-                            boundary_voltage = elec_voltage(elec_pos,u) 
+                            boundary_voltage = charge_voltage(elec_pos,u) 
                             ! print *, 'Laplace: adding boundary voltage:', boundary_voltage
                             iCharge(g) = iCharge(g) + boundary_voltage
                             ! $OMP END CRITICAL
@@ -854,7 +1015,7 @@ contains
                             ! new_pos = cart_coord(u)
                             ! print *, 'Laplace: adding boundary: x=',new_pos(1), ' y=',new_pos(2), ' z=',new_pos(3)
                             ! $OMP CRITICAL
-                            boundary_voltage = elec_voltage(elec_pos,u) 
+                            boundary_voltage = charge_voltage(elec_pos,u) 
                             ! print *, 'Laplace: adding boundary voltage:', boundary_voltage
                             iCharge(g) = iCharge(g) + boundary_voltage
                             ! $OMP END CRITICAL
@@ -872,7 +1033,7 @@ contains
                             ! new_pos = cart_coord(u)
                             ! print *, 'Laplace: adding boundary: x=',new_pos(1), ' y=',new_pos(2), ' z=',new_pos(3)
                             ! $OMP CRITICAL
-                            boundary_voltage = elec_voltage(elec_pos,u) 
+                            boundary_voltage = charge_voltage(elec_pos,u) 
                             ! print *, 'Laplace: adding boundary voltage:', boundary_voltage
                             iCharge(g) = iCharge(g) + boundary_voltage
                             ! $OMP END CRITICAL
@@ -890,7 +1051,7 @@ contains
                             ! new_pos = cart_coord(u)
                             ! print *, 'Laplace: adding boundary: x=',new_pos(1), ' y=',new_pos(2), ' z=',new_pos(3)
                             ! $OMP CRITICAL
-                            boundary_voltage = elec_voltage(elec_pos,u) 
+                            boundary_voltage = charge_voltage(elec_pos,u) 
                             ! print *, 'Laplace: adding boundary voltage:', boundary_voltage
                             iCharge(g) = iCharge(g) + boundary_voltage
                             ! $OMP END CRITICAL
@@ -908,7 +1069,7 @@ contains
                             ! new_pos = cart_coord(u)
                             ! print *, 'Laplace: adding boundary: x=',new_pos(1), ' y=',new_pos(2), ' z=',new_pos(3)
                             ! $OMP CRITICAL
-                            boundary_voltage = elec_voltage(elec_pos,u) 
+                            boundary_voltage = charge_voltage(elec_pos,u) 
                             ! print *, 'Laplace: adding boundary voltage:', boundary_voltage
                             iCharge(g) = iCharge(g) + boundary_voltage
                             ! $OMP END CRITICAL
@@ -1086,16 +1247,34 @@ contains
 ! -----------------------------------------------------------------------------
     
     subroutine Clean_Up_Laplace() ! DONE
+        integer(kind=8) :: error, phase
+
         ! Clean up memory
         print '(a)', 'Laplace: Clean up'
+
+        ! Clear pardiso memory
+        phase = -1
+        if (.not. allocated(perm)) then
+            allocate(perm(nrGridActive))
+        end if
+        print *, '  Laplace: clearing pardiso memory'
+        call pardiso_64(pt,maxfct,mnum,mtype,phase,nrGridActive,nnz_values,nnz_ia,nnz_col_index,perm,nrhs,iparm,msglvl,b,x,error)
+        if (error == 0) then
+            print *, '  Laplace: clearing pardiso memory successful'
+        else
+            print *, '  Laplace: clearing pardiso memory failed with error code ', error
+        end if
         ! Deallocate CSR matrix
-        deallocate(values)
-        deallocate(col_index)
-        deallocate(b)
+        deallocate(nnz_values)
+        deallocate(nnz_col_index)
+        deallocate(nnz_ia)
+        deallocate(nnz_center)
         ! Deallocate other arrays
+        deallocate(b)
         deallocate(oCharge)
         deallocate(gridPoints)
         deallocate(gridPointsActive)
+        deallocate(x)
         deallocate(perm)
 
         ! These should have been deallocated already in the last iteration
@@ -1105,48 +1284,27 @@ contains
         if (allocated(laplace_field)) then
             deallocate(laplace_field) 
         end if
-        if (allocated(nnz_values)) then
-            deallocate(nnz_values)
-        end if
-        if (allocated(nnz_col_index)) then
-            deallocate(nnz_col_index)
-        end if
-        if (allocated(nnz_ia)) then
-            deallocate(nnz_ia)
-        end if
         if (allocated(voltage)) then
             deallocate(voltage)
         end if
-        if (allocated(x)) then
-            deallocate(x)
-        end if
     end subroutine Clean_Up_Laplace
 
-    ! subroutine check_matrix()
-    !     integer(kind=8) :: i,count,low,high,col,index
+    subroutine check_matrix()
+        integer(kind=8) :: i,count,index,end
 
+        do i=1,nrGridActive
+            print*, 'Laplace: row=',i
+            count = 0
+            index = nnz_ia(i)
+            end = nnz_ia(i+1)
+            do while(index < end)
+                print*,'    Laplace: column=',nnz_col_index(index)
+                index = index + 1
+                count = count + 1
+            end do
+        end do
 
-    !     index = 1
-    !     do i=1,nrGridActive
-    !         count = 0
-    !         low = nnz_rows_start(i)
-    !         high = nnz_rows_end(i)
-    !         col = nnz_col_index(index)
-
-    !         do while ((low <= col) .and. (col < high))
-    !             index = index + 1
-    !             col = nnz_col_index(index)
-    !             count = count + 1
-    !         end do
-    !         count  = count + 1
-    !         index = index + 1
-
-    !         print *, 'Laplace: row=',i,' count=',count
-
-    !     end do
-
-
-    ! end subroutine check_matrix
+    end subroutine check_matrix
 
     subroutine Place_Electron(step)
         integer(kind=8), intent(in) :: step
@@ -1155,7 +1313,7 @@ contains
         if (step == 1) then
             par_pos(1) = 0.0d0*length_scale
             par_pos(2) = 0.0d0*length_scale
-            par_pos(3) = 0.5d0*length_scale 
+            par_pos(3) = 2.0d0*length_scale 
             par_vel = 0.0d0
             call Add_Particle(par_pos,par_vel,species_elec,step,1,-1)
             ! par_pos(1) = 3.0d0*length_scale
