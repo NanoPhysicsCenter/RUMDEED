@@ -56,7 +56,7 @@ contains
         print *, 'Laplace: updating matrix'
         call update_matrix()
         print *, 'Laplace: solving matrix'
-        call solve_matrix()
+        call solve_system()
         print *, 'Laplace: allocate voltage'
         call allocate_voltage()
         print *, 'Laplace: calculating field'
@@ -67,7 +67,7 @@ contains
         
     end subroutine Calculate_Laplace_Field
 
-    subroutine solve_matrix() ! TODO
+    subroutine solve_system() ! TODO
         ! Solve the system
         integer :: i
         ! double precision, dimension(nrGridActive) :: ddum
@@ -151,7 +151,7 @@ contains
         deallocate(nnz_values)
         deallocate(nnz_ia)
         deallocate(nnz_col_index) 
-    end subroutine solve_matrix
+    end subroutine solve_system
 
 ! -------------------------------------------------------------------------------------------------------------
 ! ----- Voltage and field calculations ------------------------------------------------------------------------
@@ -690,7 +690,7 @@ contains
         applied_field = -V_d / abs(emitters_pos(3,1)+box_dim(3)-grid_coord(3))
     end function applied_field
 
-    function elec_voltage(elec_pos, i) ! DONE
+    function charge_voltage(elec_pos, i) ! DONE
         ! Calculate the boundary value for an electron
         double precision, dimension(3), intent(in) :: elec_pos
         integer(kind=8), intent(in) :: i
@@ -699,7 +699,7 @@ contains
         
         grid_coord = cart_coord(i)
         elec_voltage = -q_0 / ((4.0d0*pi*epsilon_0) * norm2(grid_coord - elec_pos))
-    end function elec_voltage
+    end function charge_voltage
 
     subroutine find_electrons() ! DONE
         ! Aggregate boundary values from electrons
@@ -740,7 +740,7 @@ contains
                             ! new_pos = cart_coord(u)
                             ! print *, 'Laplace: adding boundary: x=',new_pos(1), ' y=',new_pos(2), ' z=',new_pos(3)
                             ! $OMP CRITICAL
-                            boundary_voltage = elec_voltage(elec_pos,u) 
+                            boundary_voltage = charge_voltage(elec_pos,u) 
                             ! print *, 'Laplace: adding boundary voltage:', boundary_voltage
                             iCharge(g) = iCharge(g) + boundary_voltage
                             ! $OMP END CRITICAL
@@ -758,7 +758,7 @@ contains
                             ! new_pos = cart_coord(u)
                             ! print *, 'Laplace: adding boundary: x=',new_pos(1), ' y=',new_pos(2), ' z=',new_pos(3)
                             ! $OMP CRITICAL
-                            boundary_voltage = elec_voltage(elec_pos,u) 
+                            boundary_voltage = charge_voltage(elec_pos,u) 
                             ! print *, 'Laplace: adding boundary voltage:', boundary_voltage
                             iCharge(g) = iCharge(g) + boundary_voltage
                             ! $OMP END CRITICAL
@@ -776,7 +776,7 @@ contains
                             ! new_pos = cart_coord(u)
                             ! print *, 'Laplace: adding boundary: x=',new_pos(1), ' y=',new_pos(2), ' z=',new_pos(3)
                             ! $OMP CRITICAL
-                            boundary_voltage = elec_voltage(elec_pos,u) 
+                            boundary_voltage = charge_voltage(elec_pos,u) 
                             ! print *, 'Laplace: adding boundary voltage:', boundary_voltage
                             iCharge(g) = iCharge(g) + boundary_voltage
                             ! $OMP END CRITICAL
@@ -794,7 +794,7 @@ contains
                             ! new_pos = cart_coord(u)
                             ! print *, 'Laplace: adding boundary: x=',new_pos(1), ' y=',new_pos(2), ' z=',new_pos(3)
                             ! $OMP CRITICAL
-                            boundary_voltage = elec_voltage(elec_pos,u) 
+                            boundary_voltage = charge_voltage(elec_pos,u) 
                             ! print *, 'Laplace: adding boundary voltage:', boundary_voltage
                             iCharge(g) = iCharge(g) + boundary_voltage
                             ! $OMP END CRITICAL
@@ -813,7 +813,7 @@ contains
                             ! new_pos = cart_coord(u)
                             ! print *, 'Laplace: adding boundary: x=',new_pos(1), ' y=',new_pos(2), ' z=',new_pos(3)
                             ! $OMP CRITICAL
-                            boundary_voltage = elec_voltage(elec_pos,u) 
+                            boundary_voltage = charge_voltage(elec_pos,u) 
                             ! print *, 'Laplace: adding boundary voltage:', boundary_voltage
                             iCharge(g) = iCharge(g) + boundary_voltage
                             ! $OMP END CRITICAL
@@ -831,7 +831,7 @@ contains
                             ! new_pos = cart_coord(u)
                             ! print *, 'Laplace: adding boundary: x=',new_pos(1), ' y=',new_pos(2), ' z=',new_pos(3)
                             ! $OMP CRITICAL
-                            boundary_voltage = elec_voltage(elec_pos,u) 
+                            boundary_voltage = charge_voltage(elec_pos,u) 
                             ! print *, 'Laplace: adding boundary voltage:', boundary_voltage
                             iCharge(g) = iCharge(g) + boundary_voltage
                             ! $OMP END CRITICAL
@@ -849,7 +849,7 @@ contains
                             ! new_pos = cart_coord(u)
                             ! print *, 'Laplace: adding boundary: x=',new_pos(1), ' y=',new_pos(2), ' z=',new_pos(3)
                             ! $OMP CRITICAL
-                            boundary_voltage = elec_voltage(elec_pos,u) 
+                            boundary_voltage = charge_voltage(elec_pos,u) 
                             ! print *, 'Laplace: adding boundary voltage:', boundary_voltage
                             iCharge(g) = iCharge(g) + boundary_voltage
                             ! $OMP END CRITICAL
@@ -867,7 +867,7 @@ contains
                             ! new_pos = cart_coord(u)
                             ! print *, 'Laplace: adding boundary: x=',new_pos(1), ' y=',new_pos(2), ' z=',new_pos(3)
                             ! $OMP CRITICAL
-                            boundary_voltage = elec_voltage(elec_pos,u) 
+                            boundary_voltage = charge_voltage(elec_pos,u) 
                             ! print *, 'Laplace: adding boundary voltage:', boundary_voltage
                             iCharge(g) = iCharge(g) + boundary_voltage
                             ! $OMP END CRITICAL

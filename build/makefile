@@ -20,9 +20,13 @@ OPENMP ?= yes # Set to something else to disable OpenMP
 TESTING_MODE ?= 2 # Set to 1 to enable testing mode
 
 # MKL
-MKLROOT = /opt/intel/oneapi/mkl/2025.0
-MKL_LIBS = -qmkl-ilp64=parallel $(MKLROOT)/lib/libmkl_blas95_ilp64.a $(MKLROOT)/lib/libmkl_lapack95_ilp64.a 
-FFLAGS += -I$(MKLROOT)/include/mkl/intel64/ilp64 -i8 -qmkl-ilp64=parallel
+# MKLROOT = /opt/intel/oneapi/mkl/2025.1
+# MKL_LIBS =  -m64  ${F95ROOT}/lib/libmkl_blas95_ilp64.a ${F95ROOT}/lib/libmkl_lapack95_ilp64.a -L${MKLROOT}/lib -Wl,--no-as-needed -lmkl_gf_ilp64 -lmkl_intel_thread -lmkl_core -liomp5 -lpthread -lm -ldl
+# FFLAGS +=  -I${F95ROOT}/include/mkl/intel64/ilp64 -fdefault-integer-8  -m64  -I"${MKLROOT}/include"
+
+MKLROOT = /opt/intel/oneapi/mkl/2025.1
+MKL_LIBS = -qmkl-ilp64=parallel ${MKLROOT}/lib/libmkl_blas95_ilp64.a ${MKLROOT}/lib/libmkl_lapack95_ilp64.a
+FFLAGS += -I${MKLROOT}/include/mkl/intel64/ilp64 -i8 -qmkl-ilp64=parallel
 
 
 # Compile flags
@@ -49,7 +53,7 @@ ifeq ($(FC),ifx)
 $(info Using New Intel Fortran Compiler)
 FFLAGS = -O2 -xHost -ipo -i8
 ifneq (,$(findstring yes,$(OPENMP)))
-FFLAGS += -qopenmp
+FFLAGS += -fopenmp
 endif
 endif
 
@@ -143,6 +147,7 @@ $(PROJECT_NAME).out: ../src/main.F90 ../cuba/lib/libcuba.a \
 		cd ../cuba/; chmod +x ./install-cuba.sh; ./install-cuba.sh ${CC} ${FC}
 
 mod_global.mod mod_global.o: ../src/mod_global.F90
+		$ 
 		$(FC) -c $(FFLAGS) ../src/mod_global.F90
 
 mod_ic.mod mod_ic.o: ../src/mod_ic.f90 mod_global.o mod_hyperboloid_tip.o mod_verlet.o
@@ -163,8 +168,8 @@ mod_photo_emission.mod mod_photo_emission.o: ../src/mod_photo_emission.f90 mod_g
 mod_field_emission.mod mod_field_emission.o: ../src/mod_field_emission.f90 mod_global.mod mod_verlet.mod mod_pair.mod mod_velocity.mod
 		$(FC) -c $(FFLAGS) ../src/mod_field_emission.f90
 
-mod_field_emission_v2.mod mod_field_emission_v2.o: ../src/mod_field_emission_v2.F90 mod_global.mod mod_verlet.mod mod_pair.mod mod_work_function.mod mod_velocity.mod
-		$(FC) -c $(FFLAGS) ../src/mod_field_emission_v2.F90
+mod_field_emission_v2.mod mod_field_emission_v2.o: ../src/mod_field_emission_v2.F90 mod_global.mod mod_verlet.mod mod_pair.mod mod_work_function.mod mod_velocity.mod mod_laplace_solver.mod
+		$(FC) -c $(FFLAGS) $(MKL_LIBS) ../src/mod_field_emission_v2.F90
 
 mod_field_thermo_emission.mod mod_field_thermo_emission.o: ../src/mod_field_thermo_emission.F90 mod_global.mod mod_verlet.mod mod_pair.mod mod_work_function.mod mod_kevin_rjgtf.mod mod_velocity.mod
 		$(FC) -c $(FFLAGS) ../src/mod_field_thermo_emission.F90
@@ -190,7 +195,7 @@ mod_work_function.mod mod_work_function.o: ../src/mod_work_function.F90
 mod_polynomialroots.mod mod_polynomialroots.o: ../src/mod_polynomialroots.F90
 		$(FC) -c $(FFLAGS) ../src/mod_polynomialroots.F90
 
-mod_laplace_solver.mod mod_laplace_solver.o: ../src/mod_laplace_solver.F90 mod_global.mod mkl_spblas.mod mkl_pardiso.mod
+mod_laplace_solver.mod mod_laplace_solver.o: ../src/mod_laplace_solver.F90 mod_global.mod mkl_spblas.mod mkl_pardiso.mod mod_verlet.mod mod_pair.mod
 		$(FC) -c $(FFLAGS) $(MKL_LIBS) ../src/mod_laplace_solver.F90
 
 mod_velocity.mod mod_velocity.o: ../src/mod_velocity.f90
