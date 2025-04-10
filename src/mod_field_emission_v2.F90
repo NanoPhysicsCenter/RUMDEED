@@ -10,6 +10,7 @@ Module mod_field_emission_v2
   use mod_verlet
   use mod_pair
   use mod_work_function
+  use mod_laplace_solver
   implicit none
 
   PRIVATE
@@ -554,8 +555,11 @@ end function Escape_Prob_log
     end select
 
     ! Calculate the electric field on the surface
-    field = Calc_Field_at(par_pos)
-
+    if (laplace .eqv. .true.) then
+      field = Calculate_Laplace_Field_at(par_pos)
+    else
+      field = Calc_Field_at(par_pos)
+    end if
     ! Add to the average field
     F_avg = F_avg + field
 
@@ -824,7 +828,11 @@ end function Escape_Prob_log
     par_pos(3) = 0.0d0 ! Height, i.e. on the surface
 
     ! Calculate the electric field on the surface
-    field = Calc_Field_at(par_pos)
+    if (laplace .eqv. .true.) then
+      field = Calculate_Laplace_Field_at(par_pos)
+    else
+      field = Calc_Field_at(par_pos)
+    end if
 
     ! Add to the average field
     F_avg = F_avg + field
@@ -948,7 +956,11 @@ end function Escape_Prob_log
       par_pos(3) = 0.0d0 ! z = 0, emitter surface
 
       ! Calculate the field on the emitter surface
-      field = Calc_Field_at(par_pos)
+      if (laplace .eqv. .true.) then
+        field = Calculate_Laplace_Field_at(par_pos)
+      else
+        field = Calc_Field_at(par_pos)
+      end if
 
       ! Check if the field is favourable for emission
       if (field(3) < 0.0d0) then
@@ -1030,7 +1042,11 @@ end function Escape_Prob_log
       cur_pos(3) = 0.0d0 ! On the surface
 
       ! Calculate the electric field at this position
-      field = Calc_Field_at(cur_pos)
+      if (laplace .eqv. .true.) then
+        field = Calculate_Laplace_Field_at(cur_pos)
+      else
+        field = Calc_Field_at(cur_pos)
+      end if
       if (field(3) < 0.0d0) then
         exit ! We found a nice spot so we exit the loop
       else
@@ -1065,7 +1081,11 @@ end function Escape_Prob_log
       call check_limits_metro_rec(new_pos, emit)
 
       ! Calculate the field at the new position
-      field = Calc_Field_at(new_pos)
+      if (laplace .eqv. .true.) then
+        field = Calculate_Laplace_Field_at(new_pos)
+      else
+        field = Calc_Field_at(new_pos)
+      end if
 
       ! Check if the field is favourable for emission at the new position.
       ! If it is not then cycle, i.e. we reject this location and
@@ -1127,7 +1147,11 @@ end function Escape_Prob_log
       cur_pos(3) = 0.0d0 ! On the surface
 
       ! Calculate the electric field at this position
-      cur_field = Calc_Field_at(cur_pos)
+      if (laplace .eqv. .true.) then
+        cur_field = Calculate_Laplace_Field_at(cur_pos)
+      else
+        cur_field = Calc_Field_at(cur_pos)
+      end if
       if (cur_field(3) < 0.0d0) then
         exit ! We found a nice spot so we exit the loop
       else
@@ -1147,7 +1171,11 @@ end function Escape_Prob_log
       call check_limits_metro_rec(new_pos, emit)
 
       ! Calculate the field at the new position
-      new_field = Calc_Field_at(new_pos)
+      if (laplace .eqv. .true.) then
+        new_field = Calculate_Laplace_Field_at(new_pos)
+      else
+        new_field = Calc_Field_at(new_pos)
+      end if
 
       ! Check if the field is favourable for emission at the new position.
       ! If it is not then cycle, i.e. we reject this location and
@@ -1215,7 +1243,11 @@ end function Escape_Prob_log
       cur_pos(3) = 0.0d0 ! On the surface
 
       ! Calculate the electric field at this position
-      field = Calc_Field_at(cur_pos)
+      if (laplace .eqv. .true.) then
+        field = Calculate_Laplace_Field_at(cur_pos)
+      else
+        field = Calc_Field_at(cur_pos)
+      end if
       cur_w = w_theta_xy(cur_pos, emit)
 
       if (field(3) < 0.0d0) then
@@ -1285,7 +1317,11 @@ end function Escape_Prob_log
       call check_limits_metro_rec(new_pos, emit)
 
       ! Calculate the field at the new position
-      field = Calc_Field_at(new_pos)
+      if (laplace .eqv. .true.) then
+        field = Calculate_Laplace_Field_at(new_pos)
+      else
+        field = Calc_Field_at(new_pos)
+      end if
       new_w = w_theta_xy(new_pos, emit)
 
       ! Check if the field is favourable for emission at the new position.
@@ -1465,7 +1501,11 @@ end function Escape_Prob_log
 
       ! Calculate the electric field at this position
       ! print *, 'Metropolis: Calc_field_at'
-      field = Calc_Field_at(cur_pos)
+      if (laplace .eqv. .true.) then
+        field = Calculate_Laplace_Field_at(cur_pos)
+      else
+        field = Calc_Field_at(cur_pos)
+      end if
       ! print *, 'Metropolis: w_theta_xy'
       cur_w = w_theta_xy(cur_pos, emit)
 
@@ -1543,7 +1583,11 @@ end function Escape_Prob_log
 
       ! Calculate the field at the new position
       ! print *, 'Metropolis: Calc_Field_at 2'
-      field = Calc_Field_at(new_pos)
+      if (laplace .eqv. .true.) then
+        field = Calculate_Laplace_Field_at(new_pos)
+      else
+        field = Calc_Field_at(new_pos)
+      end if
       ! print *, 'Metropolis: w_theta_xy 2'
       new_w = w_theta_xy(new_pos, emit)
 

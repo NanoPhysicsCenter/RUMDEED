@@ -40,12 +40,13 @@ module mod_laplace_solver
     double precision, allocatable, dimension(:) :: iCharge, oCharge
 
     ! Solution
-    double precision, allocatable, dimension(:) :: voltage, laplace_field, x
+    double precision, allocatable, dimension(:) :: voltage, x
+    double precision, allocatable, dimension(:,:) :: laplace_field
 
     ! Discretization
     integer(kind=8), allocatable, dimension(:) :: gridPoints, gridPointsActive
     double precision :: hx, hy, hz, emitter_radius
-    double precision, dimension(3) :: div_h2, div_h3
+    double precision, dimension(3) :: div_h, div_h2, div_h3
     double precision, dimension(2) :: lim_x, lim_y, lim_z
     integer(kind=8) :: Nx, Ny, Nz, nrGrid, nrGridActive, NxNy
 
@@ -70,17 +71,17 @@ contains
     subroutine Calculate_Laplace_Field(step) ! TODO
         integer(kind=8), intent(in) :: step
         ! Calculate the electric field
-        print *, 'Laplace: finding electrons'
+        ! print *, 'Laplace: finding electrons'
         call find_electrons()
-        print *, 'Laplace: updating matrix'
+        ! print *, 'Laplace: updating matrix'
         call update_matrix()
-        print *, 'Laplace: solving matrix'
+        ! print *, 'Laplace: solving matrix'
         call solve_system()
-        print *, 'Laplace: allocate voltage'
+        ! print *, 'Laplace: allocate voltage'
         call allocate_voltage()
-        print *, 'Laplace: calculating field'
+        ! print *, 'Laplace: calculating field'
         call calculate_field()
-        print *, 'Laplace: done'
+        ! print *, 'Laplace: done'
 
         ! call write_average_field()
         
@@ -99,30 +100,17 @@ contains
             deallocate(laplace_field)
         end if
 
-        ! if (ndiff /= 0) then ! only update LU if matrix changed
-        !     if (2*ndiff < nnz) then
-        !         iparm(4) = 11
-        !         ! iparm(11) = 0
-        !         ! iparm(13) = 0
-        !         iparm(39) = 0 ! 0 = full factorization; 1 = low-rank update
-        !         print *, 'Laplace: doing low-rank update'
-        !     else
-        !         iparm(39) = 0
-        !         print *, 'Laplace: doing full factorization'
-        !     end if
-        !     ! call symbolic_factorization()
-        !     call numerical_factorization()
-        !     ! print *, 'Laplace: numerical factorization error', iparm(20)
-        ! end if
-
-        ! iparm(4) = 31
-        ! iparm(5) = 1
-        ! iparm(39) = 1
-        ! call cpu_time(start)
-        call symbolic_factorization()
-        call numerical_factorization()
-        call solution()
-        ! call cpu_time(end)
+        if (ndiff /= 0) then
+            ! iparm(4) = 31+
+            ! iparm(9) = 12 ! tolerance = 10^(-iparm(9))	
+            ! iparm(11) = 0
+            ! iparm(13) = 0
+            ! iparm(24) = 10
+            call pardiso_phase(11) 
+            ! iparm(39) = 1
+            call pardiso_phase(22)
+        end if
+        call pardiso_phase(33)
 
         ! print *, 'Laplace: iterative solving time:', end-start
 
@@ -152,6 +140,7 @@ contains
         hy = Ly / (Ny-1)
         hz = Lz / (Nz-1)
 
+        div_h = (/1.0d0 / hx, 1.0d0 / hy, 1.0d0 / hz/)
         div_h2 = (/1.0d0 / (hx**2), 1.0d0 / (hy**2), 1.0d0 / (hz**2)/)
         div_h3 = (/1.0d0 / (hx**3), 1.0d0 / (hy**3), 1.0d0 / (hz**3)/)
 
@@ -317,12 +306,12 @@ contains
         iparm(5) = 0 ! 0 = ignored; 1 = user supplied fill-in permutation; 2 = returns permutation
         iparm(6) = 0 ! 0 = write solution on x; 1 = write solution on b
         ! iparm(7) = 0 ! output number of iterative refinement steps
-        ! iparm(8) = 100 ! maximum number of iterative refinement steps
-        ! iparm(9) = 6 ! tolerance = 10^(-iparm(9))	
+        iparm(8) = 100 ! maximum number of iterative refinement steps
+        iparm(9) = 6 ! tolerance = 10^(-iparm(9))	
         iparm(10) = 13 ! pivoting perturbation: 13 = 10^-13; 8 = 10^-8
         iparm(11) = 1 ! 0 = no scaling; 1 = scaling
         iparm(12) = 0 ! 0 = solve linear system; 1 = solve conjugate transposed system, 2 = solve transposed system
-        iparm(13) = 1 ! 0 = no weighted matching; 1 = weighted matching
+        iparm(13) = 1 ! 0 = no symmetric weighted matching; 1 = symmetric weighted matching
         ! iparm(14) = 0 ! output number of perturbed pivots
         ! iparm(15) = 0 ! output peak memory on symbolic factorization
         ! iparm(16) = 0 ! output permanent memory on symbolic factorization
@@ -348,11 +337,11 @@ contains
         iparm(36) = 0 ! 0 = not compute shur; 1 = compute shur
         iparm(37) = 0 ! 0 = CSR format; 1 = BSR format
         ! iparm(38) = 0 ! reserved
-        iparm(39) = 0 ! 0 = full factorization; 1 = low-rank update
+        iparm(39) = 1 ! 0 = full factorization; 1 = low-rank update
         ! iparm(40) = 0 ! reserved
         ! iparm(41) = 0 ! reserved
         ! iparm(42) = 0 ! reserved
-        ! iparm(43) = 0 ! 0 = do not compute diagonal inverse; 1 = compute diagonal inverse
+        iparm(43) = 0 ! 0 = do not compute diagonal inverse; 1 = compute diagonal inverse
         ! iparm(44) = 0 ! reserved
         ! iparm(45) = 0 ! reserved
         ! iparm(46) = 0 ! reserved
@@ -378,9 +367,10 @@ contains
         allocate(perm(nrGridActive))
 
         ! call cpu_time(start)
-        call symbolic_factorization()
-        call numerical_factorization()
-        call solution()
+        call pardiso_phase(11)
+        iparm(27) = 0
+        call pardiso_phase(22)
+        call pardiso_phase(33)
         ! call cpu_time(end)
 
         ! print *, 'Laplace: pardiso initialization time:', end-start
@@ -390,52 +380,21 @@ contains
         
     end subroutine init_pardiso
 
-    subroutine symbolic_factorization()
+    subroutine pardiso_phase(phase)
+        integer(kind=8), intent(in) :: phase
         double precision, dimension(nrGridActive) :: ddum
-        integer(kind=8) :: error, phase
-
-        phase = analysis  
+        integer(kind=8) :: error
 
         ! print *, '  Laplace: analysis and symbolic factorization'
-        call pardiso_64(pt,maxfct,mnum,mtype,phase,nrGridActive,nnz_values,nnz_ia,nnz_col_index,perm,nrhs,iparm,msglvl,ddum,ddum,error)
+        call pardiso_64(pt,maxfct,mnum,mtype,phase,nrGridActive,nnz_values,nnz_ia,nnz_col_index,perm,nrhs,iparm,msglvl,b,x,error)
         if (error == 0) then
             ! print *, '  Laplace: analysis and symbolic factorization successful'
         else
-            print *, '  Laplace: analysis and symbolic factorization with error code ', error
+            print *, '  Laplace: phase', phase, 'failes with error code ', error
         end if
         ! print *, '  Laplace:', iparm(17)*1e-6, 'Gb needed for numerical factorization'
 
-    end subroutine symbolic_factorization
-
-    subroutine numerical_factorization()
-        double precision, dimension(nrGridActive) :: ddum
-        integer(kind=8) :: error, phase
-
-        phase = factorization     
-
-        ! print *, '  Laplace: numerical factorization'
-        call pardiso_64(pt,maxfct,mnum,mtype,phase,nrGridActive,nnz_values,nnz_ia,nnz_col_index,perm,nrhs,iparm,msglvl,ddum,ddum,error)
-        if (error == 0) then
-            ! print *, '  Laplace: numerical factorization successful'
-        else
-            print *, '  Laplace: numerical factorization failed with error code ', error
-        end if
-
-    end subroutine numerical_factorization
-
-    subroutine solution()
-        integer(kind=8) :: error, phase
-
-        phase = solving
-
-        ! print *, '  Laplace: solve_matrix: solving'
-        call pardiso_64(pt,maxfct,mnum,mtype,phase,nrGridActive,nnz_values,nnz_ia,nnz_col_index,perm,nrhs,iparm,msglvl,b,x,error)
-        if (error == 0) then
-            ! print *, '  Laplace: solve_matrix: solving successful'
-        else
-            print *, '  Laplace: solve_matrix: solving failed with error code ', error
-        end if
-    end subroutine solution
+    end subroutine pardiso_phase
 
 ! -------------------------------------------------------------------------------------------------------------
 ! ----- Voltage and field calculations ------------------------------------------------------------------------
@@ -464,10 +423,10 @@ contains
     end subroutine allocate_voltage
 
     subroutine calculate_field() ! DONE & PARALLEL
-        integer(kind=8) :: i, boundary
+        integer(kind=8) :: i, a
         integer(kind=8), dimension(3) :: boundaries
 
-        allocate(laplace_field(nrGrid))
+        allocate(laplace_field(nrGrid,3))
 
         laplace_field = 0.0d0
 
@@ -477,16 +436,25 @@ contains
 
         do i=1,nrGrid
             boundaries = is_boundary(i)
-            boundary = boundaries(3)
-
-            select case (boundary)
-                case (0) ! Inner point
-                    laplace_field(i) = - central_difference(voltage,i) + applied_field(i)
-                case (1) ! Startpoint
-                    laplace_field(i) = - forward_difference(voltage,i) + applied_field(i)
-                case (2) ! Endpoint
-                    laplace_field (i) = - backward_difference(voltage,i) + applied_field(i)
-            end select
+            do a=1,3
+                select case (boundaries(a))
+                    case (0) ! Inner point
+                        laplace_field(i,a) = - central_difference(voltage,i,a)
+                        if (a==3) then
+                            laplace_field(i,a) = laplace_field(i,a) + applied_field(i)
+                        end if
+                    case (1) ! Startpoint
+                        laplace_field(i,a) = - forward_difference(voltage,i,a)
+                        if (a==3) then
+                            laplace_field(i,a) = laplace_field(i,a) + applied_field(i)
+                        end if
+                    case (2) ! Endpoint
+                        laplace_field(i,a) = - backward_difference(voltage,i,a)
+                        if (a==3) then
+                            laplace_field(i,a) = laplace_field(i,a) + applied_field(i)
+                        end if
+                end select
+            end do
         end do
 
         ! $OMP END PARALLEL DO
@@ -511,7 +479,7 @@ contains
         do i=0,Nx-1
             do j=0,Ny-1
                 k = i + j*Nx+1
-                sum = sum + laplace_field(k)
+                sum = sum + laplace_field(k,3)
                 num = num + 1
             end do
         end do
@@ -589,7 +557,7 @@ contains
         integer(kind=8) :: g
 
         ! allocate(permdiff(nrGridActive*9))
-        ! ndiff = 0
+        ndiff = 0
 
         do g=1,nrGridActive
             if (oCharge(g) /= iCharge(g)) then
@@ -602,11 +570,13 @@ contains
                 else
                     call remove_electron_boundary(g)
                     call insert_electron_boundary(g)
-                    if (allocated(permdiff)) then
-                        ndiff = ndiff + 1
-                        permdiff((ndiff-1)*2+1) = g
-                        permdiff((ndiff-1)*2+2) = g
-                    end if
+                    ! if (allocated(permdiff)) then
+                    !     ndiff = ndiff + 1
+                    !     permdiff((ndiff-1)*2+1) = g
+                    !     permdiff((ndiff-1)*2+2) = g
+                    ! else
+                    !     ndiff = ndiff + 1
+                    ! end if
                 end if
 
                 oCharge(g) = iCharge(g)
@@ -687,6 +657,8 @@ contains
                         ndiff = ndiff + 1
                         permdiff((ndiff-1)*2+1) = g
                         permdiff((ndiff-1)*2+2) = next
+                    else
+                        ndiff = ndiff + 2
                     end if
                 case (1) ! Startpoint (values for forward difference)
                     next = indices(a,1)
@@ -708,6 +680,8 @@ contains
                         ndiff = ndiff + 1
                         permdiff((ndiff-1)*2+1) = g
                         permdiff((ndiff-1)*2+2) = next_next_next
+                    else
+                        ndiff = ndiff + 3
                     end if
                 case (2) ! Endpoint (values for backward difference)
                     prev = indices(a,3)
@@ -729,6 +703,8 @@ contains
                         ndiff = ndiff + 1
                         permdiff((ndiff-1)*2+1) = g
                         permdiff((ndiff-1)*2+2) = prev_prev_prev
+                    else
+                        ndiff = ndiff + 3
                     end if
             end select
         end do
@@ -772,6 +748,8 @@ contains
                         ndiff = ndiff + 1
                         permdiff((ndiff-1)*2+1) = g
                         permdiff((ndiff-1)*2+2) = next
+                    else
+                        ndiff = ndiff + 2
                     end if
                 case (1)
                     next = indices(a,1)
@@ -792,6 +770,8 @@ contains
                         ndiff = ndiff + 1
                         permdiff((ndiff-1)*2+1) = g
                         permdiff((ndiff-1)*2+2) = next_next_next
+                    else
+                        ndiff = ndiff + 3
                     end if
                 case (2)
                     prev = indices(a,3)
@@ -812,6 +792,8 @@ contains
                         ndiff = ndiff + 1
                         permdiff((ndiff-1)*2+1) = g
                         permdiff((ndiff-1)*2+2) = prev_prev_prev
+                    else
+                        ndiff = ndiff + 3
                     end if
             end select
         end do
@@ -839,43 +821,41 @@ contains
 ! ----- Finite difference -----------------------------------------------------
 ! -----------------------------------------------------------------------------
 
-    function central_difference(array,index)
-        double precision, dimension(nrGrid), intent(in) :: array
-        integer(kind=8), intent(in) :: index
-        integer(kind=8) :: index_prev, index_next
+    function central_difference(f,x,a)
+        double precision, dimension(nrGrid), intent(in) :: f
+        integer(kind=8), intent(in) :: x, a
+        integer(kind=8) :: x_m1h, x_p1h
         double precision :: central_difference
 
-        index_prev = move(index,-1,3)
-        index_next = move(index,1,3)
+        x_m1h = move(x,-1,a)
+        x_p1h = move(x,1,a)
 
-        central_difference = (array(index_next) - array(index_prev))/(2.0d0*hz)
+        central_difference = (f(x_p1h) - f(x_m1h))*div_h(a)/2.0d0
     end function central_difference
 
-    function forward_difference(f,x)
+    function forward_difference(f,x,a)
         double precision, dimension(nrGrid), intent(in) :: f
-        integer(kind=8), intent(in) :: x
-        integer(kind=8) :: x_1h, x_2h, x_3h, x_4h
+        integer(kind=8), intent(in) :: x, a
+        integer(kind=8) :: x_p1h, x_p2h, x_3h, x_4h
         double precision :: forward_difference
 
-        x_1h = move(x,1,3)
-        x_2h = move(x,2,3)
-        x_3h = move(x,3,3)
-        x_4h = move(x,4,3)
+        x_p1h = move(x,1,3)
+        x_p2h = move(x,2,3)
 
-        forward_difference = (-3.0d0*f(x)+4.0d0*f(x_1h)-f(x_2h))/(2.0d0*hz)
+        forward_difference = (-3.0d0*f(x)+4.0d0*f(x_p1h)-f(x_p2h))*div_h(a)/2.0d0
         ! forward_difference = (-25.0d0*f(x)+48.0d0*f(x_1h)-36*f(x_2h)+16.0d0*f(x_3h)-3.0d0*f(x_4h))/(12.0d0*hz)
     end function forward_difference
 
-    function backward_difference(array,index)
-        double precision, dimension(nrGrid), intent(in) :: array
-        integer(kind=8), intent(in) :: index
-        integer(kind=8) :: index_prev, index_prev_prev
+    function backward_difference(f,x,a)
+        double precision, dimension(nrGrid), intent(in) :: f
+        integer(kind=8), intent(in) :: x, a
+        integer(kind=8) :: x_m1h, x_m2h
         double precision :: backward_difference
 
-        index_prev = move(index,-1,3)
-        index_prev_prev = move(index,-2,3)
+        x_m1h = move(x,-1,a)
+        x_m2h = move(x,-2,a)
 
-        backward_difference = (array(index_prev_prev)-4.0d0*array(index_prev)+3.0d0*array(index))/(2.0d0*hz)
+        backward_difference = (f(x_m2h)-4.0d0*f(x_m1h)+3.0d0*f(x))*div_h(a)/2.0d0
     end function backward_difference
 
 ! -----------------------------------------------------------------------------
@@ -920,9 +900,7 @@ contains
             if (particles_mask(k) .eqv. .true.) then
                 elec_pos = particles_cur_pos(:,k)
                 ! print *, 'Laplace: checking a particle at x=',elec_pos(1), ' y=',elec_pos(2), ' z=',elec_pos(3)
-                if ((lim_x(1)<=elec_pos(1)) .and. (elec_pos(1)<=lim_x(2)) &
-                    .and. (lim_y(1)<=elec_pos(2)) .and. (elec_pos(2)<=lim_y(2)) &
-                    .and. (lim_z(1)<=elec_pos(3)) .and. (elec_pos(3)<=lim_z(2))) then
+                if (is_inside(elec_pos) == 1) then
 
                     ! print *, 'Laplace: particle position: x=',elec_pos(1), ' y=',elec_pos(2), ' z=',elec_pos(3)
                     i = disc_coord(elec_pos(1), elec_pos(2), elec_pos(3))
@@ -1313,7 +1291,7 @@ contains
         if (step == 1) then
             par_pos(1) = 0.0d0*length_scale
             par_pos(2) = 0.0d0*length_scale
-            par_pos(3) = 2.0d0*length_scale 
+            par_pos(3) = 1.0d0*length_scale 
             par_vel = 0.0d0
             call Add_Particle(par_pos,par_vel,species_elec,step,1,-1)
             ! par_pos(1) = 3.0d0*length_scale
@@ -1362,7 +1340,7 @@ contains
                     ic_field = Calc_Field_at(ic_pos)
                     ! print *, 'Laplace: writing: x=',test_pos(1), ' y=',test_pos(2), ' z=',test_pos(3)
                     ! write(unit=ud_lp_voltage,iostat=IFAIL) i, j, voltage(k), is_emitter(k)
-                    write(unit=ud_lp_field,iostat=IFAIL) i, j, laplace_field(k), is_emitter(k)
+                    write(unit=ud_lp_field,iostat=IFAIL) i, j, laplace_field(k,3), is_emitter(k)
                     write(unit=ud_ic_field,iostat=IFAIL) i, j, ic_field(3), is_emitter(k)
                 end do
             end do
@@ -1377,56 +1355,56 @@ contains
     function Calculate_Laplace_Field_at(pos)
         double precision, dimension(3), intent(in) :: pos
         double precision, dimension(3) :: Calculate_Laplace_Field_at
-        double precision, dimension(3) :: pos_bot1, pos_bot2, pos_bot3, pos_bot4, pos_top1, pos_top2, pos_top3, pos_top4
+        double precision, dimension(3) :: pos_bot1, pos_bot2, pos_bot3, pos_bot4, pos_bot5, pos_bot6
+        double precision, dimension(3) :: pos_top1, pos_top2, pos_top3, pos_top4, pos_top5, pos_top6
         double precision, dimension(3) :: field_bot1, field_bot2, field_bot3, field_bot4, field_top1, field_top2, field_top3, field_top4
         double precision, dimension(3) :: field_bot5, field_bot6, field_bot, field_top5, field_top6, field_top
         integer(kind=8) :: i,k
 
         if (is_inside(pos) == 0) then
-            Calculate_Laplace_Field_at = (/0.0d0,0.0d0,0.0d0/)
+            Calculate_Laplace_Field_at = Calc_Field_at(pos)
             return
         end if
 
-        ! i = disc_coord(pos(1), pos(2), pos(3))
+        i = disc_coord(pos(1), pos(2), pos(3))
 
-        ! pos_bot1 = cart_coord(k)
-        ! field_bot1 = laplace_field(k)
-        ! k = move(i,1,1)
-        ! pos_bot2 = cart_coord(k)
-        ! field_bot2 = laplace_field(k)
-        ! k = move(i,1,2)
-        ! pos_bot3 = cart_coord(k)
-        ! field_bot3 = laplace_field(k)
-        ! i = move(move(i,1,2),1,1)
-        ! pos_bot4 = cart_coord(k)
-        ! field_bot4 = laplace_field(k)
+        pos_bot1 = cart_coord(k)
+        field_bot1 = laplace_field(k,:)
+        k = move(i,1,1)
+        pos_bot2 = cart_coord(k)
+        field_bot2 = laplace_field(k,:)
+        k = move(i,1,2)
+        pos_bot3 = cart_coord(k)
+        field_bot3 = laplace_field(k,:)
+        k = move(move(i,1,2),1,1)
+        pos_bot4 = cart_coord(k)
+        field_bot4 = laplace_field(k,:)
 
-        ! k = move(i,1,3)
-        ! pos_top1 = cart_coord(k)
-        ! field_top1 = laplace_field(k)
-        ! k = move(move(i,1,3),1,1)
-        ! pos_top2 = cart_coord(k)
-        ! field_top2 = laplace_field(k)
-        ! k = move(move(i,1,3),1,2)
-        ! pos_top3 = cart_coord(k)
-        ! field_top3 = laplace_field(k)
-        ! k = move(move(move(i,1,3),1,2),1,1)
-        ! pos_top4 = cart_coord(k)
-        ! field_top4 = laplace_field(k)
+        k = move(i,1,3)
+        pos_top1 = cart_coord(k)
+        field_top1 = laplace_field(k,:)
+        k = move(move(i,1,3),1,1)
+        pos_top2 = cart_coord(k)
+        field_top2 = laplace_field(k,:)
+        k = move(move(i,1,3),1,2)
+        pos_top3 = cart_coord(k)
+        field_top3 = laplace_field(k,:)
+        k = move(move(move(i,1,3),1,2),1,1)
+        pos_top4 = cart_coord(k)
+        field_top4 = laplace_field(k,:)
 
-        ! ! Bottom interpolation
+        ! Bottom interpolation
+        field_bot5 = linear_interpolate_3d(pos_bot1(1),pos_bot2(1),pos(1),field_bot1,field_bot2)
+        field_bot6 = linear_interpolate_3d(pos_bot3(1),pos_bot4(1),pos(1),field_bot3,field_bot4)
+        field_bot = linear_interpolate_3d(pos_bot1(2),pos_bot3(2),pos(2),field_bot5,field_bot6)
 
-        ! field_bot5 = linear_interpolate_3d(pos_bot1(1),pos_bot2(1),pos(1),field_bot1,field_bot2)
-        ! field_bot6 = linear_interpolate_3d(pos_bot3(1),pos_bot4(1),pos(1),field_bot3,field_bot4)
-        ! field_bot = linear_interpolate_3d(pos_bot5(2),pos_bot6(2),pos(2),field_bot5,field_bot6)
+        ! Top interpolation
+        field_top5 = linear_interpolate_3d(pos_top1(1),pos_top2(1),pos(1),field_top1,field_top2)
+        field_top6 = linear_interpolate_3d(pos_top3(1),pos_top4(1),pos(1),field_top3,field_top4)
+        field_top = linear_interpolate_3d(pos_top1(2),pos_top3(2),pos(2),field_top5,field_top6)
 
-        ! ! Top interpolation
-        ! field_top5 = linear_interpolate_3d(pos_top1(1),pos_top2(1),pos(1),field_top1,field_top2)
-        ! field_top6 = linear_interpolate_3d(pos_top3(1),pos_top4(1),pos(1),field_top3,field_top4)
-        ! field_top = linear_interpolate_3d(pos_top5(2),pos_top6(2),pos(2),field_top5,field_top6)
-
-        ! ! Final interpolation
-        ! Calculate_Laplace_Field_at = linear_interpolate_3d(pos_bot(3),pos_top(3),pos(3),field_bot,field_top)
+        ! Final interpolation
+        Calculate_Laplace_Field_at = linear_interpolate_3d(pos_bot1(3),pos_top1(3),pos(3),field_bot,field_top)
 
     end function Calculate_Laplace_Field_at
 

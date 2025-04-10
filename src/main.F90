@@ -142,9 +142,9 @@ program RUMDEED
     do i = 1, steps
 
       if (laplace .eqv. .true.) then
-        call Place_Electron(i)
+        ! call Place_Electron(i)
         call Calculate_Laplace_Field(i)
-        call Write_Laplace_Data()
+        ! call Write_Laplace_Data()
       end if
 
       ! Do Emission
@@ -883,7 +883,9 @@ contains
 
     deallocate(my_seed)
 
-    call Clean_Up_Laplace()
+    if (laplace .eqv. .true.) then
+      call Clean_Up_Laplace()
+    end if
 
   end subroutine Clean_up
 end program RUMDEED
