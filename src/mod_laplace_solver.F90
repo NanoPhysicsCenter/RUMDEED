@@ -24,7 +24,7 @@ module mod_laplace_solver
     type(MKL_PARDISO_HANDLE), dimension(64) :: pt
     integer(kind=8), dimension(64) :: iparm
 
-    integer(kind=8), parameter :: maxfct=1, mnum=1, mtype=11, nrhs=1, msglvl=0
+    integer(kind=8), parameter :: maxfct=1, mnum=1, mtype=11, nrhs=1, msglvl=1
     integer(kind=8), parameter :: analysis=11, factorization=22, solving=33, solving1=331, solving2=333
 
     integer(kind=8) :: ndiff
@@ -71,17 +71,17 @@ contains
     subroutine Calculate_Laplace_Field(step) ! TODO
         integer(kind=8), intent(in) :: step
         ! Calculate the electric field
-        ! print *, 'Laplace: finding electrons'
+        print *, 'Laplace: finding electrons'
         call find_electrons()
-        ! print *, 'Laplace: updating matrix'
+        print *, 'Laplace: updating matrix'
         call update_matrix()
-        ! print *, 'Laplace: solving matrix'
+        print *, 'Laplace: solving matrix'
         call solve_system()
-        ! print *, 'Laplace: allocate voltage'
+        print *, 'Laplace: allocate voltage'
         call allocate_voltage()
-        ! print *, 'Laplace: calculating field'
+        print *, 'Laplace: calculating field'
         call calculate_field()
-        ! print *, 'Laplace: done'
+        print *, 'Laplace: done'
 
         ! call write_average_field()
         
@@ -106,11 +106,12 @@ contains
             ! iparm(11) = 0
             ! iparm(13) = 0
             ! iparm(24) = 10
-            call pardiso_phase(11) 
+            call pardiso_phase(11,1) 
+            ! iparm(5) = 1
             ! iparm(39) = 1
-            call pardiso_phase(22)
+            call pardiso_phase(22,1)
         end if
-        call pardiso_phase(33)
+        call pardiso_phase(33,1)
 
         ! print *, 'Laplace: iterative solving time:', end-start
 
@@ -224,6 +225,18 @@ contains
                 ! Place the values
                 call insert_emitter_boundary(g)
 
+            else if (is_anode(i) == 1) then
+                ! Place the center
+                nnz_center(g) = center
+                next_center = center + 1
+
+                ! Place the column indices
+                nnz_ia(g) = center
+                nnz_col_index(center) = g
+
+                ! Place the values
+                call insert_anode_boundary(g)
+
             else
 
                 boundaries = is_boundary(i)
@@ -306,8 +319,8 @@ contains
         iparm(5) = 0 ! 0 = ignored; 1 = user supplied fill-in permutation; 2 = returns permutation
         iparm(6) = 0 ! 0 = write solution on x; 1 = write solution on b
         ! iparm(7) = 0 ! output number of iterative refinement steps
-        iparm(8) = 100 ! maximum number of iterative refinement steps
-        iparm(9) = 6 ! tolerance = 10^(-iparm(9))	
+        ! iparm(8) =  1e6 ! maximum number of iterative refinement steps
+        ! iparm(9) = 12 ! tolerance = 10^(-iparm(9))	
         iparm(10) = 13 ! pivoting perturbation: 13 = 10^-13; 8 = 10^-8
         iparm(11) = 1 ! 0 = no scaling; 1 = scaling
         iparm(12) = 0 ! 0 = solve linear system; 1 = solve conjugate transposed system, 2 = solve transposed system
@@ -337,7 +350,7 @@ contains
         iparm(36) = 0 ! 0 = not compute shur; 1 = compute shur
         iparm(37) = 0 ! 0 = CSR format; 1 = BSR format
         ! iparm(38) = 0 ! reserved
-        iparm(39) = 1 ! 0 = full factorization; 1 = low-rank update
+        iparm(39) = 0 ! 0 = full factorization; 1 = low-rank update
         ! iparm(40) = 0 ! reserved
         ! iparm(41) = 0 ! reserved
         ! iparm(42) = 0 ! reserved
@@ -367,10 +380,10 @@ contains
         allocate(perm(nrGridActive))
 
         ! call cpu_time(start)
-        call pardiso_phase(11)
+        call pardiso_phase(11,0)
         iparm(27) = 0
-        call pardiso_phase(22)
-        call pardiso_phase(33)
+        call pardiso_phase(22,0)
+        call pardiso_phase(33,0)
         ! call cpu_time(end)
 
         ! print *, 'Laplace: pardiso initialization time:', end-start
@@ -380,13 +393,13 @@ contains
         
     end subroutine init_pardiso
 
-    subroutine pardiso_phase(phase)
-        integer(kind=8), intent(in) :: phase
+    subroutine pardiso_phase(phase,msg)
+        integer(kind=8), intent(in) :: phase, msg
         double precision, dimension(nrGridActive) :: ddum
         integer(kind=8) :: error
 
         ! print *, '  Laplace: analysis and symbolic factorization'
-        call pardiso_64(pt,maxfct,mnum,mtype,phase,nrGridActive,nnz_values,nnz_ia,nnz_col_index,perm,nrhs,iparm,msglvl,b,x,error)
+        call pardiso_64(pt,maxfct,mnum,mtype,phase,nrGridActive,nnz_values,nnz_ia,nnz_col_index,perm,nrhs,iparm,msg,b,x,error)
         if (error == 0) then
             ! print *, '  Laplace: analysis and symbolic factorization successful'
         else
@@ -555,7 +568,9 @@ contains
 
     subroutine update_matrix()
         integer(kind=8) :: g
-
+        ! if (allocated(perm)) then
+        !     deallocate(perm)
+        ! end if
         ! allocate(permdiff(nrGridActive*9))
         ndiff = 0
 
@@ -570,13 +585,13 @@ contains
                 else
                     call remove_electron_boundary(g)
                     call insert_electron_boundary(g)
-                    ! if (allocated(permdiff)) then
-                    !     ndiff = ndiff + 1
-                    !     permdiff((ndiff-1)*2+1) = g
-                    !     permdiff((ndiff-1)*2+2) = g
-                    ! else
-                    !     ndiff = ndiff + 1
-                    ! end if
+                    if (allocated(permdiff)) then
+                        ndiff = ndiff + 1
+                        permdiff((ndiff-1)*2+1) = g
+                        permdiff((ndiff-1)*2+2) = g
+                    else
+                        ndiff = ndiff + 1
+                    end if
                 end if
 
                 oCharge(g) = iCharge(g)
@@ -587,9 +602,11 @@ contains
 
         deallocate(iCharge)
 
-        ! allocate(perm(1+2*ndiff))
-        ! call reduce_perm()
-        ! deallocate(permdiff)
+        if (allocated(permdiff)) then
+            allocate(perm(1+2*ndiff))
+            call reduce_perm()
+            deallocate(permdiff)
+        end if
 
         ! print *, 'Laplace: perm:', perm(2:ndiff*2+1)
 
@@ -601,8 +618,8 @@ contains
 
         center = nnz_center(g)
 
-        nnz_values(center) = 1.0d0
-        b(g) = iCharge(g)
+        nnz_values(center) = 1.0d0*div_h2(3)
+        b(g) = iCharge(g)*div_h2(3)
     end subroutine insert_electron_boundary
 
     subroutine remove_electron_boundary(g)
@@ -621,9 +638,19 @@ contains
 
         center = nnz_center(g)
 
-        nnz_values(center) = 1.0d0
+        nnz_values(center) = 1.0d0*div_h2(3)
         b(g) = 0.0d0
     end subroutine insert_emitter_boundary
+
+    subroutine insert_anode_boundary(g)
+        integer(kind=8), intent(in) :: g
+        integer(kind=8) :: center
+
+        center = nnz_center(g)
+
+        nnz_values(center) = 1.0d0*div_h2(3)
+        b(g) = V_s*div_h2(3)
+    end subroutine insert_anode_boundary
 
     subroutine insert_finite_difference(g) ! DONE
         ! Insert finite difference equation into matrix
@@ -1136,17 +1163,19 @@ contains
 
     end function is_boundary
 
-    function is_top(i)
+    function is_anode(i)
         integer(kind=8), intent(in) :: i
-        integer(kind=8) :: is_top
-        
-        if (i >= (Nz-1)*NxNy) then
-            is_top = 1
-        else
-            is_top = 0
+        integer(kind=8) :: is_anode
+
+        is_anode = 0
+
+        point_coord = card_coord(i)
+
+        if (card_coord(3) >= box_dim(3)) then
+            is_anode = 1
         end if
 
-    end function is_top
+    end function is_anode
 
     function is_emitter(i)
         ! Returns 1 if point is within the emitter and 0 otherwise
@@ -1172,6 +1201,13 @@ contains
                 case (2) ! Rectangle
                     if (emitters_pos(1,1) <= point_coord(1) .and. point_coord(1) <= emitters_pos(1,1)+emitters_dim(1,1) &
                         .and. emitters_pos(2,1) <= point_coord(2) .and. point_coord(2) <= emitters_pos(2,1)+emitters_dim(2,1)) then
+                        is_emitter = 1
+                    else
+                        is_emitter = 0
+                    end if
+                case (4) ! Ring
+                    point_radius = sqrt(point_coord(1)**2 + point_coord(2)**2)
+                    if ((point_radius <= emitters_ring(1,1)) .and. (point_radius >= emitters_ring(2,1))) then
                         is_emitter = 1
                     else
                         is_emitter = 0
@@ -1291,7 +1327,7 @@ contains
         if (step == 1) then
             par_pos(1) = 0.0d0*length_scale
             par_pos(2) = 0.0d0*length_scale
-            par_pos(3) = 1.0d0*length_scale 
+            par_pos(3) = 0.5d0*length_scale 
             par_vel = 0.0d0
             call Add_Particle(par_pos,par_vel,species_elec,step,1,-1)
             ! par_pos(1) = 3.0d0*length_scale
@@ -1363,6 +1399,7 @@ contains
 
         if (is_inside(pos) == 0) then
             Calculate_Laplace_Field_at = Calc_Field_at(pos)
+            print *, 'aaaaaa'
             return
         end if
 
