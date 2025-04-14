@@ -18,7 +18,8 @@ module mod_laplace_solver
 
     ! Accessibility
     private
-    public :: Init_Laplace_Solver, Calculate_Laplace_Field, Calculate_Laplace_Field_at, Clean_Up_Laplace, Place_Electron, Write_Laplace_Data
+    public :: Init_Laplace_Solver, Calculate_Laplace_Field, Calculate_Laplace_Field_at, &
+                Clean_Up_Laplace, Place_Electron, Write_Laplace_Data, Sample_Field
 
     ! Pardiso variables
     type(MKL_PARDISO_HANDLE), dimension(64) :: pt
@@ -1166,12 +1167,13 @@ contains
     function is_anode(i)
         integer(kind=8), intent(in) :: i
         integer(kind=8) :: is_anode
+        double precision, dimension(3) :: point_coord
 
         is_anode = 0
 
-        point_coord = card_coord(i)
+        point_coord = cart_coord(i)
 
-        if (card_coord(3) >= box_dim(3)) then
+        if (point_coord(3) >= box_dim(3)) then
             is_anode = 1
         end if
 
@@ -1387,6 +1389,59 @@ contains
         end do
         
     end subroutine Write_Laplace_Data
+
+    subroutine Sample_Field(step)
+        integer, intent(in) :: step
+        integer             :: IFAIL, x, y, ud_field_pos, Nx, Ny
+        character(len=128)  :: filename
+        double precision    :: hx, hy, cur_rad
+        double precision, dimension(3) :: cur_pos, cur_field
+
+
+        if (sample_field_file .eqv. .true.) then
+          if (mod(step,sample_field_rate) == 0) then
+            ! Create the file
+            write(filename, '(a10, i0, a4)') 'out/field-', step, '.bin'
+            ! Open the file
+            open(newunit=ud_field_pos, iostat=IFAIL, file=filename, status='REPLACE', action='WRITE', access='STREAM')
+            if (IFAIL /= 0) then
+            print *, 'RUMDEED: Failed to open the field position file.'
+            return 
+            end if
+
+            Nx = 1000
+            Ny = 1000
+            hx = 2.0d0*emitters_dim(1,1) / Nx
+            hy = 2.0d0*emitters_dim(2,1) / Ny
+
+            do x=1,Nx
+              do y=1,Ny
+    
+                cur_pos(1) = emitters_pos(1,1) + (x-1)*hx
+                cur_pos(2) = emitters_pos(2,1) + (y-1)*hy
+                cur_pos(3) = 0.0d0
+
+                cur_rad = sqrt(cur_pos(1)**2 + cur_pos(2)**2)
+
+                if (emitters_ring(2,1) <= cur_rad .and. cur_rad <= emitters_ring(1,1)) then
+    
+                    if (laplace .eqv. .true.) then
+                        cur_field = Calculate_Laplace_Field_at(cur_pos)
+                    else
+                        cur_field = Calc_Field_at(cur_pos)
+                    end if
+
+                    ! Write data
+                    write(unit=ud_field_pos, iostat=IFAIL) cur_pos(:), cur_field(3)
+                end if
+              end do
+            end do 
+
+            ! Close the file
+            close(ud_field_pos, iostat=IFAIL)
+          end if
+        end if
+    end subroutine Sample_Field
 
     function Calculate_Laplace_Field_at(pos)
         double precision, dimension(3), intent(in) :: pos

@@ -306,6 +306,8 @@ module mod_global
   integer            :: sample_atom_rate = 500
   logical            :: sample_elec_file = .false.
   integer            :: sample_elec_rate = 500
+  logical            :: sample_field_file = .false.
+  integer            :: sample_field_rate = 500
   double precision   :: ion_atom_ratio = 1.0d0
      
   ! Laplace solver
@@ -376,6 +378,7 @@ module mod_global
                    write_electron_data_file, write_ion_data_file, &
                    sample_atom_file, sample_atom_rate, &
                    sample_elec_file, sample_elec_rate, &
+                   sample_field_file, sample_field_rate, &
                    ion_atom_ratio, &
                    laplace, laplace_dim, laplace_pos, laplace_intervals, &
                    R_s, R_p, L_p, C_p, ion_life_time, &

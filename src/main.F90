@@ -157,6 +157,7 @@ program RUMDEED
       call Write_Position(i)
       call Sample_Atom_Position(i)
       call Sample_Elec_Position(i)
+      call Sample_Field(i)
       !call Write_Position_XYZ_Step(i)
 
       ! Remove particles from the system
