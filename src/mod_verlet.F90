@@ -38,15 +38,18 @@ contains
 
     ! Update the position of particles (Electrons / Ion's)
     !if (nrElecIon > 0) then
+      ! print*, 'Start update position'
       call Update_Particle_Position(step)
+      ! print*, 'End update position'
 
 #if _TESTING_MODE_ == 1
       !if ((EMISSION_MODE == EMISSION_TEST) .or. (EMISSION_MODE == EMISSION_MANUAL)) then
         call Write_Position_Test(step)
       !end if
 #endif
-
+      ! print *, 'Start calculate acceleration'
       call Calculate_Acceleration_Particles()
+      ! print *, 'End calculate acceleration'
 
 #if _TESTING_MODE_ == 1
       !if ((EMISSION_MODE == EMISSION_TEST) .or. (EMISSION_MODE == EMISSION_MANUAL)) then
@@ -59,7 +62,9 @@ contains
       wait(ud_ramo_sec) ! ud_ramo_sec is done asynchronously. We must make sure it is finished.
       ramo_current = 0.0d0
       ramo_current_emit = 0.0d0
+      ! print *, 'Start update velocity'
       call Update_Velocity(step)
+      ! print *, 'End update velocity'
     !end if
 
     ! Write out the current in the system
@@ -69,14 +74,14 @@ contains
 
   subroutine Do_Collisions(step)
     integer, intent(in) :: step
-
-    if (collisions .eqv. .true.) then
+    if (collision_mode /= 0) then
+      ! print *, 'Doing collisions'
       call Do_Electron_Atom_Collisions(step)
     end if
   end subroutine Do_Collisions
 
   subroutine Read_Cross_Section_Data()
-    if (collisions .eqv. .true.) then
+    if (collision_mode /= 0) then
       print '(a)', 'RUMDEED: Doing collisions reading in data'
       call Read_Cross_Section()
     end if
@@ -230,7 +235,7 @@ contains
     !$OMP PARALLEL DO DEFAULT(NONE) PRIVATE(i, q, k, emit, sec) &
     !$OMP& SHARED(nrPart, particles_cur_vel, particles_prev_accel, particles_cur_accel, time_step) &
     !$OMP& SHARED(ramo_current, ramo_current_emit, E_zunit, particles_section, particles_charge) &
-    !$OMP& SHARED(particles_species, particles_emitter, particles_prev2_accel, collisions) &
+    !$OMP& SHARED(particles_species, particles_emitter, particles_prev2_accel) &
     !$OMP& REDUCTION(+:avg_part_vel, avg_elec_vel, avg_ion_vel)
     do i = 1, nrPart
       if (particles_species(i) == species_elec) then
@@ -297,9 +302,12 @@ contains
     !$OMP& PRIVATE(force_E, force_c, force_ic, force_ic_N, force_ic_self, im_1, q_1, im_2, q_2, pre_fac_c) &
     !$OMP& SHARED(nrPart, particles_cur_pos, particles_mass, particles_species, ptr_field_E, box_dim) &
     !$OMP& SHARED(ptr_Image_Charge_effect, particles_charge, particles_cur_accel, d)
+    ! $OMP& SCHEDULE(DYNAMIC, 1) &
+    ! $OMP& REDUCTION(+:particles_cur_accel)
 
     do i = 1, nrPart
-      if (particles_species(i) == species_elec) then
+      ! print *, 'i', i
+      ! if (particles_species(i) == species_elec) then
         ! Information about the particle we are calculating the force/acceleration on
         pos_1 = particles_cur_pos(:, i)
         im_1 = 1.0d0 / particles_mass(i)
@@ -321,8 +329,9 @@ contains
         ! Loop over particles from i+1 to nrElec.
         ! There is no need to loop over all particles since
         ! The forces are equal but in opposite directions
+        ! print *, 'second do loop'
         do j = i+1, nrPart
-          if (particles_species(j) /= species_atom) then
+          ! if (particles_species(j) /= species_atom) then
             ! Information about the particle that is acting on the particle at pos_1
             pos_2 = particles_cur_pos(:, j)
             !if (particles_mass(j) == 0.0d0) then
@@ -382,20 +391,19 @@ contains
             ! force_ic = force_ic + (-1.0d0)*pre_fac_c * diff / r**3
 
 
-            !$OMP CRITICAL
+            ! $OMP CRITICAL
+            ! print *, 'start individual update'
             particles_cur_accel(:, j) = particles_cur_accel(:, j) - force_c * im_2 + force_ic_N * im_2
-            !$OMP END CRITICAL
-
-            !$OMP CRITICAL
             particles_cur_accel(:, i) = particles_cur_accel(:, i) + force_c * im_1 + force_ic   * im_1
-            !$OMP END CRITICAL
+            ! print *, 'end individual update'
+            ! $OMP END CRITICAL
 
-          end if
+          ! end if
         end do
-        !$OMP CRITICAL
+        ! $OMP CRITICAL
         particles_cur_accel(:, i) = particles_cur_accel(:, i) + force_E * im_1 + force_ic_self * im_1
-        !$OMP END CRITICAL
-      end if
+        ! $OMP END CRITICAL
+      ! end if
     end do
     !$OMP END PARALLEL DO
 

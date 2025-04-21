@@ -131,6 +131,10 @@ program RUMDEED
       call Init_Laplace_Solver()
     end if
 
+    if (collision_mode /= 0) then
+      call Place_Atoms_Cylinder()
+    end if
+
     print '(a)', 'RUMDEED: Starting main loop'
     print '(tr1, a, i0, a, ES12.4, a)', 'Doing ', steps, ' time steps of size ', time_step/1.0E-12, ' ps'
 
@@ -165,7 +169,9 @@ program RUMDEED
       call Remove_Particles(i)
 
       ! Do Collisions
+      ! print *, 'Start collisions'
       call Do_Collisions(i)
+      ! print *, 'End collisions'
 
       ! Flush data
       call Flush_Data()
@@ -371,6 +377,7 @@ contains
     allocate(particles_id(1:MAX_PARTICLES))
     allocate(particles_cur_energy(1:MAX_PARTICLES))
     allocate(particles_ion_cross_sec(1:MAX_PARTICLES))
+    allocate(particles_ion_cross_rad(1:MAX_PARTICLES))
     allocate(particles_recom_cross_rad(1:MAX_PARTICLES))
     allocate(particles_tot_cross_sec(1:MAX_PARTICLES))
 
@@ -869,6 +876,7 @@ contains
     deallocate(particles_step)
     deallocate(particles_cur_energy)
     deallocate(particles_ion_cross_sec)
+    deallocate(particles_ion_cross_rad)
     deallocate(particles_recom_cross_rad)
     deallocate(particles_tot_cross_sec)
 

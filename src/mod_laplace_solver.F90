@@ -1431,6 +1431,8 @@ contains
                         cur_field = Calc_Field_at(cur_pos)
                     end if
 
+                    ! print *, cur_field(3)
+
                     ! Write data
                     write(unit=ud_field_pos, iostat=IFAIL) cur_pos(:), cur_field(3)
                 end if

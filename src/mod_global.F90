@@ -140,8 +140,9 @@ module mod_global
 
   ! Collision data
   double precision, dimension(:), allocatable :: particles_cur_energy 
-  double precision, dimension(:), allocatable :: particles_recom_cross_rad
   double precision, dimension(:), allocatable :: particles_ion_cross_sec
+  double precision, dimension(:), allocatable :: particles_ion_cross_rad
+  double precision, dimension(:), allocatable :: particles_recom_cross_rad
   double precision, dimension(:), allocatable :: particles_tot_cross_sec
 
   
@@ -171,12 +172,14 @@ module mod_global
   double precision, dimension(1:3) :: box_dim ! Dimensions of the cell
 
   double precision :: time_step  ! Size of the time_step
+  integer :: time_step_collision ! Size of the time step for the collision
   double precision :: time_step2 ! time_step squared
 
   integer          :: steps      ! Number of time steps in the simulation
 
-  logical          :: collisions = .false. ! Do ion colissions or not
+  integer          :: collision_mode = 0 ! Do ion colissions or not
   integer          :: ion_life_time = 100000000 ! Lifetime of ions
+  double precision   :: ion_atom_ratio = 0.0d0 ! Initial ratio of ions to atoms
 
   double precision :: T_temp = T_ntp ! Temperature in Kelvin
   double precision :: P_abs = 1.0d0  ! Pressure as fraction of P_ntp
@@ -308,7 +311,6 @@ module mod_global
   integer            :: sample_elec_rate = 500
   logical            :: sample_field_file = .false.
   integer            :: sample_field_rate = 500
-  double precision   :: ion_atom_ratio = 1.0d0
      
   ! Laplace solver
   logical            :: laplace = .false.
@@ -369,17 +371,17 @@ module mod_global
   ! ----------------------------------------------------------------------------
   ! Define namelist for the input file
   ! These variables are read for the input file.
-  namelist /input/ V_s, box_dim, time_step, steps, &
+  namelist /input/ V_s, box_dim, time_step, time_step_collision, steps, &
                    nrEmit, emitters_pos, emitters_dim, &
                    emitters_type, emitters_delay, EMISSION_MODE, &
-                   image_charge, N_ic_max, collisions, T_temp, P_abs, &
+                   image_charge, N_ic_max, collision_mode, &
+                   ion_atom_ratio, T_temp, P_abs, &
                    write_ramo_sec, write_position_file, &
                    write_recombination_file, write_particle_data_file, &
                    write_electron_data_file, write_ion_data_file, &
                    sample_atom_file, sample_atom_rate, &
                    sample_elec_file, sample_elec_rate, &
                    sample_field_file, sample_field_rate, &
-                   ion_atom_ratio, &
                    laplace, laplace_dim, laplace_pos, laplace_intervals, &
                    R_s, R_p, L_p, C_p, ion_life_time, &
                    planes_N, planes_z
