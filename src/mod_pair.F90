@@ -353,11 +353,15 @@ contains
         !$OMP END TASK
 
         !$OMP TASK FIRSTPRIVATE(k, m) SHARED(particles_tot_cross_sec, particles_mask)
-        call compact_array(particles_tot_cross_sec, particles_mask, k, m)
+        call compact_array(particles_ion_cross_rad, particles_mask, k, m)
         !$OMP END TASK
 
         !$OMP TASK FIRSTPRIVATE(k, m) SHARED(particles_recom_cross_rad, particles_mask)
         call compact_array(particles_recom_cross_rad, particles_mask, k, m)
+        !$OMP END TASK
+
+        !$OMP TASK FIRSTPRIVATE(k, m) SHARED(particles_tot_cross_sec, particles_mask)
+        call compact_array(particles_tot_cross_sec, particles_mask, k, m)
         !$OMP END TASK
 
         !$OMP END SINGLE NOWAIT
@@ -624,40 +628,42 @@ contains
     character(len=128)  :: filename
     double precision    :: dist
 
-    particles_nearest_dist = 1000.0d0
-    !$OMP PARALLEL DO DEFAULT(NONE) &
-    !$OMP& PRIVATE(i, j, dist) &
-    !$OMP& SHARED(particles_nearest_dist, particles_nearest_id, particles_cur_pos, particles_species, nrPart) &
-    !$OMP& SCHEDULE(DYNAMIC, 1)
-    do i = 1, nrPart
-      if (particles_species(i) == species_elec) then
-        do j = i+1, nrPart
-          if (particles_species(j) == species_elec) then
-            dist = norm2(particles_cur_pos(:,i) - particles_cur_pos(:,j))
-            if (dist < particles_nearest_dist(i)) then
-              !$OMP CRITICAL
-              particles_nearest_dist(i) = dist
-              !$OMP END CRITICAL
-              !$OMP CRITICAL
-              particles_nearest_id(i) = j
-              !$OMP END CRITICAL
-            end if
-            if (dist < particles_nearest_dist(j)) then
-              !$OMP CRITICAL
-              particles_nearest_dist(j) = dist
-              !$OMP END CRITICAL
-              !$OMP CRITICAL
-              particles_nearest_id(j) = i
-              !$OMP END CRITICAL
-            end if
-          end if
-        end do
-      end if
-    end do
-    !$OMP END PARALLEL DO
-
     if (sample_elec_file .eqv. .true.) then
       if (mod(step,sample_elec_rate) == 0) then
+
+        ! Compute average nearest distance
+        particles_nearest_dist = box_dim(3) ! Set the distance to the box size
+        !$OMP PARALLEL DO DEFAULT(NONE) &
+        !$OMP& PRIVATE(i, j, dist) &
+        !$OMP& SHARED(particles_nearest_dist, particles_nearest_id, particles_cur_pos, particles_species, nrPart) &
+        !$OMP& SCHEDULE(DYNAMIC, 1)
+        do i = 1, nrPart
+          if (particles_species(i) == species_elec) then
+            do j = i+1, nrPart
+              if (particles_species(j) == species_elec) then
+                dist = norm2(particles_cur_pos(:,i) - particles_cur_pos(:,j))
+                if (dist < particles_nearest_dist(i)) then
+                  !$OMP CRITICAL
+                  particles_nearest_dist(i) = dist
+                  !$OMP END CRITICAL
+                  !$OMP CRITICAL
+                  particles_nearest_id(i) = j
+                  !$OMP END CRITICAL
+                end if
+                if (dist < particles_nearest_dist(j)) then
+                  !$OMP CRITICAL
+                  particles_nearest_dist(j) = dist
+                  !$OMP END CRITICAL
+                  !$OMP CRITICAL
+                  particles_nearest_id(j) = i
+                  !$OMP END CRITICAL
+                end if
+              end if
+            end do
+          end if
+        end do
+        !$OMP END PARALLEL DO
+
         ! Create the file
         write(filename, '(a9, i0, a4)') 'out/elec-', step, '.bin'
         ! Open the file
@@ -680,6 +686,7 @@ contains
       end if
     end if
   end subroutine Sample_Elec_Position
+
 
   !-----------------------------------------------------------------------------
   ! Write out the positions

@@ -31,26 +31,23 @@ contains
     integer, intent(in)               ::  step
     integer                           ::  IFAIL, nrCollisions=0, nrRecombinations=0, nrIonizations=0
 
-    if (mod(step, time_step_collision) == 0) then
-      ! print*, 'Current step:', step, 'Collision step:', time_step_collision
-      call Update_Collision_Data_All()
+    call Update_Collision_Data_All()
 
-      select case (collision_mode)
-        case (1) ! Continuous ionization
-          call Do_Continuous_Ionization(step, nrCollisions, nrIonizations)
-        case (2) ! Continuous ionization and discrete recombination
-          call Do_Continuous_Ionization(step, nrCollisions, nrIonizations)
-          call Do_Discrete_Recombination(step, nrRecombinations)
-          nrCollisions = nrCollisions + nrRecombinations
-        case (3) ! Discrete ionization
-          call Do_Discrete_Ionization(step, nrIonizations)
-          nrCollisions = nrIonizations
-        case (4) ! Discrete ionization and discrete recombination
-          call Do_Discrete_Ionization(step, nrIonizations)
-          call Do_Discrete_Recombination(step, nrRecombinations)
-          nrCollisions = nrIonizations + nrRecombinations
-      end select
-    end if
+    select case (collision_mode)
+      case (1) ! Continuous ionization
+        call Do_Continuous_Ionization(step, nrCollisions, nrIonizations)
+      case (2) ! Continuous ionization and discrete recombination
+        call Do_Continuous_Ionization(step, nrCollisions, nrIonizations)
+        call Do_Discrete_Recombination(step, nrRecombinations)
+        nrCollisions = nrCollisions + nrRecombinations
+      case (3) ! Discrete ionization
+        call Do_Discrete_Ionization(step, nrIonizations)
+        nrCollisions = nrIonizations
+      case (4) ! Discrete ionization and discrete recombination
+        call Do_Discrete_Ionization(step, nrIonizations)
+        call Do_Discrete_Recombination(step, nrRecombinations)
+        nrCollisions = nrIonizations + nrRecombinations
+    end select
 
     write(ud_coll, '(i6,tr2,i6,tr2,i6,tr2,i6)', iostat=IFAIL) &
             step, nrCollisions, nrIonizations, nrRecombinations
@@ -72,7 +69,7 @@ contains
     double precision, dimension(1:3)  ::  elec_cur_pos, elec_cur_vel, elec_cur_acc, elec_next_pos, rel_pos
     double precision                  ::  cur_dist2, elec_cur_speed, dist
     ! Kramers
-    double precision, parameter       ::  multiplicator = 1000.0d0
+    double precision, parameter       ::  multiplicator = 1.0d0
     double precision                  ::  recom_rad2, recom_rad
     ! Polynomial solver
     double precision                  ::  a, b, cc, dd, e, t, t1_r, t1_i, t2_r, t2_i, t3_r, t3_i, t4_r, t4_i
@@ -183,7 +180,7 @@ contains
                 ! Remove electron always
                 call Mark_Particles_Remove(k, remove_recom)
 
-                ! Add atom only if ionization is discrete
+                ! Add atom only if ionization is discrete 
                 if (collision_mode == 4) then
                   atom_cur_pos = ion_cur_pos
                   atom_cur_vel = (/0.0d0,0.0d0,0.0d0/)
@@ -210,7 +207,7 @@ contains
 
   subroutine Do_Continuous_Ionization(step,nrCollisions,nrIonizations)
     integer, intent(in)               ::  step
-    integer, intent(out)              ::  nrIonizations, nrCollisions
+    integer, intent(inout)              ::  nrIonizations, nrCollisions
     ! Parameters
     double precision, parameter       ::  elec_max_speed2 = (2.0d0*q_0*5000.0d0/m_0)
     ! Electrons and ion
@@ -227,9 +224,6 @@ contains
     integer                           ::  i
     double precision                  ::  rnd, alpha
 
-    
-    nrIonizations = 0
-    nrCollisions = 0
     count_n = 0
 
     if (nrElec == 0) return
@@ -299,7 +293,7 @@ contains
                 ! --------------------- Ejected electron ---------------------   
                 ! New position
                 call random_number(ejec_elec_pos)
-                ejec_elec_pos = ejec_elec_pos - 0.5d0
+                ejec_elec_pos = 2.0d0*(ejec_elec_pos - 0.5d0) ! allow negative_values
                 ejec_elec_pos = elec_cur_pos + ejec_elec_pos*length_scale
                 ! New direction
                 direct_vec = Get_Ejected_Vec(elec_energy, elec_energy, elec_cur_vel)
@@ -310,7 +304,9 @@ contains
                 newSpeed = norm2(ejec_elec_vel)
 
                 ! ----------------------- Created ion -----------------------
-                ion_pos = elec_cur_pos
+                call random_number(ion_pos)
+                ion_pos = 2.0d0*(ion_pos - 0.5d0) ! allow negative values
+                ion_pos = elec_cur_pos + ion_pos*length_scale
                 ion_vel = 0.0d0
 
                 ! --------------------- Ionization ---------------------------
@@ -330,6 +326,8 @@ contains
                 !$OMP END CRITICAL
 
                 nrIonizations = nrIonizations + 1
+
+                particles_emitter(i) = ion_emitter
               end if
 
               ! Update the number of collisions
@@ -344,7 +342,7 @@ contains
 
   subroutine Do_Discrete_Ionization(step,nrIonizations)
     integer, intent(in)               ::  step
-    integer, intent(out)              ::  nrIonizations
+    integer, intent(inout)              ::  nrIonizations
     ! Parameters
     double precision, parameter       ::  elec_max_speed2 = (2.0d0*q_0*5000.0d0/m_0)
     ! Atom, ion, and electron
@@ -363,8 +361,6 @@ contains
     integer                           ::  i,k
     double precision                  ::  rnd
 
-    
-    nrIonizations = 0
     if (nrElec == 0) return
     !$OMP PARALLEL DO DEFAULT(NONE) &
     !$OMP& PRIVATE(atom_cur_pos,elec_cur_pos,elec_next_pos,elec_cur_vel,elec_cur_acc) &
@@ -1096,8 +1092,6 @@ contains
     double precision, dimension(1:3)  :: atom_pos, atom_vel
     integer                           :: nrStartAtoms, nrStartIons, i
 
-    if ((collision_mode /= 3) .and. (collision_mode /= 4)) return ! No discrete ionization
-
     emitR = emitters_dim(1, 1) ! Radius of emitter
     emitR2 = emitR**2 ! Radius of emitter squared
     
@@ -1108,7 +1102,7 @@ contains
     
     !$OMP PARALLEL DO DEFAULT(NONE) &
     !$OMP& PRIVATE(i, rnd, atom_pos, atom_vel, R2) &
-    !$OMP& SHARED(emitR, emitR2, nrStartAtoms, nrStartIons, box_dim, emitters_pos, emitters_dim, ion_life_time)
+    !$OMP& SHARED(emitR, emitR2, nrStartAtoms, nrStartIons, box_dim, emitters_pos, emitters_dim, ion_life_time, collision_mode)
 
     ! Place atoms
     do i=1,nrStartAtoms
@@ -1134,9 +1128,11 @@ contains
         nrStartIons = nrStartIons - 1
       else
         ! Add particle to the system
-        !$OMP CRITICAL
-        call Add_Particle(atom_pos, atom_vel, species_atom, 0, ion_emitter, -1)
-        !$OMP END CRITICAL
+        if ((collision_mode == 3) .or. (collision_mode == 4)) then ! If we use discrete ionization
+          !$OMP CRITICAL
+          call Add_Particle(atom_pos, atom_vel, species_atom, 0, ion_emitter, -1)
+          !$OMP END CRITICAL
+        end if
       end if
     end do
     !$OMP END PARALLEL DO

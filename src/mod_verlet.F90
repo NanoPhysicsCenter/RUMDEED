@@ -98,7 +98,7 @@ contains
     !$OMP& SHARED(time_step, time_step2, particles_prev2_accel, particles_species, particles_prev_accel)
 
     do i = 1, nrPart
-      if (particles_species(i) == species_elec) then
+      ! if (particles_species(i) == species_elec) then
         ! Verlet
         !particles_prev_pos(:, i) = particles_cur_pos(:, i) ! Store the previous position
         !particles_cur_pos(:, i)  = particles_cur_pos(:, i) + particles_cur_vel(:, i)*time_step &
@@ -118,7 +118,7 @@ contains
 
         ! Record information about particles when to pass trough certain planes
         call Check_Planes(i)
-      end if
+      ! end if
     end do
     !$OMP END PARALLEL DO
   end subroutine Update_Particle_Position
@@ -238,7 +238,7 @@ contains
     !$OMP& SHARED(particles_species, particles_emitter, particles_prev2_accel) &
     !$OMP& REDUCTION(+:avg_part_vel, avg_elec_vel, avg_ion_vel)
     do i = 1, nrPart
-      if (particles_species(i) == species_elec) then
+      ! if (particles_species(i) == species_elec) then
         ! Verlet
         !particles_cur_vel(:, i) = particles_cur_vel(:, i) &
         !                      & + 0.5d0*( particles_prev_accel(:, i) &
@@ -266,7 +266,7 @@ contains
         ! avg_part_vel(:) = avg_part_vel(:) + particles_cur_vel(:, i) ! Calculate the sum for the average
         avg_elec_vel(:) = avg_elec_vel(:) + particles_cur_vel(:, i) ! Calculate the sum for the average
         avg_part_vel(:) = avg_part_vel + particles_cur_vel(:, i) ! Calculate the sum for the average
-      end if
+      ! end if
     end do
     !$OMP END PARALLEL DO
 
@@ -474,7 +474,7 @@ contains
     !$OMP& SHARED(particles_species) &
     !$OMP& REDUCTION(+:force_tot)
     do j = 1, nrPart
-      if (particles_species(j) /= species_atom) then
+      ! if (particles_species(j) /= species_atom) then
 
         ! Position of the particle that is acting on the particle at pos_1
         pos_2 = particles_cur_pos(:, j)
@@ -500,7 +500,7 @@ contains
 
         ! The total force
         force_tot = force_tot + pre_fac_c * force_c + pre_fac_c * force_ic
-      end if
+      ! end if
     end do
     !$OMP END PARALLEL DO
 

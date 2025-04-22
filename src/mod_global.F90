@@ -172,7 +172,7 @@ module mod_global
   double precision, dimension(1:3) :: box_dim ! Dimensions of the cell
 
   double precision :: time_step  ! Size of the time_step
-  integer :: time_step_collision ! Size of the time step for the collision
+  integer :: time_step_atom ! Size of the time step for the collision
   double precision :: time_step2 ! time_step squared
 
   integer          :: steps      ! Number of time steps in the simulation
@@ -371,7 +371,7 @@ module mod_global
   ! ----------------------------------------------------------------------------
   ! Define namelist for the input file
   ! These variables are read for the input file.
-  namelist /input/ V_s, box_dim, time_step, time_step_collision, steps, &
+  namelist /input/ V_s, box_dim, time_step, time_step_atom, steps, &
                    nrEmit, emitters_pos, emitters_dim, &
                    emitters_type, emitters_delay, EMISSION_MODE, &
                    image_charge, N_ic_max, collision_mode, &
