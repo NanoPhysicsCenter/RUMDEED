@@ -29,7 +29,7 @@ contains
 
   subroutine Do_Electron_Atom_Collisions(step)
     integer, intent(in)               ::  step
-    integer                           ::  IFAIL, nrCollisions=0, nrRecombinations=0, nrIonizations=0
+    integer                           ::  IFAIL, nrCollisions, nrRecombinations, nrIonizations
 
     call Update_Collision_Data_All()
 
@@ -207,7 +207,7 @@ contains
 
   subroutine Do_Continuous_Ionization(step,nrCollisions,nrIonizations)
     integer, intent(in)               ::  step
-    integer, intent(inout)              ::  nrIonizations, nrCollisions
+    integer, intent(out)              ::  nrIonizations, nrCollisions
     ! Parameters
     double precision, parameter       ::  elec_max_speed2 = (2.0d0*q_0*5000.0d0/m_0)
     ! Electrons and ion
@@ -224,6 +224,8 @@ contains
     integer                           ::  i
     double precision                  ::  rnd, alpha
 
+    nrCollisions = 0
+    nrIonizations = 0
     count_n = 0
 
     if (nrElec == 0) return
@@ -342,7 +344,7 @@ contains
 
   subroutine Do_Discrete_Ionization(step,nrIonizations)
     integer, intent(in)               ::  step
-    integer, intent(inout)              ::  nrIonizations
+    integer, intent(out)              ::  nrIonizations
     ! Parameters
     double precision, parameter       ::  elec_max_speed2 = (2.0d0*q_0*5000.0d0/m_0)
     ! Atom, ion, and electron
@@ -360,6 +362,8 @@ contains
     ! Misc
     integer                           ::  i,k
     double precision                  ::  rnd
+
+    nrIonizations = 0
 
     if (nrElec == 0) return
     !$OMP PARALLEL DO DEFAULT(NONE) &
@@ -1088,30 +1092,33 @@ contains
   ! --------------------------------------------------------------------------
 
   subroutine Place_Atoms_Cylinder()
-    double precision                  :: volume, rnd, emitR, emitR2, R2
+    double precision                  :: volume, rnd, cylindR, cylindR2, R2
     double precision, dimension(1:3)  :: atom_pos, atom_vel
     integer                           :: nrStartAtoms, nrStartIons, i
 
-    emitR = emitters_dim(1, 1) ! Radius of emitter
-    emitR2 = emitR**2 ! Radius of emitter squared
+    cylindR = 1.0d0*emitters_dim(1, 1) ! Radius of the gas cylinder
+    cylindR2 = cylindR**2 ! Radius of cylinder squared
     
     ! Calculate number of atoms
-    volume = pi*emitR2*box_dim(3)
-    nrStartAtoms = int(volume*n_d)
+    volume = pi*cylindR2*box_dim(3)
+    nrStartAtoms = int(volume*n_d*P_abs)
     nrStartIons = int(nrStartAtoms*ion_atom_ratio)
+
+    ! print *, 'Max particles = ', MAX_PARTICLES
+    ! print *, 'Nr atoms = ', nrStartAtoms
     
     !$OMP PARALLEL DO DEFAULT(NONE) &
     !$OMP& PRIVATE(i, rnd, atom_pos, atom_vel, R2) &
-    !$OMP& SHARED(emitR, emitR2, nrStartAtoms, nrStartIons, box_dim, emitters_pos, emitters_dim, ion_life_time, collision_mode)
+    !$OMP& SHARED(cylindR, cylindR2, nrStartAtoms, nrStartIons, box_dim, emitters_pos, emitters_dim, ion_life_time, collision_mode)
 
     ! Place atoms
     do i=1,nrStartAtoms
       ! Find random position in the cylinder
-      R2 = emitR2 + 1.0d0 ! Must be larger then emitR2 for the do while loop to run
-      do while (R2 > emitR2)
+      R2 = cylindR2 + 1.0d0 ! Must be larger than emitR2 for the do while loop to run
+      do while (R2 > cylindR2)
         call random_number(atom_pos(1:2)) ! Gives a random number [0,1]
-        atom_pos(1:2) = 2.0d0*(atom_pos(1:2) - 0.5d0)*emitR ! Range is -r_e to +r_e
-        r2 = atom_pos(1)**2 + atom_pos(2)**2 ! Radius squared of our random point
+        atom_pos(1:2) = 2.0d0*(atom_pos(1:2) - 0.5d0)*cylindR ! Range is -r_e to +r_e
+        R2 = atom_pos(1)**2 + atom_pos(2)**2 ! Radius squared of our random point
       end do
       atom_pos(1:2) = emitters_pos(1:2,1) + atom_pos(1:2) + emitters_dim(1:2,1)
       call random_number(rnd)
