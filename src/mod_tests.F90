@@ -301,7 +301,8 @@ contains
     call Add_Particle(R_2, par_vel, species_elec, 1, 0, -1)
     call Add_Particle(R_3, par_vel, species_ion, 1, 0, -1)
 
-    call Calculate_Acceleration_Particles()
+    call Update_Particle_Acceleration(1)
+    ! call Calculate_Acceleration_Particles()
 
     ! Test the field at this location
     par_vel = (/ -4.55, -2.34, 96.44 /) * length_scale
@@ -782,7 +783,8 @@ contains
     call Add_Particle(R_2, par_vel, species_elec, 1, 0, -1)
     call Add_Particle(R_3, par_vel, species_ion, 1, 0, -1)
 
-    call Calculate_Acceleration_Particles()
+    call Update_Particle_Acceleration(1)
+    ! call Calculate_Acceleration_Particles()
 
     ! Test the field at this location
     par_vel = (/ -4.55, -2.34, 96.44 /) * length_scale

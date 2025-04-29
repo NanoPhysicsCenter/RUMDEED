@@ -113,7 +113,7 @@ module mod_global
   integer, parameter :: atom_emitter = 4
 
   ! ----------------------------------------------------------------------------
-  ! Define storage arrays for particles
+  ! Electron data
   ! Position and velocity of particles. Fyrst dimension is x,y,z, second one is the number of the particle
   double precision, dimension(:, :), allocatable :: particles_cur_pos    ! Current position (1:3, 1:MAX_PARTICLES)
   double precision, dimension(:, :), allocatable :: particles_prev_pos   ! Previous position
@@ -136,14 +136,25 @@ module mod_global
   logical         , dimension(:)   , allocatable :: particles_mask       ! Mask array used to indicate which particles should be removed
                                                                          ! .true. means that the particle is active,
                                                                          ! .false. means it is inactive and should be removed
+  logical         , dimension(:)   , allocatable :: particles_elec_mask  ! Remove flag for the particles
+  logical         , dimension(:)   , allocatable :: particles_ion_mask   ! Remove flag for the particles
+  logical         , dimension(:)   , allocatable :: particles_atom_mask  ! Remove flag for the particles
   integer         , dimension(:)   , allocatable :: particles_id         ! ID to track the particle
 
+  ! Pointer arrays
+  integer, dimension(:), pointer :: particles_elec_pointer ! From nrElec to nrPart
+  integer, dimension(:), pointer :: particles_ion_pointer   ! From nrIon to nrPart
+  integer, dimension(:), pointer :: particles_atom_pointer  ! From nrAtom to nrPart
+  integer, dimension(:), pointer :: particles_inverse_pointer ! From nrPart to nrElec, nrIon, or nrAtom (inverse of the above)
+
+
+
   ! Collision data
-  double precision, dimension(:), allocatable :: particles_cur_energy 
-  double precision, dimension(:), allocatable :: particles_ion_cross_sec
-  double precision, dimension(:), allocatable :: particles_ion_cross_rad
-  double precision, dimension(:), allocatable :: particles_recom_cross_rad
-  double precision, dimension(:), allocatable :: particles_tot_cross_sec
+  double precision, dimension(:), allocatable :: particles_cur_energy         ! Current kinetic energy of each particle
+  double precision, dimension(:), allocatable :: particles_recom_cross_rad    ! Recombination cross section for electrons
+  double precision, dimension(:), allocatable :: particles_ion_cross_sec      ! Ionization cross section for electrons
+  double precision, dimension(:), allocatable :: particles_ion_cross_rad      ! Ionization cross section radius for electrons
+  double precision, dimension(:), allocatable :: particles_tot_cross_sec      ! Total collision cross section for electrons
 
   
   ! Cross Sections
@@ -172,14 +183,16 @@ module mod_global
   double precision, dimension(1:3) :: box_dim ! Dimensions of the cell
 
   double precision :: time_step  ! Size of the time_step
-  integer :: time_step_atom ! Size of the time step for the collision
   double precision :: time_step2 ! time_step squared
+  integer :: atom_time_interval ! Time interval for atom movement
+  double precision :: atom_time_step ! Size of the time_step for atom movement
+  double precision :: atom_interval2 ! atom_time_step squared
 
   integer          :: steps      ! Number of time steps in the simulation
 
-  integer          :: collision_mode = 0 ! Do ion colissions or not
+  integer          :: collision_mode = 0 ! Type of collision
+  double precision :: ion_atom_ratio = 0.0d0 ! Ratio of ions to atoms
   integer          :: ion_life_time = 100000000 ! Lifetime of ions
-  double precision   :: ion_atom_ratio = 0.0d0 ! Initial ratio of ions to atoms
 
   double precision :: T_temp = T_ntp ! Temperature in Kelvin
   double precision :: P_abs = 1.0d0  ! Pressure as fraction of P_ntp
@@ -309,8 +322,6 @@ module mod_global
   integer            :: sample_atom_rate = 500
   logical            :: sample_elec_file = .false.
   integer            :: sample_elec_rate = 500
-  logical            :: sample_field_file = .false.
-  integer            :: sample_field_rate = 500
      
   ! Laplace solver
   logical            :: laplace = .false.
@@ -371,17 +382,16 @@ module mod_global
   ! ----------------------------------------------------------------------------
   ! Define namelist for the input file
   ! These variables are read for the input file.
-  namelist /input/ V_s, box_dim, time_step, time_step_atom, steps, &
+  namelist /input/ V_s, box_dim, time_step, atom_time_interval, steps, &
                    nrEmit, emitters_pos, emitters_dim, &
-                   emitters_type, emitters_delay, EMISSION_MODE, &
-                   image_charge, N_ic_max, collision_mode, &
-                   ion_atom_ratio, T_temp, P_abs, &
+                   emitters_type, emitters_delay, emission_mode, &
+                   image_charge, N_ic_max, &
+                   collision_mode, ion_atom_ratio, T_temp, P_abs, &
                    write_ramo_sec, write_position_file, &
                    write_recombination_file, write_particle_data_file, &
                    write_electron_data_file, write_ion_data_file, &
                    sample_atom_file, sample_atom_rate, &
                    sample_elec_file, sample_elec_rate, &
-                   sample_field_file, sample_field_rate, &
                    laplace, laplace_dim, laplace_pos, laplace_intervals, &
                    R_s, R_p, L_p, C_p, ion_life_time, &
                    planes_N, planes_z

@@ -197,6 +197,10 @@ contains
 
       ! Add a particle to the system
       call Add_Particle(par_pos, par_vel, species_elec, step, emit, -1, sec)
+      ! Recompute field after adding particle
+      if (laplace .eqv. .true.) then
+        call Calculate_Laplace_Field()
+      end if
 
       nrElecEmit = nrElecEmit + 1
       nrEmitted_emitters(emit) = nrEmitted_emitters(emit) + 1
@@ -295,6 +299,10 @@ contains
 
           ! Add a particle to the system
           call Add_Particle(par_pos, par_vel, species_elec, step, emit, -1, sec)
+          ! Recompute field after adding particle
+          if (laplace .eqv. .true.) then
+            call Calculate_Laplace_Field()
+          end if
 
           nrElecEmit = nrElecEmit + 1
           nrEmitted_emitters(emit) = nrEmitted_emitters(emit) + 1
@@ -397,6 +405,11 @@ contains
 
           ! Add a particle to the system
           call Add_Particle(par_pos, par_vel, species_elec, step, emit, -1, sec)
+
+          ! Recompute field after adding particle
+          if (laplace .eqv. .true.) then
+            call Calculate_Laplace_Field()
+          end if
 
           nrElecEmit = nrElecEmit + 1
           nrEmitted_emitters(emit) = nrEmitted_emitters(emit) + 1

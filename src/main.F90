@@ -40,7 +40,7 @@ program RUMDEED
 #endif
 
 
-  integer                 :: i, nthreads
+  integer                 :: i, nthreads, k, j, mask
   integer, dimension(1:9) :: progress
   integer, dimension(8)   :: values ! Date and time
 
@@ -138,40 +138,37 @@ program RUMDEED
     print '(a)', 'RUMDEED: Starting main loop'
     print '(tr1, a, i0, a, ES12.4, a)', 'Doing ', steps, ' time steps of size ', time_step/1.0E-12, ' ps'
 
-    print *, ''
-
     cur_time = 0
     call Set_Voltage(0) ! Set voltage for time step 0
 
+    ! print '(a)', 'RUMDEED: Starting main loop'
     do i = 1, steps
 
       if (laplace .eqv. .true.) then
-        ! call Place_Electron(i)
-        call Calculate_Laplace_Field(i)
+        ! call Place_Electron(i) 
+        call Calculate_Laplace_Field()
         ! call Write_Laplace_Data()
       end if
 
       ! Do Emission
-      !print *, 'Emission'
+      ! print *, 'Emission'
       call ptr_Do_Emission(i)
 
       ! Update the position of all particles
-      !print *, 'Update position'
+      ! print *, 'Update position'
       call Update_Position(i)
       call Write_Position(i)
       call Sample_Atom_Position(i)
       call Sample_Elec_Position(i)
-      call Sample_Field(i)
       !call Write_Position_XYZ_Step(i)
 
       ! Remove particles from the system
-      !print *, 'Remove particles'
+      ! print *, 'Remove particles'
       call Remove_Particles(i)
 
       ! Do Collisions
-      ! print *, 'Start collisions'
+      ! print *, 'Do Collisions'
       call Do_Collisions(i)
-      ! print *, 'End collisions'
 
       ! Flush data
       call Flush_Data()
@@ -366,15 +363,26 @@ contains
     allocate(particles_prev2_accel(1:3, 1:MAX_PARTICLES))
     allocate(particles_nearest_dist(1:MAX_PARTICLES))
     allocate(particles_nearest_id(1:MAX_PARTICLES))
+
     allocate(particles_charge(1:MAX_PARTICLES))
     allocate(particles_species(1:MAX_PARTICLES))
     allocate(particles_mass(1:MAX_PARTICLES))
     allocate(particles_step(1:MAX_PARTICLES))
-    allocate(particles_mask(1:MAX_PARTICLES))
     allocate(particles_emitter(1:MAX_PARTICLES))
     allocate(particles_section(1:MAX_PARTICLES))
     allocate(particles_life(1:MAX_PARTICLES))
     allocate(particles_id(1:MAX_PARTICLES))
+
+    allocate(particles_mask(1:MAX_PARTICLES))
+    allocate(particles_elec_mask(1:MAX_PARTICLES))
+    allocate(particles_ion_mask(1:MAX_PARTICLES))
+    allocate(particles_atom_mask(1:MAX_PARTICLES))
+
+    allocate(particles_elec_pointer(1:MAX_PARTICLES))
+    allocate(particles_ion_pointer(1:MAX_PARTICLES))
+    allocate(particles_atom_pointer(1:MAX_PARTICLES))
+    allocate(particles_inverse_pointer(1:MAX_PARTICLES))
+
     allocate(particles_cur_energy(1:MAX_PARTICLES))
     allocate(particles_ion_cross_sec(1:MAX_PARTICLES))
     allocate(particles_ion_cross_rad(1:MAX_PARTICLES))
@@ -395,6 +403,10 @@ contains
     particles_mass        = 0.0d0
     particles_step        = 0
     particles_mask        = .true.
+    particles_elec_mask   = .true.
+    particles_ion_mask    = .true.
+    particles_atom_mask   = .true.
+    
     particles_id          = 0
 
     ramo_current = 0.0d0
@@ -869,11 +881,20 @@ contains
     deallocate(particles_species)
     deallocate(particles_mass)
     deallocate(particles_mask)
+    deallocate(particles_elec_mask)
+    deallocate(particles_ion_mask)
+    deallocate(particles_atom_mask)
     deallocate(particles_emitter)
     deallocate(particles_section)
     deallocate(particles_life)
     deallocate(particles_id)
     deallocate(particles_step)
+    deallocate(particles_nearest_dist)
+    deallocate(particles_nearest_id)
+    deallocate(particles_elec_pointer)
+    deallocate(particles_ion_pointer)
+    deallocate(particles_atom_pointer)
+    deallocate(particles_inverse_pointer)
     deallocate(particles_cur_energy)
     deallocate(particles_ion_cross_sec)
     deallocate(particles_ion_cross_rad)
@@ -892,9 +913,7 @@ contains
 
     deallocate(my_seed)
 
-    if (laplace .eqv. .true.) then
-      call Clean_Up_Laplace()
-    end if
+    call Clean_Up_Laplace()
 
   end subroutine Clean_up
 end program RUMDEED

@@ -14,6 +14,7 @@ module mod_photo_emission
   use mod_pair
   use mod_work_function
   use mod_velocity
+  use mod_laplace_solver
   implicit none
 
   ! ----------------------------------------------------------------------------
@@ -425,17 +426,25 @@ contains
       ! Schottkey Effect, reduction of workfunction due to electric field
       ! Workfunction_reduction = sqrt ( (electron_charge^3 * electric_fielc)/(4 * pi * epsilon_0) )
       
-      field = Calc_Field_at(par_pos)  
+      if (laplace .eqv. .true.) then
+        field = Calculate_Laplace_Field_at(par_pos)
+      else
+        field = Calc_Field_at(par_pos)
+      end if
       if (field(3) < 0.0d0) then
         schk_red = sqrt( ( -field(3) *  (q_0**3)) / (4 * pi * epsilon_0)) / q_0
         schk_wf = w_theta_xy(par_pos, emit) - schk_red
         if (schk_wf <= p_eV) then
           par_pos(3) = 1.0d0 * length_scale ! Above plane
-          field = Calc_Field_at(par_pos)
+          if (laplace .eqv. .true.) then
+            field = Calculate_Laplace_Field_at(par_pos)
+          else
+            field = Calc_Field_at(par_pos)
+          end if
 
           if (field(3) < 0.0d0) then
             par_pos(3) = 1.0d0 * length_scale ! Place above plane
-                        
+                    
             if (PHOTON_MODE == 1) then
               par_vel = 0.0d0
             else if (PHOTON_MODE == 2) then
@@ -452,6 +461,11 @@ contains
             !par_vel(3) = q_0/(4.0d0*sqrt(pi*epsilon_0*epsilon_r*m_0))*(d-2.0d0*par_pos(3))/sqrt(d*par_pos(3)*(d-par_pos(3)))
           
             call Add_Particle(par_pos, par_vel, species_elec, step, emit, -1)
+
+            if (laplace .eqv. .true.) then
+              print *, 'Recomputing Laplace field'
+              call Calculate_Laplace_Field()
+            end if
 
             nrElecEmit = nrElecEmit + 1
             nrEmitted_emitters(emit) = nrEmitted_emitters(emit) + 1
@@ -591,7 +605,6 @@ contains
         exit
       end if
 
-
       if (nrElec == MAX_PARTICLES-1) then
         print *, 'WARNING: Reached maximum number of electrons!!!'
         exit
@@ -607,12 +620,23 @@ contains
       ! Check if work function at position is lower then photon energy
       if (w_theta_xy(par_pos, emit) <= p_eV) then
 
-        field = Calc_Field_at(par_pos)
+        if (laplace .eqv. .true.) then
+          field = Calculate_Laplace_Field_at(par_pos)
+        else
+          field = Calc_Field_at(par_pos)
+        end if
+        
         if (field(3) < 0.0d0) then
           par_pos(3) = 1.0d0 * length_scale ! Above plane
-          field = Calc_Field_at(par_pos)
+
+          if (laplace .eqv. .true.) then
+            field = Calculate_Laplace_Field_at(par_pos)
+          else
+            field = Calc_Field_at(par_pos)
+          end if
 
           if (field(3) < 0.0d0) then
+
             par_pos(3) = 1.0d0 * length_scale ! Place above plane
             
             if (PHOTON_MODE == 1) then
@@ -625,6 +649,13 @@ contains
             end if
             
             call Add_Particle(par_pos, par_vel, species_elec, step, emit, -1)
+            ! print *, 'particle added at step = ', step
+            ! print *, 'pos = ', par_pos
+
+            ! Recompute field after adding particle
+            if (laplace .eqv. .true.) then
+              call Calculate_Laplace_Field()
+            end if
 
             nrElecEmit = nrElecEmit + 1
             nrEmitted_emitters(emit) = nrEmitted_emitters(emit) + 1

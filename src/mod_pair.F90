@@ -6,6 +6,7 @@
 
 module mod_pair
   use mod_global
+  use omp_lib
   implicit none
 
   ! ----------------------------------------------------------------------------
@@ -52,7 +53,7 @@ contains
       else
         ! To do: Have some default section rules, like 10x10 for square emitters?
         sec = 1
-      end if
+      end if 
 
       ! Add the particle
       particles_cur_pos(:, nrPart+1)      = par_pos
@@ -75,23 +76,38 @@ contains
       particles_tot_cross_sec(nrPart+1)   = 0.0d0
 
       if (par_species == species_elec) then ! Electron
+        nrElec = nrElec + 1
+
         particles_charge(nrPart+1) = -1.0d0*q_0
         particles_mass(nrPart+1) = m_eeff*m_0
-        nrElec = nrElec + 1
+        particles_elec_pointer(nrElec) = nrPart+1
+        particles_inverse_pointer(nrPart+1) = nrElec
+        particles_elec_mask(nrElec) = .true.
+
         ! Write out the x and y position of the emitted particle
         ! along with which emitter and section it came from.
         !if (abs(par_pos(3) - 1.0d0*length_scale) < 1.0E-3) then
           write(unit=ud_density_emit_elec) par_pos(:)/length_scale, emit, nrID
         !end if
       else if (par_species == species_ion) then ! Ion
+        nrIon = nrIon + 1
+
         particles_charge(nrPart+1) = +1.0d0*q_0
         particles_mass(nrPart+1) = m_N2p
-        nrIon = nrIon + 1
+        particles_ion_pointer(nrIon) = nrPart+1
+        particles_inverse_pointer(nrPart+1) = nrIon
+        particles_ion_mask(nrIon) = .true.
+
         write(unit=ud_density_emit_ion) par_pos(:)/length_scale, emit, nrID
       else if (par_species == species_atom) then
+        nrAtom = nrAtom + 1
+
         particles_charge(nrPart+1) = 0.0d0
         particles_mass(nrPart+1) = m_N2
-        nrAtom = nrAtom + 1
+        particles_atom_pointer(nrAtom) = nrPart+1
+        particles_inverse_pointer(nrPart+1) = nrAtom
+        particles_atom_mask(nrAtom) = .true.
+        
         write(unit=ud_density_emit_atom) par_pos(:)/length_scale, emit, nrID 
       else
         print *, 'ERROR UNKNOWN PARTICLE TYPE'
@@ -101,8 +117,14 @@ contains
       ! Update the number of particles in the system
       nrElecIon = nrElec + nrIon
       nrPart = nrElecIon + nrAtom
-
       nrID = nrID + 1
+
+      ! if (laplace .eqv. .true.) then
+      !   ! Calculate the Laplace field for the new particle
+      !   !$OMP CRITICAL(LAPLACE)
+      !   call Calculate_Laplace_Field()
+      !   !$OMP END CRITICAL(LAPLACE)
+      ! end if
     end if
   end subroutine Add_Particle
 
@@ -116,7 +138,7 @@ contains
   ! if particles_mask(i) is .false. then the particle is inactive and should be removed
   subroutine Mark_Particles_Remove(i, m)
     integer, intent(in) :: i, m
-    integer             :: emit
+    integer             :: emit, k
 
     ! Check if the particle has already been marked for removal
     ! if so just return
@@ -125,6 +147,21 @@ contains
     ! Mark the particle for removal
     ! The particle is actually removed later when Remove_Particles is called.
     particles_mask(i) = .false.
+
+    ! Mark the particle for removal in the species array
+    k = particles_inverse_pointer(i)
+    select case (particles_species(i))
+      case (species_elec)
+        particles_elec_mask(k) = .false.
+      case (species_ion)
+        particles_ion_mask(k) = .false.
+      case (species_atom)
+        particles_atom_mask(k) = .false.
+      case default
+        print *, 'Error: Unknown particle species'
+        print *, 'particles_species(i) = ', particles_species(i)
+    end select
+
 
     ! Set the charge to zero. That way it no longer has any effects on calculations.
     particles_charge(i) = 0.0d0
@@ -274,7 +311,10 @@ contains
 
     if ((nrPart_remove > 0) .and. (nrPart > 0)) then ! Check if we have some thing to do
 
-      if ((nrPart - nrPart_remove) > 0) then ! Check if we can skip this
+      if ((nrPart - nrPart_remove) > 0) then ! Check if we can skip this    
+
+        call Update_Pointer_Arrays_parallel() 
+
         !$OMP PARALLEL DEFAULT(NONE) PRIVATE(m, k) &
         !$OMP& SHARED(particles_mask, particles_cur_pos, particles_prev_pos, particles_last_col_pos) &
         !$OMP& SHARED(particles_cur_vel, particles_cur_accel, particles_prev_accel, particles_prev2_accel) &
@@ -352,16 +392,33 @@ contains
         call compact_array(particles_ion_cross_sec, particles_mask, k, m)
         !$OMP END TASK
 
-        !$OMP TASK FIRSTPRIVATE(k, m) SHARED(particles_tot_cross_sec, particles_mask)
+        !$OMP TASK FIRSTPRIVATE(k, m) SHARED(particles_ion_cross_rad, particles_mask)
         call compact_array(particles_ion_cross_rad, particles_mask, k, m)
+        !$OMP END TASK
+
+        !$OMP TASK FIRSTPRIVATE(k, m) SHARED(particles_tot_cross_sec, particles_mask)
+        call compact_array(particles_tot_cross_sec, particles_mask, k, m)
         !$OMP END TASK
 
         !$OMP TASK FIRSTPRIVATE(k, m) SHARED(particles_recom_cross_rad, particles_mask)
         call compact_array(particles_recom_cross_rad, particles_mask, k, m)
         !$OMP END TASK
 
-        !$OMP TASK FIRSTPRIVATE(k, m) SHARED(particles_tot_cross_sec, particles_mask)
-        call compact_array(particles_tot_cross_sec, particles_mask, k, m)
+
+        !$OMP TASK FIRSTPRIVATE(k, nrElec) SHARED(particles_elec_pointer, particles_elec_mask)
+        call compact_array(particles_elec_pointer, particles_elec_mask, k, nrElec)
+        !$OMP END TASK
+
+        !$OMP TASK FIRSTPRIVATE(k, nrIon) SHARED(particles_ion_pointer, particles_ion_mask)
+        call compact_array(particles_ion_pointer, particles_ion_mask, k, nrIon)
+        !$OMP END TASK
+
+        !$OMP TASK FIRSTPRIVATE(k, nrAtom) SHARED(particles_atom_pointer, particles_atom_mask)
+        call compact_array(particles_atom_pointer, particles_atom_mask, k, nrAtom)
+        !$OMP END TASK
+
+        !$OMP TASK FIRSTPRIVATE(k, m) SHARED(particles_inverse_pointer, particles_mask)
+        call compact_array(particles_inverse_pointer, particles_mask, k, m)
         !$OMP END TASK
 
         !$OMP END SINGLE NOWAIT
@@ -370,6 +427,7 @@ contains
         !$OMP TASKWAIT
 
         !$OMP END PARALLEL
+
       end if
 
       ! !Sanity check
@@ -401,6 +459,9 @@ contains
       nrPart = nrElecIon + nrAtom
 
       particles_mask = .true. ! Reset the mask. .true. means all particles are active.
+      particles_elec_mask = .true. ! Reset the mask. .true. means all particles are active.
+      particles_ion_mask = .true. ! Reset the mask. .true. means all particles are active.
+      particles_atom_mask = .true. ! Reset the mask. .true. means all particles are active.
 
       ! Reset the number of particles to remove
       nrPart_remove = 0
@@ -421,9 +482,197 @@ contains
       nrAtom_remove_ion = 0
 
       nrElec_remove_top_emit(1:MAX_EMITTERS) = 0
+
+      ! call Check_Pointer_Arrays() 
+
     end if
 
   end subroutine Remove_Particles
+
+  subroutine Update_Pointer_Arrays_sequential()
+    integer :: i, k
+    integer :: invMove, elecMove, ionMove, atomMove
+
+    invMove = 0
+    elecMove = 0
+    ionMove = 0
+    atomMove = 0
+    
+    do i = 1,nrPart
+      if (particles_mask(i) .eqv. .false.) then
+        invMove = invMove + 1
+        ! print*, 'invMove = ', invMove
+        if (particles_species(i) == species_elec) then
+          elecMove = elecMove + 1
+          ! print*, 'elecMove = ', elecMove
+        else if (particles_species(i) == species_ion) then
+          ionMove = ionMove + 1
+        else if (particles_species(i) == species_atom) then
+          atomMove = atomMove + 1
+        end if
+      end if
+
+      select case (particles_species(i))
+        case (species_elec)
+          k = particles_inverse_pointer(i)
+          particles_elec_pointer(k) = i - invMove
+          particles_inverse_pointer(i) = k - elecMove
+        case (species_ion)
+          k = particles_inverse_pointer(i)
+          particles_ion_pointer(k) = i - invMove
+          particles_inverse_pointer(i) = k - ionMove
+        case (species_atom)
+          k = particles_inverse_pointer(i)
+          particles_atom_pointer(k) = i - invMove
+          particles_inverse_pointer(i) = k - atomMove
+        case default
+          print *, 'Error: Unknown particle species'
+          print *, 'particles_species(i) = ', particles_species(i)
+      end select
+    end do
+
+  end subroutine Update_Pointer_Arrays_sequential
+
+  subroutine Update_Pointer_Arrays_parallel()
+    ! Generated by chatGPT but works remarkably well
+ 
+    integer :: nt, tid, i, k
+    integer, allocatable :: cntInv(:),  cntElec(:),  cntIon(:),  cntAtom(:)
+    integer, allocatable :: baseInv(:), baseElec(:), baseIon(:), baseAtom(:)
+    integer :: invMove, elecMove, ionMove, atomMove
+ 
+    if (nrPart <= 0) return
+ 
+    !------------------------------
+    ! Pass 1 – per‑thread counts
+    !------------------------------
+    nt = omp_get_max_threads()
+    allocate(cntInv (nt), cntElec (nt), cntIon (nt), cntAtom (nt))
+    allocate(baseInv(nt), baseElec(nt), baseIon(nt), baseAtom(nt))
+    cntInv  = 0; cntElec  = 0; cntIon  = 0; cntAtom  = 0
+    baseInv = 0; baseElec = 0; baseIon = 0; baseAtom = 0
+ 
+ !$omp parallel default(none) shared(nrPart,particles_mask,particles_species, &
+ !$omp& cntInv,cntElec,cntIon,cntAtom) private(tid,i)
+ 
+       tid = omp_get_thread_num() + 1   ! 1‑based index for arrays
+ 
+ !$omp do schedule(static)
+       do i = 1, nrPart
+          if (.not. particles_mask(i)) then
+             cntInv(tid) = cntInv(tid) + 1
+             select case (particles_species(i))
+             case (species_elec)
+                cntElec(tid) = cntElec(tid) + 1
+             case (species_ion)
+                cntIon (tid) = cntIon (tid) + 1
+             case (species_atom)
+                cntAtom(tid) = cntAtom(tid) + 1
+             end select
+          end if
+       end do
+ !$omp end do
+ !$omp end parallel
+ 
+    !------------------------------
+    ! Prefix sums (exclusive)
+    !------------------------------
+    do tid = 2, nt
+       baseInv (tid) = baseInv (tid-1) + cntInv (tid-1)
+       baseElec(tid) = baseElec(tid-1) + cntElec(tid-1)
+       baseIon (tid) = baseIon (tid-1) + cntIon (tid-1)
+       baseAtom(tid) = baseAtom(tid-1) + cntAtom(tid-1)
+    end do
+ 
+    !------------------------------
+    ! Pass 2 – repack / update
+    !------------------------------
+ !$omp parallel default(none) shared(nrPart,particles_mask,particles_species,  &
+ !$omp& particles_inverse_pointer, particles_elec_pointer, particles_ion_pointer, &
+ !$omp& particles_atom_pointer, baseInv, baseElec, baseIon, baseAtom)           &
+ !$omp private(tid,i,k,invMove,elecMove,ionMove,atomMove)
+ 
+       tid       = omp_get_thread_num() + 1
+       invMove   = baseInv (tid)
+       elecMove  = baseElec(tid)
+       ionMove   = baseIon (tid)
+       atomMove  = baseAtom(tid)
+ 
+ !$omp do schedule(static)
+       do i = 1, nrPart
+          if (.not. particles_mask(i)) then
+             invMove = invMove + 1
+             select case (particles_species(i))
+             case (species_elec)
+                elecMove = elecMove + 1
+             case (species_ion)
+                ionMove  = ionMove  + 1
+             case (species_atom)
+                atomMove = atomMove + 1
+             end select
+          end if
+ 
+          select case (particles_species(i))
+          case (species_elec)
+             k = particles_inverse_pointer(i)
+             particles_elec_pointer(k) = i - invMove
+             particles_inverse_pointer(i) = k - elecMove
+          case (species_ion)
+             k = particles_inverse_pointer(i)
+             particles_ion_pointer(k)  = i - invMove
+             particles_inverse_pointer(i) = k - ionMove
+          case (species_atom)
+             k = particles_inverse_pointer(i)
+             particles_atom_pointer(k) = i - invMove
+             particles_inverse_pointer(i) = k - atomMove
+          case default
+             ! Unknown species – ignore or handle as needed
+          end select
+       end do
+ !$omp end do
+ !$omp end parallel
+ 
+    deallocate(cntInv ,cntElec ,cntIon ,cntAtom )
+    deallocate(baseInv,baseElec,baseIon,baseAtom)
+ 
+ end subroutine Update_Pointer_Arrays_parallel
+
+  subroutine Check_Pointer_Arrays()
+    integer :: i, j, k
+    logical :: mask
+
+    do i = 1, nrPart
+      k = particles_inverse_pointer(i)
+      select case (particles_species(i))
+        case (species_elec)
+          j = particles_elec_pointer(k)
+          mask = particles_elec_mask(k)
+        case (species_ion)
+          j = particles_ion_pointer(k)
+          mask = particles_ion_mask(k)
+        case (species_atom)
+          j = particles_atom_pointer(k)
+          mask = particles_atom_mask(k)
+      end select
+
+      if (i /= j) then
+        print*,  'pointer mismatch'
+      end if
+      if (mask .neqv. particles_mask(j)) then
+        print*,  'mask mismatch'
+      end if
+    end do
+  end subroutine Check_Pointer_Arrays
+
+  subroutine Check_Mask_Arrays()
+    integer :: i
+
+    do i = 1, nrPart
+      if (particles_mask(i) .neqv. particles_elec_mask(i)) then
+        print*, 'mask array mismatch'
+      end if
+    end do
+  end subroutine Check_Mask_Arrays
 
   ! --------------------------------------------------------------------------
   ! Write out the life time of particles
@@ -628,42 +877,40 @@ contains
     character(len=128)  :: filename
     double precision    :: dist
 
-    if (sample_elec_file .eqv. .true.) then
-      if (mod(step,sample_elec_rate) == 0) then
-
-        ! Compute average nearest distance
-        particles_nearest_dist = box_dim(3) ! Set the distance to the box size
-        !$OMP PARALLEL DO DEFAULT(NONE) &
-        !$OMP& PRIVATE(i, j, dist) &
-        !$OMP& SHARED(particles_nearest_dist, particles_nearest_id, particles_cur_pos, particles_species, nrPart) &
-        !$OMP& SCHEDULE(DYNAMIC, 1)
-        do i = 1, nrPart
-          if (particles_species(i) == species_elec) then
-            do j = i+1, nrPart
-              if (particles_species(j) == species_elec) then
-                dist = norm2(particles_cur_pos(:,i) - particles_cur_pos(:,j))
-                if (dist < particles_nearest_dist(i)) then
-                  !$OMP CRITICAL
-                  particles_nearest_dist(i) = dist
-                  !$OMP END CRITICAL
-                  !$OMP CRITICAL
-                  particles_nearest_id(i) = j
-                  !$OMP END CRITICAL
-                end if
-                if (dist < particles_nearest_dist(j)) then
-                  !$OMP CRITICAL
-                  particles_nearest_dist(j) = dist
-                  !$OMP END CRITICAL
-                  !$OMP CRITICAL
-                  particles_nearest_id(j) = i
-                  !$OMP END CRITICAL
-                end if
-              end if
-            end do
+    particles_nearest_dist = 1000.0d0
+    !$OMP PARALLEL DO DEFAULT(NONE) &
+    !$OMP& PRIVATE(i, j, dist) &
+    !$OMP& SHARED(particles_nearest_dist, particles_nearest_id, particles_cur_pos, particles_species, nrPart) &
+    !$OMP& SCHEDULE(DYNAMIC, 1)
+    do i = 1, nrPart
+      if (particles_species(i) == species_elec) then
+        do j = i+1, nrPart
+          if (particles_species(j) == species_elec) then
+            dist = norm2(particles_cur_pos(:,i) - particles_cur_pos(:,j))
+            if (dist < particles_nearest_dist(i)) then
+              !$OMP CRITICAL
+              particles_nearest_dist(i) = dist
+              !$OMP END CRITICAL
+              !$OMP CRITICAL
+              particles_nearest_id(i) = j
+              !$OMP END CRITICAL
+            end if
+            if (dist < particles_nearest_dist(j)) then
+              !$OMP CRITICAL
+              particles_nearest_dist(j) = dist
+              !$OMP END CRITICAL
+              !$OMP CRITICAL
+              particles_nearest_id(j) = i
+              !$OMP END CRITICAL
+            end if
           end if
         end do
-        !$OMP END PARALLEL DO
+      end if
+    end do
+    !$OMP END PARALLEL DO
 
+    if (sample_elec_file .eqv. .true.) then
+      if (mod(step,sample_elec_rate) == 0) then
         ! Create the file
         write(filename, '(a9, i0, a4)') 'out/elec-', step, '.bin'
         ! Open the file
@@ -686,7 +933,6 @@ contains
       end if
     end if
   end subroutine Sample_Elec_Position
-
 
   !-----------------------------------------------------------------------------
   ! Write out the positions
