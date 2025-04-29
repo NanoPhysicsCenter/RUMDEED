@@ -156,14 +156,14 @@ mod_ic.mod mod_ic.o: ../src/mod_ic.f90 mod_global.o mod_hyperboloid_tip.o mod_ve
 mod_verlet.mod mod_verlet.o: ../src/mod_verlet.F90 mod_global.mod mod_pair.mod mod_collisions.mod
 		$(FC) -c $(FFLAGS) ../src/mod_verlet.F90
 
-mod_pair.mod mod_pair.o: ../src/mod_pair.F90 mod_global.mod
+mod_pair.mod mod_pair.o: ../src/mod_pair.F90 mod_global.mod 
 		$(FC) -c $(FFLAGS) ../src/mod_pair.F90
 
 mod_tests.mod mod_tests.o: ../src/mod_tests.F90 mod_global.mod mod_verlet.mod mod_pair.mod mod_field_emission_v2.mod
 		$(FC) -c $(FFLAGS) ../src/mod_tests.F90
 
-mod_photo_emission.mod mod_photo_emission.o: ../src/mod_photo_emission.f90 mod_global.mod mod_verlet.mod mod_pair.mod mod_velocity.mod
-		$(FC) -c $(FFLAGS) ../src/mod_photo_emission.f90
+mod_photo_emission.mod mod_photo_emission.o: ../src/mod_photo_emission.f90 mod_global.mod mod_verlet.mod mod_pair.mod mod_velocity.mod mod_laplace_solver.mod
+		$(FC) -c $(FFLAGS) $(MKL_LIBS) ../src/mod_photo_emission.f90
 
 mod_field_emission.mod mod_field_emission.o: ../src/mod_field_emission.f90 mod_global.mod mod_verlet.mod mod_pair.mod mod_velocity.mod
 		$(FC) -c $(FFLAGS) ../src/mod_field_emission.f90
@@ -195,7 +195,7 @@ mod_work_function.mod mod_work_function.o: ../src/mod_work_function.F90
 mod_polynomialroots.mod mod_polynomialroots.o: ../src/mod_polynomialroots.F90
 		$(FC) -c $(FFLAGS) ../src/mod_polynomialroots.F90
 
-mod_laplace_solver.mod mod_laplace_solver.o: ../src/mod_laplace_solver.F90 mod_global.mod mkl_spblas.mod mkl_pardiso.mod mod_verlet.mod mod_pair.mod
+mod_laplace_solver.mod mod_laplace_solver.o: ../src/mod_laplace_solver.F90 mod_global.mod mkl_spblas.mod mkl_pardiso.mod mod_verlet.mod
 		$(FC) -c $(FFLAGS) $(MKL_LIBS) ../src/mod_laplace_solver.F90
 
 mod_velocity.mod mod_velocity.o: ../src/mod_velocity.f90
