@@ -332,7 +332,7 @@ contains
     ! Check if we are doing a Gaussian distributed emission
     ! and set the max number of electrons allowed to be emitted if we are
     if (EmitGauss .eqv. .TRUE.) then
-      maxElecEmit = Rand_Poission( Gauss_Emission(step) )
+      maxElecEmit = Rand_Poisson( Gauss_Emission(step) )
     end if
     
     !i = 1

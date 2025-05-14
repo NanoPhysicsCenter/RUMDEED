@@ -658,7 +658,7 @@ subroutine Do_Field_Emission_Cylinder_simple(step)
   end if
 
   call Do_Surface_Integration_simple(N_sup)
-  N_round = Rand_Poission(N_sup)
+  N_round = Rand_Poisson(N_sup)
 
   nrElecEmit = 0
   nrEmitted_emitters(emit) = 0
@@ -1636,9 +1636,9 @@ subroutine Do_Surface_Integration(N_sup)
     double precision                             :: Field_normal
     double precision, dimension(1:3)             :: unit_vec
 
-    !unit_vec = surface_normal(par_xyz_pos, par_pos_org, sec_in)
-    !Field_normal = dot_product(unit_vec, field_E)
-    Field_normal = -1.0d0*sqrt(field_E(1)**2 + field_E(2)**2 + field_E(3)**2) ! Field magnitude for debugging
+    unit_vec = surface_normal(par_xyz_pos, par_pos_org, sec_in)
+    Field_normal = dot_product(unit_vec, field_E)
+    !Field_normal = -1.0d0*sqrt(field_E(1)**2 + field_E(2)**2 + field_E(3)**2) ! Field magnitude for debugging
   end function Field_normal
 
   !-----------------------------------------------------------------------------

@@ -447,7 +447,7 @@ end function box_muller
 ! Random poission variable with mean lambda.
 ! See
 ! https://en.wikipedia.org/wiki/Poisson_distribution#Generating_Poisson-distributed_random_variables
-integer function Rand_Poission(lambda)
+integer function Rand_Poisson(lambda)
 double precision, intent(in) :: lambda
 double precision             :: lambda_left, p, u
 integer                      :: k
@@ -472,7 +472,7 @@ do while (p >= 1.0d0)
   end do
 end do
 
-Rand_Poission = k - 1
+Rand_Poisson = k - 1
 
 ! From Wikipedia
 ! algorithm poisson random number (Junhao, based on Knuth):
@@ -490,7 +490,7 @@ Rand_Poission = k - 1
 !                  λLeft ← 0
 !   while p > 1.
 !   return k − 1.
-end function Rand_Poission
+end function Rand_Poisson
 
     ! ----------------------------------------------------------------------------
     ! A function that does a binary search of the list for the value.

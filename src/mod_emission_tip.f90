@@ -271,7 +271,7 @@ subroutine Do_Photo_Emission_Tip(step)
   ! We treat the number from the gauss distribution as a mean number of a
   ! poisson random number generator.
   if (EmitGauss .eqv. .TRUE.) then
-    maxElecEmit = Rand_Poission( Gauss_Emission(step) )
+    maxElecEmit = Rand_Poisson( Gauss_Emission(step) )
   end if
 
   do while (nrTry <= MAX_EMISSION_TRY_PHOTO)
@@ -1471,7 +1471,7 @@ end function Elec_supply_tip
     Freq = freq_var*10000
     call random_number(rand_photon)
     photon_rand = (Photon_power-Freq) + FLOOR(((Photon_power+Freq)-(Photon_power-Freq))*rand_photon)
-    Photo_pois = Rand_Poission(photon_rand)
+    Photo_pois = Rand_Poisson(photon_rand)
     Photon_Emission = Photo_pois/10000
 
   end function Photon_Emission

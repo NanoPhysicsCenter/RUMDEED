@@ -1033,13 +1033,37 @@ x &= \left(R + \rho\cos\theta\right)\cos(\phi)\\
 y &= \rho\sin(\theta)\\
 z &= \left(R + \rho\cos\theta\right)\sin(\phi)
 \end{align}
-Where \(\theta \in [0, 2\pi]\) and \(\phi \in [0, \pi]\). The torus is cut in half by the \(xy\) plane.
+Where \(\theta \in [0, 2\pi]\) and \(\phi \in [0, \pi]\). Toroidal coordinates (\(r\), \(\phi\), \(\theta\)) are used to describe the geometry.
+The torus is cut in half by the \(xy\) plane.
 The top half is the CNT fiber as can be seen in Figure~\ref{fig:curved_cnt}.
 \begin{figure}
   \centering
   \includegraphics[scale=0.4]{figures/curved_cnt.png}
   \caption{Curved CNT\label{fig:curved_cnt}}
 \end{figure}
+
+\subsection{Center curve}
+The center curve of the CNT is a circle with radius \(R\) and center at \((0, 0, R)\). The equation of the circle is
+\begin{align}
+  x &= R\cos(\phi)\\
+  y &= 0\\
+  z &= R\sin(\phi)\\
+\end{align}
+where \(\phi \in [0, 2\pi]\). The red line in Figure~\ref{fig:curved_cnt} shows the center curve.
+
+We can find the closest point on the center curve to a point \((x, y, z)\) by minimizing the distance between the point and the center curve.
+The distance is given by
+\begin{equation}
+  d = \sqrt{(x - R\cos(\phi))^2 + (y - 0)^2 + (z - R\sin(\phi))^2}
+\end{equation}
+and the derivative of the distance is given by
+\begin{equation}
+  \frac{d d}{d \phi} = \frac{-R z \cos{\phi} + R x \sin{\phi}}{\sqrt{y^2 + (x - R \cos{\phi})^2 + (z - R \sin{\phi})^2}}\, .
+\end{equation}
+Setting this equal to zero and solving for \(\phi\) gives
+\begin{equation}
+  \phi = \arctan{\frac{z}{x}}\, .
+\end{equation}
 
 \cleardoublepage\printbibliography
 \end{document}
