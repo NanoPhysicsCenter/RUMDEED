@@ -128,7 +128,7 @@ program RUMDEED
 
     if (laplace .eqv. .true.) then
       print '(a)', 'RUMDEED: Using Laplace solver'
-      call Init_Laplace_Solver()
+      call LP_Init_Solver()
     end if
 
     if (collision_mode /= 0) then
@@ -144,15 +144,18 @@ program RUMDEED
     ! print '(a)', 'RUMDEED: Starting main loop'
     do i = 1, steps
 
+      ! print *, Z_eff
+      ! print *, N_bind
+
       if (laplace .eqv. .true.) then
-        ! call Place_Electron(i) 
-        call Calculate_Laplace_Field()
-        ! call Write_Laplace_Data()
+        call Place_Electron(i) 
+        call LP_Calculate_Field()
+        call Write_Laplace_Data()
       end if
 
       ! Do Emission
       ! print *, 'Emission'
-      call ptr_Do_Emission(i)
+      ! call ptr_Do_Emission(i)
 
       ! Update the position of all particles
       ! print *, 'Update position'
@@ -303,6 +306,8 @@ contains
     emitters_pos = emitters_pos * length_scale
     laplace_dim = laplace_dim * length_scale
     laplace_pos = laplace_pos * length_scale
+    laplace_step = laplace_step * length_scale
+    laplace_padding = laplace_padding * length_scale
     do emit=1,nrEmit
       emitters_ring(1,emit) = emitters_dim(1,emit)
       if (emitters_dim(3,emit) == 0.0d0) then
@@ -328,6 +333,12 @@ contains
     if (steps <= 0) then
       print '(a)', 'ERROR: steps <= 0'
       stop
+    end if
+
+    if (atom_time_interval /= 0) then
+      two_time_step = .true.
+    else
+      two_time_step = .false.
     end if
 
     call Read_Cross_Section_Data()
@@ -913,7 +924,7 @@ contains
 
     deallocate(my_seed)
 
-    call Clean_Up_Laplace()
+    call LP_Clean_Up()
 
   end subroutine Clean_up
 end program RUMDEED

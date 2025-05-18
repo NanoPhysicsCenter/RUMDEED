@@ -125,7 +125,8 @@ $(PROJECT_NAME).out: ../src/main.F90 ../cuba/lib/libcuba.a \
 			mod_manual_emission.mod mod_manual_emission.o \
 			mod_laplace_solver.mod mod_laplace_solver.o \
 			mkl_pardiso.mod mkl_pardiso.o \
-			mkl_spblas.mod mkl_spblas.o
+			mkl_spblas.mod mkl_spblas.o \
+			mkl_rci.mod mkl_rci.o 
 		$(FC) $(FFLAGS) -D_GIT_VERSION_=\"${GIT_VERSION}\" -D_TESTING_MODE_=${TESTING_MODE} \
 		    ../src/main.F90 mod_global.o mod_verlet.o mod_pair.o \
 			mod_tests.o mod_photo_emission.o mod_field_emission.o mod_field_emission_v2.o \
@@ -195,7 +196,7 @@ mod_work_function.mod mod_work_function.o: ../src/mod_work_function.F90
 mod_polynomialroots.mod mod_polynomialroots.o: ../src/mod_polynomialroots.F90
 		$(FC) -c $(FFLAGS) ../src/mod_polynomialroots.F90
 
-mod_laplace_solver.mod mod_laplace_solver.o: ../src/mod_laplace_solver.F90 mod_global.mod mkl_spblas.mod mkl_pardiso.mod mod_verlet.mod
+mod_laplace_solver.mod mod_laplace_solver.o: ../src/mod_laplace_solver.F90 mod_global.mod mkl_spblas.mod mkl_pardiso.mod mod_verlet.mod mkl_rci.mod
 		$(FC) -c $(FFLAGS) $(MKL_LIBS) ../src/mod_laplace_solver.F90
 
 mod_velocity.mod mod_velocity.o: ../src/mod_velocity.f90
@@ -212,6 +213,10 @@ mkl_pardiso.mod mkl_pardiso.o: $(MKLROOT)/include/mkl_pardiso.f90
 mkl_spblas.mod mkl_spblas.o: $(MKLROOT)/include/mkl_spblas.f90
 		$(FC) -c $(FFLAGS) -I$(MKLROOT)/include $< -o mkl_spblas.o
 		cp mkl_spblas.mod ../src/
+
+mkl_rci.mod mkl_rci.o: $(MKLROOT)/include/mkl_rci.f90
+		$(FC) -c $(FFLAGS) -I$(MKLROOT)/include $< -o mkl_rci.o
+		cp mkl_rci.mod ../src/
 
 clean:
 		rm -f *.o
