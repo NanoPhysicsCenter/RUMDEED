@@ -313,14 +313,16 @@ contains
 
       if ((nrPart - nrPart_remove) > 0) then ! Check if we can skip this    
 
-        call Update_Pointer_Arrays_parallel() 
+        if (two_time_step .eqv. .true.) then
+          call Update_Pointer_Arrays_parallel() 
+        end if
 
         !$OMP PARALLEL DEFAULT(NONE) PRIVATE(m, k) &
         !$OMP& SHARED(particles_mask, particles_cur_pos, particles_prev_pos, particles_last_col_pos) &
         !$OMP& SHARED(particles_cur_vel, particles_cur_accel, particles_prev_accel, particles_prev2_accel) &
         !$OMP& SHARED(particles_step, particles_species, step, particles_mass, particles_charge) &
         !$OMP& SHARED(particles_emitter, particles_section, particles_life, particles_id, nrPart, life_time) &
-        !$OMP& SHARED(particles_cur_energy, particles_ion_cross_sec, particles_tot_cross_sec, particles_recom_cross_rad)
+        !$OMP& SHARED(particles_cur_energy, particles_ion_cross_sec, particles_ion_cross_rad, particles_tot_cross_sec, particles_recom_cross_rad)
         !$OMP SINGLE
 
         k = 1
@@ -403,7 +405,6 @@ contains
         !$OMP TASK FIRSTPRIVATE(k, m) SHARED(particles_recom_cross_rad, particles_mask)
         call compact_array(particles_recom_cross_rad, particles_mask, k, m)
         !$OMP END TASK
-
 
         !$OMP TASK FIRSTPRIVATE(k, nrElec) SHARED(particles_elec_pointer, particles_elec_mask)
         call compact_array(particles_elec_pointer, particles_elec_mask, k, nrElec)
@@ -843,7 +844,7 @@ contains
   ! Sample ion positions
   subroutine Sample_Atom_Position(step)
     integer, intent(in) :: step
-    integer             :: IFAIL, i, ud_atom_pos, species
+    integer             :: IFAIL, i, k, ud_atom_pos, species
     character(len=128)  :: filename
 
     if (sample_atom_file .eqv. .true.) then
@@ -857,13 +858,17 @@ contains
           return 
         end if
         ! Write data
-        do i = 1, nrPart
-          species = particles_species(i)
-          if ((species == species_ion) .or. (species == species_atom)) then
-            ! print*,'Start writing'
-            write(unit=ud_atom_pos, iostat=IFAIL) particles_cur_pos(:,i), species
-            ! print*,'Stop writing'
-          end if
+        do k = 1, nrAtom
+          i = particles_atom_pointer(k)
+          ! print*,'Start writing'
+          write(unit=ud_atom_pos, iostat=IFAIL) particles_cur_pos(:,i), species
+          ! print*,'Stop writing'
+        end do
+        do k = 1, nrIon
+          i = particles_ion_pointer(k)
+          ! print*,'Start writing'
+          write(unit=ud_atom_pos, iostat=IFAIL) particles_cur_pos(:,i), species
+          ! print*,'Stop writing'
         end do
         ! Close the file
         close(unit=ud_atom_pos, iostat=IFAIL, status='keep')

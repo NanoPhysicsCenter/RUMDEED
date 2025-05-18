@@ -56,12 +56,14 @@ module mod_global
   double precision, parameter :: Z_i = 1.0d0 ! Charge of N2- ion
   double precision, parameter :: Z_i2 = Z_i**2 ! Charge of N2- ion squared
   double precision, parameter :: Z_c = 7.0d0 ! Nuclear core charge of nitrogen
-  double precision, parameter :: Z_eff = sqrt(Z_i*Z_c) ! Effective charge of N2- ion
-  double precision, parameter :: Z_eff2 = Z_eff**2 ! Effective charge of N2- ion squared
+!   double precision, parameter :: Z_eff = sqrt(Z_i*Z_c) ! Effective charge of N2- ion
+!   double precision, parameter :: Z_eff2 = Z_eff**2 ! Effective charge of N2- ion squared
   double precision, parameter :: N_n = 2.0d0 ! Principal quantum number of nitrogen
-  double precision, parameter :: CS_RR_NUM = 2.105d-26*Ryd**2*(Z_eff**4) ! Numerator of Kramers cross section
-  double precision, parameter :: N_bind = Z_c**2 / N_n**2 * Ryd ! Nitrogen binding energy
-
+!   double precision, parameter :: CS_RR_NUM = 2.105d-26*Ryd**2*(Z_eff**4) ! Numerator of Kramers cross section
+!   double precision, parameter :: N_bind = Z_eff2 / N_n**2 * Ryd ! Nitrogen binding energy
+  double precision, parameter :: N_bind = 15.581d0 ! Nitrogen binding energy (NIST)
+  double precision, parameter :: Z_eff = sqrt(N_bind*N_n**2/Ryd) ! Effective charge of N2- ion
+  double precision, parameter :: Z_eff2 = Z_eff**2 ! Effective charge of N2- ion squared
   
   ! ----------------------------------------------------------------------------
   ! Define scales used when reading and writing data
@@ -191,6 +193,7 @@ module mod_global
   integer          :: steps      ! Number of time steps in the simulation
 
   integer          :: collision_mode = 0 ! Type of collision
+  integer          :: collision_delay = 0 ! Type of ion collision
   double precision :: ion_atom_ratio = 0.0d0 ! Ratio of ions to atoms
   integer          :: ion_life_time = 100000000 ! Lifetime of ions
 
@@ -322,11 +325,14 @@ module mod_global
   integer            :: sample_atom_rate = 500
   logical            :: sample_elec_file = .false.
   integer            :: sample_elec_rate = 500
+
+  logical :: two_time_step = .false.
      
   ! Laplace solver
   logical            :: laplace = .false.
   double precision, dimension(3) :: laplace_dim, laplace_pos
   integer(kind=8), dimension(3) :: laplace_intervals
+  real(kind=8) :: laplace_padding, laplace_step
 
 
   ! ----------------------------------------------------------------------------
@@ -386,13 +392,14 @@ module mod_global
                    nrEmit, emitters_pos, emitters_dim, &
                    emitters_type, emitters_delay, emission_mode, &
                    image_charge, N_ic_max, &
-                   collision_mode, ion_atom_ratio, T_temp, P_abs, &
+                   collision_mode, collision_delay, ion_atom_ratio, T_temp, P_abs, &
                    write_ramo_sec, write_position_file, &
                    write_recombination_file, write_particle_data_file, &
                    write_electron_data_file, write_ion_data_file, &
                    sample_atom_file, sample_atom_rate, &
                    sample_elec_file, sample_elec_rate, &
                    laplace, laplace_dim, laplace_pos, laplace_intervals, &
+                   laplace_step, laplace_padding, &
                    R_s, R_p, L_p, C_p, ion_life_time, &
                    planes_N, planes_z
 

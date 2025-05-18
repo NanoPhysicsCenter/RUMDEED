@@ -199,7 +199,7 @@ contains
       call Add_Particle(par_pos, par_vel, species_elec, step, emit, -1, sec)
       ! Recompute field after adding particle
       if (laplace .eqv. .true.) then
-        call Calculate_Laplace_Field()
+        call LP_Update_Field(nrPart)
       end if
 
       nrElecEmit = nrElecEmit + 1
@@ -272,6 +272,9 @@ contains
       if (F >= 0.0d0) then
         D_f = -huge(1.0d0)
         print *, 'Warning: F > 0.0d0'
+        print *, 'Solver: ', LP_Last_Solver()
+        call Write_Laplace_Data()
+        print *, 'done'
       !else
       !  if (D_f > 1.0d0) then
       !    print *, 'Warning D_f > 1.0d0'
@@ -301,7 +304,7 @@ contains
           call Add_Particle(par_pos, par_vel, species_elec, step, emit, -1, sec)
           ! Recompute field after adding particle
           if (laplace .eqv. .true.) then
-            call Calculate_Laplace_Field()
+            call LP_Update_Field(nrPart)
           end if
 
           nrElecEmit = nrElecEmit + 1
@@ -378,6 +381,11 @@ contains
       if (F >= 0.0d0) then
         D_f = -huge(1.0d0)
         print *, 'Warning: F > 0.0d0'
+        print *, 'F = ', F
+        print *, 'par_pos = ', par_pos
+        call Write_Laplace_Data()
+        print *, 'done'
+        exit
       !else
       !  if (D_f > 1.0d0) then
       !    print *, 'Warning D_f > 1.0d0'
@@ -408,7 +416,7 @@ contains
 
           ! Recompute field after adding particle
           if (laplace .eqv. .true.) then
-            call Calculate_Laplace_Field()
+            call LP_Update_Field(nrPart)
           end if
 
           nrElecEmit = nrElecEmit + 1
@@ -569,7 +577,7 @@ end function Escape_Prob_log
 
     ! Calculate the electric field on the surface
     if (laplace .eqv. .true.) then
-      field = Calculate_Laplace_Field_at(par_pos)
+      field = LP_Calculate_Field_At(par_pos)
     else
       field = Calc_Field_at(par_pos)
     end if
@@ -842,7 +850,7 @@ end function Escape_Prob_log
 
     ! Calculate the electric field on the surface
     if (laplace .eqv. .true.) then
-      field = Calculate_Laplace_Field_at(par_pos)
+      field = LP_Calculate_Field_At(par_pos)
     else
       field = Calc_Field_at(par_pos)
     end if
@@ -970,7 +978,7 @@ end function Escape_Prob_log
 
       ! Calculate the field on the emitter surface
       if (laplace .eqv. .true.) then
-        field = Calculate_Laplace_Field_at(par_pos)
+        field = LP_Calculate_Field_At(par_pos)
       else
         field = Calc_Field_at(par_pos)
       end if
@@ -1056,7 +1064,7 @@ end function Escape_Prob_log
 
       ! Calculate the electric field at this position
       if (laplace .eqv. .true.) then
-        field = Calculate_Laplace_Field_at(cur_pos)
+        field = LP_Calculate_Field_At(cur_pos)
       else
         field = Calc_Field_at(cur_pos)
       end if
@@ -1095,7 +1103,7 @@ end function Escape_Prob_log
 
       ! Calculate the field at the new position
       if (laplace .eqv. .true.) then
-        field = Calculate_Laplace_Field_at(new_pos)
+        field = LP_Calculate_Field_At(new_pos)
       else
         field = Calc_Field_at(new_pos)
       end if
@@ -1161,7 +1169,7 @@ end function Escape_Prob_log
 
       ! Calculate the electric field at this position
       if (laplace .eqv. .true.) then
-        cur_field = Calculate_Laplace_Field_at(cur_pos)
+        cur_field = LP_Calculate_Field_At(cur_pos)
       else
         cur_field = Calc_Field_at(cur_pos)
       end if
@@ -1185,7 +1193,7 @@ end function Escape_Prob_log
 
       ! Calculate the field at the new position
       if (laplace .eqv. .true.) then
-        new_field = Calculate_Laplace_Field_at(new_pos)
+        new_field = LP_Calculate_Field_At(new_pos)
       else
         new_field = Calc_Field_at(new_pos)
       end if
@@ -1257,7 +1265,7 @@ end function Escape_Prob_log
 
       ! Calculate the electric field at this position
       if (laplace .eqv. .true.) then
-        field = Calculate_Laplace_Field_at(cur_pos)
+        field = LP_Calculate_Field_At(cur_pos)
       else
         field = Calc_Field_at(cur_pos)
       end if
@@ -1331,7 +1339,7 @@ end function Escape_Prob_log
 
       ! Calculate the field at the new position
       if (laplace .eqv. .true.) then
-        field = Calculate_Laplace_Field_at(new_pos)
+        field = LP_Calculate_Field_At(new_pos)
       else
         field = Calc_Field_at(new_pos)
       end if
@@ -1515,7 +1523,7 @@ end function Escape_Prob_log
       ! Calculate the electric field at this position
       ! print *, 'Metropolis: Calc_field_at'
       if (laplace .eqv. .true.) then
-        field = Calculate_Laplace_Field_at(cur_pos)
+        field = LP_Calculate_Field_At(cur_pos)
       else
         field = Calc_Field_at(cur_pos)
       end if
@@ -1597,7 +1605,7 @@ end function Escape_Prob_log
       ! Calculate the field at the new position
       ! print *, 'Metropolis: Calc_Field_at 2'
       if (laplace .eqv. .true.) then
-        field = Calculate_Laplace_Field_at(new_pos)
+        field = LP_Calculate_Field_At(new_pos)
       else
         field = Calc_Field_at(new_pos)
       end if

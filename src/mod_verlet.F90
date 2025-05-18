@@ -87,13 +87,55 @@ contains
 
   subroutine Update_Particle_Position(step)
     integer, intent(in) :: step
-    ! Update electron at evry time step
-    call Update_Species_Position(step, species_elec)
-    ! Update ion at every atom_time_interval time step
-    if (mod(step, atom_time_interval) == 0) then
-      call Update_Species_Position(step, species_ion)
+    if (two_time_step .eqv. .true.) then
+      ! Update electron at evry time step
+      call Update_Species_Position(step, species_elec)
+      ! Update ion at every atom_time_interval time step
+      if (mod(step, atom_time_interval) == 0) then
+        call Update_Species_Position(step, species_ion)
+      end if
+    else
+      call Update_ElecIon_Position(step)
     end if
+
   end subroutine Update_Particle_Position
+
+  subroutine Update_ElecIon_Position(step)
+    ! Update the position of particles in the verlet integration
+    integer, intent(in) :: step
+    integer             :: i
+
+    !$OMP PARALLEL DO PRIVATE(i) &
+    !$OMP& SHARED(nrPart, particles_prev_pos, particles_cur_pos, particles_cur_vel, particles_cur_accel) &
+    !$OMP& SHARED(time_step, time_step2, particles_prev2_accel, particles_species, particles_prev_accel)
+
+    do i = 1, nrPart
+      if (particles_species(i) == species_atom) cycle
+      
+      ! if (particles_species(i) == species_elec) then
+        ! Verlet
+        !particles_prev_pos(:, i) = particles_cur_pos(:, i) ! Store the previous position
+        !particles_cur_pos(:, i)  = particles_cur_pos(:, i) + particles_cur_vel(:, i)*time_step &
+        !                       & + 0.5d0*particles_cur_accel(:, i)*time_step2
+
+        ! Beeman
+        particles_prev_pos(:, i) = particles_cur_pos(:, i) ! Store the previous position
+        particles_cur_pos(:, i)  = particles_cur_pos(:, i) + particles_cur_vel(:, i)*time_step &
+                              & + 1.0d0/6.0d0*( 4.0d0*particles_cur_accel(:, i) - particles_prev_accel(:, i) )*time_step2
+
+        particles_prev2_accel(:, i) = particles_prev_accel(:, i) ! Beeman
+        particles_prev_accel(:, i) = particles_cur_accel(:, i)
+        particles_cur_accel(:, i)  = 0.0d0
+
+        ! Mark particles that should be removed with .false. in the mask array
+        call ptr_Check_Boundary(i)
+
+        ! Record information about particles when to pass trough certain planes
+        call Check_Planes(i)
+      ! end if
+    end do
+    !$OMP END PARALLEL DO
+  end subroutine Update_ElecIon_Position
 
   subroutine Update_Species_Position(step,species)
     ! Update the position of particles in the verlet integration
@@ -115,7 +157,7 @@ contains
     nrStep2 = nrStep**2
 
     !$OMP PARALLEL DO PRIVATE(i) &
-    !$OMP& SHARED(nrFor, particles_prev_pos, particles_cur_pos, particles_cur_vel, particles_cur_accel) &
+    !$OMP& SHARED(nrFor, nrStep, nrStep2, particles_prev_pos, particles_cur_pos, particles_cur_vel, particles_cur_accel) &
     !$OMP& SHARED(time_step, time_step2, particles_prev2_accel, particles_species, particles_prev_accel)
 
     do k = 1, nrFor
@@ -259,15 +301,84 @@ contains
     avg_elec_vel(:) = 0.0d0
     avg_ion_vel(:)  = 0.0d0
 
-    ! Electron velocity is updated at every time step
-    call Update_Species_Velocity(step, species_elec)
-    ! Ion velocity is updated at every atom_time_interval time step
-    if (mod(step,atom_time_interval) == 0) then
-      call Update_Species_Velocity(step, species_ion)
+    if (two_time_step .eqv. .true.) then
+      ! Electron velocity is updated at every time step
+      call Update_Species_Velocity(step, species_elec)
+      ! Ion velocity is updated at every atom_time_interval time step
+      if (mod(step,atom_time_interval) == 0) then
+        call Update_Species_Velocity(step, species_ion)
+      end if
+      ! Atom velocity is currently not updated
+    else
+      call Update_ElecIon_Velocity(step)
     end if
-    ! Atom velocity is currently not updated
 
   end subroutine Update_Particle_Velocity
+
+  subroutine Update_ElecIon_Velocity(step)
+    ! Update the velocity in the verlet integration
+    integer, intent(in)              :: step
+    integer                          :: i, j, s, emit, sec
+    double precision                 :: q, nrStep
+
+    !$OMP PARALLEL DO DEFAULT(NONE) &
+    !$OMP& PRIVATE(i, j, s, q, emit, sec) &
+    !$OMP& SHARED(particles_cur_vel, particles_prev_accel, particles_cur_accel, time_step) &
+    !$OMP& SHARED(ramo_current, ramo_current_emit, E_zunit, particles_section, particles_charge) &
+    !$OMP& SHARED(nrPart, particles_elec_pointer, particles_ion_pointer, particles_species, particles_emitter, particles_prev2_accel) &
+    !$OMP& REDUCTION(+:avg_part_vel, avg_elec_vel, avg_ion_vel)
+    do i = 1, nrPart
+      if (particles_species(i) == species_atom) cycle
+      ! Verlet
+      !particles_cur_vel(:, i) = particles_cur_vel(:, i) &
+      !                      & + 0.5d0*( particles_prev_accel(:, i) &
+      !                      & + particles_cur_accel(:, i) )*time_step
+
+      !! Beeman
+      particles_cur_vel(:, i) = particles_cur_vel(:, i) &
+                            & + 1.0d0/6.0d0*( 2.0d0*particles_cur_accel(:, i) &
+                            & + 5.0d0*particles_prev_accel(:, i) & 
+                            & - particles_prev2_accel(:, i) )*time_step
+
+      q = particles_charge(i)
+      s = particles_species(i)
+      emit = particles_emitter(i)
+      sec  = particles_section(i)
+
+      ! We use OMP ATOMIC here because the index s is not a loop index
+      !$OMP ATOMIC UPDATE
+      ramo_current(s) = ramo_current(s) + q * E_zunit * particles_cur_vel(3, i)
+
+      ! We use OMP ATOMIC here because the indexes sec and emit are not loop indexes
+      !$OMP ATOMIC UPDATE
+      ramo_current_emit(sec, emit) = ramo_current_emit(sec, emit) + q * E_zunit * particles_cur_vel(3, i)
+
+      ! avg_part_vel(:) = avg_part_vel(:) + particles_cur_vel(:, i) ! Calculate the sum for the average
+
+      ! Update velocity	sum
+      select case (s)
+        case (species_elec)
+          avg_elec_vel(:) = avg_elec_vel(:) + particles_cur_vel(:, i)
+        case (species_ion)
+          avg_ion_vel(:) = avg_ion_vel(:) + particles_cur_vel(:, i)
+      end select
+      avg_part_vel(:) = avg_part_vel(:) + particles_cur_vel(:, i)
+    end do
+    !$OMP END PARALLEL DO
+
+    ! Divide velocity sum by the number of particles to get the average
+    if (nrPart /= 0) then ! Check that we don't divide by zero
+      avg_part_vel(:) = avg_part_vel(:) / nrPart ! Take the average
+    end if
+    if (nrElec /= 0) then ! Check that we don't divide by zero
+      avg_elec_vel(:) = avg_elec_vel(:) / nrElec ! Take the average
+    end if
+    if (nrIon /= 0) then ! Check that we don't divide by zero
+      avg_ion_vel(:) = avg_ion_vel(:) / nrIon ! Take the average
+    end if
+    
+    avg_mob = sqrt(avg_elec_vel(1)**2 + avg_elec_vel(2)**2 + avg_elec_vel(3)**2) / (-1.0d0*E_z)
+  end subroutine Update_ElecIon_Velocity
 
   subroutine Update_Species_Velocity(step,species)
     ! Update the velocity in the verlet integration
@@ -286,7 +397,7 @@ contains
 
     !$OMP PARALLEL DO DEFAULT(NONE) &
     !$OMP& PRIVATE(i, j, k, s, q, emit, sec) &
-    !$OMP& SHARED(species, particles_cur_vel, particles_prev_accel, particles_cur_accel, time_step) &
+    !$OMP& SHARED(species, nrStep, particles_cur_vel, particles_prev_accel, particles_cur_accel, time_step) &
     !$OMP& SHARED(ramo_current, ramo_current_emit, E_zunit, particles_section, particles_charge) &
     !$OMP& SHARED(nrFor, particles_elec_pointer, particles_ion_pointer, particles_species, particles_emitter, particles_prev2_accel) &
     !$OMP& REDUCTION(+:avg_part_vel, avg_elec_vel, avg_ion_vel)
@@ -309,7 +420,7 @@ contains
       particles_cur_vel(:, i) = particles_cur_vel(:, i) &
                             & + 1.0d0/6.0d0*( 2.0d0*particles_cur_accel(:, i) &
                             & + 5.0d0*particles_prev_accel(:, i) & 
-                            & - particles_prev2_accel(:, i) )*time_step
+                            & - particles_prev2_accel(:, i) )*time_step*nrStep
 
       q = particles_charge(i)
       s = particles_species(i)
@@ -355,13 +466,144 @@ contains
 
   subroutine Update_Particle_Acceleration(step)
     integer, intent(in) :: step
-    call Update_Electron_Acceleration()
-    if (mod(step,atom_time_interval) == 0) then
-      call Update_Ion_Acceleration()
+
+    if (two_time_step .eqv. .true.) then
+      call Update_Elec_Acceleration()
+      if (mod(step,atom_time_interval) == 0) then
+        call Update_Ion_Acceleration()
+      end if
+    else
+      call Update_ElecIon_Acceleration()
     end if
   end subroutine Update_Particle_Acceleration
 
-  subroutine Update_Electron_Acceleration()
+  subroutine Update_ElecIon_Acceleration()
+    double precision, dimension(1:3)  ::  force_E, force_c, force_ic, force_ic_N, force_ic_self
+    double precision, dimension(1:3)  ::  pos_1, pos_2, diff, pos_ic
+    double precision                  ::  r
+    double precision                  ::  q_1, q_2
+    double precision                  ::  im_1, im_2
+    double precision                  ::  pre_fac_c
+    integer                           ::  i, j
+    integer                           ::  k_1, k_2
+
+    ! We do not use GUIDED scheduling in OpenMP here because the inner loop changes size.
+    !$OMP PARALLEL DO DEFAULT(NONE) &
+    !$OMP& PRIVATE(i, j, k_1, k_2, pos_1, pos_2, diff, r, pos_ic) &
+    !$OMP& PRIVATE(force_E, force_c, force_ic, force_ic_N, force_ic_self, im_1, q_1, im_2, q_2, pre_fac_c) &
+    !$OMP& SHARED(nrPart, particles_cur_pos, particles_mass, particles_species, ptr_field_E, box_dim) &
+    !$OMP& SHARED(ptr_Image_Charge_effect, particles_charge, particles_cur_accel, d)
+
+    do i = 1, nrPart
+      if (particles_species(i) == species_atom) cycle
+      ! Information about the particle we are calculating the force/acceleration on
+      pos_1 = particles_cur_pos(:, i)
+      im_1 = 1.0d0 / particles_mass(i)
+      q_1 = particles_charge(i)
+      k_1 = particles_species(i)
+
+      ! Acceleration due to electric field
+      force_E = q_1 * ptr_field_E(pos_1)
+
+      ! Do image charge, self interaction
+      ! It is questionable if the self interaction of the image charge is valid at these
+      ! short distances. The escape velocity for an electron at z = 1nm from its image charge partner
+      ! is v_esc = e/sqrt(8*pi*epsilon_0*m_e*z) = 355853 m/s. This gives a de Broglie wavelength of
+      ! w_l = h/(m_e*v_esc) = 2.04 nm. This equal to the distance between the electron and its
+      ! image charge partner.
+      !force_ic_self = q_1**2 * div_fac_c * Force_Image_charges_v2(pos_1, pos_1)
+      force_ic_self = 0.0d0
+
+      ! Loop over particles from i+1 to nrElec.
+      ! There is no need to loop over all particles since
+      ! The forces are equal but in opposite directions
+      do j = i+1, nrPart
+        if (particles_species(j) == species_atom) cycle
+
+        ! Information about the particle that is acting on the particle at pos_1
+        pos_2 = particles_cur_pos(:, j)
+        !if (particles_mass(j) == 0.0d0) then
+        !  print *, 'Hi'
+        !end if
+        im_2 = 1.0d0 / particles_mass(j)
+        q_2 = particles_charge(j)
+        k_2 = particles_species(j)
+
+        ! Prefactor for Coloumb's law
+        pre_fac_c = q_1*q_2 * div_fac_c ! q_1*q_2 / (4*pi*epsilon)
+
+        ! Calculate the distance between the two particles
+        diff = pos_1 - pos_2
+        ! There are fours ways to calculate the distance
+        ! Number 1: Use the intrinsic function NORM2(v)
+        ! Number 2: Use the equation for it sqrt( v(1)**2 + v(2)**2 + v(3)**2 )
+        ! Number 3: Or do sqrt( dot_product(v, v) )
+        ! Number 4: Or use sqrt( sum(v**2) )
+        ! It turns you number 1 is the slowest by far. Number 2, 3 and 4 are
+        ! often similar in speed. The difference is small and they fluctuate a lot,
+        ! with no clear winner.
+        !
+        ! We add a small number (length_scale**3) to the results to
+        ! prevent a singularity when calulating 1/r**3
+        !
+        r = sqrt( sum(diff**2) ) + length_scale**3
+        !r = sqrt( dot_product(diff, diff) ) + length_scale**3
+        !r = NORM2(diff) + length_scale**3
+
+        ! Calculate the Coulomb force
+        ! F = (r_1 - r_2) / |r_1 - r_2|^3
+        ! F = (diff / r) * 1/r^2
+        ! (diff / r) is a unit vector
+        force_c = pre_fac_c * diff / r**3
+
+        ! Do image charge
+        force_ic = pre_fac_c * ptr_Image_Charge_effect(pos_1, pos_2)
+
+        ! The image charge force of particle i on particle j is the same in the z-direction
+        ! but we reverse the x and y directions of the force due to symmetry.
+        force_ic_N(1:2) = -1.0d0*force_ic(1:2)
+        force_ic_N(3)   = +1.0d0*force_ic(3)
+
+        ! ! Below plane
+        ! pos_ic(1:2) = pos_2(1:2)
+        ! pos_ic(3) = -1.0d0*pos_2(3)
+        ! diff = pos_1 - pos_ic
+        ! r = sqrt( sum(diff**2) ) + length_scale**3
+        ! force_ic = (-1.0d0)*pre_fac_c * diff / r**3
+
+        ! ! Above plane
+        ! pos_ic(1:2) = pos_2(1:2)
+        ! pos_ic(3) = 2*d - pos_2(3)
+        ! diff = pos_1 - pos_ic
+        ! r = sqrt( sum(diff**2) ) + length_scale**3
+        ! force_ic = force_ic + (-1.0d0)*pre_fac_c * diff / r**3
+
+        !$OMP CRITICAL
+        particles_cur_accel(:, j) = particles_cur_accel(:, j) - force_c * im_2 + force_ic_N * im_2
+        !$OMP END CRITICAL
+
+        !$OMP CRITICAL
+        particles_cur_accel(:, i) = particles_cur_accel(:, i) + force_c * im_1 + force_ic   * im_1
+        !$OMP END CRITICAL
+        end do
+
+      !$OMP CRITICAL
+      particles_cur_accel(:, i) = particles_cur_accel(:, i) + force_E * im_1 + force_ic_self * im_1
+      !$OMP END CRITICAL
+    end do
+    !$OMP END PARALLEL DO
+
+    !print *, 'Accel'
+    !print *, particles_cur_accel(:, 1:nrPart)
+    !print *, ''
+    !print *, 'Pos'
+    !print *, particles_cur_pos(:, 1:nrPart)/length_scale
+    !print *, 'Done'
+    !print *, nrPart
+    !stop
+  end subroutine Update_ElecIon_Acceleration
+
+  subroutine Update_Elec_Acceleration()
     double precision, dimension(1:3)  ::  force_E, force_c, force_ic, force_ic_N, force_ic_self
     double precision, dimension(1:3)  ::  pos_1, pos_2, diff, pos_ic
     double precision                  ::  r
@@ -520,7 +762,7 @@ contains
     !print *, 'Done'
     !print *, nrPart
     !stop
-  end subroutine Update_Electron_Acceleration
+  end subroutine Update_Elec_Acceleration
 
   subroutine Update_Ion_Acceleration()
     double precision, dimension(1:3)  ::  force_E, force_c, force_ic, force_ic_N, force_ic_self
@@ -645,8 +887,77 @@ contains
   !-----------------------------------------------------------------------------
   ! Find field in a point
   ! Returns the electric field in V/m
+
   function Calc_Field_at(pos)
-    double precision, dimension(1:3)             :: Calc_Field_at
+    double precision, dimension(1:3), intent(in) :: pos
+    double precision, dimension(1:3)       :: Calc_Field_at
+
+    if (two_time_step .eqv. .true.) then
+      Calc_Field_at = Calc_Field_at_tts(pos)
+    else
+      Calc_Field_at = Calc_Field_at_ots(pos)
+    end if
+  end function Calc_Field_at
+
+  function Calc_Field_at_ots(pos)
+    double precision, dimension(1:3)             :: Calc_Field_at_ots
+    double precision, dimension(1:3), intent(in) :: pos
+
+    double precision, dimension(1:3) :: force_c, force_tot, force_ic
+    double precision, dimension(1:3) :: pos_1, pos_2, diff
+    double precision                 :: r
+    double precision                 :: q_1, q_2
+    double precision                 :: pre_fac_c
+    integer                          :: j
+
+    ! Position of the particle we are calculating the force/acceleration on
+    pos_1 = pos
+
+    ! Electric field in the system
+    force_tot = ptr_field_E(pos_1)
+    !print *, force_tot
+
+    !$OMP PARALLEL DO DEFAULT(NONE) PRIVATE(j, pos_2, diff, r, force_c, force_ic, q_2, pre_fac_c) &
+    !$OMP& SHARED(nrPart, particles_elec_pointer, particles_species, particles_cur_pos, ptr_Image_Charge_effect, pos_1, box_dim) &
+    !$OMP& SHARED(particles_charge) &
+    !$OMP& REDUCTION(+:force_tot)
+    do j = 1, nrPart
+
+      if (particles_species(j) == species_atom) cycle
+
+      ! Position of the particle that is acting on the particle at pos_1
+      pos_2 = particles_cur_pos(:, j)
+      q_2 = particles_charge(j)
+
+      pre_fac_c = q_2 * div_fac_c ! q_2 / (4*pi*epsilon)
+
+      ! Calculate the distance between the two particles
+      diff = pos_1 - pos_2
+      r = sqrt( sum(diff**2) ) + length_scale**3
+      !r = sqrt( dot_product(diff, diff) ) + length_scale**3
+      !r = NORM2(diff) + length_scale**3 ! distance + Prevent singularity
+
+      ! Calculate the Coulomb force
+      ! F = (r_1 - r_2) / |r_1 - r_2|^3
+      ! F = (diff / r) * 1/r^2
+      ! (diff / r) is a unit vector
+      force_c = diff / r**3
+      !force_c = diff / (r*r*r)
+
+      ! Image charge effect
+      force_ic = ptr_Image_Charge_effect(pos_1, pos_2)
+
+      ! The total force
+      force_tot = force_tot + pre_fac_c * force_c + pre_fac_c * force_ic
+    end do
+    !$OMP END PARALLEL DO
+
+    Calc_Field_at_ots = force_tot
+
+  end function Calc_Field_at_ots
+
+  function Calc_Field_at_tts(pos)
+    double precision, dimension(1:3)             :: Calc_Field_at_tts
     double precision, dimension(1:3), intent(in) :: pos
 
     double precision, dimension(1:3) :: force_c, force_tot, force_ic
@@ -731,9 +1042,9 @@ contains
     end do
     !$OMP END PARALLEL DO
 
-    Calc_Field_at = force_tot
+    Calc_Field_at_tts = force_tot
 
-  end function Calc_Field_at
+  end function Calc_Field_at_tts
 
   !-----------------------------------------------------------------------------
   ! We have a particle at location pos_1 and we want to calculate the effects of

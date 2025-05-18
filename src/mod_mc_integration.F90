@@ -10,7 +10,7 @@ module mod_mc_integration
 
   implicit none
 
-  double precision, dimension(1:3)   :: F_avg = 0.0d0
+  real(kind=16), dimension(1:3)   :: F_avg = 0.0d0
 contains
   ! ----------------------------------------------------------------------------
   ! This function is called to do the surface integration.
@@ -18,7 +18,7 @@ contains
   !
   subroutine Do_Surface_Integration_FE(emit, N_sup)
     integer, intent(in)           :: emit ! The emitter to do the integration on
-    double precision, intent(out) :: N_sup ! Number of electrons
+    real(kind=16), intent(out) :: N_sup ! Number of electrons
 
     !call Do_2D_MC_plain(emit, N_sup)
     call Do_Cuba_Suave_FE(emit, N_sup)
@@ -32,12 +32,12 @@ contains
     integer, intent(in) :: ndim ! Number of dimensions (Should be 2)
     integer, intent(in) :: ncomp ! Number of vector-components in the integrand (Always 1 here)
     integer, intent(in) :: userdata ! Additional data passed to the integral function (In our case the number of the emitter)
-    double precision, intent(in), dimension(1:ndim)   :: xx ! Integration points, between 0 and 1
-    double precision, intent(out), dimension(1:ncomp) :: ff ! Results of the integrand function
+    real(kind=16), intent(in), dimension(1:ndim)   :: xx ! Integration points, between 0 and 1
+    real(kind=16), intent(out), dimension(1:ncomp) :: ff ! Results of the integrand function
 
     ! Variables used for calculations
-    double precision, dimension(1:3) :: par_pos, field
-    double precision                 :: A ! Emitter area
+    real(kind=16), dimension(1:3) :: par_pos, field
+    real(kind=16)                 :: A ! Emitter area
 
     ! Emitter area
     A = emitters_dim(1, userdata)*emitters_dim(2, userdata)
@@ -79,22 +79,22 @@ contains
   subroutine Do_Cuba_Suave_FE(emit, N_sup)
     ! Input / output variables
     integer, intent(in)           :: emit
-    double precision, intent(out) :: N_sup
+    real(kind=16), intent(out) :: N_sup
 
     ! Cuba integration variables
     integer, parameter :: ndim = 2 ! Number of dimensions
     integer, parameter :: ncomp = 1 ! Number of components in the integrand
     integer            :: userdata = 0 ! User data passed to the integrand
     integer, parameter :: nvec = 1 ! Number of points given to the integrand function
-    double precision   :: epsrel = 1.0d-2 ! Requested relative error
-    double precision   :: epsabs = 1.0d-4 ! Requested absolute error
+    real(kind=16)   :: epsrel = 1.0d-2 ! Requested relative error
+    real(kind=16)   :: epsabs = 1.0d-4 ! Requested absolute error
     integer            :: flags = 0+4 ! Flags
     integer            :: seed = 0 ! Seed for the rng. Zero will use Sobol.
     integer            :: mineval = 2000 ! Minimum number of integrand evaluations
     integer            :: maxeval = 5000000 ! Maximum number of integrand evaluations
     integer            :: nnew = 250 ! Number of integrand evaluations in each subdivision
     integer            :: nmin = 100 ! Minimum number of samples a former pass must contribute to a subregion to be considered in the region's compound integral value.
-    double precision   :: flatness = 5.0d0 ! Determine how prominently out-liers, i.e. samples with a large fluctuation, 
+    real(kind=16)   :: flatness = 5.0d0 ! Determine how prominently out-liers, i.e. samples with a large fluctuation, 
                                            ! figure in the total fluctuation, which in turn determines how a region is split up.
                                            ! As suggested by its name, flatness should be chosen large for 'flat" integrand and small for 'volatile' integrands
                                            ! with high peaks.
@@ -103,9 +103,9 @@ contains
     integer            :: nregions ! <out> The actual number of subregions nedded
     integer            :: neval ! <out> The actual number of integrand evaluations needed
     integer            :: fail ! <out> Error flag (0 = Success, -1 = Dimension out of range, >0 = Accuracy goal was not met)
-    double precision, dimension(1:ncomp) :: integral ! <out> The integral of the integrand over the unit hybercube
-    double precision, dimension(1:ncomp) :: error ! <out> The presumed absolute error
-    double precision, dimension(1:ncomp) :: prob ! <out> The chi-square probability
+    real(kind=16), dimension(1:ncomp) :: integral ! <out> The integral of the integrand over the unit hybercube
+    real(kind=16), dimension(1:ncomp) :: error ! <out> The presumed absolute error
+    real(kind=16), dimension(1:ncomp) :: prob ! <out> The chi-square probability
 
 
     ! Initialize the average field to zero
@@ -143,13 +143,13 @@ contains
     integer, intent(out) :: N_sup ! Number of electrons
 
     ! MC integration variables
-    double precision                 :: mc_err ! Error in the Monte Carlo integration
+    real(kind=16)                 :: mc_err ! Error in the Monte Carlo integration
     integer                          :: N_mc, Nmc_try
-    double precision                 :: A ! Area of the emitter
-    double precision, dimension(1:3) :: par_pos, field
-    double precision                 :: e_sup, e_sup_avg, e_sup_res
-    double precision                 :: e_sup2, e_sup_avg2
-    double precision                 :: N_sup_db
+    real(kind=16)                 :: A ! Area of the emitter
+    real(kind=16), dimension(1:3) :: par_pos, field
+    real(kind=16)                 :: e_sup, e_sup_avg, e_sup_res
+    real(kind=16)                 :: e_sup2, e_sup_avg2
+    real(kind=16)                 :: N_sup_db
 
     ! Calculate the area of the emitter
     A = emitters_dim(1, emit) * emitters_dim(2, emit)
