@@ -16,7 +16,7 @@ program RUMDEED
   use mod_emission_tip
   use mod_field_emission_2D
   use mod_field_thermo_emission
-  use mod_laplace_solver
+  use mod_polarso
   !use mod_therminoic_emission
   use mod_pair
   use mod_tests
@@ -126,9 +126,9 @@ program RUMDEED
     call Run_Tests()
   else
 
-    if (laplace .eqv. .true.) then
-      print '(a)', 'RUMDEED: Using Laplace solver'
-      call LP_Init_Solver()
+    if (use_polarso .eqv. .true.) then
+      print '(a)', 'RUMDEED: Using POLARSO'
+      call PL_Init_Solver()
     end if
 
     if (collision_mode /= 0) then
@@ -147,15 +147,13 @@ program RUMDEED
       ! print *, Z_eff
       ! print *, N_bind
 
-      if (laplace .eqv. .true.) then
-        call Place_Electron(i) 
-        call LP_Calculate_Field()
-        call Write_Laplace_Data()
+      if (use_polarso .eqv. .true.) then
+        call PL_Calculate_Field()
       end if
 
       ! Do Emission
       ! print *, 'Emission'
-      ! call ptr_Do_Emission(i)
+      call ptr_Do_Emission(i)
 
       ! Update the position of all particles
       ! print *, 'Update position'
@@ -304,10 +302,6 @@ contains
     ! Emitters position and dimensions are given in length_scale (nm)
     emitters_dim = emitters_dim * length_scale
     emitters_pos = emitters_pos * length_scale
-    laplace_dim = laplace_dim * length_scale
-    laplace_pos = laplace_pos * length_scale
-    laplace_step = laplace_step * length_scale
-    laplace_padding = laplace_padding * length_scale
     do emit=1,nrEmit
       emitters_ring(1,emit) = emitters_dim(1,emit)
       if (emitters_dim(3,emit) == 0.0d0) then
@@ -342,6 +336,8 @@ contains
     end if
 
     call Read_Cross_Section_Data()
+
+    call Read_Polarso_Variables()
 
     open(newunit=ud_debug, iostat=IFAIL, file='debug.dt', status='replace', action='write')
     if (IFAIL /= 0) then
@@ -924,7 +920,7 @@ contains
 
     deallocate(my_seed)
 
-    call LP_Clean_Up()
+    call PL_Clean_Up()
 
   end subroutine Clean_up
 end program RUMDEED

@@ -1,10 +1,10 @@
 ! ------------------------------------------------------------------------------
-! ----- Module: mod_laplace_solver ---------------------------------------------
+! ----- Module: mod_polarso ---------------------------------------------
 ! ----- Author: Arnar Jonsson --------------------------------------------------
 ! ----- Date: 2025 -------------------------------------------------------------
 ! ------------------------------------------------------------------------------
 
-module mod_laplace_solver
+module mod_polarso
     
     ! Dependencies
     use mod_global
@@ -19,12 +19,10 @@ module mod_laplace_solver
 
     ! Accessibility
     private
-    public :: LP_Init_Solver, LP_Calculate_Field, LP_Update_Field, LP_Calculate_Field_At, LP_Last_Solver, &
-                LP_Clean_Up, Place_Electron, Write_Laplace_Data
+    public :: PL_Init_Solver, PL_Calculate_Field, PL_Update_Field, PL_Calculate_Field_At, &
+                PL_Clean_Up, Place_Electron, Write_Polarso_Data, Read_Polarso_Variables
 
     integer(kind=8), parameter :: pardiso_precision = 8
-
-    integer(kind=8) :: last_used
 
     ! fgmres variables
     integer(kind=8), parameter :: fgmres_tol = 12
@@ -60,7 +58,7 @@ module mod_laplace_solver
     ! Solution
     real(kind=pardiso_precision), allocatable, dimension(:) :: x
     real(kind=8), allocatable, dimension(:) :: voltage
-    real(kind=8), allocatable, dimension(:,:) :: laplace_field
+    real(kind=8), allocatable, dimension(:,:) :: polarso_field
 
     ! Discretization
     integer(kind=8), allocatable, dimension(:) :: gridPoints, gridPointsActive
@@ -71,42 +69,73 @@ module mod_laplace_solver
     real(kind=8), dimension(3,2) :: elec_lim, grid_lim, emit_lim, anode_lim
     integer(kind=8) :: Nx, Ny, Nz, nrGrid, nrGridActive, NxNy
 
+    ! Input file
+    namelist /polarso/ use_polarso, polarso_dim, polarso_pos, &
+                   polarso_step, polarso_padding, write_field_files
+
 contains
 
-    subroutine LP_Init_Solver() ! DONE
+    subroutine PL_Init_Solver() ! DONE
         ! Initialize environment based on input file
 
-        print *, 'Laplace: initializing grid'
+        print *, 'Polarso: initializing grid'
         call init_grid()
 
-        print *, 'Laplace: initializing matrix'
+        print *, 'Polarso: initializing matrix'
         call init_matrix()
 
-        print *, 'Laplace: initializing pardiso'
+        print *, 'Polarso: initializing pardiso'
         call init_pardiso()
 
         ! call write_grid()
 
-    end subroutine LP_Init_Solver
+    end subroutine PL_Init_Solver
 
-    subroutine LP_Calculate_Field() ! TODO
-        print *, 'Laplace: finding electrons'
+    subroutine Read_Polarso_Variables()
+        integer :: ud_polarso, IFAIL, emit
+
+        !Open the file 'input' for reading and check for errors
+        open(newunit=ud_polarso, iostat=IFAIL, file='polarso', status='OLD', action='read')
+        if (IFAIL /= 0) then
+        print '(a)', 'RUMDEED: ERROR UNABLE TO OPEN file polarso'
+        stop
+        end if
+
+        read(ud_polarso, NML=polarso)
+
+        ! Close the 'polarso' file
+        close(unit=ud_polarso, iostat=IFAIL, status='keep')
+
+        polarso_dim = polarso_dim * length_scale
+        polarso_pos = polarso_pos * length_scale
+        polarso_padding = polarso_padding * length_scale
+        polarso_step = polarso_step * length_scale
+    end subroutine Read_Polarso_Variables
+
+    subroutine PL_Calculate_Field() ! TODO
+        if (write_field_files .eqv. .true.) then
+            call Place_Electron()
+        end if
+        print *, 'Polarso: finding electrons'
         call full_update_charge()
-        print *, 'Laplace: updating matrix'
+        print *, 'Polarso: updating matrix'
         call full_update_rhs()
-        print *, 'Laplace: solving system'
+        print *, 'Polarso: solving system'
         call solve_system()
-        print *, 'Laplace: allocate voltage'
+        print *, 'Polarso: allocate voltage'
         call allocate_voltage()
-        print *, 'Laplace: calculating field'
+        print *, 'Polarso: calculating field'
         call calculate_field()
-        print *, 'Laplace: done'
+        print *, 'Polarso: done'
+        if (write_field_files .eqv. .true.) then
+            call Write_Polarso_Data()
+        end if
 
         ! call write_average_field()
         
-    end subroutine LP_Calculate_Field
+    end subroutine PL_Calculate_Field
 
-    subroutine LP_Update_Field(index)
+    subroutine PL_Update_Field(index)
         integer(kind=8), intent(in) :: index ! Index of the new particle in particle arrays
 
         call partial_update_charge(index)
@@ -115,7 +144,7 @@ contains
         call allocate_voltage()
         call calculate_field()
 
-    end subroutine LP_Update_Field
+    end subroutine PL_Update_Field
 
 ! ------------------------------------------------------------------------------
 ! ----- Solution ---------------------------------------------------------------
@@ -127,11 +156,11 @@ contains
         integer(kind=8) :: i
 
         ! Attempt direct solution with pardiso
-        ! print *, 'Laplace: attempting direct solver'
+        ! print *, 'Polarso: attempting direct solver'
         call direct_solve_system()
 
         ! Compute relative error
-        ! print * , 'Laplace: computing error'
+        ! print * , 'Polarso: computing error'
         sol_b = sparse_dot(nrGridActive, nnz_values, nnz_ia, nnz_col_index, x)
         error = norm2(sol_b-b)/norm2(b)
 
@@ -139,7 +168,7 @@ contains
 
         ! Possibly use iterative solver
         if (error > 10.0d0**(-switch_tol)) then
-            print *, 'Laplace: switching to iterative solver'
+            print *, 'Polarso: switching to iterative solver'
             call iterative_solve_system()
         end if
         
@@ -152,8 +181,6 @@ contains
 
         call pardiso_phase(33,0)
 
-        last_used = 0
-
     end subroutine direct_solve_system
 
     subroutine iterative_solve_system() ! TODO
@@ -162,7 +189,7 @@ contains
         integer(kind=8) :: par_error
         integer(kind=8) :: itercount
         ! Solve the system iteratively        
-        ! print *, 'Laplace: initializing dfgmres'
+        ! print *, 'Polarso: initializing dfgmres'
         allocate(tmp((2*ipar(15)+1)*nrGridActive + ipar(15)*(ipar(15)+9)/2 + 1))
         call init_dfgmres()
         ipar(5) = max_iter
@@ -170,28 +197,28 @@ contains
         ipar(9) = 1
         ipar(11) = 1
 
-        ! print *, 'Laplace: checking dfgmres'
+        ! print *, 'Polarso: checking dfgmres'
         deallocate(tmp)
         allocate(tmp((2*ipar(15)+1)*nrGridActive + ipar(15)*(ipar(15)+9)/2 + 1))
         call dfgmres_check(nrGridActive, x, b, rci_request, ipar, dpar, tmp)
         if (rci_request /= 0) then
-            print *, '  Laplace: dfgmres_check failed with error code ', rci_request
+            print *, '  Polarso: dfgmres_check failed with error code ', rci_request
         end if
 
         iterate: do while (.true.)
-            ! print *, 'Laplace: DFGMRES iteration', ipar(4), 'of', ipar(5)
+            ! print *, 'Polarso: DFGMRES iteration', ipar(4), 'of', ipar(5)
             call dfgmres(nrGridActive, x, b, rci_request, ipar, dpar, tmp)
 
             ! print *, 'size of tmp:', size(tmp)
             ! print *, 'ipar(23)+nrGridActive-1', ipar(23)+nrGridActive-1
             ! print *, 'ipar(22)+nrGridActive-1', ipar(22)+nrGridActive-1
 
-            ! print *, 'Laplace: receiving feedback'
+            ! print *, 'Polarso: receiving feedback'
             select case(rci_request)
                 case (0)
                     exit iterate
                 case (1) ! Residual computation
-                    ! print *, 'Laplace: dot product'
+                    ! print *, 'Polarso: dot product'
                     tmp(ipar(23):ipar(23)+nrGridActive-1) = sparse_dot(nrGridActive, nnz_values, nnz_ia, nnz_col_index, tmp(ipar(22):ipar(22)+nrGridActive-1))
                     cycle
                 case (2) ! Stop condition
@@ -207,26 +234,24 @@ contains
                         exit iterate
                     end if
                 case (3) ! Preconditioner
-                    ! print *, 'Laplace: dfgmres: solving'
+                    ! print *, 'Polarso: dfgmres: solving'
                     call pardiso_64(pt,maxfct,mnum,mtype,33,nrGridActive,nnz_values,nnz_ia,nnz_col_index, &
                     & perm,nrhs,iparm,0,tmp(ipar(22):ipar(22)+nrGridActive-1),tmp(ipar(23):ipar(23)+nrGridActive-1),par_error)
                 case (4)
                     if (dpar(7) <= 10.0d0**(-16)) then
-                        ! print *, 'Laplace: Reached minimum tolerance'
+                        ! print *, 'Polarso: Reached minimum tolerance'
                         exit iterate
                     else
                         cycle
                     end if
                 case default ! Error
-                    print *, '  Laplace: dfgmres failed with error code ', rci_request
+                    print *, '  Polarso: dfgmres failed with error code ', rci_request
                     exit iterate
             end select
         end do iterate
 
-        ! print *, 'Laplace: getting solution'
+        ! print *, 'Polarso: getting solution'
         call dfgmres_get(nrGridActive, x, b, rci_request, ipar, dpar, tmp, itercount)
-
-        last_used = 1
 
         deallocate(tmp)
 
@@ -246,12 +271,10 @@ contains
         allocate(newCharge_index(8,max_particles), newCharge_density(8,max_particles), oldCharge_index(8,max_particles))
 
 
-        Lx = laplace_dim(1)+2.0d0*laplace_padding; Ly = laplace_dim(2)+2.0d0*laplace_padding; Lz = laplace_dim(3)
+        Lx = polarso_dim(1)+2.0d0*polarso_padding; Ly = polarso_dim(2)+2.0d0*polarso_padding; Lz = polarso_dim(3)
 
-        ! Nx = laplace_intervals(1); Ny = laplace_intervals(2); Nz = laplace_intervals(3)
-
-        Nx = ceiling(Lx / laplace_step)+1; Ny = ceiling(Ly / laplace_step)+1; Nz = ceiling(Lz / laplace_step)+1
-        Lx = (Nx-1)*laplace_step; Ly = (Ny-1)*laplace_step; Lz = (Nz-1)*laplace_step
+        Nx = ceiling(Lx / polarso_step)+1; Ny = ceiling(Ly / polarso_step)+1; Nz = ceiling(Lz / polarso_step)+1
+        Lx = (Nx-1)*polarso_step; Ly = (Ny-1)*polarso_step; Lz = (Nz-1)*polarso_step
 
         ! hx = Lx / (Nx-1)
         ! hy = Ly / (Ny-1)
@@ -262,34 +285,34 @@ contains
         h = (/hx, hy, hz/)
 
         ! Physical limits of the grid
-        elec_lim(1,:) = (/laplace_pos(1), laplace_pos(1)+laplace_dim(1)/)
-        elec_lim(2,:) = (/laplace_pos(2), laplace_pos(2)+laplace_dim(2)/)
-        elec_lim(3,:) = (/laplace_pos(3), laplace_pos(3)+laplace_dim(3)/)
-        ! print *, 'Laplace: physical limits:', elec_lim(1,:), elec_lim(2,:), elec_lim(3,:)
+        elec_lim(1,:) = (/polarso_pos(1), polarso_pos(1)+polarso_dim(1)/)
+        elec_lim(2,:) = (/polarso_pos(2), polarso_pos(2)+polarso_dim(2)/)
+        elec_lim(3,:) = (/polarso_pos(3), polarso_pos(3)+polarso_dim(3)/)
+        ! print *, 'Polarso: physical limits:', elec_lim(1,:), elec_lim(2,:), elec_lim(3,:)
 
-        ! print *, 'Laplace: physical limits:', elec_lim(1,:), elec_lim(2,:), elec_lim(3,:)
+        ! print *, 'Polarso: physical limits:', elec_lim(1,:), elec_lim(2,:), elec_lim(3,:)
 
         ! Grid limits
-        grid_lim(1,:) = (/laplace_pos(1)-laplace_padding, laplace_pos(1)-laplace_padding+Lx/)
-        grid_lim(2,:) = (/laplace_pos(2)-laplace_padding, laplace_pos(2)-laplace_padding+Ly/)
-        grid_lim(3,:) = (/laplace_pos(3), laplace_pos(3)+Lz/)
+        grid_lim(1,:) = (/polarso_pos(1)-polarso_padding, polarso_pos(1)-polarso_padding+Lx/)
+        grid_lim(2,:) = (/polarso_pos(2)-polarso_padding, polarso_pos(2)-polarso_padding+Ly/)
+        grid_lim(3,:) = (/polarso_pos(3), polarso_pos(3)+Lz/)
 
-        ! print *, 'Laplace: grid limits:', grid_lim(1,:), grid_lim(2,:), grid_lim(3,:)
+        ! print *, 'Polarso: grid limits:', grid_lim(1,:), grid_lim(2,:), grid_lim(3,:)
 
         ! Emitter limits
         emit_lim(1,:) = (/emitters_pos(1,1), emitters_pos(1,1)+emitters_dim(1,1)/)
         emit_lim(2,:) = (/emitters_pos(2,1), emitters_pos(2,1)+emitters_dim(2,1)/)
         emit_lim(3,:) = (/emitters_pos(3,1), emitters_pos(3,1)+emitters_dim(3,1)/)
-        ! print *, 'Laplace: emitter limits:', emit_lim(1,:), emit_lim(2,:), emit_lim(3,:)
+        ! print *, 'Polarso: emitter limits:', emit_lim(1,:), emit_lim(2,:), emit_lim(3,:)
 
         ! Anode limits
         ! anode_lim(1,:) = emit_lim(1,:)
         ! anode_lim(2,:) = emit_lim(2,:)
         anode_lim(1,:) = grid_lim(1,:)
         anode_lim(2,:) = grid_lim(2,:)
-        anode_lim(3,:) = (/laplace_pos(3) + box_dim(3), laplace_pos(3) + box_dim(3)/)
+        anode_lim(3,:) = (/polarso_pos(3) + box_dim(3), polarso_pos(3) + box_dim(3)/)
 
-        ! print *, 'Laplace: emitter limits:', emit_lim(1,:), emit_lim(2,:), emit_lim(3,:)
+        ! print *, 'Polarso: emitter limits:', emit_lim(1,:), emit_lim(2,:), emit_lim(3,:)
 
         ! emit_lim = grid_lim
 
@@ -353,7 +376,7 @@ contains
 
         ! print *, 'nrGrid', nrGrid
         ! print *, 'nrGridActive', nrGridActive
-        allocate(laplace_field(nrGrid,3))
+        allocate(polarso_field(nrGrid,3))
 
     end subroutine init_grid
 
@@ -463,11 +486,11 @@ contains
 
         deallocate(nnz_center)
 
-        ! print *, 'Laplace: nnz:', nnz
-        ! print *, 'Laplace: size(nnz_values):', size(nnz_values)
-        ! print *, 'Laplace: size(nnz_col_index):', size(nnz_col_index)
-        ! print *, 'Laplace: size(nnz_ia):', size(nnz_ia)
-        ! print *, 'Laplace: size(b):', size(b)
+        ! print *, 'Polarso: nnz:', nnz
+        ! print *, 'Polarso: size(nnz_values):', size(nnz_values)
+        ! print *, 'Polarso: size(nnz_col_index):', size(nnz_col_index)
+        ! print *, 'Polarso: size(nnz_ia):', size(nnz_ia)
+        ! print *, 'Polarso: size(b):', size(b)
         
     end subroutine init_matrix
 
@@ -551,13 +574,13 @@ contains
         ! iparm(64) = 0 ! reserved
 
         ! call cpu_time(start)
-        ! print *, 'Laplace: symbolic factorization'
+        ! print *, 'Polarso: symbolic factorization'
         call pardiso_phase(11,1)
         iparm(27) = 0
-        print *, 'Laplace: required memory:', iparm(17)*1e-6, 'Gb'
-        ! print *, 'Laplace: numerical factorization'
+        print *, 'Polarso: required memory:', iparm(17)*1e-6, 'Gb'
+        ! print *, 'Polarso: numerical factorization'
         call pardiso_phase(22,1)
-        ! print *, 'Laplace: solving'
+        ! print *, 'Polarso: solving'
         perm = 0
         call pardiso_phase(33,1)
         ! call cpu_time(end)
@@ -568,7 +591,7 @@ contains
         call dfgmres_init(nrGridActive, x, b, rci_request, ipar, dpar, tmp)
 
         if (rci_request /= 0) then
-            print *, '  Laplace: dfgmres_init failed with error code ', rci_request
+            print *, '  Polarso: dfgmres_init failed with error code ', rci_request
         end if
     end subroutine init_dfgmres
 
@@ -579,9 +602,9 @@ contains
         call pardiso_64(pt,maxfct,mnum,mtype,phase,nrGridActive,nnz_values,nnz_ia,nnz_col_index,perm,nrhs,iparm,msg,b,x,error)
 
         if (error == 0) then
-            ! print *, '  Laplace: analysis and symbolic factorization successful'
+            ! print *, '  Polarso: analysis and symbolic factorization successful'
         else
-            print *, '  Laplace: phase', phase, 'failed with error code ', error
+            print *, '  Polarso: phase', phase, 'failed with error code ', error
         end if
 
     end subroutine pardiso_phase
@@ -602,11 +625,11 @@ contains
         !$OMP& PRIVATE(i, g)
         ! print *, nrGrid
         do i=1,nrGrid
-            ! print *, 'Laplace: i:', i
+            ! print *, 'Polarso: i:', i
             if (gridPoints(i) /= 0) then
                 ! print *, 'x(g)', x(g)
                 g = gridPoints(i)
-                ! print *, 'Laplace: g:', g
+                ! print *, 'Polarso: g:', g
                 voltage(i) = x(g)
             end if
         end do
@@ -620,33 +643,33 @@ contains
         real(kind=8), dimension(3) :: pos
         real(kind=8) :: l, l_const = q_0 / (4.0d0*pi*epsilon_0)
 
-        laplace_field = 0.0d0
+        polarso_field = 0.0d0
 
         !$OMP PARALLEL DO DEFAULT(NONE) &
-        !$OMP& SHARED(nrGrid, voltage, laplace_field) &
+        !$OMP& SHARED(nrGrid, voltage, polarso_field) &
         !$OMP& PRIVATE(i, axis, boundaries)
         do i=1,nrGrid
-            ! print *, 'Laplace: i:', i, 'nrGrid:', nrGrid
+            ! print *, 'Polarso: i:', i, 'nrGrid:', nrGrid
             boundaries = is_boundary(i)
             do axis=1,3
                 select case (boundaries(axis))
                     case (0) ! Inner point
-                        ! print *, '  Laplace: central difference'
-                        laplace_field(i,axis) = - central_difference(voltage,i,axis)
+                        ! print *, '  Polarso: central difference'
+                        polarso_field(i,axis) = - central_difference(voltage,i,axis)
                         if (axis==3) then
-                            laplace_field(i,axis) = laplace_field(i,axis) + applied_field(i)
+                            polarso_field(i,axis) = polarso_field(i,axis) + applied_field(i)
                         end if
                     case (1) ! Startpoint
-                        ! print *, '  Laplace: forward difference'
-                        laplace_field(i,axis) = - forward_difference(voltage,i,axis)
+                        ! print *, '  Polarso: forward difference'
+                        polarso_field(i,axis) = - forward_difference(voltage,i,axis)
                         if (axis==3) then
-                            laplace_field(i,axis) = laplace_field(i,axis) + applied_field(i)
+                            polarso_field(i,axis) = polarso_field(i,axis) + applied_field(i)
                         end if
                     case (2) ! Endpoint
-                        ! print *, '  Laplace: backward difference'
-                        laplace_field(i,axis) = - backward_difference(voltage,i,axis)
+                        ! print *, '  Polarso: backward difference'
+                        polarso_field(i,axis) = - backward_difference(voltage,i,axis)
                         if (axis==3) then
-                            laplace_field(i,axis) = laplace_field(i,axis) + applied_field(i)
+                            polarso_field(i,axis) = polarso_field(i,axis) + applied_field(i)
                         end if
                 end select
             end do
@@ -707,7 +730,6 @@ contains
         do i=1,nrGrid
             if (is_anode(i)) then
                 g = gridPointsActive(i)
-                print *, b(g)
             end if
         end do
         ! $OMP PARALLEL DO DEFAULT(NONE) &
@@ -758,7 +780,7 @@ contains
         integer(kind=8), intent(in) :: g
         integer(kind=8) :: center
 
-        ! print *, 'Laplace: inserting anode boundary', g
+        ! print *, 'Polarso: inserting anode boundary', g
 
         center = nnz_center(g)
 
@@ -832,13 +854,13 @@ contains
         do axis=1,3
             select case (boundaries(axis))
                 case (0) ! Inner point
-                    ! print *, '  Laplace: central difference'
+                    ! print *, '  Polarso: central difference'
                     first_finite_difference_3d(axis) = central_difference(f,i,axis)
                 case (1) ! Startpoint
-                    ! print *, '  Laplace: forward difference'
+                    ! print *, '  Polarso: forward difference'
                     first_finite_difference_3d(axis) = forward_difference(f,i,axis)
                 case (2) ! Endpoint
-                    ! print *, '  Laplace: backward difference'
+                    ! print *, '  Polarso: backward difference'
                     first_finite_difference_3d(axis) = backward_difference(f,i,axis)
             end select
         end do
@@ -855,7 +877,7 @@ contains
         x_m2h = move(x,-2,a)
         x_p1h = move(x,1,a)
         x_p2h = move(x,2,a)
--
+
         central_difference = (f(x_p1h)-f(x_m1h))/(2.0d0*h(a))
     end function central_difference
 
@@ -998,7 +1020,7 @@ contains
                 do m=1,4
                     cube_weight(l,m) = cube_weight(l,m) / weight_sum
                     if (cube_weight(l,m) < 0.0d0) then
-                        print*, 'Laplace: negative weight:', cube_weight(l,m)
+                        print*, 'Polarso: negative weight:', cube_weight(l,m)
                     end if
                     g = gridPoints(cube_id(l,m))
                     newCharge_index((l-1)*4+m,newNrCharge) = g
@@ -1197,14 +1219,14 @@ contains
 ! ----- Clean Up --------------------------------------------------------------
 ! -----------------------------------------------------------------------------
     
-    subroutine LP_Clean_Up() ! DONE
+    subroutine PL_Clean_Up() ! DONE
         integer(kind=8) :: error, phase
 
         ! Clean up memory
-        print '(a)', 'Laplace: Clean up'
+        print '(a)', 'Polarso: Clean up'
 
         ! Clear pardiso memory
-        print *, '  Laplace: clearing pardiso memory'
+        print *, '  Polarso: clearing pardiso memory'
         call pardiso_phase(-1,0)
         
         ! Deallocate CSR matrix
@@ -1221,24 +1243,24 @@ contains
         deallocate(perm)
 
         ! These should have been deallocated already in the last iteration
-        if (allocated(laplace_field)) then
-            deallocate(laplace_field) 
+        if (allocated(polarso_field)) then
+            deallocate(polarso_field) 
         end if
         if (allocated(voltage)) then
             deallocate(voltage)
         end if
-    end subroutine LP_Clean_Up
+    end subroutine PL_Clean_Up
 
     subroutine check_matrix()
         integer(kind=8) :: i,count,index,end
 
         do i=1,nrGridActive
-            print*, 'Laplace: row=',i
+            print*, 'Polarso: row=',i
             count = 0
             index = nnz_ia(i)
             end = nnz_ia(i+1)
             do while(index < end)
-                print*,'    Laplace: column=',nnz_col_index(index)
+                print*,'    Polarso: column=',nnz_col_index(index)
                 index = index + 1
                 count = count + 1
             end do
@@ -1246,84 +1268,78 @@ contains
 
     end subroutine check_matrix
 
-    subroutine Place_Electron(step)
-        integer(kind=8), intent(in) :: step
+    subroutine Place_Electron()
         real(kind=8), dimension(3) :: par_pos, par_vel
 
-        if (step == 1) then
-            par_pos(1) = 0.0d0*length_scale
-            par_pos(2) = 0.0d0*length_scale
-            par_pos(3) = 2.0d0*length_scale
-            par_vel = 0.0d0
-            call Add_Particle(par_pos,par_vel,species_elec,step,1,-1)
-        end if
+        par_pos = (/0.0d0, 0.0d0, 2.0d0/)*length_scale
+        par_vel = 0.0d0
+        call Add_Particle(par_pos,par_vel,species_elec,1,1,-1)
+
     end subroutine Place_Electron
 
-    subroutine Write_Laplace_Data()
-        integer :: ud_lp_field, ud_ic_field, IFAIL, lvl, i, j, k
-        character(len=128) :: filename_lp_field, filename_ic_field
-        real(kind=8), dimension(3) :: cur_pos, ic_field, lp_field
+    subroutine Write_Polarso_Data()
+        integer :: ud_pl_field, ud_ic_field, IFAIL, lvl, i, j, k
+        character(len=128) :: filename_pl_field, filename_ic_field
+        real(kind=8), dimension(3) :: cur_pos, ic_field, pl_field
         real(kind=8), dimension(3,2) :: lim
         real(kind=8) :: Lx, Ly, hx_temp, hy_temp
         
-        do lvl=0,0
-            ! write(filename_lp_voltage, '(a15,i0,a4)') 'out/lp_voltage_',lvl,'.bin'
-            write(filename_lp_field, '(a13,i0,a4)') 'out/lp_field_',lvl,'.bin'
-            write(filename_ic_field, '(a13,i0,a4)') 'out/ic_field_',lvl,'.bin'
+        ! write(filename_lp_voltage, '(a15,i0,a4)') 'out/lp_voltage_',lvl,'.bin'
+        write(filename_pl_field, '(a16)') 'out/pl_field.bin'
+        write(filename_ic_field, '(a16)') 'out/ic_field.bin'
 
-            ! ! Open the voltage file
-            ! open(newunit=ud_lp_voltage, iostat=IFAIL, file=filename_lp_voltage, status='REPLACE', action='WRITE', access='STREAM')
-            ! if (IFAIL /= 0) then
-            !     print *, 'RUMDEED: Failed to open the laplace voltage file.'
-            !     return 
-            ! end if
+        ! ! Open the voltage file
+        ! open(newunit=ud_lp_voltage, iostat=IFAIL, file=filename_lp_voltage, status='REPLACE', action='WRITE', access='STREAM')
+        ! if (IFAIL /= 0) then
+        !     print *, 'RUMDEED: Failed to open the Polarso voltage file.'
+        !     return 
+        ! end if
 
-            ! Open the field file
-            open(newunit=ud_lp_field, iostat=IFAIL, file=filename_lp_field, status='REPLACE', action='WRITE', access='STREAM')
-            if (IFAIL /= 0) then
-                print *, 'RUMDEED: Failed to open the laplace field file.'
-                return 
-            end if
+        ! Open the field file
+        open(newunit=ud_pl_field, iostat=IFAIL, file=filename_pl_field, status='REPLACE', action='WRITE', access='STREAM')
+        if (IFAIL /= 0) then
+            print *, 'RUMDEED: Failed to open the polarso field file.'
+            return 
+        end if
 
-            ! Open the field file
-            open(newunit=ud_ic_field, iostat=IFAIL, file=filename_ic_field, status='REPLACE', action='WRITE', access='STREAM')
-            if (IFAIL /= 0) then
-                print *, 'RUMDEED: Failed to open the image charge field file.'
-                return 
-            end if
+        ! Open the field file
+        open(newunit=ud_ic_field, iostat=IFAIL, file=filename_ic_field, status='REPLACE', action='WRITE', access='STREAM')
+        if (IFAIL /= 0) then
+            print *, 'RUMDEED: Failed to open the image charge field file.'
+            return 
+        end if
 
-            lim = emit_lim
+        lim = emit_lim
 
-            Lx = lim(1,2) - lim(1,1)
-            Ly = lim(2,2) - lim(2,1)
-            hx_temp = Lx / 199
-            hy_temp = Ly / 199
+        Lx = lim(1,2) - lim(1,1)
+        Ly = lim(2,2) - lim(2,1)
+        hx_temp = Lx / 199
+        hy_temp = Ly / 199
 
-            do i=0,199
-                do j=0,199
-                    cur_pos(1) = lim(1,1) + i*hx_temp
-                    cur_pos(2) = lim(2,1) + j*hy_temp
-                    cur_pos(3) = 0.0d0
+        do i=0,199
+            do j=0,199
+                cur_pos(1) = lim(1,1) + i*hx_temp
+                cur_pos(2) = lim(2,1) + j*hy_temp
+                cur_pos(3) = 0.0d0
 
-                    lp_field = LP_Calculate_Field_At(cur_pos)
-                    ic_field = Calc_Field_at(cur_pos)
-                    ! print *, 'Laplace: writing: x=',test_pos(1), ' y=',test_pos(2), ' z=',test_pos(3)
-                    ! write(unit=ud_lp_voltage,iostat=IFAIL) i, j, voltage(k), is_emitter(k)
-                    write(unit=ud_lp_field,iostat=IFAIL) i, j, lp_field(3), is_emitter(k)
-                    write(unit=ud_ic_field,iostat=IFAIL) i, j, ic_field(3), is_emitter(k)
-                end do
+                pl_field = PL_Calculate_Field_At(cur_pos)
+                ic_field = Calc_Field_at(cur_pos)
+                ! print *, 'Polarso: writing: x=',test_pos(1), ' y=',test_pos(2), ' z=',test_pos(3)
+                ! write(unit=ud_lp_voltage,iostat=IFAIL) i, j, voltage(k), is_emitter(k)
+                write(unit=ud_pl_field,iostat=IFAIL) i, j, pl_field(3)
+                write(unit=ud_ic_field,iostat=IFAIL) i, j, ic_field(3)
             end do
-
-            ! close(unit=ud_lp_voltage, iostat=IFAIL, status='keep')
-            close(unit=ud_lp_field, iostat=IFAIL, status='keep')
-            close(unit=ud_ic_field, iostat=IFAIL, status='keep')
         end do
-        
-    end subroutine Write_Laplace_Data
 
-    function LP_Calculate_Field_At(point_pos)
+        ! close(unit=ud_lp_voltage, iostat=IFAIL, status='keep')
+        close(unit=ud_pl_field, iostat=IFAIL, status='keep')
+        close(unit=ud_ic_field, iostat=IFAIL, status='keep')
+        
+    end subroutine Write_Polarso_Data
+
+    function PL_Calculate_Field_At(point_pos)
         real(kind=8), dimension(3), intent(in) :: point_pos
-        real(kind=8), dimension(3) :: LP_Calculate_Field_At
+        real(kind=8), dimension(3) :: PL_Calculate_Field_At
         integer(kind=8) :: i, k, l, m
 
         integer(kind=8), dimension(2,4) :: grid_id
@@ -1333,7 +1349,7 @@ contains
         real(kind=8), dimension(3) :: point_field
 
         ! if (is_inside(point_pos) == 0) then
-        !     print *, 'Laplace: calculating field outside the domain'
+        !     print *, 'Polarso: calculating field outside the domain'
         !     return
         ! end if
 
@@ -1345,7 +1361,7 @@ contains
             do m=1,4
                 k = grid_id(l,m)
                 grid_pos(l,m,:) = cart_coord(k)
-                grid_field(l,m,:) = laplace_field(k,:)
+                grid_field(l,m,:) = polarso_field(k,:)
             end do
         end do
 
@@ -1355,9 +1371,9 @@ contains
             temp_field_back(l,:) = trilinear_interpolate(grid_pos(l,3,1),grid_pos(l,4,1),point_pos(1),grid_field(l,3,:),grid_field(l,4,:))
             temp_field(l,:) = trilinear_interpolate(grid_pos(l,1,2),grid_pos(l,3,2),point_pos(2),temp_field_front(l,:),temp_field_back(l,:))
         end do
-        LP_Calculate_Field_At = trilinear_interpolate(grid_pos(1,1,3),grid_pos(2,1,3),point_pos(3),temp_field(1,:),temp_field(2,:))
+        PL_Calculate_Field_At = trilinear_interpolate(grid_pos(1,1,3),grid_pos(2,1,3),point_pos(3),temp_field(1,:),temp_field(2,:))
 
-    end function LP_Calculate_Field_At
+    end function PL_Calculate_Field_At
 
     
 
@@ -1395,7 +1411,7 @@ contains
         real(kind=8), allocatable, dimension(:) :: sparse_dot
         integer(kind=8) :: i, j, col_start, col_end
 
-        ! print *, 'Laplace: sparse_dot start'
+        ! print *, 'Polarso: sparse_dot start'
         allocate(sparse_dot(n))
         sparse_dot = 0.0d0
 
@@ -1415,13 +1431,6 @@ contains
         end do
         !$OMP END PARALLEL DO
 
-        ! print *, 'Laplace: sparse_dot end'
+        ! print *, 'Polarso: sparse_dot end'
     end function sparse_dot
-
-    function LP_Last_Solver()
-        integer(kind=8) :: LP_Last_Solver
-
-        LP_Last_Solver = last_used
-    end function LP_Last_Solver
-
-end module mod_laplace_solver
+end module mod_polarso

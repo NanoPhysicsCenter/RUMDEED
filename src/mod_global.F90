@@ -329,10 +329,9 @@ module mod_global
   logical :: two_time_step = .false.
      
   ! Laplace solver
-  logical            :: laplace = .false.
-  double precision, dimension(3) :: laplace_dim, laplace_pos
-  integer(kind=8), dimension(3) :: laplace_intervals
-  real(kind=8) :: laplace_padding, laplace_step
+  logical            :: use_polarso = .false., write_field_files = .false.
+  double precision, dimension(3) :: polarso_dim, polarso_pos
+  real(kind=8) :: polarso_padding, polarso_step
 
 
   ! ----------------------------------------------------------------------------
@@ -398,8 +397,6 @@ module mod_global
                    write_electron_data_file, write_ion_data_file, &
                    sample_atom_file, sample_atom_rate, &
                    sample_elec_file, sample_elec_rate, &
-                   laplace, laplace_dim, laplace_pos, laplace_intervals, &
-                   laplace_step, laplace_padding, &
                    R_s, R_p, L_p, C_p, ion_life_time, &
                    planes_N, planes_z
 

@@ -123,7 +123,7 @@ $(PROJECT_NAME).out: ../src/main.F90 ../cuba/lib/libcuba.a \
 			mod_kevin_rjgtf.mod mod_kevin_rjgtf.o \
 			mod_velocity.mod mod_velocity.o \
 			mod_manual_emission.mod mod_manual_emission.o \
-			mod_laplace_solver.mod mod_laplace_solver.o \
+			mod_polarso.mod mod_polarso.o \
 			mkl_pardiso.mod mkl_pardiso.o \
 			mkl_spblas.mod mkl_spblas.o \
 			mkl_rci.mod mkl_rci.o 
@@ -135,7 +135,7 @@ $(PROJECT_NAME).out: ../src/main.F90 ../cuba/lib/libcuba.a \
 			mod_polynomialroots.o \
 			mod_work_function.o mod_collisions.o \
 			mod_velocity.o mod_manual_emission.o \
-			mod_laplace_solver.o \
+			mod_polarso.o \
 			$(CUBA_LIB) $(MKL_LIBS) -lpthread -lm -ldl -o $(PROJECT_NAME).out
 
 ../cuba/Cuba-4.2.2.tar.gz:
@@ -163,13 +163,13 @@ mod_pair.mod mod_pair.o: ../src/mod_pair.F90 mod_global.mod
 mod_tests.mod mod_tests.o: ../src/mod_tests.F90 mod_global.mod mod_verlet.mod mod_pair.mod mod_field_emission_v2.mod
 		$(FC) -c $(FFLAGS) ../src/mod_tests.F90
 
-mod_photo_emission.mod mod_photo_emission.o: ../src/mod_photo_emission.f90 mod_global.mod mod_verlet.mod mod_pair.mod mod_velocity.mod mod_laplace_solver.mod
+mod_photo_emission.mod mod_photo_emission.o: ../src/mod_photo_emission.f90 mod_global.mod mod_verlet.mod mod_pair.mod mod_velocity.mod mod_polarso.mod
 		$(FC) -c $(FFLAGS) $(MKL_LIBS) ../src/mod_photo_emission.f90
 
 mod_field_emission.mod mod_field_emission.o: ../src/mod_field_emission.f90 mod_global.mod mod_verlet.mod mod_pair.mod mod_velocity.mod
 		$(FC) -c $(FFLAGS) ../src/mod_field_emission.f90
 
-mod_field_emission_v2.mod mod_field_emission_v2.o: ../src/mod_field_emission_v2.F90 mod_global.mod mod_verlet.mod mod_pair.mod mod_work_function.mod mod_velocity.mod mod_laplace_solver.mod
+mod_field_emission_v2.mod mod_field_emission_v2.o: ../src/mod_field_emission_v2.F90 mod_global.mod mod_verlet.mod mod_pair.mod mod_work_function.mod mod_velocity.mod mod_polarso.mod
 		$(FC) -c $(FFLAGS) $(MKL_LIBS) ../src/mod_field_emission_v2.F90
 
 mod_field_thermo_emission.mod mod_field_thermo_emission.o: ../src/mod_field_thermo_emission.F90 mod_global.mod mod_verlet.mod mod_pair.mod mod_work_function.mod mod_kevin_rjgtf.mod mod_velocity.mod
@@ -196,8 +196,8 @@ mod_work_function.mod mod_work_function.o: ../src/mod_work_function.F90
 mod_polynomialroots.mod mod_polynomialroots.o: ../src/mod_polynomialroots.F90
 		$(FC) -c $(FFLAGS) ../src/mod_polynomialroots.F90
 
-mod_laplace_solver.mod mod_laplace_solver.o: ../src/mod_laplace_solver.F90 mod_global.mod mkl_spblas.mod mkl_pardiso.mod mod_verlet.mod mkl_rci.mod
-		$(FC) -c $(FFLAGS) $(MKL_LIBS) ../src/mod_laplace_solver.F90
+mod_polarso.mod mod_polarso.o: ../src/mod_polarso.F90 mod_global.mod mkl_spblas.mod mkl_pardiso.mod mod_verlet.mod mkl_rci.mod
+		$(FC) -c $(FFLAGS) $(MKL_LIBS) ../src/mod_polarso.F90
 
 mod_velocity.mod mod_velocity.o: ../src/mod_velocity.f90
 		$(FC) -c $(FFLAGS) ../src/mod_velocity.f90

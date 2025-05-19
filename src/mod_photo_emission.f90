@@ -14,7 +14,7 @@ module mod_photo_emission
   use mod_pair
   use mod_work_function
   use mod_velocity
-  use mod_laplace_solver
+  use mod_polarso
   implicit none
 
   ! ----------------------------------------------------------------------------
@@ -426,8 +426,8 @@ contains
       ! Schottkey Effect, reduction of workfunction due to electric field
       ! Workfunction_reduction = sqrt ( (electron_charge^3 * electric_fielc)/(4 * pi * epsilon_0) )
       
-      if (laplace .eqv. .true.) then
-        field = Calculate_Laplace_Field_at(par_pos)
+      if (use_polarso .eqv. .true.) then
+        field = PL_Calculate_Field_At(par_pos)
       else
         field = Calc_Field_at(par_pos)
       end if
@@ -436,8 +436,8 @@ contains
         schk_wf = w_theta_xy(par_pos, emit) - schk_red
         if (schk_wf <= p_eV) then
           par_pos(3) = 1.0d0 * length_scale ! Above plane
-          if (laplace .eqv. .true.) then
-            field = Calculate_Laplace_Field_at(par_pos)
+          if (use_polarso .eqv. .true.) then
+            field = PL_Calculate_Field_At(par_pos)
           else
             field = Calc_Field_at(par_pos)
           end if
@@ -462,9 +462,9 @@ contains
           
             call Add_Particle(par_pos, par_vel, species_elec, step, emit, -1)
 
-            if (laplace .eqv. .true.) then
-              print *, 'Recomputing Laplace field'
-              call Calculate_Laplace_Field()
+            if (use_polarso .eqv. .true.) then
+              print *, 'Recomputing Polarso field'
+              call PL_Update_Field(nrPart)
             end if
 
             nrElecEmit = nrElecEmit + 1
@@ -620,8 +620,8 @@ contains
       ! Check if work function at position is lower then photon energy
       if (w_theta_xy(par_pos, emit) <= p_eV) then
 
-        if (laplace .eqv. .true.) then
-          field = Calculate_Laplace_Field_at(par_pos)
+        if (use_polarso .eqv. .true.) then
+          field = PL_Calculate_Field_At(par_pos)
         else
           field = Calc_Field_at(par_pos)
         end if
@@ -629,8 +629,8 @@ contains
         if (field(3) < 0.0d0) then
           par_pos(3) = 1.0d0 * length_scale ! Above plane
 
-          if (laplace .eqv. .true.) then
-            field = Calculate_Laplace_Field_at(par_pos)
+          if (use_polarso .eqv. .true.) then
+            field = PL_Calculate_Field_At(par_pos)
           else
             field = Calc_Field_at(par_pos)
           end if
@@ -653,8 +653,8 @@ contains
             ! print *, 'pos = ', par_pos
 
             ! Recompute field after adding particle
-            if (laplace .eqv. .true.) then
-              call Calculate_Laplace_Field()
+            if (use_polarso .eqv. .true.) then
+              call PL_Update_Field(nrPart)
             end if
 
             nrElecEmit = nrElecEmit + 1
