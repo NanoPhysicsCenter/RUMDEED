@@ -1,10 +1,10 @@
 !-------------------------------------------!
-! Module for emission from tip              !
+! Module for GTF emission from tip              !
 ! Kristinn Torfason                         !
-! 04.06.18                                  !
+! 25.05.25                                  !
 !-------------------------------------------!
 
-Module mod_emission_tip
+Module mod_gtf_tip
   use mod_global
   use mod_hyperboloid_tip
   use mod_verlet
@@ -14,7 +14,7 @@ Module mod_emission_tip
   implicit none
 
   PRIVATE
-  PUBLIC :: Init_Emission_Tip, Clean_Up_Emission_Tip
+  PUBLIC :: Init_GTF_Tip, Clean_Up_GTF_Tip
 
   ! ----------------------------------------------------------------------------
   ! Variables
@@ -58,7 +58,7 @@ contains
 
   !-----------------------------------------------------------------------------
   ! Initialize the Field Emission
-  subroutine Init_Emission_Tip()
+  subroutine Init_GTF_Tip()
 
     ! Function that checks the boundary conditions for the System
     ptr_Check_Boundary => Check_Boundary_Tip
@@ -102,11 +102,11 @@ contains
     pre_fac_E_tip = log( (1.0d0 + eta_1)/(1.0d0 - eta_1) * (1.0d0 - eta_2)/(1.0d0 + eta_2) )
     pre_fac_E_tip = 2.0d0 * V_s / (a_foci * pre_fac_E_tip)
 
-  end subroutine Init_Emission_Tip
+  end subroutine Init_GTF_Tip
 
-  subroutine Clean_Up_Emission_Tip()
+  subroutine Clean_Up_GTF_Tip()
     ! Nothing to do here
-  end subroutine Clean_Up_Emission_Tip
+  end subroutine Clean_Up_GTF_Tip
 
   subroutine Do_Emission_Tip(step)
     integer, intent(in) :: step
@@ -1478,4 +1478,4 @@ end function Elec_supply_tip
     Photon_Emission = Photo_pois/10000
 
   end function Photon_Emission
-end module mod_emission_tip
+end module mod_gtf_tip
