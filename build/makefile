@@ -15,7 +15,12 @@ GIT_VERSION := $(shell git describe --dirty --always --tags || echo `date +'%d/%
 
 CUBA_LIB=../cuba/lib/libcuba.a
 
-OPENMP ?= yes # Set to something else to disable OpenMP
+ifndef OPENMP
+OPENMP = yes # Set to something else to disable OpenMP
+$(info Using OpenMP)
+else
+$(info OpenMP disabled)
+endif
 
 TESTING_MODE ?= 2 # Set to 1 to enable testing mode
 
@@ -33,7 +38,7 @@ FFLAGS=-O2 -xHost -ip -ipo #-fp-model precise -g
 #-prec-div -prec-sqrt
 #-fp-model precise
 #FFLAGS=-check all -g -warn interfaces -warn all -traceback -ftrapuv
-ifeq ($(OPENMP),yes)
+ifneq (,$(findstring yes,$(OPENMP)))
 FFLAGS+=-qopenmp
 endif
 endif
@@ -42,7 +47,7 @@ endif
 ifeq ($(FC),ifx)
 $(info Using New Intel Fortran Compiler)
 FFLAGS=-O2 -xHost -ipo
-ifeq ($(OPENMP),yes)
+ifneq (,$(findstring yes,$(OPENMP)))
 FFLAGS+=-qopenmp
 endif
 endif
@@ -53,7 +58,7 @@ ifneq (,$(findstring gfortran,$(FC)))
 $(info Using GNU Fortran)
 FFLAGS=-O3 -march=native -flto=auto
 #FFLAGS=-g -fcheck=all -Wall -fbacktrace -ffpe-trap=invalid,zero,overflow,underflow
-ifeq ($(OPENMP),yes)
+ifneq (,$(findstring yes,$(OPENMP)))
 FFLAGS+=-fopenmp
 endif
 endif
@@ -64,7 +69,7 @@ $(info Using PGI Fortran)
 FFLAGS=-fast
 #FFLAGS=-fast -Minfo -Mllvm
 #FFLAGS=-g -gopt -Mbounds -Mchkfpstk -Mchkfpstk -Mchkfpstk -Melf -traceback
-ifeq ($(OPENMP),yes)
+ifneq (,$(findstring yes,$(OPENMP)))
 FFLAGS+=-mp
 endif
 endif
@@ -74,7 +79,7 @@ ifeq ($(FC),nvfortran)
 $(info Using NVidia Fortran)
 #FFLAGS=-O3 -fastsse -Mipa=fast,inline -Munroll
 FFLAGS=-O3 -fastsse
-ifeq ($(OPENMP),yes)
+ifneq (,$(findstring yes,$(OPENMP)))
 FFLAGS+=-mp
 endif
 endif
@@ -82,7 +87,7 @@ endif
 ifeq ($(FC),flang)
 $(info Using AMD Fortran)
 FFLAGS=-O3 -march=native -D_AOCC_=1
-ifeq ($(OPENMP),yes)
+ifneq (,$(findstring yes,$(OPENMP)))
 FFLAGS+=-fopenmp
 endif
 endif
