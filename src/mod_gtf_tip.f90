@@ -10,6 +10,7 @@ Module mod_gtf_tip
   use mod_verlet
   use mod_pair
   use mod_ic
+  use mod_kevin_rjgtf
   !use ieee_arithmetic
   implicit none
 
@@ -767,6 +768,15 @@ end subroutine Do_Photo_Emission_Tip
     par_pos = cur_pos
   end subroutine Metro_algo_tip_v2
 
+  subroutine Metro_algo_tip_gtf(ndim, xi, phi, eta_f, df_cur, par_pos)
+    integer, intent(in)              :: ndim
+    double precision, intent(out)    :: xi, phi, eta_f, df_cur
+    double precision                 :: new_xi, new_phi, new_eta_f, df_new, rnd, alpha
+    double precision, dimension(1:3) :: std, new_pos, cur_pos, par_pos, field
+    integer                          :: i, count
+    
+  end subroutine Metro_algo_tip_gtf
+
   function Sphere_IC_field(pos_1, pos_2)
     double precision, dimension(1:3)             :: Sphere_IC_field
     double precision, dimension(1:3), intent(in) :: pos_1, pos_2
@@ -874,34 +884,6 @@ end subroutine Do_Photo_Emission_Tip
 
     par_pos(1) = 0.0d0
     par_pos(2) = 0.0d0
-
-    !IFAIL = vdRngGaussianMV(VSL_RNG_METHOD_GAUSSIANMV_ICDF, stream, ndim, r(:, 1:2), 2, VSL_MATRIX_STORAGE_FULL, par_pos(1:2), T)
-
-    !print *, 'Random start'
-
-    ! IFAIL = vdRngGaussian(VSL_RNG_METHOD_GAUSSIAN_ICDF, stream, ndim, r(:, 1), par_pos(1), T(1, 1))
-    ! if (IFAIL /= 0) then
-    !   print *, 'IFAIL'
-    !   print *, 'ndim = ', ndim
-    ! end if
-    !
-    ! IFAIL = vdRngGaussian(VSL_RNG_METHOD_GAUSSIAN_ICDF, stream, ndim, r(:, 2), par_pos(2), T(2, 2))
-    ! if (IFAIL /= 0) then
-    !   print *, 'IFAIL'
-    !   print *, 'ndim = ', ndim
-    ! end if
-    !
-    ! IFAIL = vdrnguniform(VSL_RNG_METHOD_UNIFORM_STD, stream, ndim, alpha_r(:), 0.0d0, 1.0d0)
-    ! if (IFAIL /= 0) then
-    !   print *, 'IFAIL'
-    !   print *, 'ndim = ', ndim
-    ! end if
-    !
-    ! IFAIL = vdrnguniform(VSL_RNG_METHOD_UNIFORM_STD, stream, 2, par_pos(1:2), 0.0d0, 1.0d0)
-    ! if (IFAIL /= 0) then
-    !   print *, 'IFAIL'
-    !   print *, 'ndim = ', ndim
-    ! end if
 
     do i = 1, ndim
       par_pos(1:2) = box_muller((/0.0d0, 0.0d0/), (/T(1,1), T(1, 1)/))

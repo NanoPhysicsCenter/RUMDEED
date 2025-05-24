@@ -10,6 +10,7 @@ Module mod_emission_tip
   use mod_verlet
   use mod_pair
   use mod_ic
+  use mod_kevin_rjgtf
   !use ieee_arithmetic
   implicit none
 
@@ -129,6 +130,10 @@ contains
       ! Photo emission
       call Do_Photo_Emission_Tip(step)
 
+    case (4)
+      ! GTF emission
+      call Do_GTF_Emission_Tip(step)
+
     case default
       print *, 'RUMDEED: ERROR unknown emitter type!!'
       stop
@@ -138,6 +143,19 @@ contains
     cur_time = time_step * step / time_scale ! Scaled in units of time_scale
     write (ud_emit, "(E14.6, *(tr8, i6))", iostat=IFAIL) cur_time, step, nrEmitted, nrElec
   end subroutine Do_Emission_Tip
+
+!----------------------------------------------------------------------------------------
+! GTF emission
+subroutine Do_GTF_Emission_Tip(step)
+  integer, intent(in) :: step
+  integer             :: nrElecEmit, emit
+  double precision    :: N_sup
+
+  nrElecEmit = 0
+
+  call Do_Cuba_Suave_GTF_Tip(1, N_sup)
+  
+end subroutine Do_GTF_Emission_Tip
 
 !----------------------------------------------------------------------------------------
 subroutine Do_Field_Emission_Tip_2(step)
@@ -1303,6 +1321,17 @@ end function Elec_supply_tip
     integrand_cuba_fe_tip_test = 0 ! Return value to Cuba, 0 = success
   end function integrand_cuba_fe_tip_test
 
+  ! ----------------------------------------------------------------------------
+  ! This subroutine does the Cuba integration for the GTF emission tip.
+  integer function integrand_cuba_gtf_tip(ndim, xx, ncomp, ff, userdata)
+    integer, intent(in) :: ndim ! Number of dimensions (Should be 2)
+    integer, intent(in) :: ncomp ! Number of vector-components in the integrand (Always 1 here)
+    integer, intent(in) :: userdata ! Additional data passed to the integral function (In our case the number of the emitter)
+    double precision, intent(in), dimension(1:ndim)   :: xx ! Integration points, between 0 and 1
+    double precision, intent(out), dimension(1:ncomp) :: ff ! Results of the integrand function
+
+  end function integrand_cuba_gtf_tip
+
   subroutine Do_Cuba_Suave_FE_Tip_old(emit, N_sup)
     ! Input / output variables
     integer, intent(in)           :: emit
@@ -1371,6 +1400,69 @@ end function Elec_supply_tip
      !F_avg = F_avg / neval
   end subroutine Do_Cuba_Suave_FE_Tip_old
 
+  ! ----------------------------------------------------------------------------
+  ! This subroutine does the Cuba integration for the GTF emission tip.
+  subroutine Do_Cuba_Suave_GTF_Tip(emit, N_sup)
+    ! Input / output variables
+    integer, intent(in)           :: emit
+    double precision, intent(out) :: N_sup
+
+    ! Cuba integration variables
+    integer, parameter :: ndim = 2 ! Number of dimensions
+    integer, parameter :: ncomp = 1 ! Number of components in the integrand
+    integer            :: userdata = 0 ! User data passed to the integrand
+    integer, parameter :: nvec = 1 ! Number of points given to the integrand function
+    double precision   :: epsrel = 1.0d-2 ! Requested relative error
+    double precision   :: epsabs = 1.0d-4 ! Requested absolute error
+    integer            :: flags = 0+4 ! Flags
+    integer            :: seed = 0 ! Seed for the rng. Zero will use Sobol.
+    integer            :: mineval = 10000 ! Minimum number of integrand evaluations
+    integer            :: maxeval = 5000000 ! Maximum number of integrand evaluations
+    integer            :: nnew = 2500 ! Number of integrand evaluations in each subdivision
+    integer            :: nmin = 1000 ! Minimum number of samples a former pass must contribute to a subregion to be considered in the region's compound integral value.
+    double precision   :: flatness = 5.0d0 ! Determine how prominently out-liers, i.e. samples with a large fluctuation, 
+                                           ! figure in the total fluctuation, which in turn determines how a region is split up.
+                                           ! As suggested by its name, flatness should be chosen large for 'flat" integrand and small for 'volatile' integrands
+                                           ! with high peaks.
+    character          :: statefile = "" ! File to save the state in. Empty string means don't do it.
+    integer            :: spin = -1 ! Spinning cores
+    integer            :: nregions ! <out> The actual number of subregions nedded
+    integer            :: neval ! <out> The actual number of integrand evaluations needed
+    integer            :: fail ! <out> Error flag (0 = Success, -1 = Dimension out of range, >0 = Accuracy goal was not met)
+    double precision, dimension(1:ncomp) :: integral ! <out> The integral of the integrand over the unit hybercube
+    double precision, dimension(1:ncomp) :: error ! <out> The presumed absolute error
+    double precision, dimension(1:ncomp) :: prob ! <out> The chi-square probability
+
+    !integer            :: verbose = 0
+    !integer, parameter :: last = 4
+    integer, parameter :: key = 0
+
+    userdata = emit
+
+
+    call cuhre(ndim, ncomp, integrand_cuba_gtf_tip, userdata, nvec, &
+     & epsrel, epsabs, flags, &
+     & mineval, maxeval, key, &
+     & statefile, spin, &
+     & nregions, neval, fail, integral, error, prob)
+
+
+     if (fail /= 0) then
+      print '(a)', 'RUMDEED: WARNING Cuba did not return 0'
+      print *, fail
+      print *, error
+      print *, prob
+      print *, integral(1)
+     end if
+
+     ! Round the results to the nearest integer
+     !N_sup = nint( integral(1) )
+     N_sup = integral(1)
+
+  end subroutine Do_Cuba_Suave_GTF_Tip
+
+  ! ----------------------------------------------------------------------------
+  ! This subroutine does the Cuba integration for the field emission tip.
   subroutine Do_Cuba_Suave_FE_Tip(emit, N_sup)
     ! Input / output variables
     integer, intent(in)           :: emit
