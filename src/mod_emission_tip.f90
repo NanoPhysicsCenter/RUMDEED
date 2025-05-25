@@ -147,14 +147,36 @@ contains
 !----------------------------------------------------------------------------------------
 ! GTF emission
 subroutine Do_GTF_Emission_Tip(step)
-  integer, intent(in) :: step
-  integer             :: nrElecEmit, emit
-  double precision    :: N_sup
+  integer, intent(in)               :: step
+  integer                           :: nrElecEmit, N_round, ndim, i
+  double precision                  :: N_sup, xi, phi, F, D_f
+  double precision, dimension(1:3)  :: par_pos, par_vel, surf_norm
 
   nrElecEmit = 0
 
   call Do_Cuba_Suave_GTF_Tip(1, N_sup)
+
+  N_round = nint(N_sup + res_s)
+  res_s = N_sup - N_round
+
+  do i = 1, N_round
+    ndim = 30
+
+    call Metro_algo_tip_gtf(ndim, xi, phi, F, D_f, par_pos)
+
+    if (F < 0.0d0) then
+      surf_norm = surface_normal(par_pos)
+      par_pos = par_pos + surf_norm*length_scale ! Move 1 nm above the surface
+      par_vel = 0.0d0 ! No initial velocity
+
+      ! Add the particle to the system
+      call Add_Particle(par_pos, par_vel, species_elec, step, 1, -1)
+      nrElecEmit = nrElecEmit + 1
+    end if
+  end do
   
+  posInit = posInit + nrElecEmit
+  nrEmitted = nrEmitted + nrElecEmit
 end subroutine Do_GTF_Emission_Tip
 
 !----------------------------------------------------------------------------------------
@@ -784,6 +806,15 @@ end subroutine Do_Photo_Emission_Tip
 
     par_pos = cur_pos
   end subroutine Metro_algo_tip_v2
+
+  subroutine Metro_algo_tip_gtf(ndim, xi, phi, eta_f, df_cur, par_pos)
+    integer, intent(in)              :: ndim
+    double precision, intent(out)    :: xi, phi, eta_f, df_cur
+    double precision                 :: new_xi, new_phi, new_eta_f, df_new, rnd, alpha
+    double precision, dimension(1:3) :: std, new_pos, cur_pos, par_pos, field
+    integer                          :: i, count
+    
+  end subroutine Metro_algo_tip_gtf
 
   function Sphere_IC_field(pos_1, pos_2)
     double precision, dimension(1:3)             :: Sphere_IC_field
