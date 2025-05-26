@@ -1474,6 +1474,51 @@ end function Elec_supply_tip
     double precision, intent(in), dimension(1:ndim)   :: xx ! Integration points, between 0 and 1
     double precision, intent(out), dimension(1:ncomp) :: ff ! Results of the integrand function
 
+    ! Variables used for calculations
+    double precision, dimension(1:3) :: par_pos, field
+    !double precision                 :: w_theta ! Emitter area
+    double precision                 :: eta_f ! Component normal to the surface
+    double precision                 :: xi, phi ! Prolate coordinates
+    double precision                 :: h_xi, h_phi ! Scale factors
+
+    ! Surface position
+    ! Cuba does the intergration over the hybercube.
+    ! It gives us coordinates between 0 and 1.
+    xi = (max_xi - 1.0d0)*xx(1) + 1.0d0
+    phi = 2.0d0*pi*xx(2)
+
+    ! xyz position on the surface
+    par_pos = xyz_corr(xi, eta_1, phi)
+
+    ! Calculate the electric field on the surface
+    field = Calc_Field_at(par_pos)
+    eta_f = Field_normal(par_pos, field)
+
+    ! Add to the average field
+    !F_avg = F_avg + field
+
+    ! Check if the field is favourable for emission
+    if (eta_f < 0.0d0) then
+      ! The field is favourable for emission
+
+      ! Calculate the scale factors
+      h_xi = a_foci*sqrt((xi**2 - eta_1**2)/(xi**2 - 1.0d0))
+      h_phi = a_foci*sqrt((xi**2 - 1.0d0)*(1 - eta_1**2))
+
+      ! Calculate the current density at this point
+      !w_theta = w_theta_xy(par_pos, userdata)
+      ff(1) = Get_Kevin_Jgtf(field(3), T_temp, w_theta) * h_xi * h_phi
+    else
+      ! The field is NOT favourable for emission
+      ! This point does not contribute
+      ff(1) = 0.0d0
+    end if
+
+    ! We mutiply with the area of the emitter because Cuba does the 
+    ! integration over the hybercube, i.e. from 0 to 1.
+    ff(1) = 2.0d0*pi*(max_xi - 1.0d0)*ff(1)
+    
+    integrand_cuba_gtf_tip = 0 ! Return value to Cuba, 0 = success
   end function integrand_cuba_gtf_tip
 
   subroutine Do_Cuba_Suave_FE_Tip_old(emit, N_sup)
