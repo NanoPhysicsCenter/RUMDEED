@@ -1502,21 +1502,21 @@ end function Elec_supply_tip
       ! The field is favourable for emission
 
       ! Calculate the scale factors
-      h_xi = a_foci*sqrt((xi**2 - eta_1**2)/(xi**2 - 1.0d0))
-      h_phi = a_foci*sqrt((xi**2 - 1.0d0)*(1 - eta_1**2))
+      !h_xi = a_foci*sqrt((xi**2 - eta_1**2)/(xi**2 - 1.0d0))
+      !h_phi = a_foci*sqrt((xi**2 - 1.0d0)*(1 - eta_1**2))
 
       ! Calculate the current density at this point
       !w_theta = w_theta_xy(par_pos, userdata)
-      ff(1) = Get_Kevin_Jgtf(eta_f, T_temp, w_theta) * h_xi * h_phi
+      ff(1) = Get_Kevin_Jgtf(eta_f, T_temp, w_theta)
     else
       ! The field is NOT favourable for emission
       ! This point does not contribute
       ff(1) = 0.0d0
     end if
 
-    ! We mutiply with the area of the emitter because Cuba does the 
+    ! We mutiply with the jacobian because Cuba does the 
     ! integration over the hybercube, i.e. from 0 to 1.
-    ! ff(1) = 2.0d0*pi*(max_xi - 1.0d0)*ff(1)
+    ff(1) = ff(1) * a_foci * xi * (1 - eta_1**2)
     
     integrand_cuba_gtf_tip = 0 ! Return value to Cuba, 0 = success
   end function integrand_cuba_gtf_tip
