@@ -813,7 +813,120 @@ end subroutine Do_Photo_Emission_Tip
     double precision                 :: new_xi, new_phi, new_eta_f, df_new, rnd, alpha
     double precision, dimension(1:3) :: std, new_pos, cur_pos, par_pos, field
     integer                          :: i, count
-    
+    double precision                 :: a_rate, MH_std, ratio_change
+
+
+    ! ! Try to keep the acceptance ratio around 50% by
+    ! ! changing the standard deviation.
+    ! ratio_change = 0.075d0/100.d0
+    ! CALL RANDOM_NUMBER(rnd) ! Change be a random number
+    ! if (a_rate < 0.525d0) then
+    !   MH_std = MH_std * (1.0d0 - rnd*0.00025d0)
+    ! else
+    !   MH_std = MH_std * (1.0d0 + rnd*0.00025d0)
+    ! end if
+    ! ! Limits on how big or low the standard deviation can be.
+    ! if (MH_std > 0.1250d0) then
+    !   MH_std = 0.1250d0
+    ! else if (MH_std < 0.0005d0) then
+    !   MH_std = 0.005d0
+    ! end if
+
+    ! std(1) = max_xi*MH_std ! Standard deviation for the normal distribution is 0.075% of the emitter length.
+    ! std(2) = 2.0d0*pi*MH_std
+
+    std(1) = max_xi*0.075d0/100.d0 ! Standard deviation for the normal distribution is 0.075% of the emitter length.
+    std(2) = 2.0d0*pi*0.075d0/100.d0
+    ! This means that 68% of jumps are less than this value.
+    ! The expected value of the absolute value of the normal distribution is std*sqrt(2/pi).
+
+    ! Get a random initial position on the surface of the tip.
+    ! We pick this location from a uniform distribution.
+    count = 0
+    do ! Infinite loop, we try to find a favourable position to start from
+      CALL RANDOM_NUMBER(cur_pos(1:2))
+
+      xi = (max_xi - 1.0d0)*cur_pos(1) + 1.0d0
+      phi = 2.0d0*pi*cur_pos(2)
+
+      cur_pos(1) = x_coor(xi, eta_1, phi)
+      cur_pos(2) = y_coor(xi, eta_1, phi)
+      cur_pos(3) = z_coor(xi, eta_1, phi)
+
+      ! Calculate the electric field at this position
+      field = Calc_Field_at(cur_pos)
+      eta_f = Field_normal(cur_pos, field) ! Component normal to the surface
+
+      if (eta_f < 0.0d0) then
+        exit ! We found a nice spot so we exit the loop
+      else
+        count = count + 1
+        if (count > 10000) exit ! The loop is infnite, must stop it at some point.
+        ! In field emission it is rare the we reach the CL limit.
+      end if
+    end do
+
+    ! Calculate the escape probability at this location
+    if (eta_f < 0.0d0) then
+      df_cur = Escape_Prob_tip(field(3), cur_pos)
+    else
+      df_cur = 0.0d0 ! Zero escape probabilty if field is not favourable
+    end if
+
+    !---------------------------------------------------------------------------
+    ! We now pick a random distance and direction to jump to from our
+    ! current location. We do this ndim times.
+    do i = 1, ndim
+      ! Find a new position using a normal distribution.
+      new_pos(1:2) = box_muller((/0.0d0, 0.0d0/), std)
+      new_xi = new_pos(1) + xi
+      new_phi = new_pos(2) + phi
+
+      ! Make sure that the new position is within the limits of the emitter area.
+      call check_limits_metro_rec_tip(new_xi, new_phi)
+
+      new_pos(1) = x_coor(new_xi, eta_1, new_phi)
+      new_pos(2) = y_coor(new_xi, eta_1, new_phi)
+      new_pos(3) = z_coor(new_xi, eta_1, new_phi)
+
+      ! Calculate the field at the new position
+      field = Calc_Field_at(new_pos)
+      new_eta_f = Field_normal(new_pos, field)
+
+      ! Check if the field is favourable for emission at the new position.
+      ! If it is not then cycle, i.e. we reject this location and
+      ! pick another one.
+      if (new_eta_f > 0.0d0) cycle ! Do the next loop iteration, i.e. find a new position.
+
+      ! Calculate the escape probability at the new position, to compair with
+      ! the current position.
+      df_new = Escape_Prob_Tip(new_eta_f, new_pos)
+
+      ! If the escape probability is higher in the new location,
+      ! then we jump to that location. If it is not then we jump to that
+      ! location with the probabilty df_new / df_cur.
+      if (df_new > df_cur) then
+        cur_pos = new_pos ! New position becomes the current position
+        df_cur = df_new
+        eta_f = new_eta_f
+        xi = new_xi
+        phi = new_phi
+      else
+        alpha = df_new / df_cur
+
+        CALL RANDOM_NUMBER(rnd)
+        ! Jump to this position with probability alpha, i.e. if rnd is less than alpha
+        if (rnd < alpha) then
+          cur_pos = new_pos ! New position becomes the current position
+          df_cur = df_new
+          eta_f = new_eta_f
+          xi = new_xi
+          phi = new_phi
+        end if
+      end if
+    end do
+
+    par_pos = cur_pos
   end subroutine Metro_algo_tip_gtf
 
   function Sphere_IC_field(pos_1, pos_2)
