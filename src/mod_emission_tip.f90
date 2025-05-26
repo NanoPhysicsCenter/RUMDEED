@@ -1507,7 +1507,7 @@ end function Elec_supply_tip
 
       ! Calculate the current density at this point
       !w_theta = w_theta_xy(par_pos, userdata)
-      ff(1) = Get_Kevin_Jgtf(field(3), T_temp, w_theta) * h_xi * h_phi
+      ff(1) = Get_Kevin_Jgtf(eta_f, T_temp, w_theta) * h_xi * h_phi
     else
       ! The field is NOT favourable for emission
       ! This point does not contribute
@@ -1516,7 +1516,7 @@ end function Elec_supply_tip
 
     ! We mutiply with the area of the emitter because Cuba does the 
     ! integration over the hybercube, i.e. from 0 to 1.
-    ff(1) = 2.0d0*pi*(max_xi - 1.0d0)*ff(1)
+    ! ff(1) = 2.0d0*pi*(max_xi - 1.0d0)*ff(1)
     
     integrand_cuba_gtf_tip = 0 ! Return value to Cuba, 0 = success
   end function integrand_cuba_gtf_tip
