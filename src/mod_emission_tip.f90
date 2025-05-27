@@ -156,8 +156,8 @@ subroutine Do_GTF_Emission_Tip(step)
 
   call Do_Cuba_Suave_GTF_Tip(1, N_sup)
 
-  N_round = nint(N_sup + res_s)
-  res_s = N_sup - N_round
+  N_round = Rand_Poission(N_sup)
+  !res_s = N_sup - N_round
 
   do i = 1, N_round
     ndim = 30
@@ -1502,21 +1502,23 @@ end function Elec_supply_tip
       ! The field is favourable for emission
 
       ! Calculate the scale factors
-      !h_xi = a_foci*sqrt((xi**2 - eta_1**2)/(xi**2 - 1.0d0))
-      !h_phi = a_foci*sqrt((xi**2 - 1.0d0)*(1 - eta_1**2))
+      ! Scale factors for the prolate coordinates to Cartesian coordinates
+      h_xi = a_foci*sqrt((xi**2 - eta_1**2)/(xi**2 - 1.0d0))
+      h_phi = a_foci*sqrt((xi**2 - 1.0d0)*(1 - eta_1**2))
 
       ! Calculate the current density at this point
       !w_theta = w_theta_xy(par_pos, userdata)
-      ff(1) = Get_Kevin_Jgtf(eta_f, T_temp, w_theta)
+      ff(1) = Get_Kevin_Jgtf(eta_f, T_temp, w_theta) * h_xi * h_phi
     else
       ! The field is NOT favourable for emission
       ! This point does not contribute
+      !print *, 'Warning: Field is not favourable for emission'
       ff(1) = 0.0d0
     end if
 
-    ! We mutiply with the jacobian because Cuba does the 
-    ! integration over the hybercube, i.e. from 0 to 1.
-    ff(1) = ff(1) * a_foci * xi * (1 - eta_1**2)
+    ! We mutiply with the range of the coordinates because
+    ! Cuba does the  integration over the hybercube, i.e. from 0 to 1.
+    ff(1) = ff(1) * 2.0d0*pi*(max_xi - 1.0d0)
     
     integrand_cuba_gtf_tip = 0 ! Return value to Cuba, 0 = success
   end function integrand_cuba_gtf_tip
@@ -1628,20 +1630,25 @@ end function Elec_supply_tip
 
     userdata = emit
 
+    !call cuhre(ndim, ncomp, integrand_cuba_gtf_tip, userdata, nvec, &
+    ! & epsrel, epsabs, flags, &
+    ! & mineval, maxeval, key, &
+    ! & statefile, spin, &
+    ! & nregions, neval, fail, integral, error, prob)
 
-    call cuhre(ndim, ncomp, integrand_cuba_gtf_tip, userdata, nvec, &
-     & epsrel, epsabs, flags, &
-     & mineval, maxeval, key, &
+    call suave(ndim, ncomp, integrand_cuba_gtf_tip, userdata, nvec, &
+     & epsrel, epsabs, flags, seed, &
+     & mineval, maxeval, nnew, nmin, flatness, &
      & statefile, spin, &
      & nregions, neval, fail, integral, error, prob)
 
 
      if (fail /= 0) then
-      print '(a)', 'RUMDEED: WARNING Cuba did not return 0'
-      print *, fail
-      print *, error
-      print *, prob
-      print *, integral(1)
+      print '(a)', 'RUMDEED: WARNING Cuba did not return 0 (GTF)'
+      print *, 'fail = ', fail
+      print *, 'error = ', error
+      print *, 'prob = ', prob
+      print *, 'integral = ', integral(1)
      end if
 
      ! Round the results to the nearest integer

@@ -14,7 +14,6 @@ program RUMDEED
   use mod_field_emission
   use mod_field_emission_v2
   use mod_emission_tip
-  use mod_gtf_tip
   use mod_field_emission_2D
   use mod_field_thermo_emission
   !use mod_therminoic_emission
@@ -90,11 +89,8 @@ program RUMDEED
     print '(a)', 'RUMDEED: Doing Field emission'
     call Init_Field_Emission()
   case(EMISSION_TIP)
-    print '(a)', 'RUMDEED: Doing Field emission from a tip'
+    print '(a)', 'RUMDEED: Doing emission from a tip'
     call Init_Emission_Tip()
-  case(EMISSION_GTF_TIP)
-    print '(a)', 'RUMDEED: Doing GTF emission from a tip'
-    call Init_GTF_Tip()
   case(EMISSION_FIELD_2D_2DEG_C, EMISSION_FIELD_2D_2DEG_NC, EMISSION_FIELD_2D_DIRAC_C, EMISSION_FIELD_2D_DIRAC_NC)
     print '(a)', 'RUMDEED: Doing Field emission from 2D material'
     call Init_Field_Emission_2D()
@@ -190,8 +186,6 @@ program RUMDEED
     call Clean_Up_Field_Emission()
   case(EMISSION_TIP)
     call Clean_Up_Emission_Tip()
-  case(EMISSION_GTF_TIP)
-    call Clean_Up_GTF_Tip()
   case(EMISSION_FIELD_2D_2DEG_C, EMISSION_FIELD_2D_2DEG_NC, EMISSION_FIELD_2D_DIRAC_C, EMISSION_FIELD_2D_DIRAC_NC)
     call Clean_Up_Field_Emission_2D()
   !case(EMISSION_THERMIONIC)
