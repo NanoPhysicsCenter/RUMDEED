@@ -1653,7 +1653,7 @@ end function Elec_supply_tip
 
      ! Round the results to the nearest integer
      !N_sup = nint( integral(1) )
-     N_sup = integral(1)
+     N_sup = integral(1) * time_step_div_q0
 
   end subroutine Do_Cuba_Suave_GTF_Tip
 
