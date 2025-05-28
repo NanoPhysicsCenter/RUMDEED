@@ -881,6 +881,7 @@ end subroutine Do_Photo_Emission_Tip
       new_xi = exp(new_xi_log) ! Convert back to linear xi value
       ! Make sure that the new xi value is not greater than max_xi
       if (new_xi > max_xi) then
+        print *, 'Warning: new_xi > max_xi, new_xi = ', new_xi
         cycle ! Reject this jump, i.e. do not use this position
       end if
       
@@ -948,7 +949,7 @@ end subroutine Do_Photo_Emission_Tip
         if (abs(accepted_rate - 0.234d0) < 0.05d0) then
           done_tune = .true. ! If the acceptance rate is close to 0.234, we stop tuning
           print *, 'Tuning done after ', i, ' iterations.'
-          iter_before_tuning = 0 ! Reset the counter for iterations
+          !iter_before_tuning = 0 ! Reset the counter for iterations
         end if
       end if
 
