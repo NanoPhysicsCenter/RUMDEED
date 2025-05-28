@@ -168,7 +168,7 @@ subroutine Do_GTF_Emission_Tip(step)
   do i = 1, N_round
     ndim = 30
 
-    call Metro_algo_tip_gtf(ndim, xi, phi, F, D_f, par_pos)
+    call Metro_algo_tip_gtf_v2(ndim, xi, phi, F, D_f, par_pos)
 
     if (F < 0.0d0) then
       surf_norm = surface_normal(par_pos)
@@ -816,6 +816,143 @@ end subroutine Do_Photo_Emission_Tip
     par_pos = cur_pos
   end subroutine Metro_algo_tip_v2
 
+  !--------------------------------------------------------------------------------
+  ! MH algorithm with Robbins-Monro tuning
+  subroutine Metro_algo_tip_gtf_v2(ndim, xi, phi, eta_f, df_cur, par_pos)
+    integer, intent(in)              :: ndim
+    double precision, intent(out)    :: xi, phi, eta_f, df_cur
+    double precision                 :: xi_log ! Logarithmic xi value
+    double precision                 :: new_xi, new_phi, new_eta_f, df_new, rnd, alpha
+    double precision                 :: new_xi_log ! Logarithmic xi value
+    double precision                 :: alpha_xiphi = 0.44, new_alpha_xiphi ! Tuning parameters for the MH algorithm
+    double precision                 :: sigma_xi = 1.0d0, sigma_phi = 1.0d0 ! Standard deviations for the normal distribution
+    double precision                 :: gamma = 0.01 ! Tuning parameter for the Robbins-Monro algorithm
+    double precision, dimension(1:3) :: std, new_pos, cur_pos, par_pos, field
+    integer                          :: i, count, max_tune = 1000
+    integer                          :: accepted = 0 ! Number of accepted jumps
+    integer                          :: rejected = 0 ! Number of rejected jumps
+    double precision                 :: accepted_rate
+    logical                          :: done_tune = .false. ! Flag to indicate if we are tuning the parameters
+    integer                          :: iter_after_tuning = 0 ! Number of iterations after tuning is done
+
+    ! Find a starting position on the tip
+    count = 0
+    do ! Infinite loop, we try to find a favourable position to start from
+      CALL RANDOM_NUMBER(cur_pos(1:2))
+      
+      ! xi = 1 + (M - 1)*u^k, the k value skews the distribution towards the tip.
+      xi = 1.0d0 + (max_xi - 1.0d0)*cur_pos(1)**3 ! xi in [1, max_xi] skewed towards the tip
+      phi = 2.0d0*pi*cur_pos(2)
+
+      cur_pos(1) = x_coor(xi, eta_1, phi)
+      cur_pos(2) = y_coor(xi, eta_1, phi)
+      cur_pos(3) = z_coor(xi, eta_1, phi)
+
+      ! Calculate the electric field at this position
+      field = Calc_Field_at(cur_pos)
+      eta_f = Field_normal(cur_pos, field) ! Component normal to the surface
+
+      if (eta_f < 0.0d0) then
+        exit ! We found a nice spot so we exit the loop
+      else
+        count = count + 1
+        if (count > 10000) exit ! The loop is infnite, must stop it at some point.
+        ! In field emission it is rare the we reach the CL limit.
+      end if
+    end do
+
+    ! Using logarithmic xi values keeps xi between 1 and max_xi
+    xi_log = log(xi) ! Logarithmic xi value
+
+    ! Calculate the escape probability at this location
+    if (eta_f < 0.0d0) then
+      df_cur = Escape_Prob_tip(eta_f, cur_pos)
+    else
+      df_cur = 0.0d0 ! Zero escape probabilty if field is not favourable
+    end if
+
+    do i = 1, max_tune
+      ! New position using a normal distribution
+      ! mean = 0 and std = 1
+      new_pos(1:2) = box_muller((/0.0d0, 0.0d0/), (/1.0d0, 1.0d0/))
+
+      new_xi_log = xi_log + sigma_xi*new_pos(1) ! Logarithmic xi value
+      new_xi = exp(new_xi_log) ! Convert back to linear xi value
+      ! Make sure that the new xi value is not greater than max_xi
+      if (new_xi > max_xi) then
+        cycle ! Reject this jump, i.e. do not use this position
+      end if
+      
+
+      new_phi = phi + sigma_phi*new_pos(2) ! New phi value
+      ! Make sure phi is between 0 and 2*pi
+      new_phi = mod(new_phi, 2.0d0*pi)
+
+      new_pos(1) = x_coor(new_xi, eta_1, new_phi)
+      new_pos(2) = y_coor(new_xi, eta_1, new_phi)
+      new_pos(3) = z_coor(new_xi, eta_1, new_phi)
+      ! Calculate the field at the new position
+      field = Calc_Field_at(new_pos)
+      new_eta_f = Field_normal(new_pos, field)
+      ! Check if the field is favourable for emission at the new position.
+      ! If it is not then cycle, i.e. we reject this location and
+      ! pick another one.
+      if (new_eta_f > 0.0d0) cycle ! Do the next loop iteration, i.e. find a new position.
+      ! Calculate the escape probability at the new position, to compair with
+      df_new = Escape_Prob_tip(new_eta_f, new_pos)
+
+      ! If the escape probability is higher in the new location,
+      ! then we jump to that location. If it is not then we jump to that
+      ! location with the probabilty df_new / df_cur.
+      if (df_new > df_cur) then
+        cur_pos = new_pos ! New position becomes the current position
+        df_cur = df_new
+        eta_f = new_eta_f
+        xi_log = new_xi_log ! Update logarithmic xi value
+        xi = new_xi ! Update linear xi value
+        phi = new_phi ! Update phi value
+        accepted = accepted + 1 ! Count this as an accepted jump
+      else
+        alpha = df_new / df_cur
+
+        CALL RANDOM_NUMBER(rnd)
+        ! Jump to this position with probability alpha, i.e. if rnd is less than alpha
+        if (rnd < alpha) then
+          cur_pos = new_pos ! New position becomes the current position
+          df_cur = df_new
+          eta_f = new_eta_f
+          xi_log = new_xi_log ! Update logarithmic xi value
+          xi = new_xi ! Update linear xi value
+          phi = new_phi ! Update phi value
+          accepted = accepted + 1 ! Count this as an accepted jump
+        else
+          rejected = rejected + 1 ! Count this as a rejected jump
+        end if
+      end if
+
+      if (done_tune .eqv. .true.) then
+        iter_after_tuning = iter_after_tuning + 1
+        if (iter_after_tuning >= ndim) then
+          exit
+        end if
+      end if
+
+      ! Every 100 iterations we adjust the standard deviation
+      if (mod(i, 100) == 0) then
+        accepted_rate = DBLE(accepted) / DBLE(accepted + rejected)
+        ! Adjust the standard deviation based on the acceptance rate
+        alpha_xiphi = alpha_xiphi * exp(gamma*((accepted_rate - 0.234d0)))
+        print *, 'Iteration: ', i, ' Accepted rate: ', accepted_rate, ' Alpha xiphi: ', alpha_xiphi
+
+        if (abs(accepted_rate - 0.234d0) < 0.05d0) then
+          done_tune = .true. ! If the acceptance rate is close to 0.234, we stop tuning
+          print *, 'Tuning done after ', i, ' iterations.'
+        end if
+      end if
+    end do
+
+  end subroutine Metro_algo_tip_gtf_v2
+
   subroutine Metro_algo_tip_gtf(ndim, xi, phi, eta_f, df_cur, par_pos)
     integer, intent(in)              :: ndim
     double precision, intent(out)    :: xi, phi, eta_f, df_cur
@@ -877,7 +1014,7 @@ end subroutine Do_Photo_Emission_Tip
 
     ! Calculate the escape probability at this location
     if (eta_f < 0.0d0) then
-      df_cur = Escape_Prob_tip(field(3), cur_pos)
+      df_cur = Escape_Prob_tip(eta_f, cur_pos)
     else
       df_cur = 0.0d0 ! Zero escape probabilty if field is not favourable
     end if
