@@ -168,7 +168,7 @@ subroutine Do_GTF_Emission_Tip(step)
   do i = 1, N_round
     ndim = 60
 
-    call Metro_algo_tip_gtf(ndim, xi, phi, F, D_f, par_pos)
+    call Metro_algo_tip_gtf_v2(ndim, xi, phi, F, D_f, par_pos)
 
     if (F < 0.0d0) then
       surf_norm = surface_normal(par_pos)
