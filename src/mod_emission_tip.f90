@@ -834,6 +834,7 @@ end subroutine Do_Photo_Emission_Tip
     double precision                 :: accepted_rate
     logical                          :: done_tune = .false. ! Flag to indicate if we are tuning the parameters
     integer                          :: iter_after_tuning = 0 ! Number of iterations after tuning is done
+    integer                          :: iter_before_tuning = 0 ! Number of iterations before tuning is done
 
     ! Find a starting position on the tip
     count = 0
@@ -871,7 +872,7 @@ end subroutine Do_Photo_Emission_Tip
       df_cur = 0.0d0 ! Zero escape probabilty if field is not favourable
     end if
 
-    do i = 1, max_tune
+    do
       ! New position using a normal distribution
       ! mean = 0 and std = 1
       new_pos(1:2) = box_muller((/0.0d0, 0.0d0/), (/1.0d0, 1.0d0/))
@@ -947,7 +948,14 @@ end subroutine Do_Photo_Emission_Tip
         if (abs(accepted_rate - 0.234d0) < 0.05d0) then
           done_tune = .true. ! If the acceptance rate is close to 0.234, we stop tuning
           print *, 'Tuning done after ', i, ' iterations.'
+          iter_before_tuning = 0 ! Reset the counter for iterations
         end if
+      end if
+
+      iter_before_tuning = iter_before_tuning + 1
+      if (iter_before_tuning >= max_tune) then
+        print *, 'Warning: Maximum tuning iterations reached without convergence.'
+        exit
       end if
     end do
 
