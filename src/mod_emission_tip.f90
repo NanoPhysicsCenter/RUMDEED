@@ -899,7 +899,10 @@ end subroutine Do_Photo_Emission_Tip
       ! Check if the field is favourable for emission at the new position.
       ! If it is not then cycle, i.e. we reject this location and
       ! pick another one.
-      if (new_eta_f > 0.0d0) cycle ! Do the next loop iteration, i.e. find a new position.
+      if (new_eta_f > 0.0d0) then
+        print *, 'Warning: new_eta_f > 0.0d0, new_eta_f = ', new_eta_f
+        cycle ! Do the next loop iteration, i.e. find a new position.
+      end if
       ! Calculate the escape probability at the new position, to compair with
       df_new = Escape_Prob_tip(new_eta_f, new_pos)
 
