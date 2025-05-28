@@ -166,7 +166,7 @@ subroutine Do_GTF_Emission_Tip(step)
   !res_s = N_sup - N_round
 
   do i = 1, N_round
-    ndim = 30
+    ndim = 60
 
     call Metro_algo_tip_gtf(ndim, xi, phi, F, D_f, par_pos)
 
@@ -824,8 +824,7 @@ end subroutine Do_Photo_Emission_Tip
     double precision                 :: xi_log ! Logarithmic xi value
     double precision                 :: new_xi, new_phi, new_eta_f, df_new, rnd, alpha
     double precision                 :: new_xi_log ! Logarithmic xi value
-    double precision                 :: alpha_xiphi = 0.44, new_alpha_xiphi ! Tuning parameters for the MH algorithm
-    double precision                 :: sigma_xi = 1.0d0, sigma_phi = 1.0d0 ! Standard deviations for the normal distribution
+    double precision                 :: sigma_xiphi = 1.0d0 ! Standard deviations for the normal distribution
     double precision                 :: gamma = 0.01 ! Tuning parameter for the Robbins-Monro algorithm
     double precision, dimension(1:3) :: std, new_pos, cur_pos, par_pos, field
     integer                          :: i, count, max_tune = 1000
@@ -877,17 +876,17 @@ end subroutine Do_Photo_Emission_Tip
       ! mean = 0 and std = 1
       new_pos(1:2) = box_muller((/0.0d0, 0.0d0/), (/1.0d0, 1.0d0/))
 
-      new_xi_log = xi_log + sigma_xi*new_pos(1) ! Logarithmic xi value
+      new_xi_log = xi_log + sigma_xiphi*new_pos(1) ! Logarithmic xi value
       new_xi = exp(new_xi_log) ! Convert back to linear xi value
       ! Make sure that the new xi value is not greater than max_xi
       if (new_xi > max_xi) then
         print *, 'Warning: new_xi > max_xi, new_xi = ', new_xi
-        sigma_xi = sigma_xi * 0.5d0 ! Reduce the standard deviation
+        sigma_xiphi = sigma_xiphi * 0.5d0 ! Reduce the standard deviation
         cycle ! Reject this jump, i.e. do not use this position
       end if
       
 
-      new_phi = phi + sigma_phi*new_pos(2) ! New phi value
+      new_phi = phi + sigma_xiphi*new_pos(2) ! New phi value
       ! Make sure phi is between 0 and 2*pi
       new_phi = mod(new_phi, 2.0d0*pi)
 
@@ -944,8 +943,9 @@ end subroutine Do_Photo_Emission_Tip
       if (mod(i, 100) == 0) then
         accepted_rate = DBLE(accepted) / DBLE(accepted + rejected)
         ! Adjust the standard deviation based on the acceptance rate
-        alpha_xiphi = alpha_xiphi * exp(gamma*((accepted_rate - 0.234d0)))
-        print *, 'Iteration: ', i, ' Accepted rate: ', accepted_rate, ' Alpha xiphi: ', alpha_xiphi
+        sigma_xiphi = sigma_xiphi * exp(gamma*((accepted_rate - 0.234d0)))
+        print *, 'Iteration: ', i, ' Accepted rate: ', accepted_rate, ' Alpha xiphi: ', sigma_xiphi
+
 
         if (abs(accepted_rate - 0.234d0) < 0.05d0) then
           done_tune = .true. ! If the acceptance rate is close to 0.234, we stop tuning
