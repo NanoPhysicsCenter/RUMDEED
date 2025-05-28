@@ -853,9 +853,21 @@ end subroutine Do_Photo_Emission_Tip
     ! We pick this location from a uniform distribution.
     count = 0
     do ! Infinite loop, we try to find a favourable position to start from
-      CALL RANDOM_NUMBER(cur_pos(1:2))
+      cur_pos(1:2) = box_muller((/1.0d0, 1.0d0/), (/max_xi/2.0d0, 1.0d0/)) ! Gives a random number [0,1]
+      CALL RANDOM_NUMBER(cur_pos(2:2))
 
-      xi = (max_xi - 1.0d0)*cur_pos(1) + 1.0d0
+      cur_pos(1) = abs(cur_pos(1)) ! Make sure that the xi coordinate is positive
+
+      ! Make sure that the xi coordinate is between 1.0 and max_xi
+      if (cur_pos(1) < 1.0d0) then
+        cur_pos(1) = 1.0d0
+        print *, 'Warning: xi < 1.0 in Metro_algo_tip_gtf'
+      end if
+      if (cur_pos(1) > max_xi) then
+        cur_pos(1) = max_xi
+        print *, 'Warning: xi > max_xi in Metro_algo_tip_gtf'
+      end if
+      xi = cur_pos(1)
       phi = 2.0d0*pi*cur_pos(2)
 
       cur_pos(1) = x_coor(xi, eta_1, phi)
