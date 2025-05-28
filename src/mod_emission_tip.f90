@@ -168,7 +168,7 @@ subroutine Do_GTF_Emission_Tip(step)
   do i = 1, N_round
     ndim = 30
 
-    call Metro_algo_tip_gtf_v2(ndim, xi, phi, F, D_f, par_pos)
+    call Metro_algo_tip_gtf(ndim, xi, phi, F, D_f, par_pos)
 
     if (F < 0.0d0) then
       surf_norm = surface_normal(par_pos)
@@ -842,7 +842,7 @@ end subroutine Do_Photo_Emission_Tip
       CALL RANDOM_NUMBER(cur_pos(1:2))
       
       ! xi = 1 + (M - 1)*u^k, the k value skews the distribution towards the tip.
-      xi = 1.0d0 + (max_xi - 1.0d0)*cur_pos(1)**3 ! xi in [1, max_xi] skewed towards the tip
+      xi = 1.0d0 + (max_xi - 1.0d0)*cur_pos(1)**2 ! xi in [1, max_xi] skewed towards the tip
       phi = 2.0d0*pi*cur_pos(2)
 
       cur_pos(1) = x_coor(xi, eta_1, phi)
@@ -882,6 +882,7 @@ end subroutine Do_Photo_Emission_Tip
       ! Make sure that the new xi value is not greater than max_xi
       if (new_xi > max_xi) then
         print *, 'Warning: new_xi > max_xi, new_xi = ', new_xi
+        sigma_xi = sigma_xi * 0.5d0 ! Reduce the standard deviation
         cycle ! Reject this jump, i.e. do not use this position
       end if
       
