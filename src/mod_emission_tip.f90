@@ -45,6 +45,12 @@ Module mod_emission_tip
 
   double precision :: time_step_div_q0
 
+  ! MH algorithm parameters
+  double precision :: a_rate = 1.0d0, MH_std = 0.0d0 ! Acceptance rate and standard deviation for the MH algorithm
+  integer          :: jump_a = 0, jump_r = 0 ! Number of jumps accepted and rejected
+
+  double precision, dimension(1:3)   :: F_avg = 0.0d0
+
   ! Use image Charge or not
   !logical, parameter          :: image_charge = .true.
 
@@ -148,7 +154,7 @@ contains
 ! GTF emission
 subroutine Do_GTF_Emission_Tip(step)
   integer, intent(in)               :: step
-  integer                           :: nrElecEmit, N_round, ndim, i
+  integer                           :: nrElecEmit, N_round, ndim, i, IFAIL
   double precision                  :: N_sup, xi, phi, F, D_f
   double precision, dimension(1:3)  :: par_pos, par_vel, surf_norm
 
@@ -177,6 +183,9 @@ subroutine Do_GTF_Emission_Tip(step)
   
   posInit = posInit + nrElecEmit
   nrEmitted = nrEmitted + nrElecEmit
+
+  write (ud_field, "(i8, tr2, E16.8, tr2, E16.8, tr2, E16.8, tr2, E16.8, tr2, E16.8, tr2, E16.8)", iostat=IFAIL) &
+                                      step, F_avg(1), F_avg(2), F_avg(3), N_sup, a_rate, MH_std
 end subroutine Do_GTF_Emission_Tip
 
 !----------------------------------------------------------------------------------------
@@ -813,30 +822,30 @@ end subroutine Do_Photo_Emission_Tip
     double precision                 :: new_xi, new_phi, new_eta_f, df_new, rnd, alpha
     double precision, dimension(1:3) :: std, new_pos, cur_pos, par_pos, field
     integer                          :: i, count
-    double precision                 :: a_rate, MH_std, ratio_change
 
 
-    ! ! Try to keep the acceptance ratio around 50% by
-    ! ! changing the standard deviation.
+    ! Try to keep the acceptance ratio around 50% by
+    ! changing the standard deviation.
     ! ratio_change = 0.075d0/100.d0
-    ! CALL RANDOM_NUMBER(rnd) ! Change be a random number
-    ! if (a_rate < 0.525d0) then
-    !   MH_std = MH_std * (1.0d0 - rnd*0.00025d0)
-    ! else
-    !   MH_std = MH_std * (1.0d0 + rnd*0.00025d0)
-    ! end if
-    ! ! Limits on how big or low the standard deviation can be.
-    ! if (MH_std > 0.1250d0) then
-    !   MH_std = 0.1250d0
-    ! else if (MH_std < 0.0005d0) then
-    !   MH_std = 0.005d0
-    ! end if
+    
+    CALL RANDOM_NUMBER(rnd) ! Change be a random number
+    if (a_rate < 0.525d0) then
+      MH_std = MH_std * (1.0d0 - rnd*0.025d0)
+    else
+      MH_std = MH_std * (1.0d0 + rnd*0.025d0)
+    end if
+    ! Limits on how big or low the standard deviation can be.
+    if (MH_std > 0.1250d0) then
+      MH_std = 0.1250d0
+    else if (MH_std < 0.0005d0) then
+      MH_std = 0.0005d0
+    end if
 
     ! std(1) = max_xi*MH_std ! Standard deviation for the normal distribution is 0.075% of the emitter length.
     ! std(2) = 2.0d0*pi*MH_std
 
-    std(1) = max_xi*0.075d0/100.d0 ! Standard deviation for the normal distribution is 0.075% of the emitter length.
-    std(2) = 2.0d0*pi*0.075d0/100.d0
+    std(1) = max_xi*0.075d0/100.d0 * MH_std! Standard deviation for the normal distribution is 0.075% of the emitter length.
+    std(2) = 2.0d0*pi*0.075d0/100.d0 * MH_std
     ! This means that 68% of jumps are less than this value.
     ! The expected value of the absolute value of the normal distribution is std*sqrt(2/pi).
 
@@ -911,6 +920,7 @@ end subroutine Do_Photo_Emission_Tip
         eta_f = new_eta_f
         xi = new_xi
         phi = new_phi
+        jump_a = jump_a + 1 ! Count the accepted jumps
       else
         alpha = df_new / df_cur
 
@@ -922,11 +932,18 @@ end subroutine Do_Photo_Emission_Tip
           eta_f = new_eta_f
           xi = new_xi
           phi = new_phi
+
+          jump_a = jump_a + 1 ! Count the accepted jumps
+        else
+          jump_r = jump_r + 1 ! Count the rejected jumps
         end if
       end if
     end do
 
     par_pos = cur_pos
+
+    ! Acceptance rate
+    a_rate = DBLE(jump_a) / DBLE(jump_r + jump_a)
   end subroutine Metro_algo_tip_gtf
 
   function Sphere_IC_field(pos_1, pos_2)
@@ -1495,7 +1512,7 @@ end function Elec_supply_tip
     eta_f = Field_normal(par_pos, field)
 
     ! Add to the average field
-    !F_avg = F_avg + field
+    F_avg = F_avg + field
 
     ! Check if the field is favourable for emission
     if (eta_f < 0.0d0) then
@@ -1735,7 +1752,7 @@ end function Elec_supply_tip
     !  pause
 
      ! Finish calculating the average field
-     !F_avg = F_avg / neval
+     F_avg = F_avg / neval
   end subroutine Do_Cuba_Suave_FE_Tip
 
   ! Gives a gaussian emission curve
