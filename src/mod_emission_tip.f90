@@ -46,7 +46,7 @@ Module mod_emission_tip
   double precision :: time_step_div_q0
 
   ! MH algorithm parameters
-  double precision :: a_rate = 1.0d0, MH_std = 0.0d0 ! Acceptance rate and standard deviation for the MH algorithm
+  double precision :: a_rate = 0.5d0, MH_std = 1.0d0 ! Acceptance rate and standard deviation for the MH algorithm
   integer          :: jump_a = 0, jump_r = 0 ! Number of jumps accepted and rejected
 
   double precision, dimension(1:3)   :: F_avg = 0.0d0
@@ -166,9 +166,9 @@ subroutine Do_GTF_Emission_Tip(step)
   !res_s = N_sup - N_round
 
   do i = 1, N_round
-    ndim = 60
+    ndim = 80 ! Number of iterations for the Metropolish Hastings algorithm
 
-    call Metro_algo_tip_gtf_v2(ndim, xi, phi, F, D_f, par_pos)
+    call Metro_algo_tip_gtf(ndim, xi, phi, F, D_f, par_pos)
 
     if (F < 0.0d0) then
       surf_norm = surface_normal(par_pos)
@@ -818,6 +818,7 @@ end subroutine Do_Photo_Emission_Tip
 
   !--------------------------------------------------------------------------------
   ! MH algorithm with Robbins-Monro tuning
+  ! Not used at the moment, but can be used in the future.
   subroutine Metro_algo_tip_gtf_v2(ndim, xi, phi, eta_f, df_cur, par_pos)
     integer, intent(in)              :: ndim
     double precision, intent(out)    :: xi, phi, eta_f, df_cur
@@ -972,18 +973,11 @@ end subroutine Do_Photo_Emission_Tip
     double precision                 :: new_xi, new_phi, new_eta_f, df_new, rnd, alpha
     double precision, dimension(1:3) :: std, new_pos, cur_pos, par_pos, field
     integer                          :: i, count
+    double precision                 :: gamma = 0.01 ! Tuning parameter for the Robbins-Monro algorithm
 
 
     ! Try to keep the acceptance ratio around 50% by
-    ! changing the standard deviation.
-    ! ratio_change = 0.075d0/100.d0
-    
-    CALL RANDOM_NUMBER(rnd) ! Change be a random number
-    if (a_rate < 0.525d0) then
-      MH_std = MH_std * (1.0d0 - rnd*0.025d0)
-    else
-      MH_std = MH_std * (1.0d0 + rnd*0.025d0)
-    end if
+    MH_std = MH_std * exp(gamma*(0.50d0 - a_rate)) ! Adjust the standard deviation based on the acceptance rate
     ! Limits on how big or low the standard deviation can be.
     if (MH_std > 0.1250d0) then
       MH_std = 0.1250d0
@@ -991,11 +985,9 @@ end subroutine Do_Photo_Emission_Tip
       MH_std = 0.0005d0
     end if
 
-    ! std(1) = max_xi*MH_std ! Standard deviation for the normal distribution is 0.075% of the emitter length.
-    ! std(2) = 2.0d0*pi*MH_std
-
-    std(1) = max_xi*0.075d0/100.d0 * MH_std! Standard deviation for the normal distribution is 0.075% of the emitter length.
-    std(2) = 2.0d0*pi*0.075d0/100.d0 * MH_std
+    ! Standard deviation for the normal distribution
+    std(1) = max_xi*2.5d0/100.d0 * MH_std
+    std(2) = 2.0d0*pi*2.5d0/100.d0 * MH_std
     ! This means that 68% of jumps are less than this value.
     ! The expected value of the absolute value of the normal distribution is std*sqrt(2/pi).
 
@@ -1005,12 +997,10 @@ end subroutine Do_Photo_Emission_Tip
     do ! Infinite loop, we try to find a favourable position to start from
       CALL RANDOM_NUMBER(cur_pos(1:2))
       
-      xi = 1.0d0 + (max_xi - 1.0d0)*cur_pos(1)**3 ! xi in [1, max_xi] skewed towards the tip
+      xi = 1.0d0 + (max_xi - 1.0d0)*cur_pos(1)**2.0d0 ! xi in [1, max_xi] skewed towards the tip
       phi = 2.0d0*pi*cur_pos(2)
 
-      cur_pos(1) = x_coor(xi, eta_1, phi)
-      cur_pos(2) = y_coor(xi, eta_1, phi)
-      cur_pos(3) = z_coor(xi, eta_1, phi)
+      cur_pos = xyz_corr(xi, eta_1, phi) ! xyz coordinates of the position on the tip surface
 
       ! Calculate the electric field at this position
       field = Calc_Field_at(cur_pos)
@@ -1044,9 +1034,7 @@ end subroutine Do_Photo_Emission_Tip
       ! Make sure that the new position is within the limits of the emitter area.
       call check_limits_metro_rec_tip(new_xi, new_phi)
 
-      new_pos(1) = x_coor(new_xi, eta_1, new_phi)
-      new_pos(2) = y_coor(new_xi, eta_1, new_phi)
-      new_pos(3) = z_coor(new_xi, eta_1, new_phi)
+      new_pos = xyz_corr(new_xi, eta_1, new_phi) ! xyz coordinates of the new position on the tip surface
 
       ! Calculate the field at the new position
       field = Calc_Field_at(new_pos)
@@ -1152,8 +1140,10 @@ end subroutine Do_Photo_Emission_Tip
       phi = phi + 2.0d0*pi
     end if
 
+    ! Keep \xi between 1 and max_xi
     max_d = max_xi - 1.0d0
 
+    ! Reflect the position if it is outside the limits
     if (xi > max_xi) then
       d_xi = xi - max_xi
       if (d_xi > max_d) then
@@ -1774,9 +1764,9 @@ end function Elec_supply_tip
     double precision   :: epsabs = 1.0d-4 ! Requested absolute error
     integer            :: flags = 0+4 ! Flags
     integer            :: seed = 0 ! Seed for the rng. Zero will use Sobol.
-    integer            :: mineval = 10000 ! Minimum number of integrand evaluations
-    integer            :: maxeval = 5000000 ! Maximum number of integrand evaluations
-    integer            :: nnew = 2500 ! Number of integrand evaluations in each subdivision
+    integer            :: mineval = 25000 ! Minimum number of integrand evaluations
+    integer            :: maxeval = 50000000 ! Maximum number of integrand evaluations
+    integer            :: nnew = 5000 ! Number of integrand evaluations in each subdivision
     integer            :: nmin = 1000 ! Minimum number of samples a former pass must contribute to a subregion to be considered in the region's compound integral value.
     double precision   :: flatness = 5.0d0 ! Determine how prominently out-liers, i.e. samples with a large fluctuation, 
                                            ! figure in the total fluctuation, which in turn determines how a region is split up.
