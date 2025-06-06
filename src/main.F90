@@ -274,7 +274,7 @@ contains
     E_z = -1.0d0*V_d/d
 
     ! Electric field for unit voltage (See ramo current)
-    E_zunit = -1.0d0/d
+    !E_zunit = -1.0d0/d
 
     ! Emitters position and dimensions are given in length_scale (nm)
     emitters_dim = emitters_dim * length_scale

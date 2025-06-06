@@ -67,6 +67,9 @@ subroutine Init_Field_Thermo_Emission()
     ! The function to do image charge effects
     ptr_Image_Charge_effect => Force_Image_charges_v2
 
+    ! Ramo
+    ptr_E_zunit => E_zunit_planar
+
     call Init_Emission_Velocity(VELOCITY_MB)
 
     call Read_work_function()
@@ -84,6 +87,16 @@ subroutine Init_Field_Thermo_Emission()
 
     call Work_fun_cleanup()
   end subroutine Clean_Up_Field_Thermo_Emission
+
+  function E_zunit_planar(pos)
+    double precision, dimension(1:3), intent(in) :: pos ! Position to calculate the E_z unit vector at
+    double precision, dimension(1:3)               :: E_zunit_planar
+
+    ! The z-component of the electric field is always -1.0d0/d in planar geometry
+    E_zunit_planar(1:2) = 0.0d0
+    E_zunit_planar(3) = -1.0d0/d
+
+  end function E_zunit_planar
 
   !-----------------------------------------------------------------------------
   ! This subroutine gets called from main when the emitters should emit the electrons

@@ -218,14 +218,16 @@ contains
     ! Update the velocity in the verlet integration
     integer, intent(in)              :: step
     integer                          :: i, k, emit, sec
-    double precision                 :: q
+    double precision                 :: q, EzV
+    double precision, dimension(1:3) :: E_zu
+
 
     avg_vel(:) = 0.0d0
 
-    !$OMP PARALLEL DO DEFAULT(NONE) PRIVATE(i, q, k, emit, sec) &
+    !$OMP PARALLEL DO DEFAULT(NONE) PRIVATE(i, q, k, emit, sec, E_zu, EzV) &
     !$OMP& SHARED(nrPart, particles_cur_vel, particles_prev_accel, particles_cur_accel, time_step) &
-    !$OMP& SHARED(ramo_current, ramo_current_emit, E_zunit, particles_section, particles_charge) &
-    !$OMP& SHARED(particles_species, particles_emitter, particles_prev2_accel) &
+    !$OMP& SHARED(ramo_current, ramo_current_emit, particles_section, particles_charge, particles_cur_pos) &
+    !$OMP& SHARED(particles_species, particles_emitter, particles_prev2_accel, ptr_E_zunit) &
     !$OMP& REDUCTION(+:avg_vel)
     do i = 1, nrPart
       ! Verlet
@@ -245,12 +247,21 @@ contains
       sec  = particles_section(i)
 
       ! We use OMP ATOMIC here because the index k is not a loop index
+      ! Dot product the velocity with the electric field unit vector
+      !E_zu = dot_product(ptr_E_zunit(particles_cur_pos(:, i)), particles_cur_vel(:, i))
+      E_zu = ptr_E_zunit(particles_cur_pos(:, i))
+      EzV = particles_cur_vel(1, i) * E_zu(1) &
+        & + particles_cur_vel(2, i) * E_zu(2) &
+        & + particles_cur_vel(3, i) * E_zu(3)
+      
+      ! Update the ramo current
+      ! We use OMP ATOMIC here because the index k is not a loop index
       !$OMP ATOMIC UPDATE
-      ramo_current(k) = ramo_current(k) + q * E_zunit * particles_cur_vel(3, i)
+      ramo_current(k) = ramo_current(k) + q * EzV
 
       ! We use OMP ATOMIC here because the indexes sec and emit are not loop indexes
       !$OMP ATOMIC UPDATE
-      ramo_current_emit(sec, emit) = ramo_current_emit(sec, emit) + q * E_zunit * particles_cur_vel(3, i)
+      ramo_current_emit(sec, emit) = ramo_current_emit(sec, emit) + q * EzV
 
       avg_vel(:) = avg_vel(:) + particles_cur_vel(:, i) ! Calculate the sum for the average
     end do

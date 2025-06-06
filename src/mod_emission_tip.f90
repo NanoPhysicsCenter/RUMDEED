@@ -82,6 +82,8 @@ contains
     ptr_Image_Charge_effect => Sphere_IC_field
     !ptr_Image_Charge_effect => NULL()
 
+    ptr_E_zunit => E_zunit_tip
+
     ! Parameters used in the module
     time_step_div_q0 = time_step / q_0
     res_s = 0.0d0
@@ -94,8 +96,7 @@ contains
     h_tip = emitters_dim(3, 1)
 
     d = d_tip + h_tip
-    E_z = -1.0d0*V_s/d
-    E_zunit = -1.0d0/d
+    !E_z = -1.0d0*V_s/d
 
     ! Other Parameters
     max_xi = h_tip/d_tip + 1.0d0
@@ -107,6 +108,7 @@ contains
     shift_z = abs(a_foci * eta_1 * max_xi)
 
     pre_fac_E_tip = log( (1.0d0 + eta_1)/(1.0d0 - eta_1) * (1.0d0 - eta_2)/(1.0d0 + eta_2) )
+    pre_fac_E_tip_unit_voltage = 2.0d0 * 1.0d0 / (a_foci * pre_fac_E_tip)
     pre_fac_E_tip = 2.0d0 * V_s / (a_foci * pre_fac_E_tip)
 
   end subroutine Init_Emission_Tip
@@ -114,6 +116,16 @@ contains
   subroutine Clean_Up_Emission_Tip()
     ! Nothing to do here
   end subroutine Clean_Up_Emission_Tip
+
+  function E_zunit_tip(pos)
+    double precision, dimension(1:3), intent(in) :: pos
+    double precision, dimension(1:3)             :: E_zunit_tip
+
+    ! Calculate the electric field at the tip
+    E_zunit_tip = field_E_Hyperboloid(pos)
+    E_zunit_tip = E_zunit_tip * pre_fac_E_tip_unit_voltage / pre_fac_E_tip 
+
+  end function E_zunit_tip
 
   subroutine Do_Emission_Tip(step)
     integer, intent(in) :: step
