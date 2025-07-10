@@ -2,7 +2,7 @@
   V_S = 2.0d3,                       ! Voltage over the gap in volts
   BOX_DIM = 0.0d0, 0.0d0, 1000.0d0,   ! Simulations unit size in nano-meter, last number is gap spacing. Others ignored
   TIME_STEP = 1.00d-4,                ! Size of the time step in pico-seconds
-  STEPS = 2000,                       ! Number of steps to do in the simulation
+  STEPS = 20,                       ! Number of steps to do in the simulation
   EMISSION_MODE = 10,                 ! Emission mode, field emission = 10, space charge limited = 1, thermal field emission = 9
   NREMIT = 1,                         ! Number of emitters in the system
   IMAGE_CHARGE = .True.,              ! True means use image charge effects
