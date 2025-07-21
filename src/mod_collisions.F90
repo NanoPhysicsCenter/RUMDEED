@@ -1058,22 +1058,24 @@ subroutine Do_Discrete_Ionization_tts(step,nrIonizations)
       ! Check ionization only if electron has enough energy to ionize
       if (elec_energy >= N_bind) then
         ! print *, 'Ionization energy reached'
-        ion_rad2 = particles_ion_cross_rad(j)*1e12
+        ion_rad2 = particles_ion_cross_rad(j)
         ! print *, 'Ionization radius = ', ion_rad2 
 
         ionization = .false.
 
         ! Check if ionization happens
-        if (cur_dist2*1e12 <= ion_rad2) then
+        call random_number(rnd)
+        if (cur_dist2 <= ion_rad2) then
+        ! if  (rnd <= ion_rad2/cur_dist2) then
           ionization = .true.
           t = 0
           ionization_dist = norm2(elec_cur_pos - atom_cur_pos)
         else
-          a = 0.25d0*(dot_product(elec_cur_acc,elec_cur_acc))*1d12
-          b = dot_product(elec_cur_vel,elec_cur_acc)*1d12
-          cc = (dot_product(elec_cur_vel,elec_cur_vel) + dot_product(relative_pos,elec_cur_acc))*1d12
-          dd = 2.0d0*dot_product(relative_pos,elec_cur_vel)*1d12
-          e = (cur_dist2*1d12 - ion_rad2)
+          a = 0.25d0*(dot_product(elec_cur_acc,elec_cur_acc))
+          b = dot_product(elec_cur_vel,elec_cur_acc)
+          cc = (dot_product(elec_cur_vel,elec_cur_vel) + dot_product(relative_pos,elec_cur_acc))
+          dd = 2.0d0*dot_product(relative_pos,elec_cur_vel)
+          e = (cur_dist2 - ion_rad2)
 
           call SolvePolynomial(a,b,cc,dd,e,code,root1,root2,root3,root4)
 
