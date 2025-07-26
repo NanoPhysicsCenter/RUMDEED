@@ -32,6 +32,8 @@ Module mod_torus
     ! Variables
     integer, dimension(:), allocatable :: nrEmitted_emitters
 
+    double precision, dimension(1:3)   :: F_avg = 0.0d0
+
     ! Parameters for the torus
     double precision :: R = 10.0d0
     double precision :: rho = 1.0d0
@@ -39,6 +41,23 @@ Module mod_torus
     ! ----------------------------------------------------------------------------
     ! Variables for the Metropolis-Hastings algorithm
     integer, parameter                 :: N_MH_step = 55 ! Number of steps to do in the MH algorithm
+
+
+    ! ----------------------------------------------------------------------------
+    ! Constants for field emission
+    ! First Fowler-Nordheim constant in units [ A eV V^{-2} ]
+    double precision, parameter :: a_FN = q_02/(16.0d0*pi**2*h_bar)
+
+    ! Second Fowler-Nodheim constant in units [ eV^{-3/2} V m^{-1} ]
+    double precision, parameter :: b_FN = -4.0d0/(3.0d0*h_bar) * sqrt(2.0d0*m_0*q_0)
+  
+    ! Constant used for calculation of the l in v_y and t_y.
+    ! The units are [ eV^{2} V^{-1} m ]
+    ! See Forbes, R. G., & Deane, J. H. (2007, November).
+    ! "Reformulation of the standard theory of Fowler–Nordheim tunnelling and cold field electron emission."
+    ! In Proceedings of the Royal Society of London A: Mathematical,
+    ! Physical and Engineering Sciences (Vol. 463, No. 2087, pp. 2907-2927). The Royal Society.
+    double precision, parameter :: l_const = q_0 / (4.0d0*pi*epsilon_0)
 
 contains
 !-------------------------------------------!
@@ -353,10 +372,8 @@ subroutine Get_Random_Surface_Pos(pos, pos_torus)
     pos_torus(2) = phi
     pos_torus(3) = theta
 
-    ! Calculate the position on the surface of the torus
-    pos(1) = (R + rho * cos(theta)) * cos(phi)
-    pos(2) = rho * sin(theta)
-    pos(3) = (R + rho * cos(theta)) * sin(phi)
+    ! Calculate the xyz position on the surface of the torus
+    pos = Convert_to_xyz(pos_torus)
 end subroutine Get_Random_Surface_Pos
 
 function Field_Normal(pos, pos_torus, F)
@@ -373,10 +390,7 @@ function Field_Normal(pos, pos_torus, F)
     theta = pos_torus(3)
 
     ! Get a unit vector from the surface at pos
-    ! Check this!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    unit_vector(1) = (R + rho * cos(theta)) * cos(phi)
-    unit_vector(2) = rho * sin(theta)
-    unit_vector(3) = (R + rho * cos(theta)) * sin(phi)
+    unit_vector = Get_Unit_Vector(pos_torus)
 
     ! Normalize the unit vector
     unit_vector = unit_vector / sqrt(sum(unit_vector**2))
@@ -389,23 +403,72 @@ function Field_Normal(pos, pos_torus, F)
 end function Field_Normal
 
 !-------------------------------------------!
+! Calculate the unit vector from the surface at pos
+! Check this!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+function Get_Unit_Vector(pos_torus)
+    double precision, dimension(1:3)             :: Get_Unit_Vector
+    double precision, dimension(1:3), intent(in) :: pos_torus ! Position of in toroidal coordinates
+
+    double precision :: phi, theta
+
+    ! Calculate the angles from the position
+    ! rho is fixed, should be rho = pos_torus(1)
+    phi = pos_torus(2)
+    theta = pos_torus(3)
+
+    ! Get a unit vector from the surface at pos
+    Get_Unit_Vector(1) = (R + rho * cos(theta)) * cos(phi)
+    Get_Unit_Vector(2) = rho * sin(theta)
+    Get_Unit_Vector(3) = (R + rho * cos(theta)) * sin(phi)
+
+    ! Normalize the unit vector
+    Get_Unit_Vector = Get_Unit_Vector / sqrt(sum(Get_Unit_Vector**2))
+end function Get_Unit_Vector
+
+!-------------------------------------------!
+! Convert from toroidal coordinates to Cartesian coordinates
+function Convert_to_xyz(pos_torus)
+    double precision, dimension(1:3)             :: Convert_to_xyz
+    double precision, dimension(1:3), intent(in) :: pos_torus ! Position of in toroidal coordinates
+
+    ! Calculate the position on the surface of the torus
+    Convert_to_xyz(1) = (R + rho * cos(pos_torus(3))) * cos(pos_torus(2))
+    Convert_to_xyz(2) = rho * sin(pos_torus(3))
+    Convert_to_xyz(3) = (R + rho * cos(pos_torus(3))) * sin(pos_torus(2))
+end function Convert_to_xyz
+
+!-------------------------------------------!
+! Convert from Cartesian coordinates to toroidal coordinates
+! Check this!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+function Convert_to_torus(pos)
+    double precision, dimension(1:3)             :: Convert_to_torus
+    double precision, dimension(1:3), intent(in) :: pos ! Position to calculate the toroidal coordinates at
+
+    ! Calculate the toroidal coordinates
+    Convert_to_torus(1) = rho
+    Convert_to_torus(2) = atan2(pos(2), pos(1))
+    Convert_to_torus(3) = atan2(pos(3), pos(1))
+end function Convert_to_torus
+
+!-------------------------------------------!
 ! Metropolis-Hastings algorithm for the torus
-subroutine Metropolis_Hastings_Torus(N_MH_step, F_out, F_norm_out, pos_xyz_out, n_vec)
-    integer, intent(in) :: N_MH_step
+subroutine Metropolis_Hastings_Torus(ndim_in, F_out, F_norm_out, pos_xyz_out, n_vec)
+    integer, intent(in)                           :: ndim_in
     double precision, dimension(1:3), intent(out) :: F_out
-    double precision, intent(out) :: F_norm_out
+    double precision, intent(out)                 :: F_norm_out
     double precision, dimension(1:3), intent(out) :: pos_xyz_out
     double precision, dimension(1:3), intent(out) :: n_vec
 
+    ! Local variables
     double precision, dimension(1:3) :: F_cur, F_new
-    double precision, dimension(1:3) :: pos_cur, pos_new, pos_torus
+    double precision, dimension(1:3) :: pos_cur, pos_new
+    double precision, dimension(1:3) :: pos_cur_torus, pos_new_torus
     double precision, dimension(1:3) :: n_vec_cur, n_vec_new
     double precision :: F_norm, F_norm_new, F_norm_cur
+    double precision :: alpha, rnd
 
-    integer :: IFAIL, k
-
-    ! Local variables
-    integer :: i
+    integer :: IFAIL, k, i
+    integer :: accepted, rejected
 
     ! Initialize the output variables
     F_out = 0.0d0
@@ -415,10 +478,10 @@ subroutine Metropolis_Hastings_Torus(N_MH_step, F_out, F_norm_out, pos_xyz_out, 
     ! Get an initial position for the particle
     k = 0
     do
-        call Get_Random_Surface_Pos(pos_cur, pos_torus)
+        call Get_Random_Surface_Pos(pos_cur, pos_cur_torus)
 
-        F_cur = field_E_Torus(pos_cur)
-        F_norm_cur = Field_Normal(pos_cur, pos_torus, F_cur)
+        F_cur = Calc_Field_at(pos_cur)
+        F_norm_cur = Field_Normal(pos_cur, pos_cur_torus, F_cur)
 
         if (F_norm_cur < 0.0d0) then
             ! The field is favorable for emission
@@ -432,15 +495,415 @@ subroutine Metropolis_Hastings_Torus(N_MH_step, F_out, F_norm_out, pos_xyz_out, 
             k = k + 1
         end if
     end do
+    
+    ! Do the Metropolis-Hastings algorithm
+    do i = 1, ndim_in
+        call Jump_MH(pos_cur, pos_cur_torus, pos_new, pos_new_torus, n_vec_new)
 
+        alpha = Get_Jump_Probability(pos_cur, pos_cur_torus, F_norm_cur, F_norm_new)
+
+        ! Accept or reject the jump
+        call random_number(rnd)
+        if (rnd < alpha) then
+            ! Accept the jump
+            accepted = accepted + 1
+
+            ! Update the position
+            pos_cur = pos_new
+            pos_cur_torus = pos_new_torus
+
+            ! Update the electric field
+            F_cur = F_new
+            F_norm_cur = F_norm_new
+            
+            !write (unit=ud_mh, iostat=IFAIL) cur_time, pos_xyz_cur/length_scale, sec_cur, pos_cur
+        else
+            ! Reject the jump
+            rejected = rejected + 1
+        end if
+    end do
 
 end subroutine Metropolis_Hastings_Torus
 
+function Get_Jump_Probability(pos, pos_torus, F_norm_cur, F_norm_new) result(alpha)
+    double precision, dimension(1:3), intent(in) :: pos ! Position to calculate the jump probability at
+    double precision, dimension(1:3), intent(in) :: pos_torus ! Position of in toroidal coordinates
+    double precision, intent(in)                 :: F_norm_cur ! Electric field at the current position
+    double precision, intent(out)                 :: F_norm_new ! Electric field at the new position
+    double precision :: alpha
 
+    ! Local variables
+    double precision, dimension(1:3) :: F_new
+
+    ! Calculate the electric field at the new position
+    F_new = Calc_Field_at(pos)
+    F_norm_new = Field_Normal(pos, pos_torus, F_new)
+
+    ! Calculate the jump probability
+    ! Calculate the jump probability
+    if (F_norm_new >= 0.0d0) then ! If the field is positive, then the jump probability is zero
+      alpha = 0.0d0
+    else
+      alpha = F_norm_new / F_norm_cur
+    end if
+
+end function Get_Jump_Probability
+
+!-------------------------------------------!
+! Jump in the Metropolis-Hastings algorithm
+subroutine Jump_MH(pos_cur, pos_torus, pos_new, pos_new_torus, n_vec_new)
+    double precision, dimension(1:3), intent(in)  :: pos_cur
+    double precision, dimension(1:3), intent(in)  :: pos_torus
+    double precision, dimension(1:3), intent(out) :: pos_new
+    double precision, dimension(1:3), intent(out) :: pos_new_torus
+    double precision, dimension(1:3), intent(out) :: n_vec_new
+
+    ! Local
+    double precision, dimension(1:2) :: std_xy
+
+    ! Generate a new position on the surface from the current position
+    std_xy(1) = 1.0d0*pi*0.05d0
+    std_xy(2) = 2.0d0*pi*0.05d0
+    pos_new_torus(2:3) = box_muller(pos_torus(2:3), std_xy) ! Jump in x and y
+
+    ! Calculate the x and y coordinates
+    pos_new = Convert_to_xyz(pos_new_torus)
+
+    ! Calculate the normal vector to the surface at the new position
+    n_vec_new = Get_Unit_Vector(pos_new_torus)
+end subroutine Jump_MH
+
+
+!----------------------------------------------------------------------------------------
+! The functions v_y and t_y are because of the image charge effect in the FN equation.
+! The approximation for v_y and t_y are taken from
+! Forbes, R. G., & Deane, J. H. (2007, November).
+! "Reformulation of the standard theory of Fowler–Nordheim tunnelling and cold field electron emission."
+! In Proceedings of the Royal Society of London A: Mathematical,
+! Physical and Engineering Sciences (Vol. 463, No. 2087, pp. 2907-2927). The Royal Society.
+!
+double precision function v_y(F, pos)
+  double precision, intent(in)                 :: F
+  double precision, dimension(1:3), intent(in) :: pos
+  !integer                                      :: emit = 1
+  double precision                             :: l
+
+  if (image_charge .eqv. .true.) then
+    l = l_const * (-1.0d0*F) / w_theta_pos_tip(pos)**2 ! l = y^2, y = 3.79E-4 * sqrt(F_old) / w_theta
+    if (l > 1.0d0) then
+      l = 1.0d0
+    end if
+    v_y = 1.0d0 - l + 1.0d0/6.0d0 * l * log(l)
+  else
+    v_y = 1.0d0
+  end if
+end function v_y
+
+double precision function t_y(F, pos)
+  double precision, intent(in)                 :: F
+  double precision, dimension(1:3), intent(in) :: pos
+  !integer                                      :: emit = 1
+  double precision                             :: l
+
+  if (image_charge .eqv. .true.) then
+    l = l_const * (-1.0d0*F) / w_theta_pos_tip(pos)**2 ! l = y^2, y = 3.79E-4 * sqrt(F_old) / w_theta
+    if (l > 1.0d0) then
+      print *, 'Error: l > 1.0'
+      print *, 'l = ', l, ', F = ', F, ', t_y = ', t_y
+      print *, 'x = ', pos(1)/length_scale, 'y = ', pos(2)/length_scale, ' z = ,', pos(3)/length_scale
+      l = 1.0d0
+      !call Write_Current_Position()
+      !stop
+    end if
+
+    t_y = 1.0d0 + l*(1.0d0/9.0d0 - 1.0d0/18.0d0*log(l))
+  else
+    t_y = 1.0d0
+  end if
+end function t_y
+
+!-----------------------------------------------------------------------------
+! This function returns the escape probability of the Electrons.
+! Escape_prob = exp(-b_FN*w_theta^(3/2)*v_y/F) .
+double precision function Escape_Prob(F, pos)
+  double precision, intent(in)                 :: F
+  double precision, dimension(1:3), intent(in) :: pos
+  !integer                                      :: emit = 1
+
+  !print *, 'F = ', F
+  !print *, 'pos = ', pos
+  !print *, 'v_y = ', v_y(F, pos)
+  !print *, 'w_theta = ', w_theta_pos_tip(pos)
+  !print *, b_FN * (sqrt(w_theta_pos_tip(pos)))**3 * v_y(F, pos) / abs(F)
+  !print *, 'Escape_prob = ', exp(b_FN * (sqrt(w_theta_pos_tip(pos)))**3 * v_y(F, pos) / abs(F))
+  !print *, ''
+  Escape_Prob = exp(b_FN * (sqrt(w_theta_pos_tip(pos)))**3 * v_y(F, pos) / abs(F))
+  if (Escape_Prob > 1.0d0) then
+    print *, 'Escape_prob is larger than 1.0'
+    print *, 'Escape_prob = ', Escape_Prob
+    print *, ''
+  else if (Escape_Prob < 0.0d0) then
+    print *, 'Escape_prob is smaller than 0.0'
+    print *, 'Escape_prob = ', Escape_Prob
+    print *, ''
+  end if
+end function Escape_Prob
+
+
+!-----------------------------------------------------------------------------
+! A simple function that calculates
+! A_FN/(t**2(l)*w_theta(x,y)) F**2(x,y)
+! pos: Position to calculate the function
+! F: The z-component of the field at par_pos, it should be F < 0.0d0.
+double precision function Elec_Supply_V2(F, pos)
+  double precision, dimension(1:3), intent(in) :: pos
+  double precision,                 intent(in) :: F
+  !integer                                      :: emit = 1
+
+  Elec_Supply_V2 = time_step_div_q0 * a_FN/(t_y(F, pos)**2*w_theta_pos_tip(pos)) * F**2
+end function Elec_Supply_V2
+
+double precision function w_theta_pos_tip(pos)
+  double precision, dimension(1:3), intent(in) :: pos
+
+  w_theta_pos_tip = 4.65d0
+end function w_theta_pos_tip
+
+
+!-------------------------------------------!
+! Do the surface integration for the torus
 subroutine Do_Surface_Integration_simple(N_sup)
-    double precision, intent(out) :: N_sup
+    double precision, intent(out) :: N_sup ! Number of electrons
 
-    N_sup = 0.0d0
+    SELECT CASE (cuba_method)
+    case(cuba_method_suave)
+      !call Do_Cuba_Suave(N_sup)
+      print '(a)', 'RUMDEED: ERROR SIMPLE METHOD NOT IMPLEMENTED FOR SUAVE'
+      stop
+    case(cuba_method_divonne)
+      call Do_Cuba_Divonne_simple(N_sup)
+    case default
+      print '(a)', 'RUMDEED: ERROR UNKNOWN INTEGRATION METHOD'
+      print *, cuba_method
+      stop
+    end select
 end subroutine Do_Surface_Integration_simple
+
+  subroutine Do_Cuba_Divonne_simple(N_sup)
+    implicit none
+    double precision, intent(out) :: N_sup
+    integer                       :: i
+    integer                       :: IFAIL
+  
+    
+    ! Cuba integration variables (common)
+    integer, parameter :: ndim = 2 ! Number of dimensions
+    integer, parameter :: ncomp = 1 ! Number of components in the integrand
+    integer            :: userdata = 0 ! User data passed to the integrand
+    integer, parameter :: nvec = 1 ! Number of points given to the integrand function
+    !double precision   :: epsrel = 1.0d-4 ! Requested relative error
+    !double precision   :: epsabs = 0.25d0 ! Requested absolute error
+    integer            :: flags = 0+4 ! Flags
+    ! Set seed to non-zero value based on the current time
+    integer            :: seed = 0 ! Seed for the rng. Zero will use Sobol.
+    !integer            :: mineval = 75000 ! Minimum number of integrand evaluations
+    !integer            :: maxeval = 10000000 ! Maximum number of integrand evaluations
+  
+    ! Divonne specific
+    integer :: key1 = 47 ! 〈in〉, determines sampling in the partitioning phase:
+                    ! key1 = 7,9,11,13 selects the cubature rule of degree key1.
+                    ! Note that the degree-11 rule is available only in 3 dimensions, the degree-13 rule only in 2 dimensions.
+                    ! For other values of key1, a quasi-random sample of n_1=|key1| points is used,
+                    ! where the sign of key1 determines the type of sample,
+                    ! – key1 > 0, use a Korobov quasi-random sample,
+                    ! – key1 < 0, use a “standard” sample (a Sobol quasi-random sample if seed= 0, otherwise a pseudo-random sample).
+    integer :: key2 = -1 !<in>, determines sampling in the final integration phase:
+                    ! key2 = 7, 9, 11, 13 selects the cubature rule of degree key2. Note that the degree-11
+                    ! rule is available only in 3 dimensions, the degree-13 rule only in 2 dimensions.
+                    ! For other values of key2, a quasi-random sample is used, where the sign of key2
+                    ! determines the type of sample,
+                    ! - key2 > 0, use a Korobov quasi-random sample,
+                    ! - key2 < 0, use a "standard" sample (see description of key1 above),
+                    ! and n_2 = |key2| determines the number of points,
+                    ! - n_2 > 40, sample n2 points,
+                    ! - n_2 < 40, sample n2 nneed points, where nneed is the number of points needed to
+                    ! reach the prescribed accuracy, as estimated by Divonne from the results of the
+                    ! partitioning phase.
+    integer :: key3 = -1 ! <in>, sets the strategy for the refinement phase:
+                    ! key3 = 0, do not treat the subregion any further.
+                    ! key3 = 1, split the subregion up once more.
+                    ! Otherwise, the subregion is sampled a third time with key3 specifying the sampling
+                    ! parameters exactly as key2 above.
+    integer :: maxpass = 2! <in>, controls the thoroughness of the partitioning phase: The
+  ! partitioning phase terminates when the estimated total number of integrand evaluations
+  ! (partitioning plus final integration) does not decrease for maxpass successive iterations.
+  ! A decrease in points generally indicates that Divonne discovered new structures of
+  ! the integrand and was able to find a more effective partitioning. maxpass can be
+  ! understood as the number of `safety' iterations that are performed before the partition
+  ! is accepted as final and counting consequently restarts at zero whenever new structures are found.
+    double precision :: border = 0.0d0 ! <in>, the width of the border of the integration region.
+  ! Points falling into this border region will not be sampled directly, but will be extrapolated
+  ! from two samples from the interior. Use a non-zero border if the integrand
+  ! subroutine cannot produce values directly on the integration boundary.
+    double precision :: maxchisq = 10.0d0 !<in>, the maximum \chi^2 value a single subregion is allowed
+  ! to have in the final integration phase. Regions which fail this \chi^2 test and whose
+  ! sample averages differ by more than mindeviation move on to the refinement phase.
+    double precision :: mindeviation = 0.25d0 !<in>, a bound, given as the fraction of the requested
+  ! error of the entire integral, which determines whether it is worthwhile further
+  ! examining a region that failed the \chi^2 test. Only if the two sampling averages
+  ! obtained for the region differ by more than this bound is the region further treated.
+    integer :: ngiven = 0 ! <in>, the number of points in the xgiven array.
+    integer :: ldxgiven = ndim ! <in>, the leading dimension of xgiven, i.e. the offset between one point and the next in memory.
+    !double precision, allocatable :: xgiven(:,:) ! xgiven(ldxgiven,ngiven) <in>, a list of points where the integrand
+  ! might have peaks. Divonne will consider these points when partitioning the
+  ! integration region. The idea here is to help the integrator find the extrema of the integrand
+  ! in the presence of very narrow peaks. Even if only the approximate location
+  ! of such peaks is known, this can considerably speed up convergence.
+    integer :: nextra = 0 ! <in>, the maximum number of extra points the peak-finder subroutine
+  ! will return. If nextra is zero, peakfinder is not called and an arbitrary object
+  ! may be passed in its place, e.g. just 0.
+  
+  
+    ! Output
+    character          :: statefile = "" ! File to save the state in. Empty string means don't do it.
+    integer            :: spin = -1 ! Spinning cores
+    integer            :: nregions ! <out> The actual number of subregions needed
+    integer            :: neval ! <out> The actual number of integrand evaluations needed
+    integer            :: fail ! <out> Error flag (0 = Success, -1 = Dimension out of range, >0 = Accuracy goal was not met)
+    double precision, dimension(1:ncomp) :: integral ! <out> The integral of the integrand over the unit hybercube
+    double precision, dimension(1:ncomp) :: error ! <out> The presumed absolute error
+    double precision, dimension(1:ncomp) :: prob ! <out> The chi-square probability
+  
+    ! Initialize the average field to zero
+    F_avg = 0.0d0
+
+    ! Set seed
+    !seed = my_seed(1)
+
+    !-----------------------------------------------------------------------------
+    ! Integrate over the surface
+   
+    call divonne(ndim, ncomp, integrand_cuba_torus_simple, userdata, nvec,&
+                cuba_epsrel, cuba_epsabs, flags, seed, cuba_mineval, cuba_maxeval,&
+                key1, key2, key3, maxpass,&
+                border, maxchisq, mindeviation,&
+                ngiven, ldxgiven, 0, nextra, 0,&
+                statefile, spin,&
+                nregions, neval, fail, integral, error, prob)
+  
+    if (fail /= 0) then
+      if (abs(error(1) - cuba_epsabs) > 1.0d-2) then
+        print '(a)', 'RUMDEED: WARNING Cuba did not return 0'
+        print *, 'Top integration'
+        print *, 'time_step = ', time_step
+        print *, 'Fail = ', fail
+        print *, 'nregions = ', nregions
+        print *, 'neval = ', neval, ' max is ', cuba_maxeval
+        print *, 'error(1) = ', error(1)
+        print *, 'integral(1)*epsrel = ', integral(1)*cuba_epsrel
+        print *, 'epsabs = ', cuba_epsabs
+        print *, 'prob(1) = ', prob(1)
+        print *, 'integral(1) = ', integral(1)
+        call Flush_Data()
+      end if
+    end if
+  
+    ! Store the results
+    N_sup = integral(1)
+
+    ! Write the output variables of the integration to a file
+    write(ud_integrand, '(i8, tr2, i8, tr2, i4, tr2, ES12.4, tr2, ES12.4, tr2, ES12.4)', iostat=IFAIL) &
+                            & nregions, neval, fail, integral(1), error(1), prob(1)
+
+    ! Finish calculating the average field
+    F_avg = F_avg / neval
+
+  end subroutine Do_Cuba_Divonne_simple
+
+  ! ----------------------------------------------------------------------------
+  ! The integration function for the Cuba library
+  !
+  integer function integrand_cuba_torus_simple(ndim, xx, ncomp, ff, userdata)
+    ! Input / output variables
+    integer, intent(in) :: ndim ! Number of dimensions (Should be 2)
+    integer, intent(in) :: ncomp ! Number of vector-components in the integrand (Always 1 here)
+    integer, intent(in) :: userdata ! Additional data passed to the integral function (In our case the number of the emitter)
+    double precision, intent(in), dimension(1:ndim)   :: xx ! Integration points, between 0 and 1
+    double precision, intent(out), dimension(1:ncomp) :: ff ! Results of the integrand function
+
+    ! Variables used for calculations
+    double precision, dimension(1:3) :: par_pos, par_pos_org, field
+    double precision                 :: field_norm
+
+    ! Variables used for the transformation from the hypercube to the surface
+    double precision, dimension(1:2) :: upper, lower, range
+    double precision                 :: jacobian ! Jacobian of the transformation from the hypercube to the surface
+
+    ! Other variables
+    integer :: IFAIL
+
+    ! Use toroidal coordinates for the corner surface (r, phi, theta)
+    ! phi [0, pi]
+    ! theta [0, 2*pi]
+    upper(1:2) = (/pi, 2.0d0*pi/)
+    lower(1:2) = (/0.0d0, 0.0d0/)
+
+    ! Range
+    range(1:2) = upper(1:2) - lower(1:2)
+
+    ! rho, phi and theta coordinates of the point on the surface
+    par_pos_org(1) = rho ! Fixed distance from the center of the torus
+    par_pos_org(2:3) = lower(1:2) + xx(1:2)*range(1:2)
+
+    ! Convert to cartesian coordinates
+    par_pos(1) = (R + rho*cos(par_pos_org(3)))*cos(par_pos_org(2))
+    par_pos(2) = rho*sin(par_pos_org(3))
+    par_pos(3) = (R + rho*cos(par_pos_org(3)))*sin(par_pos_org(2))
+
+    ! Jacobian of the transformation from the hypercube (Check this!)
+    jacobian = rho*(R + rho*cos(par_pos_org(3)))* &
+               (range(1)*range(2)) ! Jacobian of the transformation from the hypercube to the surface
+    !jacobian = radius_cor*(radius_cyl - radius_cor + radius_cor*cos(par_pos_org(3)))*range(1)*range(2) ! rho*(R_0 + rho*cos(theta)) dphi dtheta
+
+    !ff(1) = 1.0d0 ! Integrand results debug
+
+    integrand_cuba_torus_simple = 0 ! Return value to Cuba, 0 = success
+
+    ! Calculate the electric field on the surface
+    field = Calc_Field_at(par_pos)
+    field_norm = Field_normal(par_pos, par_pos_org, field)
+
+    ! Add to the average field
+    F_avg = F_avg + field
+
+    ! Check if the field is favorable for emission
+    if (field_norm < 0.0d0) then
+      ! The field is favorable for emission
+      ! Calculate the electron supply at this point
+      ff(1) = Elec_Supply_V2(field_norm, par_pos)*Escape_Prob(field_norm, par_pos)
+      !print *, 'Electron supply = ', ff(1)
+    else
+    !   ! The field is NOT favorable for emission
+    !   ! This point does not contribute
+      !print *, 'Field not favorable for emission'
+      !print *, 'field_norm = ', field_norm
+      !print *, 'par_pos = ', par_pos/length_scale_cyl
+
+      ff(1) = 0.0d0
+      !pause
+    end if
+
+    ! We multiply with the jacobian because Cuba does the 
+    ! integration over the hybercube, i.e. from 0 to 1.
+    ff(1) = jacobian*ff(1)
+    !if (userdata == sec_corner) then
+    !  print *, 'ff(1) = ', ff(1)
+    !end if
+
+    !write (ud_field, "(*(E16.8, tr2))", iostat=IFAIL) &
+    !                                  par_pos(1), par_pos(2), par_pos(3), &
+    !                                  field(1), field(2), field(3), &
+    !                                  field_norm
+  end function integrand_cuba_torus_simple
 
 end module mod_torus
