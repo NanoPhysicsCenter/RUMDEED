@@ -91,7 +91,7 @@ subroutine Init_Torus()
     time_step_div_q0 = time_step / q_0
 
     ! Create the KD-tree
-    !call Create_KD_Tree()
+    call Create_KD_Tree()
 end subroutine Init_Torus
 
 !-------------------------------------------!
@@ -105,7 +105,7 @@ end subroutine Clean_Up_Torus
 !-------------------------------------------!
 ! Create the K-dimensional tree using the kdtree2 module
 subroutine Create_KD_Tree()
-    character (len=*), parameter :: filename_meshdata = "Cyl_mesh_data.txt"
+    character (len=*), parameter :: filename_meshdata = "Torus_mesh_data.txt"
     character (len=*), parameter :: filename_imagedata = "image_charge_data.txt"
     integer                      :: IFAIL
     integer                      :: ud_meshdata, ud_imagedata
