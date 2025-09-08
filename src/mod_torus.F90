@@ -35,8 +35,9 @@ Module mod_torus
     double precision, dimension(1:3)   :: F_avg = 0.0d0
 
     ! Parameters for the torus
-    double precision :: R = 10.0d0
-    double precision :: rho = 1.0d0
+    double precision :: R_y = 0.05d0 * 1.0d-3 ! mm -> m
+    double precision :: R_z = 0.1d0 * 1.0d-3 ! mm -> m
+    double precision :: rho = 0.012d0 * 1.0d-3 ! mm -> m
 
     ! ----------------------------------------------------------------------------
     ! Variables for the Metropolis-Hastings algorithm
@@ -92,6 +93,9 @@ subroutine Init_Torus()
 
     ! Create the KD-tree
     call Create_KD_Tree()
+
+    ! Output field along a curve on top of the looped CNT
+    call Calc_E_Along_Top()
 end subroutine Init_Torus
 
 !-------------------------------------------!
@@ -170,6 +174,79 @@ subroutine Create_KD_Tree()
 end subroutine Create_KD_Tree
 
 !-------------------------------------------!
+! Output field along a curve on top of the looped cnt
+subroutine Calc_E_Along_Top()
+  implicit none
+  integer :: k
+  integer, parameter :: N_p = 10000
+
+  real(kdkind), dimension(1:3) :: p, E_vec, E_vec_image
+  double precision :: phi, rho, theta
+  integer :: ud_cyl_around, IFAIL
+  !character (len=*), parameter :: filename_cyl_circle="cyl_E_circle.dt"
+  character (len=100) :: filename_cyl_circle
+
+  ! Data arrays
+  double precision, dimension(:, :, :), allocatable :: data_cyl_around
+  double precision, dimension(:, :), allocatable :: p_cyl_around
+  double precision, dimension(:), allocatable    :: len_cyl_around
+
+  !print *, 'Calc_E_circle_cyl started'
+
+  allocate(data_cyl_around(1:3, 1:3, 1:N_p))
+  allocate(len_cyl_around(1:N_p))
+  allocate(p_cyl_around(1:3, 1:N_p))
+
+  ! Calculate the electric field around the cylinder
+  !print *, 'Calculating the electric field around the cylinder'
+  do k = 1, N_p
+    ! Right corner
+    phi = (k-1)*1.0d0*pi/(N_p-1)
+    theta = 0.0d0
+    p(1) = 0.0d0
+    p(2) = (R_y + rho*cos(theta))*cos(phi)
+    p(3) = (R_z + rho*cos(theta))*sin(phi)
+
+    p_cyl_around(:, k) = p(:)
+    len_cyl_around(k) = phi
+
+    E_vec = field_E_Torus(p) ! Vacuum field 
+    E_vec_image = Calc_Field_at(p) ! Total field
+    ! Store data in array
+    data_cyl_around(1, :, k) = E_vec_image ! Total field
+    data_cyl_around(2, :, k) = E_vec(:) ! Vacuum field
+    data_cyl_around(3, :, k) = E_vec_image(:) - E_vec ! Electric field due to the image charges and electrons
+  end do
+
+  ! Open data file
+  !print *, 'Opening data file'
+
+  filename_cyl_circle = "out/loop_E_top.dt"
+
+  open(newunit=ud_cyl_around, iostat=IFAIL, file=filename_cyl_circle, status='REPLACE', action='WRITE')
+  if (IFAIL /= 0) then
+    print '(a)', 'RUMDEED: ERROR UNABLE TO OPEN file ', filename_cyl_circle
+    stop
+  end if
+
+  ! Write data to file
+  !print *, 'Writing data to file'
+  do k = 1, N_p
+    write(ud_cyl_around, *) data_cyl_around(1, :, k), data_cyl_around(2, :, k), data_cyl_around(3, :, k), &
+                            len_cyl_around(k), p_cyl_around(:, k)
+  end do
+
+  ! Close data file
+  close(unit=ud_cyl_around, iostat=IFAIL, status='keep')
+
+  deallocate(data_cyl_around)
+  deallocate(p_cyl_around)
+  deallocate(len_cyl_around)
+
+  !print *, 'Calc_E_circle_cyl finished'
+end subroutine Calc_E_Along_Top
+
+!-------------------------------------------!
 ! Check the boundary conditions for the torus
 ! Coordinates are in the form of (x, y, z)
 ! x = (R + rho*cos(theta))*cos(phi)
@@ -196,10 +273,10 @@ subroutine Check_Boundary_Torus(i)
         ! Check if we are inside the torus
 
         ! Find the closest point on the torus center curve
-        phi = atan2(pos(2), pos(1)) ! See notes
-        x_c = R*cos(phi)
-        y_c = 0.0d0
-        z_c = R*sin(phi)
+        phi = atan2(pos(2), pos(1)) ! See notes (Check this! after flip)
+        x_c = 0.0d0
+        y_c = R_y*cos(phi)
+        z_c = R_z*sin(phi)
 
         ! Calculate the distance from the particle to the center of the torus
         d = sqrt((pos(1) - x_c)**2 + (pos(2) - y_c)**2 + (pos(3) - z_c)**2)
@@ -283,7 +360,7 @@ subroutine Do_Field_Emission_Torus_simple(step)
     nrEmitted_emitters = 0
   
     ! Check if the step is 10%, 20%, 30%, 40%, 50%, 60%, 70%, 80%, 90% or 100% of the total steps
-    if (mod(step, steps/10) == 0) then
+    !if (mod(step, steps/10) == 0) then
       !per = nint(dble(step)/dble(steps)*100.0d0) ! Calculate the percentage of the simulation
       !print *, 'Step = ', step
       !print *, 'Percentage = ', per, '%'
@@ -298,11 +375,13 @@ subroutine Do_Field_Emission_Torus_simple(step)
   
       !call Calc_E_cyl(per)
       !call Calc_E_circle_cyl(per)
-    end if
+    !end if
   
     call Do_Surface_Integration_simple(N_sup)
     N_round = Rand_Poisson(N_sup)
-  
+    print *, 'N_round = ', N_round
+    pause
+
     nrElecEmit = 0
     nrEmitted_emitters(emit) = 0
   
@@ -413,13 +492,14 @@ function Get_Unit_Vector(pos_torus)
 
     ! Calculate the angles from the position
     ! rho is fixed, should be rho = pos_torus(1)
-    phi = pos_torus(2)
-    theta = pos_torus(3)
+    !phi = pos_torus(2)
+    !theta = pos_torus(3)
 
     ! Get a unit vector from the surface at pos
-    Get_Unit_Vector(1) = (R + rho * cos(theta)) * cos(phi)
-    Get_Unit_Vector(2) = rho * sin(theta)
-    Get_Unit_Vector(3) = (R + rho * cos(theta)) * sin(phi)
+    Get_Unit_Vector = Convert_to_xyz(pos_torus)
+    !Get_Unit_Vector(1) = (R + rho * cos(theta)) * cos(phi)
+    !Get_Unit_Vector(2) = rho * sin(theta)
+    !Get_Unit_Vector(3) = (R + rho * cos(theta)) * sin(phi)
 
     ! Normalize the unit vector
     Get_Unit_Vector = Get_Unit_Vector / sqrt(sum(Get_Unit_Vector**2))
@@ -432,9 +512,9 @@ function Convert_to_xyz(pos_torus)
     double precision, dimension(1:3), intent(in) :: pos_torus ! Position of in toroidal coordinates
 
     ! Calculate the position on the surface of the torus
-    Convert_to_xyz(1) = (R + rho * cos(pos_torus(3))) * cos(pos_torus(2))
-    Convert_to_xyz(2) = rho * sin(pos_torus(3))
-    Convert_to_xyz(3) = (R + rho * cos(pos_torus(3))) * sin(pos_torus(2))
+    Convert_to_xyz(1) = rho * sin(pos_torus(3))
+    Convert_to_xyz(2) = (R_y + rho * cos(pos_torus(3))) * cos(pos_torus(2))
+    Convert_to_xyz(3) = (R_z + rho * cos(pos_torus(3))) * sin(pos_torus(2))
 end function Convert_to_xyz
 
 !-------------------------------------------!
@@ -446,8 +526,8 @@ function Convert_to_torus(pos)
 
     ! Calculate the toroidal coordinates
     Convert_to_torus(1) = rho
-    Convert_to_torus(2) = atan2(pos(2), pos(1))
-    Convert_to_torus(3) = atan2(pos(3), pos(1))
+    Convert_to_torus(2) = atan2(pos(1), pos(2))
+    Convert_to_torus(3) = atan2(pos(3), pos(2))
 end function Convert_to_torus
 
 !-------------------------------------------!
@@ -810,6 +890,7 @@ end subroutine Do_Surface_Integration_simple
   
     ! Store the results
     N_sup = integral(1)
+    print *, 'N_sup = ', N_sup
 
     ! Write the output variables of the integration to a file
     write(ud_integrand, '(i8, tr2, i8, tr2, i4, tr2, ES12.4, tr2, ES12.4, tr2, ES12.4)', iostat=IFAIL) &
@@ -856,12 +937,13 @@ end subroutine Do_Surface_Integration_simple
     par_pos_org(2:3) = lower(1:2) + xx(1:2)*range(1:2)
 
     ! Convert to cartesian coordinates
-    par_pos(1) = (R + rho*cos(par_pos_org(3)))*cos(par_pos_org(2))
-    par_pos(2) = rho*sin(par_pos_org(3))
-    par_pos(3) = (R + rho*cos(par_pos_org(3)))*sin(par_pos_org(2))
+    par_pos = Convert_to_xyz(par_pos_org)
+    !par_pos(1) = rho*sin(par_pos_org(3))
+    !par_pos(2) = (R + rho*cos(par_pos_org(3)))*cos(par_pos_org(2))
+    !par_pos(3) = (R + rho*cos(par_pos_org(3)))*sin(par_pos_org(2))
 
     ! Jacobian of the transformation from the hypercube (Check this!)
-    jacobian = rho*(R + rho*cos(par_pos_org(3)))* &
+    jacobian = rho*(R_y + rho*cos(par_pos_org(3)))* &
                (range(1)*range(2)) ! Jacobian of the transformation from the hypercube to the surface
     !jacobian = radius_cor*(radius_cyl - radius_cor + radius_cor*cos(par_pos_org(3)))*range(1)*range(2) ! rho*(R_0 + rho*cos(theta)) dphi dtheta
 

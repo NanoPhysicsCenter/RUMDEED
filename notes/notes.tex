@@ -1027,11 +1027,11 @@ The scale factors for the cylindrical coordinate system are
 %
 \section{Curved CNT}
 \subsection{Geometry}
-The geometry of the curved CNT is a torus with a major radius of \(R\) and a minor radius of \(\rho\). The torus is rotated around the \(x\)-axis.
+The geometry of the curved CNT is a torus with a major radius of \(R_y\), \(R_z\) and a minor radius of \(\rho\). The torus is rotated around the \(x\)-axis.
 \begin{align}
-x &= \left(R + \rho\cos\theta\right)\cos(\phi)\\
-y &= \rho\sin(\theta)\\
-z &= \left(R + \rho\cos\theta\right)\sin(\phi)
+x &= \rho\sin(\theta)\\
+y &= \left(R_y + \rho\cos\theta\right)\cos(\phi)\\
+z &= \left(R_z + \rho\cos\theta\right)\sin(\phi)
 \end{align}
 Where \(\theta \in [0, 2\pi]\) and \(\phi \in [0, \pi]\). Toroidal coordinates (\(r\), \(\phi\), \(\theta\)) are used to describe the geometry.
 The torus is cut in half by the \(xy\) plane.
@@ -1043,26 +1043,21 @@ The top half is the CNT fiber as can be seen in Figure~\ref{fig:curved_cnt}.
 \end{figure}
 
 \subsection{Center curve}
-The center curve of the CNT is a circle with radius \(R\) and center at \((0, 0, R)\). The equation of the circle is
+The center curve of the CNT is an ellipse with radius \(R_y\), \(R_z\). The equation of the ellipse is
 \begin{align}
-  x &= R\cos(\phi)\\
-  y &= 0\\
-  z &= R\sin(\phi)\\
+  x &= 0\\
+  y &= R_y\cos(\phi)\\
+  z &= R_z\sin(\phi)\\
 \end{align}
 where \(\phi \in [0, 2\pi]\). The red line in Figure~\ref{fig:curved_cnt} shows the center curve.
 
-We can find the closest point on the center curve to a point \((x, y, z)\) by minimizing the distance between the point and the center curve.
-The distance is given by
+We can find the closest point on the center curve to a point \((x, y, z)\) by
 \begin{equation}
-  d = \sqrt{(x - R\cos(\phi))^2 + (y - 0)^2 + (z - R\sin(\phi))^2}
+  \frac{z}{y} = \frac{R_z\sin(\phi)}{R_y\cos(\phi)} = \frac{R_z}{R_y}\tan(\phi)\, .
 \end{equation}
-and the derivative of the distance is given by
+Which gives
 \begin{equation}
-  \frac{d d}{d \phi} = \frac{-R z \cos{\phi} + R x \sin{\phi}}{\sqrt{y^2 + (x - R \cos{\phi})^2 + (z - R \sin{\phi})^2}}\, .
-\end{equation}
-Setting this equal to zero and solving for \(\phi\) gives
-\begin{equation}
-  \phi = \arctan{\frac{z}{x}}\, .
+  \phi = \arctan\left( \frac{R_y}{R_z}\frac{z}{y} \right)\, .
 \end{equation}
 
 \cleardoublepage\printbibliography
