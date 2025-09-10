@@ -915,6 +915,7 @@ end subroutine Do_Surface_Integration_simple
     ! Variables used for calculations
     double precision, dimension(1:3) :: par_pos, par_pos_org, field
     double precision                 :: field_norm
+    double precision                 :: h_theta, h_phi
 
     ! Variables used for the transformation from the hypercube to the surface
     double precision, dimension(1:2) :: upper, lower, range
@@ -943,9 +944,10 @@ end subroutine Do_Surface_Integration_simple
     !par_pos(3) = (R + rho*cos(par_pos_org(3)))*sin(par_pos_org(2))
 
     ! Jacobian of the transformation from the hypercube (Check this!)
-    jacobian = rho*(R_y + rho*cos(par_pos_org(3)))* &
-               (range(1)*range(2)) ! Jacobian of the transformation from the hypercube to the surface
-    !jacobian = radius_cor*(radius_cyl - radius_cor + radius_cor*cos(par_pos_org(3)))*range(1)*range(2) ! rho*(R_0 + rho*cos(theta)) dphi dtheta
+    h_theta = rho
+    h_phi = sqrt((R_y + rho*cos(par_pos_org(3)))**2*sin(par_pos_org(2))**2 &
+          & + (R_z + rho*cos(par_pos_org(3)))**2*cos(par_pos_org(2))**2)
+    jacobian = h_theta * h_phi * (range(1)*range(2)) ! Jacobian of the transformation from the hypercube to the surface
 
     !ff(1) = 1.0d0 ! Integrand results debug
 
@@ -978,6 +980,7 @@ end subroutine Do_Surface_Integration_simple
     ! We multiply with the jacobian because Cuba does the 
     ! integration over the hybercube, i.e. from 0 to 1.
     ff(1) = jacobian*ff(1)
+    !ff(1) = 1.0d0*jacobian ! Area test
     !if (userdata == sec_corner) then
     !  print *, 'ff(1) = ', ff(1)
     !end if
