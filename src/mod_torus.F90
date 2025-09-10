@@ -35,9 +35,9 @@ Module mod_torus
     double precision, dimension(1:3)   :: F_avg = 0.0d0
 
     ! Parameters for the torus
-    double precision :: R_y = 0.05d0 * 1.0d-3 ! mm -> m
-    double precision :: R_z = 0.1d0 * 1.0d-3 ! mm -> m
     double precision :: rho = 0.012d0 * 1.0d-3 ! mm -> m
+    double precision :: R_y = 0.05d0 * 1.0d-3 + 0.012d0*1.0d-3 ! mm -> m
+    double precision :: R_z = 0.1d0 * 1.0d-3 + 0.012d0*1.0d-3 ! mm -> m
 
     ! ----------------------------------------------------------------------------
     ! Variables for the Metropolis-Hastings algorithm
@@ -337,7 +337,7 @@ function field_E_Torus(pos) result(field_E)
     do k = 1, nn
         field_E = field_E + w(k) * kd_data(:, kd_results(k)%idx)
     end do
-    !field_E = field_E * 0.125d1 ! Debug to make field larger
+    field_E = field_E * 1.00d1 ! Debug to make field larger
 end function field_E_Torus
 
 subroutine Do_Field_Emission_Torus_simple(step)
@@ -379,8 +379,8 @@ subroutine Do_Field_Emission_Torus_simple(step)
   
     call Do_Surface_Integration_simple(N_sup)
     N_round = Rand_Poisson(N_sup)
-    print *, 'N_round = ', N_round
-    pause
+    !print *, 'N_round = ', N_round
+    !pause
 
     nrElecEmit = 0
     nrEmitted_emitters(emit) = 0
@@ -396,7 +396,7 @@ subroutine Do_Field_Emission_Torus_simple(step)
         ! Check if the field is favorable for emission or not
         if (F_norm >= 0.0d0) then
           D_f = -huge(1.0d0)
-          print *, 'Warning: F > 0.0d0 (Do_Field_Emission_Cylinder)'
+          print *, 'Warning: F > 0.0d0 (Do_Field_Emission_Torus)'
           print *, 'F_norm = ', F_norm
           print *, 'F = ', F
           print *, 'par_pos = ', par_pos
@@ -472,7 +472,7 @@ function Field_Normal(pos, pos_torus, F)
     unit_vector = Get_Unit_Vector(pos_torus)
 
     ! Normalize the unit vector
-    unit_vector = unit_vector / sqrt(sum(unit_vector**2))
+    !unit_vector = unit_vector / sqrt(sum(unit_vector**2))
 
     ! Calculate the normal vector to the surface
     Field_Normal = dot_product(unit_vector, F)
@@ -496,12 +496,15 @@ function Get_Unit_Vector(pos_torus)
     !theta = pos_torus(3)
 
     ! Get a unit vector from the surface at pos
-    Get_Unit_Vector = Convert_to_xyz(pos_torus)
+    !Get_Unit_Vector = Convert_to_xyz(pos_torus)
     !Get_Unit_Vector(1) = (R + rho * cos(theta)) * cos(phi)
     !Get_Unit_Vector(2) = rho * sin(theta)
     !Get_Unit_Vector(3) = (R + rho * cos(theta)) * sin(phi)
 
     ! Normalize the unit vector
+    Get_Unit_Vector(1) = 1.0d0
+    Get_Unit_Vector(2) = 1.0d0
+    Get_Unit_Vector(3) = 1.0d0
     Get_Unit_Vector = Get_Unit_Vector / sqrt(sum(Get_Unit_Vector**2))
 end function Get_Unit_Vector
 
@@ -890,7 +893,7 @@ end subroutine Do_Surface_Integration_simple
   
     ! Store the results
     N_sup = integral(1)
-    print *, 'N_sup = ', N_sup
+    !print *, 'N_sup = ', N_sup
 
     ! Write the output variables of the integration to a file
     write(ud_integrand, '(i8, tr2, i8, tr2, i4, tr2, ES12.4, tr2, ES12.4, tr2, ES12.4)', iostat=IFAIL) &
@@ -965,7 +968,9 @@ end subroutine Do_Surface_Integration_simple
       ! The field is favorable for emission
       ! Calculate the electron supply at this point
       ff(1) = Elec_Supply_V2(field_norm, par_pos)*Escape_Prob(field_norm, par_pos)
-      !print *, 'Electron supply = ', ff(1)
+      !print *, 'Electron supply = ', Elec_Supply_V2(field_norm, par_pos)
+      !print *, 'Escape probability = ', Escape_Prob(field_norm, par_pos)
+      !print *, 'ff(1) = ', ff(1)
     else
     !   ! The field is NOT favorable for emission
     !   ! This point does not contribute
