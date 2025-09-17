@@ -337,7 +337,7 @@ function field_E_Torus(pos) result(field_E)
     do k = 1, nn
         field_E = field_E + w(k) * kd_data(:, kd_results(k)%idx)
     end do
-    field_E = field_E * 1.00d1 ! Debug to make field larger
+    field_E = field_E * 2.75d0 ! Debug to make field larger
 end function field_E_Torus
 
 subroutine Do_Field_Emission_Torus_simple(step)
@@ -496,16 +496,10 @@ function Get_Unit_Vector(pos_torus)
     !theta = pos_torus(3)
 
     ! Get a unit vector from the surface at pos
-    !Get_Unit_Vector = Convert_to_xyz(pos_torus)
-    !Get_Unit_Vector(1) = (R + rho * cos(theta)) * cos(phi)
-    !Get_Unit_Vector(2) = rho * sin(theta)
-    !Get_Unit_Vector(3) = (R + rho * cos(theta)) * sin(phi)
-
-    ! Normalize the unit vector
-    Get_Unit_Vector(1) = 1.0d0
-    Get_Unit_Vector(2) = 1.0d0
-    Get_Unit_Vector(3) = 1.0d0
-    Get_Unit_Vector = Get_Unit_Vector / sqrt(sum(Get_Unit_Vector**2))
+    ! Unit vector is [ sin(theta), cos(theta)*cos(phi), cos(theta)*sin(phi) ]
+    Get_Unit_Vector(1) = sin(pos_torus(3))
+    Get_Unit_Vector(2) = cos(pos_torus(3))*cos(pos_torus(2))
+    Get_Unit_Vector(3) = cos(pos_torus(3))*sin(pos_torus(2))
 end function Get_Unit_Vector
 
 !-------------------------------------------!
