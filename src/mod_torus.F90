@@ -337,7 +337,7 @@ function field_E_Torus(pos) result(field_E)
     do k = 1, nn
         field_E = field_E + w(k) * kd_data(:, kd_results(k)%idx)
     end do
-    field_E = field_E * 3.5d0 ! Debug to make field larger
+    field_E = field_E * 4.0d0 ! Debug to make field larger
 end function field_E_Torus
 
 subroutine Do_Field_Emission_Torus_simple(step)
@@ -352,7 +352,8 @@ subroutine Do_Field_Emission_Torus_simple(step)
     ! Emission variables
     double precision                 :: D_f, Df_avg, F_norm, rnd
     double precision, dimension(1:3) :: F, n_vec
-    integer                          :: s, sec, sec_b
+    !integer                          :: sec, sec_b
+    integer                          :: s
     integer                          :: nrElecEmit
     double precision, dimension(1:3) :: par_pos, par_vel, old_pos
     !logical                          :: to_pause = .false.
@@ -405,7 +406,7 @@ subroutine Do_Field_Emission_Torus_simple(step)
         else
   
           par_pos = par_pos + n_vec*length_scale
-          call Add_Particle(par_pos, par_vel, species_elec, step, emit, -1, sec)
+          call Add_Particle(par_pos, par_vel, species_elec, step, emit, -1)
   
           nrElecEmit = nrElecEmit + 1
           nrEmitted_emitters(emit) = nrEmitted_emitters(emit) + 1
