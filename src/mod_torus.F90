@@ -337,7 +337,7 @@ function field_E_Torus(pos) result(field_E)
     do k = 1, nn
         field_E = field_E + w(k) * kd_data(:, kd_results(k)%idx)
     end do
-    field_E = field_E * 2.75d0 ! Debug to make field larger
+    field_E = field_E * 3.5d0 ! Debug to make field larger
 end function field_E_Torus
 
 subroutine Do_Field_Emission_Torus_simple(step)
@@ -400,7 +400,7 @@ subroutine Do_Field_Emission_Torus_simple(step)
           print *, 'F_norm = ', F_norm
           print *, 'F = ', F
           print *, 'par_pos = ', par_pos
-          print *, 'sec = ', sec
+          !print *, 'sec = ', sec
           stop
         else
   
@@ -443,9 +443,14 @@ subroutine Get_Random_Surface_Pos(pos, pos_torus)
     double precision, dimension(1:3), intent(out)  :: pos_torus ! Toroidal coordinates
     double precision :: phi, theta
 
+    double precision, dimension(1:2) :: rnd
+
+    ! Get random numbers
+    call random_number(rnd)
+
     ! Generate random angles
-    phi = 1.0d0 * pi * rand()
-    theta = 2.0d0 * pi * rand()
+    phi = 1.0d0 * pi * rnd(1)
+    theta = 2.0d0 * pi * rnd(2)
 
     pos_torus(1) = rho
     pos_torus(2) = phi
@@ -465,20 +470,14 @@ function Field_Normal(pos, pos_torus, F)
     double precision :: phi, theta
 
     ! Calculate the angles from the position
-    phi = pos_torus(2)
-    theta = pos_torus(3)
+    !phi = pos_torus(2)
+    !theta = pos_torus(3)
 
     ! Get a unit vector from the surface at pos
     unit_vector = Get_Unit_Vector(pos_torus)
 
-    ! Normalize the unit vector
-    !unit_vector = unit_vector / sqrt(sum(unit_vector**2))
-
     ! Calculate the normal vector to the surface
     Field_Normal = dot_product(unit_vector, F)
-
-    ! Normalize the normal vector
-    !Field_Normal = Field_Normal / sqrt(sum(Field_Normal**2))
 end function Field_Normal
 
 !-------------------------------------------!
@@ -540,7 +539,7 @@ subroutine Metropolis_Hastings_Torus(ndim_in, F_out, F_norm_out, pos_xyz_out, n_
     double precision, dimension(1:3) :: F_cur, F_new
     double precision, dimension(1:3) :: pos_cur, pos_new
     double precision, dimension(1:3) :: pos_cur_torus, pos_new_torus
-    double precision, dimension(1:3) :: n_vec_cur, n_vec_new
+    !double precision, dimension(1:3) :: n_vec_cur, n_vec_new
     double precision :: F_norm, F_norm_new, F_norm_cur
     double precision :: alpha, rnd
 
@@ -575,7 +574,7 @@ subroutine Metropolis_Hastings_Torus(ndim_in, F_out, F_norm_out, pos_xyz_out, n_
     
     ! Do the Metropolis-Hastings algorithm
     do i = 1, ndim_in
-        call Jump_MH(pos_cur, pos_cur_torus, pos_new, pos_new_torus, n_vec_new)
+        call Jump_MH(pos_cur, pos_cur_torus, pos_new, pos_new_torus)
 
         alpha = Get_Jump_Probability(pos_cur, pos_cur_torus, F_norm_cur, F_norm_new)
 
@@ -600,6 +599,11 @@ subroutine Metropolis_Hastings_Torus(ndim_in, F_out, F_norm_out, pos_xyz_out, n_
         end if
     end do
 
+    ! Set the output variables
+    pos_xyz_out = pos_cur
+    n_vec = Get_Unit_Vector(pos_cur_torus)
+    F_out = F_cur
+    F_norm_out = F_norm_cur
 end subroutine Metropolis_Hastings_Torus
 
 function Get_Jump_Probability(pos, pos_torus, F_norm_cur, F_norm_new) result(alpha)
@@ -628,12 +632,11 @@ end function Get_Jump_Probability
 
 !-------------------------------------------!
 ! Jump in the Metropolis-Hastings algorithm
-subroutine Jump_MH(pos_cur, pos_torus, pos_new, pos_new_torus, n_vec_new)
+subroutine Jump_MH(pos_cur, pos_torus, pos_new, pos_new_torus)
     double precision, dimension(1:3), intent(in)  :: pos_cur
     double precision, dimension(1:3), intent(in)  :: pos_torus
     double precision, dimension(1:3), intent(out) :: pos_new
     double precision, dimension(1:3), intent(out) :: pos_new_torus
-    double precision, dimension(1:3), intent(out) :: n_vec_new
 
     ! Local
     double precision, dimension(1:2) :: std_xy
@@ -643,11 +646,27 @@ subroutine Jump_MH(pos_cur, pos_torus, pos_new, pos_new_torus, n_vec_new)
     std_xy(2) = 2.0d0*pi*0.05d0
     pos_new_torus(2:3) = box_muller(pos_torus(2:3), std_xy) ! Jump in x and y
 
+    ! Check the angles are within the limits and rebound if necessary
+    ! phi is between 0 and pi
+    if (pos_new_torus(2) < 0.0d0) then
+      pos_new_torus(2) = -pos_new_torus(2)
+    else if (pos_new_torus(2) >= pi) then
+      pos_new_torus(2) = 2.0d0*pi - pos_new_torus(2) ! Reflect back, d = P - L, P' = L - d = 2L - P
+    end if
+    ! theta is between 0 and 2*pi
+    if (pos_new_torus(3) < 0.0d0) then
+      pos_new_torus(3) = -pos_new_torus(3)
+    else if (pos_new_torus(3) >= 2.0d0*pi) then
+      pos_new_torus(3) = 4.0d0*pi - pos_new_torus(3)
+    end if
+
+    pos_new_torus(1) = rho ! rho is fixed
+
     ! Calculate the x and y coordinates
     pos_new = Convert_to_xyz(pos_new_torus)
 
     ! Calculate the normal vector to the surface at the new position
-    n_vec_new = Get_Unit_Vector(pos_new_torus)
+    !n_vec_new = Get_Unit_Vector(pos_new_torus)
 end subroutine Jump_MH
 
 
