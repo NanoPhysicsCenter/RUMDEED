@@ -140,6 +140,8 @@ program RUMDEED
     stop
   END SELECT
 
+  call Check_Pointers()
+
   print '(tr1, a, i0)', 'Number of emitters ', nrEmit
 
   print '(a)', 'RUMDEED: Writing out variables'
@@ -647,6 +649,42 @@ contains
   !   flush(ud_density_absorb_bot)
 
   ! end subroutine Flush_Data
+
+  !----------------------------------------------------------------------------
+  ! Check that all needed procedure pointers are associated
+  ! ptr_Check_Boundary
+  ! ptr_Do_Emission
+  ! ptr_field_E
+  ! ptr_Image_Charge_effect
+  ! ptr_E_zunit
+  subroutine Check_Pointers()
+    implicit none
+
+    if (.not. associated(ptr_Do_Emission)) then
+      print *, 'RUMDEED: ERROR ptr_Do_Emission not associated'
+      stop
+    end if
+
+    if (.not. associated(ptr_field_E)) then
+      print *, 'RUMDEED: ERROR ptr_field_E not associated'
+      stop
+    end if
+
+    if (.not. associated(ptr_Check_Boundary)) then
+      print *, 'RUMDEED: ERROR ptr_Check_Boundary not associated'
+      stop
+    end if
+
+    if (.not. associated(ptr_E_zunit)) then
+      print *, 'RUMDEED: ERROR ptr_E_zunit not associated'
+      stop
+    end if
+
+    if (.not. associated(ptr_Image_Charge_effect)) then
+      print *, 'RUMDEED: ERROR ptr_Image_Charge_effect not associated'
+      stop
+    end if
+  end subroutine Check_Pointers
 
 
   ! ----------------------------------------------------------------------------
