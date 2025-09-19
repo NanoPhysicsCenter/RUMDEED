@@ -168,7 +168,7 @@ mod_kevin_rjgtf.mod mod_kevin_rjgtf.o: ../src/mod_kevin_rjgtf.F90
 mod_field_emission_2D.mod mod_field_emission_2D.o: ../src/mod_field_emission_2D.f90 mod_global.mod mod_verlet.mod mod_pair.mod mod_velocity.mod
 		$(FC) -c $(FFLAGS) ../src/mod_field_emission_2D.f90
 
-mod_emission_tip.mod mod_emission_tip.o: ../src/mod_emission_tip.f90 mod_global.mod mod_verlet.mod mod_pair.mod mod_hyperboloid_tip.mod mod_ic.mod mod_velocity.mod
+mod_emission_tip.mod mod_emission_tip.o: ../src/mod_emission_tip.f90 mod_global.mod mod_verlet.mod mod_pair.mod mod_hyperboloid_tip.mod mod_ic.mod mod_velocity.mod mod_kevin_rjgtf.mod
 		$(FC) -c $(FFLAGS) ../src/mod_emission_tip.f90
 
 mod_hyperboloid_tip.mod mod_hyperboloid_tip.o: ../src/mod_hyperboloid_tip.f90 mod_global.mod

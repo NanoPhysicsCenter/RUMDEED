@@ -18,7 +18,7 @@ Module mod_hyperboloid_tip
   double precision            :: shift_z ! shift_z = a_foci*eta_1*max_xi Shift the z-coordinate uppwards. Base of tip at z = 0
   double precision            :: h_tip ! Height of the tip from base
   double precision            :: R_base ! Base radius
-  double precision            :: pre_fac_E_tip
+  double precision            :: pre_fac_E_tip, pre_fac_E_tip_unit_voltage
   !double precision            :: xi_0 = 1.0124d0 ! 99.9% Emission area
 
 contains
