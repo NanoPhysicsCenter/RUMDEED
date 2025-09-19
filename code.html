@@ -7,7 +7,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>7. Code description &mdash; RUMDEED  documentation</title>
-      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=e59714d7" />
       <link rel="stylesheet" type="text/css" href="_static/css/custom.css?v=f7e3ae64" />
 
@@ -49,6 +49,7 @@
 <li class="toctree-l1"><a class="reference internal" href="intro.html">1. Introduction</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="intro.html#features">1.1. Features</a></li>
 <li class="toctree-l2"><a class="reference internal" href="intro.html#acknowledgments">1.2. Acknowledgments</a></li>
+<li class="toctree-l2"><a class="reference internal" href="intro.html#other-software">1.3. Other software</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="build.html">2. Building the code</a><ul>
@@ -134,7 +135,7 @@
 <p>Below is a short description of the theory and equations used in the code.</p>
 <section id="verlet">
 <h2><span class="section-number">7.1. </span>Verlet<a class="headerlink" href="#verlet" title="Link to this heading"></a></h2>
-<p>For particle advancement the code uses a variant of the Velocity Verlet algorithm <span id="id1">[<a class="reference internal" href="bib.html#id8" title="Loup Verlet. Computer &quot;experiments&quot; on classical fluids. i. thermodynamical properties of lennard-jones molecules. Phys. Rev., 159:98–103, Jul 1967. URL: https://link.aps.org/doi/10.1103/PhysRev.159.98, doi:10.1103/PhysRev.159.98.">6</a>]</span> called Beeman’s algorithm <span id="id2">[<a class="reference internal" href="bib.html#id9" title="Michael Levitt, Hagai Meirovitch, and R. Huber. Integrating the equations of motion. Journal of Molecular Biology, 168(3):617 - 620, 1983. URL: http://www.sciencedirect.com/science/article/pii/S0022283683803052, doi:https://doi.org/10.1016/S0022-2836(83)80305-2.">7</a>, <a class="reference internal" href="bib.html#id10" title="D. Beeman. Some multistep methods for use in molecular dynamics calculations. Journal of Computational Physics, 20(2):130 - 139, 1976. URL: http://www.sciencedirect.com/science/article/pii/0021999176900590, doi:https://doi.org/10.1016/0021-9991(76)90059-0.">8</a>]</span>. The code for it can be found in <strong>mod_verlet.F90</strong> and the main subroutine is called
+<p>For particle advancement the code uses a variant of the Velocity Verlet algorithm <span id="id1">[<a class="reference internal" href="bib.html#id9" title="Loup Verlet. Computer &quot;experiments&quot; on classical fluids. i. thermodynamical properties of lennard-jones molecules. Phys. Rev., 159:98–103, Jul 1967. URL: https://link.aps.org/doi/10.1103/PhysRev.159.98, doi:10.1103/PhysRev.159.98.">7</a>]</span> called Beeman’s algorithm <span id="id2">[<a class="reference internal" href="bib.html#id10" title="Michael Levitt, Hagai Meirovitch, and R. Huber. Integrating the equations of motion. Journal of Molecular Biology, 168(3):617 - 620, 1983. URL: http://www.sciencedirect.com/science/article/pii/S0022283683803052, doi:https://doi.org/10.1016/S0022-2836(83)80305-2.">8</a>, <a class="reference internal" href="bib.html#id11" title="D. Beeman. Some multistep methods for use in molecular dynamics calculations. Journal of Computational Physics, 20(2):130 - 139, 1976. URL: http://www.sciencedirect.com/science/article/pii/0021999176900590, doi:https://doi.org/10.1016/0021-9991(76)90059-0.">9</a>]</span>. The code for it can be found in <strong>mod_verlet.F90</strong> and the main subroutine is called
 <code class="docutils literal notranslate"><span class="pre">Velocity_Verlet</span></code>.</p>
 <p>The updated positions are calculated with:</p>
 <div class="math notranslate nohighlight">
@@ -208,7 +209,7 @@ After the force calculate the velocity is update using:</p>
 <span id="field"></span><h2><span class="section-number">7.3. </span>Field emission<a class="headerlink" href="#field-emission" title="Link to this heading"></a></h2>
 <p>The field emission code uses the Fowler-Nordheim equation to calculate the total number of electrons to emit.
 The code for this can be found in <strong>mod_field_emission_v2.F90</strong>.</p>
-<p>The Fowler-Nordheim equation <span id="id3">[<a class="reference internal" href="bib.html#id6" title="Richard G Forbes and Jonathan H.B Deane. Reformulation of the standard theory of fowler–nordheim tunnelling and cold field electron emission. Proceedings of the Royal Society A: Mathematical, Physical and Engineering Science, 463(2087):2907-2927, 2007. URL: http://rspa.royalsocietypublishing.org/content/463/2087/2907.abstract, arXiv:http://rspa.royalsocietypublishing.org/content/463/2087/2907.full.pdf+html, doi:10.1098/rspa.2007.0030.">9</a>]</span> is</p>
+<p>The Fowler-Nordheim equation <span id="id3">[<a class="reference internal" href="bib.html#id6" title="Richard G Forbes and Jonathan H.B Deane. Reformulation of the standard theory of fowler–nordheim tunnelling and cold field electron emission. Proceedings of the Royal Society A: Mathematical, Physical and Engineering Science, 463(2087):2907-2927, 2007. URL: http://rspa.royalsocietypublishing.org/content/463/2087/2907.abstract, arXiv:http://rspa.royalsocietypublishing.org/content/463/2087/2907.full.pdf+html, doi:10.1098/rspa.2007.0030.">10</a>]</span> is</p>
 <div class="math notranslate nohighlight">
 \[J = \frac{a_{FN}}{\phi t^2(\ell)}F^2 exp(-\nu(\ell)b_{FN}\phi^{3/2}/F)\]</div>
 <p>where <span class="math notranslate nohighlight">\(a_{FN}\)</span> and <span class="math notranslate nohighlight">\(b_{FN}\)</span> are the first and second Fowler-Nordheim constants respectively.
