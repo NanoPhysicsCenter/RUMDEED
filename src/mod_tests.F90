@@ -204,7 +204,7 @@ contains
     d = box_dim(3)
     V_d = V_s
     E_z = -1.0d0*V_d/d
-    E_zunit = -1.0d0/d
+    !E_zunit = -1.0d0/d ! Needs to be updated
 
     ! Temperature, pressure and density
     P_abs = P_abs * P_ntp 

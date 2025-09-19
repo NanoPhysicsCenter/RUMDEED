@@ -15,7 +15,12 @@ GIT_VERSION := $(shell git describe --dirty --always --tags || echo `date +'%d/%
 
 CUBA_LIB=../cuba/lib/libcuba.a
 
-OPENMP ?= yes# Set to something else to disable OpenMP
+ifndef OPENMP
+OPENMP = yes # Set to something else to disable OpenMP
+$(info Using OpenMP)
+else
+$(info OpenMP disabled)
+endif
 
 TESTING_MODE ?= 2 # Set to 1 to enable testing mode
 
@@ -33,7 +38,7 @@ FFLAGS=-O2 -xHost -ip -ipo #-fp-model precise -g
 #-prec-div -prec-sqrt
 #-fp-model precise
 #FFLAGS=-check all -g -warn interfaces -warn all -traceback -ftrapuv
-ifeq ($(OPENMP),yes)
+ifneq (,$(findstring yes,$(OPENMP)))
 FFLAGS+=-qopenmp
 endif
 endif
@@ -42,7 +47,7 @@ endif
 ifeq ($(FC),ifx)
 $(info Using New Intel Fortran Compiler)
 FFLAGS=-O2 -xHost -ipo
-ifeq ($(OPENMP),yes)
+ifneq (,$(findstring yes,$(OPENMP)))
 FFLAGS+=-qopenmp
 endif
 endif
@@ -51,9 +56,9 @@ endif
 # ifeq ($(FC),gfortran)
 ifneq (,$(findstring gfortran,$(FC)))
 $(info Using GNU Fortran)
-FFLAGS=-O2 -march=native -mtune=native -flto=auto -fno-strict-aliasing -fno-math-errno -fno-trapping-math -ffinite-math-only
-#FFLAGS=-g -fcheck=all -Wall -fbacktrace -ffpe-trap=invalid,zero,overflow,underflow,denormal
-ifeq ($(OPENMP),yes)
+FFLAGS=-O3 -march=native -flto=auto
+#FFLAGS=-g -fcheck=all -Wall -fbacktrace -ffpe-trap=invalid,zero,overflow,underflow
+ifneq (,$(findstring yes,$(OPENMP)))
 FFLAGS+=-fopenmp
 else
 FFLAGS+=-fno-openmp
@@ -67,7 +72,7 @@ $(info Using PGI Fortran)
 FFLAGS=-fast
 #FFLAGS=-fast -Minfo -Mllvm
 #FFLAGS=-g -gopt -Mbounds -Mchkfpstk -Mchkfpstk -Mchkfpstk -Melf -traceback
-ifeq ($(OPENMP),yes)
+ifneq (,$(findstring yes,$(OPENMP)))
 FFLAGS+=-mp
 endif
 endif
@@ -77,7 +82,7 @@ ifeq ($(FC),nvfortran)
 $(info Using NVidia Fortran)
 #FFLAGS=-O3 -fastsse -Mipa=fast,inline -Munroll
 FFLAGS=-O3 -fastsse
-ifeq ($(OPENMP),yes)
+ifneq (,$(findstring yes,$(OPENMP)))
 FFLAGS+=-mp
 endif
 endif
@@ -85,7 +90,7 @@ endif
 ifeq ($(FC),flang)
 $(info Using AMD Fortran)
 FFLAGS=-O3 -march=native -D_AOCC_=1
-ifeq ($(OPENMP),yes)
+ifneq (,$(findstring yes,$(OPENMP)))
 FFLAGS+=-fopenmp
 endif
 endif
@@ -171,7 +176,7 @@ mod_kevin_rjgtf.mod mod_kevin_rjgtf.o: ../src/mod_kevin_rjgtf.F90
 mod_field_emission_2D.mod mod_field_emission_2D.o: ../src/mod_field_emission_2D.f90 mod_global.mod mod_verlet.mod mod_pair.mod mod_velocity.mod
 		$(FC) -c $(FFLAGS) ../src/mod_field_emission_2D.f90
 
-mod_emission_tip.mod mod_emission_tip.o: ../src/mod_emission_tip.f90 mod_global.mod mod_verlet.mod mod_pair.mod mod_hyperboloid_tip.mod mod_ic.mod mod_velocity.mod
+mod_emission_tip.mod mod_emission_tip.o: ../src/mod_emission_tip.f90 mod_global.mod mod_verlet.mod mod_pair.mod mod_hyperboloid_tip.mod mod_ic.mod mod_velocity.mod mod_kevin_rjgtf.mod
 		$(FC) -c $(FFLAGS) ../src/mod_emission_tip.f90
 
 mod_hyperboloid_tip.mod mod_hyperboloid_tip.o: ../src/mod_hyperboloid_tip.f90 mod_global.mod

@@ -135,7 +135,7 @@ module mod_global
   double precision :: V_s     ! Voltage from the source
   double precision :: d       ! Gap spacing
   double precision :: E_z     ! Electric field in the y-direction (E_z = -V/d)
-  double precision :: E_zunit ! Unit electric field (E_zunit = -1/d) (See Ramo Current)
+  !double precision :: E_zunit ! Unit electric field (E_zunit = -1/d) (See Ramo Current)
 
   double precision, dimension(1:3) :: box_dim ! Dimensions of the cell
 
@@ -336,7 +336,12 @@ module mod_global
       double precision, dimension(1:3), intent(in) :: pos_1, pos_2 ! Image charge effects of pos_2 on pos_1
     end function Image_Charge_effect
 
-    function Get_Emission_Velocity()
+   function E_zunit(pos)
+      double precision, dimension(1:3), intent(in) :: pos
+      double precision, dimension(1:3)             :: E_zunit
+   end function E_zunit
+
+   function Get_Emission_Velocity()
       double precision, dimension(1:3) :: Get_Emission_Velocity
     end function Get_Emission_Velocity
 
@@ -350,6 +355,7 @@ module mod_global
   procedure(Electric_Field), pointer            :: ptr_field_E => null()
   procedure(Do_Emission), pointer               :: ptr_Do_Emission => null()
   procedure(Image_Charge_effect), pointer       :: ptr_Image_Charge_effect => null()
+  procedure(E_zunit), pointer                   :: ptr_E_zunit => null()
   procedure(Get_Emission_Velocity), pointer     :: ptr_Get_Emission_Velocity => null()
   procedure(Get_Photo_Emission_Energy), pointer :: ptr_Get_Photo_Emission_Energy => null()
 

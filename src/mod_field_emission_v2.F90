@@ -111,6 +111,9 @@ contains
     ! The function to do image charge effects
     ptr_Image_Charge_effect => Force_Image_charges_v2
 
+    ! Ramo E_z
+    ptr_E_zunit => E_zunit_planar
+
     call Read_work_function()
 
     ! Parameters used in the module
@@ -130,6 +133,16 @@ contains
 
     !deallocate(xgiven)
   end subroutine Clean_Up_Field_Emission_v2
+
+  function E_zunit_planar(pos)
+    double precision, dimension(1:3), intent(in) :: pos ! Position to calculate the E_z unit vector at
+    double precision, dimension(1:3)               :: E_zunit_planar
+
+    ! The z-component of the electric field is always -1.0d0/d in planar geometry
+    E_zunit_planar(1:2) = 0.0d0
+    E_zunit_planar(3) = -1.0d0/d
+
+  end function E_zunit_planar
 
   !-----------------------------------------------------------------------------
   ! This subroutine gets called from main when the emitters should emit the electrons

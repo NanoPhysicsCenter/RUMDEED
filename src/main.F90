@@ -111,7 +111,7 @@ program RUMDEED
     print '(a)', 'RUMDEED: Doing Field emission'
     call Init_Field_Emission()
   case(EMISSION_TIP)
-    print '(a)', 'RUMDEED: Doing Field emission from a tip'
+    print '(a)', 'RUMDEED: Doing emission from a tip'
     call Init_Emission_Tip()
   case(EMISSION_FIELD_2D_2DEG_C, EMISSION_FIELD_2D_2DEG_NC, EMISSION_FIELD_2D_DIRAC_C, EMISSION_FIELD_2D_DIRAC_NC)
     print '(a)', 'RUMDEED: Doing Field emission from 2D material'
@@ -306,7 +306,7 @@ contains
     E_z = -1.0d0*V_d/d
 
     ! Electric field for unit voltage (See ramo current)
-    E_zunit = -1.0d0/d
+    !E_zunit = -1.0d0/d
 
     ! Emitters position and dimensions are given in length_scale (nm)
     emitters_dim = emitters_dim * length_scale
