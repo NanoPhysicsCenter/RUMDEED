@@ -445,7 +445,7 @@ end function box_muller
 ! Random poission variable with mean lambda.
 ! See
 ! https://en.wikipedia.org/wiki/Poisson_distribution#Generating_Poisson-distributed_random_variables
-integer function Rand_Poission(lambda)
+integer function Rand_Poisson(lambda)
 double precision, intent(in) :: lambda
 double precision             :: lambda_left, p, u
 integer                      :: k
