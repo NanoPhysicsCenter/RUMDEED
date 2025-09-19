@@ -29,7 +29,7 @@ Pygments==2.19.2
 pyparsing==3.1.1
 pytz==2023.3
 PyYAML==6.0.1
-requests==2.31.0
+requests==2.32.4
 roman-numerals-py==3.1.0
 setuptools==80.9.0
 six==1.16.0
