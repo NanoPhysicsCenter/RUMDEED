@@ -243,7 +243,7 @@ subroutine Calc_E_Along_Top()
   integer, parameter :: N_p = 10000
 
   real(kdkind), dimension(1:3) :: p, E_vec, E_vec_image
-  double precision :: phi, rho, theta
+  double precision :: phi, theta
   integer :: ud_cyl_around, IFAIL
   !character (len=*), parameter :: filename_cyl_circle="cyl_E_circle.dt"
   character (len=100) :: filename_cyl_circle
@@ -307,6 +307,77 @@ subroutine Calc_E_Along_Top()
 
   !print *, 'Calc_E_circle_cyl finished'
 end subroutine Calc_E_Along_Top
+
+subroutine Calc_E_Around_Top()
+  implicit none
+  integer :: k
+  integer, parameter :: N_p = 10000
+
+  real(kdkind), dimension(1:3) :: p, E_vec, E_vec_image
+  double precision :: phi, theta
+  integer :: ud_cyl_around, IFAIL
+  !character (len=*), parameter :: filename_cyl_circle="cyl_E_circle.dt"
+  character (len=100) :: filename_cyl_circle
+
+  ! Data arrays
+  double precision, dimension(:, :, :), allocatable :: data_cyl_around
+  double precision, dimension(:, :), allocatable :: p_cyl_around
+  double precision, dimension(:), allocatable    :: len_cyl_around
+
+  !print *, 'Calc_E_circle_cyl started'
+
+  allocate(data_cyl_around(1:3, 1:3, 1:N_p))
+  allocate(len_cyl_around(1:N_p))
+  allocate(p_cyl_around(1:3, 1:N_p))
+
+  ! Calculate the electric field around the cylinder
+  !print *, 'Calculating the electric field around the cylinder'
+  do k = 1, N_p
+    ! Right corner
+    phi = pi/2.0d0
+    theta = (k-1)*1.0d0*pi/(N_p-1)
+    p(1) = rho*sin(theta)
+    p(2) = (R_y + rho*cos(theta))*cos(phi)
+    p(3) = (R_z + rho*cos(theta))*sin(phi)
+
+    p_cyl_around(:, k) = p(:)
+    len_cyl_around(k) = phi
+
+    E_vec = field_E_Torus(p) ! Vacuum field 
+    E_vec_image = Calc_Field_at(p) ! Total field
+    ! Store data in array
+    data_cyl_around(1, :, k) = E_vec_image ! Total field
+    data_cyl_around(2, :, k) = E_vec(:) ! Vacuum field
+    data_cyl_around(3, :, k) = E_vec_image(:) - E_vec ! Electric field due to the image charges and electrons
+  end do
+
+  ! Open data file
+  !print *, 'Opening data file'
+
+  filename_cyl_circle = "out/around_E_top.dt"
+
+  open(newunit=ud_cyl_around, iostat=IFAIL, file=filename_cyl_circle, status='REPLACE', action='WRITE')
+  if (IFAIL /= 0) then
+    print '(a)', 'RUMDEED: ERROR UNABLE TO OPEN file ', filename_cyl_circle
+    stop
+  end if
+
+  ! Write data to file
+  !print *, 'Writing data to file'
+  do k = 1, N_p
+    write(ud_cyl_around, *) data_cyl_around(1, :, k), data_cyl_around(2, :, k), data_cyl_around(3, :, k), &
+                            len_cyl_around(k), p_cyl_around(:, k)
+  end do
+
+  ! Close data file
+  close(unit=ud_cyl_around, iostat=IFAIL, status='keep')
+
+  deallocate(data_cyl_around)
+  deallocate(p_cyl_around)
+  deallocate(len_cyl_around)
+
+  !print *, 'Calc_E_circle_cyl finished'
+end subroutine Calc_E_Around_Top
 
 !-------------------------------------------!
 ! Check the boundary conditions for the torus
@@ -399,7 +470,7 @@ function field_E_Torus(pos) result(field_E)
     do k = 1, nn
         field_E = field_E + w(k) * kd_data(:, kd_results(k)%idx)
     end do
-    field_E = field_E * 4.0d0 ! Debug to make field larger
+    !field_E = field_E * 4.0d0 ! Debug to make field larger
 end function field_E_Torus
 
 !-------------------------------------------!
@@ -936,7 +1007,7 @@ end subroutine Do_Surface_Integration_simple
                     ! key3 = 1, split the subregion up once more.
                     ! Otherwise, the subregion is sampled a third time with key3 specifying the sampling
                     ! parameters exactly as key2 above.
-    integer :: maxpass = 2! <in>, controls the thoroughness of the partitioning phase: The
+    integer :: maxpass = 3 ! <in>, controls the thoroughness of the partitioning phase: The
   ! partitioning phase terminates when the estimated total number of integrand evaluations
   ! (partitioning plus final integration) does not decrease for maxpass successive iterations.
   ! A decrease in points generally indicates that Divonne discovered new structures of
@@ -947,10 +1018,10 @@ end subroutine Do_Surface_Integration_simple
   ! Points falling into this border region will not be sampled directly, but will be extrapolated
   ! from two samples from the interior. Use a non-zero border if the integrand
   ! subroutine cannot produce values directly on the integration boundary.
-    double precision :: maxchisq = 10.0d0 !<in>, the maximum \chi^2 value a single subregion is allowed
+    double precision :: maxchisq = 5.0d0 !<in>, the maximum \chi^2 value a single subregion is allowed
   ! to have in the final integration phase. Regions which fail this \chi^2 test and whose
   ! sample averages differ by more than mindeviation move on to the refinement phase.
-    double precision :: mindeviation = 0.25d0 !<in>, a bound, given as the fraction of the requested
+    double precision :: mindeviation = 0.20d0 !<in>, a bound, given as the fraction of the requested
   ! error of the entire integral, which determines whether it is worthwhile further
   ! examining a region that failed the \chi^2 test. Only if the two sampling averages
   ! obtained for the region differ by more than this bound is the region further treated.
