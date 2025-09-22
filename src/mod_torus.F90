@@ -102,6 +102,7 @@ subroutine Init_Torus()
 
     ! Output field along a curve on top of the looped CNT
     call Calc_E_Along_Top()
+    call Calc_E_Around_Top()
 end subroutine Init_Torus
 
 !-------------------------------------------!
