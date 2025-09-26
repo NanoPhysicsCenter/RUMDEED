@@ -39,8 +39,8 @@ Module mod_torus
 
     ! Parameters for the torus
     double precision :: rho = 0.012d0 * 1.0d-3 ! mm -> m
-    double precision :: R_y = 0.05d0 * 1.0d-3 + 0.012d0*1.0d-3 ! mm -> m
-    double precision :: R_z = 0.1d0 * 1.0d-3 + 0.012d0*1.0d-3 ! mm -> m
+    double precision :: R_y = 0.05d0 * 1.0d-3 ! mm -> m
+    double precision :: R_z = 0.1d0 * 1.0d-3 ! mm -> m
 
     ! ----------------------------------------------------------------------------
     ! Variables for the Metropolis-Hastings algorithm
@@ -103,6 +103,8 @@ subroutine Init_Torus()
     ! Output field along a curve on top of the looped CNT
     call Calc_E_Along_Top()
     call Calc_E_Around_Top()
+
+    !stop
 end subroutine Init_Torus
 
 !-------------------------------------------!

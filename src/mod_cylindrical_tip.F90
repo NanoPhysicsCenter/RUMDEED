@@ -24,8 +24,11 @@ Module mod_cylindrical_tip
     ! ----------------------------------------------------------------------------
     ! KD-tree variables
     type(kdtree2), pointer :: kd_tree => null() ! KD-tree for the mesh
+    type(kdtree2), pointer :: kd_tree_1V => null() ! KD-tree for the mesh at 1 V
     double precision, dimension(:, :), allocatable :: kd_mesh ! Mesh for the KD-tree
     double precision, dimension(:, :), allocatable :: kd_data ! Data for the KD-tree
+    double precision, dimension(:, :), allocatable :: kd_data_1V ! Data for the KD-tree at 1 V
+    double precision, dimension(:, :), allocatable :: kd_mesh_1V ! Mesh for the KD-tree at 1 V
 
     ! Declare type to store the kd-tree for the image charges
     ! This is a workaround since we cannot declare an array of pointers in Fortran
@@ -131,6 +134,9 @@ subroutine Init_Cylindrical_Tip()
     ! Function for the electric field in the system
     ptr_field_E => field_E_cylinder
 
+    ! The function to get field at 1 V
+    ptr_E_zunit => E_zunit_cylinder
+
     ! The function that does the emission
     ptr_Do_Emission => Do_Field_Emission_Cylinder_simple
 
@@ -223,9 +229,10 @@ end subroutine Init_Cylindrical_Tip
 ! Create the K-dimensional tree using the kdtree2 module
 subroutine Create_KD_Tree()
     character (len=*), parameter :: filename_meshdata = "Cyl_mesh_data.txt"
+    character (len=*), parameter :: filename_meshdata_1V = "Cyl_mesh_data_1V.txt"
     character (len=*), parameter :: filename_imagedata = "image_charge_data.txt"
     integer                      :: IFAIL
-    integer                      :: ud_meshdata, ud_imagedata
+    integer                      :: ud_meshdata, ud_meshdata_1V, ud_imagedata
     integer                      :: n_points, k
     double precision             :: max_z
 
@@ -276,6 +283,61 @@ subroutine Create_KD_Tree()
 
     ! Create the kd-tree
     kd_tree => kdtree2_create(kd_mesh, sort=.false., rearrange=.true.)
+
+    ! Repeat for the mesh at 1 V
+    ! Open the file for reading
+    open(newunit=ud_meshdata_1V, iostat=IFAIL, file=filename_meshdata_1V, status='OLD', action='READ')
+    if (IFAIL /= 0) then
+      print '(a)', 'RUMDEED: ERROR UNABLE TO OPEN file ', filename_meshdata_1V
+      stop
+    end if
+
+    ! Count the number of lines in the file
+    n_points = 0
+    do
+      read(ud_meshdata_1V, *, iostat=IFAIL)
+      if (IFAIL /= 0) exit
+      n_points = n_points + 1
+    end do
+
+    ! Rewind to the start of the file
+    rewind(ud_meshdata_1V)
+
+    ! Allocate the arrays to hold the file
+    allocate(kd_mesh_1V(1:3, 1:n_points))
+    allocate(kd_data_1V(1:3, 1:n_points))
+
+    ! Read the file into the array and scale the coordinates from mm to m
+    do k = 1, n_points
+      read(ud_meshdata_1V, *) kd_mesh_1V(1, k), kd_mesh_1V(2, k), kd_mesh_1V(3, k), &
+                              kd_data_1V(1, k), kd_data_1V(2, k), kd_data_1V(3, k)
+    
+      ! Convert from mm to m
+      kd_mesh_1V(:, k) = kd_mesh_1V(:, k) * 1.0d-3
+    end do
+
+    ! Find the maximum z-coordinate
+    max_z = maxval(kd_mesh_1V(3, :))
+
+    ! Compare with the height of the simulation box
+    if (abs(max_z - box_dim(3))/length_scale > 1.0d-6) then
+      print *, 'RUMDEED: ERROR The maximum z-coordinate in the 1V mesh data is not equal to the height of the simulation box'
+      print *, 'max_z = ', max_z, ' m'
+      print *, 'box_dim(3) = ', box_dim(3), ' m'
+      stop
+    end if
+
+    ! Close the file
+    close(unit=ud_meshdata_1V, iostat=IFAIL, status='keep')
+
+    ! Create the kd-tree
+    kd_tree_1V => kdtree2_create(kd_mesh_1V, sort=.false., rearrange=.true.)
+
+    ! Check if the kd-tree was created successfully
+    if (.not. associated(kd_tree_1V)) then
+      print *, 'RUMDEED: ERROR The kd-tree was not created successfully'
+      stop
+    end if
 
     ! Read the image charge data from file
     ! Open the file for reading
@@ -402,6 +464,51 @@ function field_E_cylinder(pos) result(field_E)
     !field_E = field_E * 0.125d1 ! Debug to make field larger
 end function field_E_cylinder
 
+!-------------------------------------------!
+! Electric field at 1 V
+function E_zunit_cylinder(pos) result(E_zunit)
+    ! Input variables
+    double precision, dimension(1:3), intent(in) :: pos ! Position to calculate the electric field at
+
+    ! Output variables
+    double precision, dimension(1:3)             :: E_zunit ! Electric field at the point
+
+    ! Local variables
+    integer, parameter                        :: nn = 4 ! number of nearest neighbors to find
+    integer                                   :: k ! loop variable
+    type(kdtree2_result)                      :: kd_results(1:nn) ! results from the kd-tree
+    double precision, dimension(1:nn)         :: w ! weights for the interpolation
+    double precision, parameter               :: eps = length_scale**3 ! Small number to avoid division by zero
+    integer, parameter                        :: p = 1 ! Power for the inverse distance weighting
+
+    !! For debugging start with planar field
+    !field_E = field_E_planar(pos)
+
+    ! Find the nearest neighbors
+    !print *, 'pos = ', pos
+    ! Note: The kd-tree is not thread safe, so we have to use a critical section
+    !$omp critical (kdtree2)
+    call kdtree2_n_nearest(tp=kd_tree_1V, qv=pos, nn=nn, results=kd_results)
+    !$omp end critical (kdtree2)
+
+    ! Interpolate the electric field at the point using the nearest neighbors and the inverse distance to each as weights
+    ! Calculate the weights as 1/distance^p
+    !print *, 'kd_results(1:nn)%idx = ', kd_results(1:nn)%idx
+    !print *, 'kd_results(1:nn)%dis = ', kd_results(1:nn)%dis
+    w(1:nn) = 1.0d0/(kd_results(1:nn)%dis**p + eps)
+
+    ! Normalize the weights
+    w = w / sum(w)
+    
+    ! Calculate the interpolated electric field
+    E_zunit = 0.0d0
+    do k = 1, nn
+        E_zunit = E_zunit + w(k) * kd_data(:, kd_results(k)%idx)
+    end do
+end function E_zunit_cylinder
+
+!-------------------------------------------!
+! Check the boundary conditions for the cylindrical tip
 subroutine Check_Boundary_Cylinder(i)
   integer, intent(in) :: i
   integer             :: sec
