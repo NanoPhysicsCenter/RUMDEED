@@ -24,10 +24,23 @@ Module mod_torus
     ! KD-tree variables
     type(kdtree2), pointer :: kd_tree => null() ! KD-tree for the mesh
     type(kdtree2), pointer :: kd_tree_1V => null() ! KD-tree for the mesh for 1V
+    type(kdtree2), pointer :: kd_tree_image => null() ! KD-tree for the image charges
+
     double precision, dimension(:, :), allocatable :: kd_mesh ! Mesh for the KD-tree
     double precision, dimension(:, :), allocatable :: kd_data ! Data for the KD-tree
     double precision, dimension(:, :), allocatable :: kd_mesh_1V ! Mesh for the KD-tree for 1V
     double precision, dimension(:, :), allocatable :: kd_data_1V ! Data for the KD-tree for 1V
+
+    double precision, dimension(:,:), allocatable  :: kd_elec_pos ! Electron positions for image charges
+    double precision, dimension(:,:), allocatable  :: kd_image_pos ! Electron velocities for image charges
+    double precision, dimension(:)  , allocatable  :: kd_image_q   ! Electron charges for image charges
+
+    double precision :: image_max_z ! Maximum z-coordinate for the image charges
+    double precision :: image_min_z ! Minimum z-coordinate for the image charges
+    double precision :: image_max_x ! Maximum x-coordinate for the image charges
+    double precision :: image_min_x ! Minimum x-coordinate for the image charges
+    double precision :: image_max_y ! Maximum y-coordinate for the image charges
+    double precision :: image_min_y ! Minimum y-coordinate for the image charges
 
     double precision :: time_step_div_q0
 
@@ -120,7 +133,7 @@ end subroutine Clean_Up_Torus
 subroutine Create_KD_Tree()
     character (len=*), parameter :: filename_meshdata = "Torus_mesh_data.txt"
     character (len=*), parameter :: filename_meshdata_1V = "Torus_mesh_data_1V.txt"
-    character (len=*), parameter :: filename_imagedata = "image_charge_data.txt"
+    character (len=*), parameter :: filename_imagedata = "image_charge_data_torus.txt"
     integer                      :: IFAIL
     integer                      :: ud_meshdata, ud_meshdata_1V, ud_imagedata
     integer                      :: n_points, k
@@ -235,7 +248,78 @@ subroutine Create_KD_Tree()
       stop
     end if
 
-    ! To do: Image charge data
+    ! Image charge data
+    ! Read the mesh and data from file
+    ! Open the file for reading
+    open(newunit=ud_imagedata, iostat=IFAIL, file=filename_imagedata, status='OLD', action='READ')
+    if (IFAIL /= 0) then
+      print '(a)', 'RUMDEED: ERROR UNABLE TO OPEN file ', filename_imagedata
+      stop
+    end if
+
+    ! Count the number of lines in the file
+    n_points = 0
+    do
+      read(ud_imagedata, *, iostat=IFAIL)
+      if (IFAIL /= 0) exit
+      n_points = n_points + 1
+    end do
+
+    ! Rewind to the start of the file
+    rewind(ud_imagedata)
+
+    ! Allocate the arrays to hold the file
+    allocate(kd_elec_pos(1:3, 1:n_points))
+    allocate(kd_image_pos(1:3, 1:n_points))
+    allocate(kd_image_q(1:n_points))
+
+    ! Read the file into the array and scale the coordinates from mm to m
+    ! Columns are: ix, iy, iz, iq, ex, ey, ez
+    do k = 1, n_points
+      read(ud_imagedata, *) kd_image_pos(1, k), kd_image_pos(2, k), kd_image_pos(3, k), &
+                              kd_image_q(k), kd_elec_pos(1, k), kd_elec_pos(2, k), kd_elec_pos(3, k)
+
+      ! Convert from mm to m
+      kd_elec_pos(:, k) = kd_elec_pos(:, k) * 1.0d-3
+      kd_image_pos(:, k) = kd_image_pos(:, k) * 1.0d-3
+
+      ! Find the min and max coordinates for the electron positions
+      if (k == 1) then
+        image_max_x = kd_elec_pos(1, k)
+        image_min_x = kd_elec_pos(1, k)
+        image_max_y = kd_elec_pos(2, k)
+        image_min_y = kd_elec_pos(2, k)
+        image_max_z = kd_elec_pos(3, k)
+        image_min_z = kd_elec_pos(3, k)
+      else
+        if (kd_elec_pos(1, k) > image_max_x) image_max_x = kd_elec_pos(1, k)
+        if (kd_elec_pos(1, k) < image_min_x) image_min_x = kd_elec_pos(1, k)
+        if (kd_elec_pos(2, k) > image_max_y) image_max_y = kd_elec_pos(2, k)
+        if (kd_elec_pos(2, k) < image_min_y) image_min_y = kd_elec_pos(2, k)
+        if (kd_elec_pos(3, k) > image_max_z) image_max_z = kd_elec_pos(3, k)
+        if (kd_elec_pos(3, k) < image_min_z) image_min_z = kd_elec_pos(3, k)
+      end if
+    end do
+
+    ! Multiply min and max positions by 1.10 to have some margin
+    image_max_x = image_max_x * 1.10d0
+    image_min_x = image_min_x * 1.10d0
+    image_max_y = image_max_y * 1.10d0
+    image_min_y = image_min_y * 1.10d0
+    image_max_z = image_max_z * 1.10d0
+    image_min_z = image_min_z * 1.10d0
+
+    ! Close the file
+    close(unit=ud_imagedata, iostat=IFAIL, status='keep')
+
+    ! Create the kd-tree
+    kd_tree_image => kdtree2_create(kd_elec_pos, sort=.false., rearrange=.true.)
+
+    ! Check if the kd-tree was created successfully
+    if (.not. associated(kd_tree_image)) then
+      print *, 'RUMDEED: ERROR The kd-tree was not created successfully'
+      stop
+    end if
 end subroutine Create_KD_Tree
 
 !-------------------------------------------!
@@ -613,7 +697,34 @@ function Image_Charge_Torus(pos_1, pos_2)
     double precision, intent(in), dimension(1:3) :: pos_1 ! Position of the particle we are calculating the force/acceleration on
     double precision, intent(in), dimension(1:3) :: pos_2 ! Position of the particle that is acting on the particle at pos_1
 
-    Image_Charge_Torus = 0.0d0
+    double precision, dimension(1:3) :: pos_ic ! Position of the image charge
+    double precision                 :: q_ic ! Charge of the image charge
+    double precision, dimension(1:3) :: diff ! Vector from pos_1 to pos_ic
+    double precision                 :: r ! Distance from pos_1 to pos_ic
+    integer, parameter               :: nn = 1 ! number of nearest neighbors to find
+    type(kdtree2_result)             :: kd_results(1:nn) ! results from the kd-tree
+
+    ! Check if the position is within the bounds of the image charge data
+    if (pos_2(1) < image_min_x .or. pos_2(1) > image_max_x .or. &
+        pos_2(2) < image_min_y .or. pos_2(2) > image_max_y .or. &
+        pos_2(3) < image_min_z .or. pos_2(3) > image_max_z) then
+        Image_Charge_Torus = 0.0d0
+    else
+
+      ! Look up the nearest electron position
+      !$omp critical (kdtree2)
+      call kdtree2_n_nearest(tp=kd_tree_image, qv=pos_2, nn=nn, results=kd_results)
+      !$omp end critical (kdtree2)
+
+      ! Look up the image charge position and charge
+      pos_ic = kd_image_pos(:, kd_results(1)%idx)
+      q_ic = kd_image_q(kd_results(1)%idx)
+
+      ! Calculate the force/acceleration on the particle at pos_1 due to the image charge
+      diff = pos_1 - pos_ic
+      r = sqrt( sum(diff**2) ) + length_scale**2
+      Image_Charge_Torus = (-1.0d0)*(diff*q_ic/r**3)
+    end if
 end function Image_Charge_Torus
 
 !-------------------------------------------!
