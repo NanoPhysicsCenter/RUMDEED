@@ -83,7 +83,7 @@ contains
 subroutine Init_Torus()
     ! Local variables
     !double precision :: int_res
-    !double precision, dimension(1:3) :: E_test, pos_test, vel_test
+    double precision, dimension(1:3) :: pos_test, vel_test
     !integer :: IFAIL
 
     ! Allocate the number of emitters
@@ -113,11 +113,18 @@ subroutine Init_Torus()
     ! Create the KD-tree
     call Create_KD_Tree()
 
+    ! Debugging
+    ! Add a test particle
+    ! -2.810000e-06	0.000000	0.000114 ! Line 30
+    pos_test = [-2.81d-6, 0.0d0, 0.114d-3]
+    vel_test = [0.0d0, 0.0d0, 0.0d0]
+    call Add_Particle(pos_test, vel_test, species_elec, 0, 1, -1)
+
     ! Output field along a curve on top of the looped CNT
     call Calc_E_Along_Top()
     call Calc_E_Around_Top()
-
-    !stop
+    
+    stop
 end subroutine Init_Torus
 
 !-------------------------------------------!
