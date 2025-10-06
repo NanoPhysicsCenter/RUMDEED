@@ -57,7 +57,7 @@ Module mod_torus
 
     ! ----------------------------------------------------------------------------
     ! Variables for the Metropolis-Hastings algorithm
-    integer, parameter                 :: N_MH_step = 55 ! Number of steps to do in the MH algorithm
+    integer, parameter                 :: N_MH_step = 120 ! Number of steps to do in the MH algorithm
 
 
     ! ----------------------------------------------------------------------------
@@ -759,7 +759,14 @@ subroutine Get_Random_Surface_Pos(pos, pos_torus)
     call random_number(rnd)
 
     ! Generate random angles
-    phi = 1.0d0 * pi * rnd(1)
+    !phi = 1.0d0 * pi * rnd(1)
+    ! Bias phi toward pi/2
+    ! p(x) = 1/2 * sin(x) for x in [0, pi]
+    ! CDF is F(x) = 1/2 * (1 - cos(x))
+    ! Inverse CDF is x = acos(1 - 2y)
+    phi = acos(1.0d0 - 2.0d0 * rnd(1)) ! biased toward pi/2
+
+    ! theta uniformly distributed in [0, 2pi]
     theta = 2.0d0 * pi * rnd(2)
 
     pos_torus(1) = rho
@@ -845,6 +852,15 @@ subroutine Metropolis_Hastings_Torus(ndim_in, F_out, F_norm_out, pos_xyz_out, n_
     double precision, dimension(1:3), intent(out) :: pos_xyz_out
     double precision, dimension(1:3), intent(out) :: n_vec
 
+    ! Parameters for tuning the standard deviation
+    integer, parameter :: max_tune = 5000 ! Maximum number of iterations for tuning
+    integer :: iter_before_tuning = 0 ! Counter for iterations before tuning is done
+    integer :: iter_after_tuning = 0 ! Counter for iterations after tuning is done
+    logical :: done_tune = .false. ! Flag to indicate if tuning is done
+    double precision :: accepted_rate ! Acceptance rate for tuning
+    double precision, parameter :: gamma = 0.01d0 ! Learning rate for tuning
+    double precision :: sigma_phitheta = 1.0d0 ! Initial standard deviation for jumps in phi and theta
+
     ! Local variables
     double precision, dimension(1:3) :: F_cur, F_new
     double precision, dimension(1:3) :: pos_cur, pos_new
@@ -883,8 +899,8 @@ subroutine Metropolis_Hastings_Torus(ndim_in, F_out, F_norm_out, pos_xyz_out, n_
     end do
     
     ! Do the Metropolis-Hastings algorithm
-    do i = 1, ndim_in
-        call Jump_MH(pos_cur, pos_cur_torus, pos_new, pos_new_torus)
+    do
+        call Jump_MH(pos_cur, pos_cur_torus, pos_new, pos_new_torus, [sigma_phitheta, sigma_phitheta])
 
         alpha = Get_Jump_Probability(pos_cur, pos_cur_torus, F_norm_cur, F_norm_new)
 
@@ -907,6 +923,34 @@ subroutine Metropolis_Hastings_Torus(ndim_in, F_out, F_norm_out, pos_xyz_out, n_
             ! Reject the jump
             rejected = rejected + 1
         end if
+
+      if (done_tune .eqv. .true.) then
+        iter_after_tuning = iter_after_tuning + 1
+        if (iter_after_tuning >= ndim_in) then
+          exit
+        end if
+      end if
+
+      ! Every 5 iterations we adjust the standard deviation
+      if (mod(i, 5) == 0) then
+        accepted_rate = DBLE(accepted) / DBLE(accepted + rejected)
+        ! Adjust the standard deviation based on the acceptance rate
+        sigma_phitheta = sigma_phitheta * exp(gamma*((accepted_rate - 0.234d0)))
+        !print *, 'Iteration: ', i, ' Accepted rate: ', accepted_rate, ' Alpha phi/theta: ', sigma_phitheta
+
+
+        if (abs(accepted_rate - 0.234d0) < 0.05d0) then
+          done_tune = .true. ! If the acceptance rate is close to 0.234, we stop tuning
+          !print *, 'Tuning done after ', i, ' iterations.'
+          !iter_before_tuning = 0 ! Reset the counter for iterations
+        end if
+      end if
+
+      iter_before_tuning = iter_before_tuning + 1
+      if (iter_before_tuning >= max_tune) then
+        print *, 'Warning: Maximum tuning iterations reached without convergence.'
+        exit
+      end if
     end do
 
     ! Set the output variables
@@ -942,18 +986,16 @@ end function Get_Jump_Probability
 
 !-------------------------------------------!
 ! Jump in the Metropolis-Hastings algorithm
-subroutine Jump_MH(pos_cur, pos_torus, pos_new, pos_new_torus)
+subroutine Jump_MH(pos_cur, pos_torus, pos_new, pos_new_torus, std_xy)
     double precision, dimension(1:3), intent(in)  :: pos_cur
     double precision, dimension(1:3), intent(in)  :: pos_torus
     double precision, dimension(1:3), intent(out) :: pos_new
     double precision, dimension(1:3), intent(out) :: pos_new_torus
-
-    ! Local
-    double precision, dimension(1:2) :: std_xy
+    double precision, dimension(1:2), intent(in)  :: std_xy
 
     ! Generate a new position on the surface from the current position
-    std_xy(1) = 1.0d0*pi*0.05d0
-    std_xy(2) = 2.0d0*pi*0.05d0
+    !std_xy(1) = 1.0d0*pi*0.05d0
+    !std_xy(2) = 2.0d0*pi*0.05d0
     pos_new_torus(2:3) = box_muller(pos_torus(2:3), std_xy) ! Jump in x and y
 
     ! Check the angles are within the limits and rebound if necessary
