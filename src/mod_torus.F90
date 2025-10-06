@@ -116,15 +116,15 @@ subroutine Init_Torus()
     ! Debugging
     ! Add a test particle
     ! -2.810000e-06	0.000000	0.000114 ! Line 30
-    pos_test = [-2.81d-6, 0.0d0, 0.114d-3]
-    vel_test = [0.0d0, 0.0d0, 0.0d0]
-    call Add_Particle(pos_test, vel_test, species_elec, 0, 1, -1)
+    !pos_test = [-2.81d-6, 0.0d0, 0.114d-3]
+    !vel_test = [0.0d0, 0.0d0, 0.0d0]
+    !call Add_Particle(pos_test, vel_test, species_elec, 0, 1, -1)
 
     ! Output field along a curve on top of the looped CNT
-    call Calc_E_Along_Top()
-    call Calc_E_Around_Top()
-    
-    stop
+    !call Calc_E_Along_Top()
+    !call Calc_E_Around_Top()
+
+    !stop
 end subroutine Init_Torus
 
 !-------------------------------------------!
@@ -331,10 +331,11 @@ end subroutine Create_KD_Tree
 
 !-------------------------------------------!
 ! Output field along a curve on top of the looped cnt
-subroutine Calc_E_Along_Top()
+subroutine Calc_E_Along_Top(per)
   implicit none
   integer :: k
   integer, parameter :: N_p = 10000
+  integer, intent(in), optional :: per
 
   real(kdkind), dimension(1:3) :: p, E_vec, E_vec_image
   double precision :: phi, theta
@@ -377,7 +378,12 @@ subroutine Calc_E_Along_Top()
   ! Open data file
   !print *, 'Opening data file'
 
-  filename_cyl_circle = "out/loop_E_top.dt"
+  !filename_cyl_circle = "out/loop_E_top.dt"
+  if (present(per)) then
+      write(filename_cyl_circle, '(a10, i0, a3)') "out/loop_E_top_", per, ".dt"
+    else
+      filename_cyl_circle = "out/loop_E_top.dt"
+    end if
 
   open(newunit=ud_cyl_around, iostat=IFAIL, file=filename_cyl_circle, status='REPLACE', action='WRITE')
   if (IFAIL /= 0) then
@@ -402,10 +408,11 @@ subroutine Calc_E_Along_Top()
   !print *, 'Calc_E_circle_cyl finished'
 end subroutine Calc_E_Along_Top
 
-subroutine Calc_E_Around_Top()
+subroutine Calc_E_Around_Top(per)
   implicit none
   integer :: k
   integer, parameter :: N_p = 10000
+  integer, intent(in), optional :: per
 
   real(kdkind), dimension(1:3) :: p, E_vec, E_vec_image
   double precision :: phi, theta
@@ -448,7 +455,12 @@ subroutine Calc_E_Around_Top()
   ! Open data file
   !print *, 'Opening data file'
 
-  filename_cyl_circle = "out/around_E_top.dt"
+  !filename_cyl_circle = "out/around_E_top.dt"
+  if (present(per)) then
+      write(filename_cyl_circle, '(a10, i0, a3)') "out/around_E_top_", per, ".dt"
+    else
+      filename_cyl_circle = "out/around_E_top.dt"
+    end if
 
   open(newunit=ud_cyl_around, iostat=IFAIL, file=filename_cyl_circle, status='REPLACE', action='WRITE')
   if (IFAIL /= 0) then
@@ -631,8 +643,8 @@ subroutine Do_Field_Emission_Torus_simple(step)
     nrEmitted_emitters = 0
   
     ! Check if the step is 10%, 20%, 30%, 40%, 50%, 60%, 70%, 80%, 90% or 100% of the total steps
-    !if (mod(step, steps/10) == 0) then
-      !per = nint(dble(step)/dble(steps)*100.0d0) ! Calculate the percentage of the simulation
+    if (mod(step, steps/10) == 0) then
+      per = nint(dble(step)/dble(steps)*100.0d0) ! Calculate the percentage of the simulation
       !print *, 'Step = ', step
       !print *, 'Percentage = ', per, '%'
   
@@ -644,9 +656,9 @@ subroutine Do_Field_Emission_Torus_simple(step)
       !print *, 'Calling Calc_E_top_cyl'
       !call Calc_E_corner_cyl(per)
   
-      !call Calc_E_cyl(per)
-      !call Calc_E_circle_cyl(per)
-    !end if
+      call Calc_E_Along_Top(per)
+      call Calc_E_Around_Top(per)
+    end if
   
     call Do_Surface_Integration_simple(N_sup)
     N_round = Rand_Poisson(N_sup)
