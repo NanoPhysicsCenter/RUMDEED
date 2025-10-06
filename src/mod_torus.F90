@@ -859,7 +859,7 @@ subroutine Metropolis_Hastings_Torus(ndim_in, F_out, F_norm_out, pos_xyz_out, n_
     logical :: done_tune = .false. ! Flag to indicate if tuning is done
     double precision :: accepted_rate ! Acceptance rate for tuning
     double precision, parameter :: gamma = 0.01d0 ! Learning rate for tuning
-    double precision :: sigma_phitheta = 1.0d0 ! Initial standard deviation for jumps in phi and theta
+    double precision :: sigma_phitheta = 0.1d0 ! Initial standard deviation for jumps in phi and theta
 
     ! Local variables
     double precision, dimension(1:3) :: F_cur, F_new
@@ -1005,11 +1005,11 @@ subroutine Jump_MH(pos_cur, pos_torus, pos_new, pos_new_torus, std_xy)
     else if (pos_new_torus(2) >= pi) then
       pos_new_torus(2) = 2.0d0*pi - pos_new_torus(2) ! Reflect back, d = P - L, P' = L - d = 2L - P
     end if
-    ! theta is between 0 and 2*pi
+    ! theta is between 0 and 2*pi, use modulo
     if (pos_new_torus(3) < 0.0d0) then
-      pos_new_torus(3) = -pos_new_torus(3)
+      pos_new_torus(3) = pos_new_torus(3) + 2.0d0*pi
     else if (pos_new_torus(3) >= 2.0d0*pi) then
-      pos_new_torus(3) = 4.0d0*pi - pos_new_torus(3)
+      pos_new_torus(3) = mod(pos_new_torus(3), 2.0d0*pi)
     end if
 
     pos_new_torus(1) = rho ! rho is fixed
