@@ -57,7 +57,7 @@ Module mod_torus
 
     ! ----------------------------------------------------------------------------
     ! Variables for the Metropolis-Hastings algorithm
-    integer, parameter                 :: N_MH_step = 120 ! Number of steps to do in the MH algorithm
+    integer, parameter                 :: N_MH_step = 15000 ! Number of steps to do in the MH algorithm
 
 
     ! ----------------------------------------------------------------------------
