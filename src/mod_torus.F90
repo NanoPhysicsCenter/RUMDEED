@@ -688,7 +688,9 @@ subroutine Do_Field_Emission_Torus_simple(step)
         else
   
           par_pos = par_pos + n_vec*length_scale
+          par_vel = 0.0d0
           call Add_Particle(par_pos, par_vel, species_elec, step, emit, -1)
+          !print *, 'Emitted electron at position: ', par_pos
   
           nrElecEmit = nrElecEmit + 1
           nrEmitted_emitters(emit) = nrEmitted_emitters(emit) + 1
@@ -751,7 +753,7 @@ end function Image_Charge_Torus
 subroutine Get_Random_Surface_Pos(pos, pos_torus)
     double precision, dimension(1:3), intent(out) :: pos
     double precision, dimension(1:3), intent(out)  :: pos_torus ! Toroidal coordinates
-    double precision :: phi, theta
+    double precision, dimension(1:2) :: phi_theta
 
     double precision, dimension(1:2) :: rnd
 
@@ -764,14 +766,24 @@ subroutine Get_Random_Surface_Pos(pos, pos_torus)
     ! p(x) = 1/2 * sin(x) for x in [0, pi]
     ! CDF is F(x) = 1/2 * (1 - cos(x))
     ! Inverse CDF is x = acos(1 - 2y)
-    phi = acos(1.0d0 - 2.0d0 * rnd(1)) ! biased toward pi/2
+    !phi = acos(1.0d0 - 2.0d0 * rnd(1)) ! biased toward pi/2
+
+    ! Bias twoards phi = pi/2 using normal distribution
+    ! Bias theta toward pi using normal distribution
+    phi_theta = box_muller([pi/2.0d0, 0.0d0], [pi/16.0d0, pi/4.0d0])
+
+    ! Warp phi to be in [0, pi] using modulo
+    phi_theta(1) = modulo(phi_theta(1), pi)
+
+    ! Warp theta to be in [0, 2pi] using modulo
+    phi_theta(2) = modulo(phi_theta(2), 2.0d0*pi)
 
     ! theta uniformly distributed in [0, 2pi]
-    theta = 2.0d0 * pi * rnd(2)
+    !theta = 2.0d0 * pi * rnd(2)
 
     pos_torus(1) = rho
-    pos_torus(2) = phi
-    pos_torus(3) = theta
+    pos_torus(2) = phi_theta(1)
+    pos_torus(3) = phi_theta(2)
 
     ! Calculate the xyz position on the surface of the torus
     pos = Convert_to_xyz(pos_torus)
@@ -859,7 +871,7 @@ subroutine Metropolis_Hastings_Torus(ndim_in, F_out, F_norm_out, pos_xyz_out, n_
     logical :: done_tune = .false. ! Flag to indicate if tuning is done
     double precision :: accepted_rate ! Acceptance rate for tuning
     double precision, parameter :: gamma = 0.01d0 ! Learning rate for tuning
-    double precision :: sigma_phitheta = 0.1d0 ! Initial standard deviation for jumps in phi and theta
+    double precision, save :: sigma_phitheta = 0.2d0 ! Initial standard deviation for jumps in phi and theta
 
     ! Local variables
     double precision, dimension(1:3) :: F_cur, F_new
@@ -948,8 +960,11 @@ subroutine Metropolis_Hastings_Torus(ndim_in, F_out, F_norm_out, pos_xyz_out, n_
 
       iter_before_tuning = iter_before_tuning + 1
       if (iter_before_tuning >= max_tune) then
-        print *, 'Warning: Maximum tuning iterations reached without convergence.'
-        exit
+        !print *, 'Warning: Maximum tuning iterations reached without convergence.'
+        !print *, 'Accepted rate: ', accepted_rate
+        !print *, 'Sigma phi/theta: ', sigma_phitheta
+        done_tune = .true.
+        !exit
       end if
     end do
 
@@ -1076,25 +1091,41 @@ end function t_y
 double precision function Escape_Prob(F, pos)
   double precision, intent(in)                 :: F
   double precision, dimension(1:3), intent(in) :: pos
-  !integer                                      :: emit = 1
+  double precision :: exponent_val
+  double precision, parameter :: tinyF = 1.0d-300
+  double precision, parameter :: exp_clamp = 700.0d0
 
-  !print *, 'F = ', F
-  !print *, 'pos = ', pos
-  !print *, 'v_y = ', v_y(F, pos)
-  !print *, 'w_theta = ', w_theta_pos_tip(pos)
-  !print *, b_FN * (sqrt(w_theta_pos_tip(pos)))**3 * v_y(F, pos) / abs(F)
-  !print *, 'Escape_prob = ', exp(b_FN * (sqrt(w_theta_pos_tip(pos)))**3 * v_y(F, pos) / abs(F))
-  !print *, ''
-  Escape_Prob = exp(b_FN * (sqrt(w_theta_pos_tip(pos)))**3 * v_y(F, pos) / abs(F))
-  if (Escape_Prob > 1.0d0) then
-    print *, 'Escape_prob is larger than 1.0'
-    print *, 'Escape_prob = ', Escape_Prob
-    print *, ''
-  else if (Escape_Prob < 0.0d0) then
-    print *, 'Escape_prob is smaller than 0.0'
-    print *, 'Escape_prob = ', Escape_Prob
-    print *, ''
+  ! Guard against zero or extremely small field to avoid division by zero
+  if (abs(F) < tinyF) then
+    Escape_Prob = 0.0d0
+    return
   end if
+
+  exponent_val = b_FN * (sqrt(w_theta_pos_tip(pos)))**3 * v_y(F, pos) / abs(F)
+
+  ! If exponent is NaN or infinite, return zero probability
+  if (.not. (exponent_val == exponent_val)) then
+    Escape_Prob = 0.0d0
+    return
+  end if
+
+  ! If exponent is non-negative the expression would give >1 (unphysical here) => clamp to 1
+  if (exponent_val >= 0.0d0) then
+    Escape_Prob = 1.0d0
+    return
+  end if
+
+  ! Avoid overflow/underflow issues for extreme negative exponents:
+  if (exponent_val < -exp_clamp) then
+    Escape_Prob = 0.0d0
+  else
+    Escape_Prob = exp(exponent_val)
+  end if
+
+  ! Ensure numerical bounds [0,1]
+  if (Escape_Prob < 0.0d0) Escape_Prob = 0.0d0
+  if (Escape_Prob > 1.0d0) Escape_Prob = 1.0d0
+
 end function Escape_Prob
 
 

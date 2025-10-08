@@ -97,6 +97,10 @@ contains
       !particles_cur_pos(:, i)  = particles_cur_pos(:, i) + particles_cur_vel(:, i)*time_step &
       !                       & + 0.5d0*particles_cur_accel(:, i)*time_step2
 
+      !print *, particles_cur_pos(:, i)
+      !print *, particles_cur_vel(:, i)
+      !print *, particles_cur_accel(:, i)
+      !print *, particles_prev_accel(:, i)
       ! Beeman
       particles_prev_pos(:, i) = particles_cur_pos(:, i) ! Store the previous position
       particles_cur_pos(:, i)  = particles_cur_pos(:, i) + particles_cur_vel(:, i)*time_step &
