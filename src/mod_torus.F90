@@ -102,7 +102,7 @@ subroutine Init_Torus()
     ptr_E_zunit => E_zunit_torus
 
     ! The function to do image charge effects
-    ptr_Image_Charge_effect => Image_Charge_Torus ! Force_Image_charges for the cylinder
+    ptr_Image_Charge_effect => Image_Charge_Torus_four ! Force_Image_charges for the cylinder
     !ptr_Image_Charge_effect => Force_Image_charges_v2
 
     !call Read_work_function()
@@ -713,8 +713,9 @@ end subroutine Do_Field_Emission_Torus_simple
 
 !-------------------------------------------!
 ! Image charge effect
-function Image_Charge_Torus(pos_1, pos_2)
-    double precision, dimension(1:3)             :: Image_Charge_Torus ! Image charge effect
+! Single electron
+function Image_Charge_Torus_single(pos_1, pos_2)
+    double precision, dimension(1:3)             :: Image_Charge_Torus_single ! Image charge effect
     double precision, intent(in), dimension(1:3) :: pos_1 ! Position of the particle we are calculating the force/acceleration on
     double precision, intent(in), dimension(1:3) :: pos_2 ! Position of the particle that is acting on the particle at pos_1
 
@@ -729,7 +730,7 @@ function Image_Charge_Torus(pos_1, pos_2)
     if (pos_2(1) < image_min_x .or. pos_2(1) > image_max_x .or. &
         pos_2(2) < image_min_y .or. pos_2(2) > image_max_y .or. &
         pos_2(3) < image_min_z .or. pos_2(3) > image_max_z) then
-        Image_Charge_Torus = 0.0d0
+        Image_Charge_Torus_single = 0.0d0
     else
 
       ! Look up the nearest electron position
@@ -744,9 +745,71 @@ function Image_Charge_Torus(pos_1, pos_2)
       ! Calculate the force/acceleration on the particle at pos_1 due to the image charge
       diff = pos_1 - pos_ic
       r = sqrt( sum(diff**2) ) + length_scale**2
-      Image_Charge_Torus = (-1.0d0)*(diff*q_ic/r**3)
+      Image_Charge_Torus_single = (-1.0d0)*(diff*q_ic/r**3)
     end if
-end function Image_Charge_Torus
+end function Image_Charge_Torus_single
+
+! Interpolate four nearest neighbors
+function Image_Charge_Torus_four(pos_1, pos_2)
+    double precision, dimension(1:3)             :: Image_Charge_Torus_four ! Image charge effect
+    double precision, intent(in), dimension(1:3) :: pos_1 ! Position of the particle we are calculating the force/acceleration on
+    double precision, intent(in), dimension(1:3) :: pos_2 ! Position of the particle that is acting on the particle at pos_1
+
+    double precision, dimension(1:3) :: pos_1_ic, pos_2_ic, pos_3_ic, pos_4_ic, pos_ic ! Position of the image charge
+    double precision                 :: q_1_ic, q_2_ic, q_3_ic, q_4_ic, q_ic ! Charge of the image charge
+    double precision                 :: w1, w2, w3, w4 ! Weights for the interpolation
+    double precision, dimension(1:3) :: diff ! Vector from pos_1 to pos_ic
+    double precision                 :: r ! Distance from pos_1 to pos_ic
+    integer, parameter               :: nn = 4 ! number of nearest neighbors to find
+    integer, parameter               :: p = 1 ! Power for the inverse distance weighting
+    double precision, parameter      :: eps = length_scale**3 ! Small number to avoid division by zero
+    type(kdtree2_result)             :: kd_results(1:nn) ! results from the kd-tree
+
+    ! Check if the position is within the bounds of the image charge data
+    if (pos_2(1) < image_min_x .or. pos_2(1) > image_max_x .or. &
+        pos_2(2) < image_min_y .or. pos_2(2) > image_max_y .or. &
+        pos_2(3) < image_min_z .or. pos_2(3) > image_max_z) then
+        Image_Charge_Torus_four = 0.0d0
+    else
+
+      ! Look up the nearest electron position
+      !$omp critical (kdtree2)
+      call kdtree2_n_nearest(tp=kd_tree_image, qv=pos_2, nn=nn, results=kd_results)
+      !$omp end critical (kdtree2)
+
+      ! Look up the image charge position and charge
+      pos_1_ic = kd_image_pos(:, kd_results(1)%idx)
+      q_1_ic = kd_image_q(kd_results(1)%idx)
+      w1 = 1.0d0 / (kd_results(1)%dis + eps)**p
+
+      pos_2_ic = kd_image_pos(:, kd_results(2)%idx)
+      q_2_ic = kd_image_q(kd_results(2)%idx)
+      w2 = 1.0d0 / (kd_results(2)%dis + eps)**p
+
+      pos_3_ic = kd_image_pos(:, kd_results(3)%idx)
+      q_3_ic = kd_image_q(kd_results(3)%idx)
+      w3 = 1.0d0 / (kd_results(3)%dis + eps)**p
+
+      pos_4_ic = kd_image_pos(:, kd_results(4)%idx)
+      q_4_ic = kd_image_q(kd_results(4)%idx)
+      w4 = 1.0d0 / (kd_results(4)%dis + eps)**p
+
+      ! Normalize the weights
+      w1 = w1 / (w1 + w2 + w3 + w4)
+      w2 = w2 / (w1 + w2 + w3 + w4)
+      w3 = w3 / (w1 + w2 + w3 + w4)
+      w4 = w4 / (w1 + w2 + w3 + w4)
+
+      ! Interpolate the image charge position and charge using inverse distance weighting
+      q_ic = w1*q_1_ic + w2*q_2_ic + w3*q_3_ic + w4*q_4_ic
+      pos_ic = w1*pos_1_ic + w2*pos_2_ic + w3*pos_3_ic + w4*pos_4_ic
+
+      ! Calculate the force/acceleration on the particle at pos_1 due to the image charge
+      diff = pos_1 - pos_ic
+      r = sqrt( sum(diff**2) ) + length_scale**2
+      Image_Charge_Torus_four = (-1.0d0)*(diff*q_ic/r**3)
+    end if
+end function Image_Charge_Torus_four
 
 !-------------------------------------------!
 ! Generate a random position on the surface of the torus
