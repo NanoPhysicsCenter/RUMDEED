@@ -44,6 +44,8 @@ Module mod_torus
 
     double precision :: time_step_div_q0
 
+    double precision :: length_scale_torus = 1.0d-6 ! Length scale for the torus in meters
+
     ! ----------------------------------------------------------------------------
     ! Variables
     integer, dimension(:), allocatable :: nrEmitted_emitters
@@ -57,7 +59,7 @@ Module mod_torus
 
     ! ----------------------------------------------------------------------------
     ! Variables for the Metropolis-Hastings algorithm
-    integer, parameter                 :: N_MH_step = 15000 ! Number of steps to do in the MH algorithm
+    integer, parameter                 :: N_MH_step = 100 ! Number of steps to do in the MH algorithm
 
 
     ! ----------------------------------------------------------------------------
@@ -687,7 +689,7 @@ subroutine Do_Field_Emission_Torus_simple(step)
           stop
         else
   
-          par_pos = par_pos + n_vec*length_scale
+          par_pos = par_pos + n_vec*length_scale_torus ! Move the particle a bit away from the surface
           par_vel = 0.0d0
           call Add_Particle(par_pos, par_vel, species_elec, step, emit, -1)
           !print *, 'Emitted electron at position: ', par_pos
@@ -928,13 +930,8 @@ subroutine Metropolis_Hastings_Torus(ndim_in, F_out, F_norm_out, pos_xyz_out, n_
     double precision, dimension(1:3), intent(out) :: n_vec
 
     ! Parameters for tuning the standard deviation
-    integer, parameter :: max_tune = 5000 ! Maximum number of iterations for tuning
-    integer :: iter_before_tuning = 0 ! Counter for iterations before tuning is done
-    integer :: iter_after_tuning = 0 ! Counter for iterations after tuning is done
-    logical :: done_tune = .false. ! Flag to indicate if tuning is done
-    double precision :: accepted_rate ! Acceptance rate for tuning
-    double precision, parameter :: gamma = 0.01d0 ! Learning rate for tuning
-    double precision, save :: sigma_phitheta = 0.2d0 ! Initial standard deviation for jumps in phi and theta
+    integer :: total_iter = 0 ! Total number of iterations
+    double precision, dimension(1:2) :: std_xy
 
     ! Local variables
     double precision, dimension(1:3) :: F_cur, F_new
@@ -944,13 +941,17 @@ subroutine Metropolis_Hastings_Torus(ndim_in, F_out, F_norm_out, pos_xyz_out, n_
     double precision :: F_norm, F_norm_new, F_norm_cur
     double precision :: alpha, rnd
 
-    integer :: IFAIL, k, i
+    integer :: IFAIL, k
     integer :: accepted, rejected
 
     ! Initialize the output variables
     F_out = 0.0d0
     F_norm_out = 0.0d0
     pos_xyz_out = 0.0d0
+
+    ! Standard deviations for the jumps in the Metropolis-Hastings algorithm
+    std_xy(1) = 0.05d0 * pi ! Standard deviation for phi
+    std_xy(2) = 0.05d0 * 2.0d0*pi  ! Standard deviation for theta
 
     ! Get an initial position for the particle
     k = 0
@@ -975,13 +976,13 @@ subroutine Metropolis_Hastings_Torus(ndim_in, F_out, F_norm_out, pos_xyz_out, n_
     
     ! Do the Metropolis-Hastings algorithm
     do
-        call Jump_MH(pos_cur, pos_cur_torus, pos_new, pos_new_torus, [sigma_phitheta, sigma_phitheta])
+        call Jump_MH(pos_cur, pos_cur_torus, pos_new, pos_new_torus, std_xy)
 
         alpha = Get_Jump_Probability(pos_cur, pos_cur_torus, F_norm_cur, F_norm_new)
 
         ! Accept or reject the jump
         call random_number(rnd)
-        if (rnd < alpha) then
+        if (rnd <= alpha) then
             ! Accept the jump
             accepted = accepted + 1
 
@@ -999,36 +1000,8 @@ subroutine Metropolis_Hastings_Torus(ndim_in, F_out, F_norm_out, pos_xyz_out, n_
             rejected = rejected + 1
         end if
 
-      if (done_tune .eqv. .true.) then
-        iter_after_tuning = iter_after_tuning + 1
-        if (iter_after_tuning >= ndim_in) then
-          exit
-        end if
-      end if
-
-      ! Every 5 iterations we adjust the standard deviation
-      if (mod(i, 5) == 0) then
-        accepted_rate = DBLE(accepted) / DBLE(accepted + rejected)
-        ! Adjust the standard deviation based on the acceptance rate
-        sigma_phitheta = sigma_phitheta * exp(gamma*((accepted_rate - 0.234d0)))
-        !print *, 'Iteration: ', i, ' Accepted rate: ', accepted_rate, ' Alpha phi/theta: ', sigma_phitheta
-
-
-        if (abs(accepted_rate - 0.234d0) < 0.05d0) then
-          done_tune = .true. ! If the acceptance rate is close to 0.234, we stop tuning
-          !print *, 'Tuning done after ', i, ' iterations.'
-          !iter_before_tuning = 0 ! Reset the counter for iterations
-        end if
-      end if
-
-      iter_before_tuning = iter_before_tuning + 1
-      if (iter_before_tuning >= max_tune) then
-        !print *, 'Warning: Maximum tuning iterations reached without convergence.'
-        !print *, 'Accepted rate: ', accepted_rate
-        !print *, 'Sigma phi/theta: ', sigma_phitheta
-        done_tune = .true.
-        !exit
-      end if
+        total_iter = total_iter + 1
+        if (total_iter >= ndim_in) exit
     end do
 
     ! Set the output variables
@@ -1076,27 +1049,48 @@ subroutine Jump_MH(pos_cur, pos_torus, pos_new, pos_new_torus, std_xy)
     !std_xy(2) = 2.0d0*pi*0.05d0
     pos_new_torus(2:3) = box_muller(pos_torus(2:3), std_xy) ! Jump in x and y
 
-    ! Check the angles are within the limits and rebound if necessary
-    ! phi is between 0 and pi
-    if (pos_new_torus(2) < 0.0d0) then
-      pos_new_torus(2) = -pos_new_torus(2)
-    else if (pos_new_torus(2) >= pi) then
-      pos_new_torus(2) = 2.0d0*pi - pos_new_torus(2) ! Reflect back, d = P - L, P' = L - d = 2L - P
+    ! Sanity check to make sure jump is not too large
+    if (abs(pos_new_torus(2) - pos_torus(2)) > 0.25d0*pi) then
+      print *, 'RUMDEED: ERROR: Jump in phi too large (Jump_MH)'
+      print *, 'pos_cur = ', pos_cur
+      print *, 'pos_torus = ', pos_torus
+      print *, 'pos_new_torus = ', pos_new_torus
+      print *, 'Jump in phi = ', abs(pos_new_torus(2) - pos_torus(2))
+      print *, 'std_xy(1) = ', std_xy(1)
+      stop
     end if
-    ! theta is between 0 and 2*pi, use modulo
-    if (pos_new_torus(3) < 0.0d0) then
-      pos_new_torus(3) = pos_new_torus(3) + 2.0d0*pi
-    else if (pos_new_torus(3) >= 2.0d0*pi) then
-      pos_new_torus(3) = mod(pos_new_torus(3), 2.0d0*pi)
+    if (abs(pos_new_torus(3) - pos_torus(3)) > 0.25d0*2.0d0*pi) then
+      print *, 'RUMDEED: ERROR: Jump in theta too large (Jump_MH)'
+      print *, 'pos_cur = ', pos_cur
+      print *, 'pos_torus = ', pos_torus
+      print *, 'pos_new_torus = ', pos_new_torus
+      print *, 'Jump in theta = ', abs(pos_new_torus(3) - pos_torus(3))
+      print *, 'std_xy(2) = ', std_xy(2)
+      stop
     end if
 
     pos_new_torus(1) = rho ! rho is fixed
 
+    ! Check the angles are within the limits and rebound if necessary
+    ! phi is between 0 and pi
+    if (pos_new_torus(2) < 0.0d0) then
+      pos_new_torus(2) = -1.0d0*pos_new_torus(2)
+    else if (pos_new_torus(2) >= pi) then
+      pos_new_torus(2) = 2.0d0*pi - pos_new_torus(2) ! Reflect back, d = P - L, P' = L - d = 2L - P
+    end if
+
+    ! theta is between 0 and 2*pi, use modulo
+    pos_new_torus(3) = modulo(pos_new_torus(3), 2.0d0*pi)
+
     ! Calculate the x and y coordinates
     pos_new = Convert_to_xyz(pos_new_torus)
 
-    ! Calculate the normal vector to the surface at the new position
-    !n_vec_new = Get_Unit_Vector(pos_new_torus)
+    if (pos_new(3) < 0.0d0) then
+      print *, 'RUMDEED: ERROR: New position out of bounds (Jump_MH)'
+      print *, 'pos_new = ', pos_new
+      print *, 'pos_new_torus = ', pos_new_torus
+      stop
+    end if
 end subroutine Jump_MH
 
 

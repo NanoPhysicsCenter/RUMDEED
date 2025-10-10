@@ -840,13 +840,14 @@ end subroutine Do_Photo_Emission_Tip
     double precision                 :: sigma_xiphi = 1.0d0 ! Standard deviations for the normal distribution
     double precision                 :: gamma = 0.01 ! Tuning parameter for the Robbins-Monro algorithm
     double precision, dimension(1:3) :: std, new_pos, cur_pos, par_pos, field
-    integer                          :: i, count, max_tune = 1000
+    integer                          :: count, max_tune = 1000
     integer                          :: accepted = 0 ! Number of accepted jumps
     integer                          :: rejected = 0 ! Number of rejected jumps
     double precision                 :: accepted_rate
     logical                          :: done_tune = .false. ! Flag to indicate if we are tuning the parameters
     integer                          :: iter_after_tuning = 0 ! Number of iterations after tuning is done
     integer                          :: iter_before_tuning = 0 ! Number of iterations before tuning is done
+    integer                          :: total_iter = 0 ! Total number of iterations
 
     ! Find a starting position on the tip
     count = 0
@@ -956,16 +957,16 @@ end subroutine Do_Photo_Emission_Tip
       end if
 
       ! Every 100 iterations we adjust the standard deviation
-      if (mod(i, 100) == 0) then
+      if (mod(total_iter, 100) == 0) then
         accepted_rate = DBLE(accepted) / DBLE(accepted + rejected)
         ! Adjust the standard deviation based on the acceptance rate
         sigma_xiphi = sigma_xiphi * exp(gamma*((accepted_rate - 0.234d0)))
-        print *, 'Iteration: ', i, ' Accepted rate: ', accepted_rate, ' Alpha xiphi: ', sigma_xiphi
+        print *, 'Iteration: ', total_iter, ' Accepted rate: ', accepted_rate, ' Alpha xiphi: ', sigma_xiphi
 
 
         if (abs(accepted_rate - 0.234d0) < 0.05d0) then
           done_tune = .true. ! If the acceptance rate is close to 0.234, we stop tuning
-          print *, 'Tuning done after ', i, ' iterations.'
+          print *, 'Tuning done after ', total_iter, ' iterations.'
           !iter_before_tuning = 0 ! Reset the counter for iterations
         end if
       end if
@@ -975,6 +976,8 @@ end subroutine Do_Photo_Emission_Tip
         print *, 'Warning: Maximum tuning iterations reached without convergence.'
         exit
       end if
+
+      total_iter = total_iter + 1
     end do
 
   end subroutine Metro_algo_tip_gtf_v2
