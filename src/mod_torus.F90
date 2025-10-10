@@ -59,7 +59,7 @@ Module mod_torus
 
     ! ----------------------------------------------------------------------------
     ! Variables for the Metropolis-Hastings algorithm
-    integer, parameter                 :: N_MH_step = 100 ! Number of steps to do in the MH algorithm
+    integer, parameter                 :: N_MH_step = 500 ! Number of steps to do in the MH algorithm
 
 
     ! ----------------------------------------------------------------------------
@@ -852,6 +852,13 @@ subroutine Get_Random_Surface_Pos(pos, pos_torus)
 
     ! Calculate the xyz position on the surface of the torus
     pos = Convert_to_xyz(pos_torus)
+
+    if (pos(3) < R_z/2.0d0) then
+        print *, 'Warning: pos(3) < R_z/2.0d0 (Get_Random_Surface_Pos)'
+        print *, 'pos = ', pos
+        print *, 'pos_torus = ', pos_torus
+        stop
+    end if
 end subroutine Get_Random_Surface_Pos
 
 function Field_Normal(pos, pos_torus, F)
@@ -950,8 +957,8 @@ subroutine Metropolis_Hastings_Torus(ndim_in, F_out, F_norm_out, pos_xyz_out, n_
     pos_xyz_out = 0.0d0
 
     ! Standard deviations for the jumps in the Metropolis-Hastings algorithm
-    std_xy(1) = 0.05d0 * pi ! Standard deviation for phi
-    std_xy(2) = 0.05d0 * 2.0d0*pi  ! Standard deviation for theta
+    std_xy(1) = 0.005d0 * pi ! Standard deviation for phi
+    std_xy(2) = 0.005d0 * 2.0d0*pi  ! Standard deviation for theta
 
     ! Get an initial position for the particle
     k = 0
@@ -1045,9 +1052,7 @@ subroutine Jump_MH(pos_cur, pos_torus, pos_new, pos_new_torus, std_xy)
     double precision, dimension(1:2), intent(in)  :: std_xy
 
     ! Generate a new position on the surface from the current position
-    !std_xy(1) = 1.0d0*pi*0.05d0
-    !std_xy(2) = 2.0d0*pi*0.05d0
-    pos_new_torus(2:3) = box_muller(pos_torus(2:3), std_xy) ! Jump in x and y
+    pos_new_torus(2:3) = box_muller(pos_torus(2:3), std_xy) ! Jump in phi and theta
 
     ! Sanity check to make sure jump is not too large
     if (abs(pos_new_torus(2) - pos_torus(2)) > 0.25d0*pi) then
@@ -1085,8 +1090,10 @@ subroutine Jump_MH(pos_cur, pos_torus, pos_new, pos_new_torus, std_xy)
     ! Calculate the x and y coordinates
     pos_new = Convert_to_xyz(pos_new_torus)
 
-    if (pos_new(3) < 0.0d0) then
+    if (pos_new(3) < R_z/2.0d0) then
       print *, 'RUMDEED: ERROR: New position out of bounds (Jump_MH)'
+      print *, 'pos_cur = ', pos_cur
+      print *, 'pos_torus = ', pos_torus
       print *, 'pos_new = ', pos_new
       print *, 'pos_new_torus = ', pos_new_torus
       stop
