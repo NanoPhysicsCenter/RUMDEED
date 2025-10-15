@@ -194,7 +194,7 @@ contains
 
   function E_zunit_Planar(pos)
     double precision, dimension(1:3), intent(in) :: pos ! Position to calculate the E_z unit vector at
-    double precision, dimension(1:3)               :: E_zunit_planar
+    double precision, dimension(1:3)             :: E_zunit_planar
 
     ! The z-component of the electric field is always -1.0d0/d in planar geometry
     E_zunit_planar(1:2) = 0.0d0
