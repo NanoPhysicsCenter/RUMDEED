@@ -837,11 +837,21 @@ subroutine Get_Random_Surface_Pos(pos, pos_torus)
     ! Bias theta toward pi using normal distribution
     phi_theta = box_muller([pi/2.0d0, 0.0d0], [pi/16.0d0, pi/4.0d0])
 
-    ! Warp phi to be in [0, pi] using modulo
-    phi_theta(1) = modulo(phi_theta(1), pi)
+    !! Warp phi to be in [0, pi] using modulo
+    !phi_theta(1) = modulo(phi_theta(1), pi)
 
-    ! Warp theta to be in [0, 2pi] using modulo
-    phi_theta(2) = modulo(phi_theta(2), 2.0d0*pi)
+    ! Warp phi to be in [pi/4, 3pi/4]
+    if (phi_theta(1) < pi/4.0d0) then
+      phi_theta(1) = -1.0d0*phi_theta(1) + pi/2.0d0
+    else if (phi_theta(1) > 3.0d0*pi/4.0d0) then
+      phi_theta(1) = -1.0d0*phi_theta(1) + 3.0d0*pi/2.0d0
+    end if
+
+    !! Warp theta to be in [0, 2pi] using modulo
+    !phi_theta(2) = modulo(phi_theta(2), 2.0d0*pi)
+
+    ! Constrain theta to be [-pi/4, pi/4] using modulo
+    phi_theta(2) = modulo(phi_theta(2) + pi/4.0d0, pi/2.0d0) - pi/4.0d0
 
     ! theta uniformly distributed in [0, 2pi]
     !theta = 2.0d0 * pi * rnd(2)
@@ -1077,15 +1087,29 @@ subroutine Jump_MH(pos_cur, pos_torus, pos_new, pos_new_torus, std_xy)
     pos_new_torus(1) = rho ! rho is fixed
 
     ! Check the angles are within the limits and rebound if necessary
-    ! phi is between 0 and pi
-    if (pos_new_torus(2) < 0.0d0) then
-      pos_new_torus(2) = -1.0d0*pos_new_torus(2)
-    else if (pos_new_torus(2) >= pi) then
-      pos_new_torus(2) = 2.0d0*pi - pos_new_torus(2) ! Reflect back, d = P - L, P' = L - d = 2L - P
+    !! phi is between 0 and pi
+    !if (pos_new_torus(2) < 0.0d0) then
+    !  pos_new_torus(2) = -1.0d0*pos_new_torus(2)
+    !else if (pos_new_torus(2) >= pi) then
+    !  pos_new_torus(2) = 2.0d0*pi - pos_new_torus(2) ! Reflect back, d = P - L, P' = L - d = 2L - P
+    !end if
+
+    ! phi is between pi/4 and 3pi/4, reflect back if out of bounds
+    if (pos_new_torus(2) < pi/4.0d0) then
+      pos_new_torus(2) = -1.0d0*pos_new_torus(2) + pi/2.0d0
+    else if (pos_new_torus(2) > 3.0d0*pi/4.0d0) then
+      pos_new_torus(2) = -1.0d0*pos_new_torus(2) + 3.0d0*pi/2.0d0
     end if
 
-    ! theta is between 0 and 2*pi, use modulo
-    pos_new_torus(3) = modulo(pos_new_torus(3), 2.0d0*pi)
+    !! theta is between 0 and 2*pi, use modulo
+    !pos_new_torus(3) = modulo(pos_new_torus(3), 2.0d0*pi)
+
+    ! theta is between -pi/4 and pi/4, reflect back if out of bounds
+    if (pos_new_torus(3) < -pi/4.0d0) then
+      pos_new_torus(3) = -1.0d0*pos_new_torus(3) - pi
+    else if (pos_new_torus(3) > pi/4.0d0) then
+      pos_new_torus(3) = -1.0d0*pos_new_torus(3) + pi
+    end if
 
     ! Calculate the x and y coordinates
     pos_new = Convert_to_xyz(pos_new_torus)
