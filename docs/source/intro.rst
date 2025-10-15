@@ -20,3 +20,9 @@ Funded by the Icelandic Research Fund, grants number 12000-902, 174127-051, 2180
 Also supported by the Reykjavik University Development Fund and by the Air Force Office of Scientific Research under Grant No. FA9550-18-1-7011.
 Any opinions, findings, and conclusions or recommendations expressed in this material are those of the authors and do not
 necessarily reflect the views of the United States Air Force.
+
+Other software
+---------------
+The RUMDEED code uses the following open source software:
+- Cuba a library for multidimensional numerical integration :cite:p:`HAHN200578`
+- KDTree2 a library for nearest neighbor search :cite:p:`kennel2004kdtree`

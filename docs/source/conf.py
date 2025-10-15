@@ -70,7 +70,7 @@ html_theme_options = {
     'collapse_navigation': False,
     'prev_next_buttons_location': 'both',
     'style_external_links': True,
-    'display_version': False,
+    #'display_version': False,
 }
 
 html_show_sourcelink = False
