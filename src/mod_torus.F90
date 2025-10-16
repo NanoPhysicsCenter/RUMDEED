@@ -579,7 +579,20 @@ function field_E_Torus(pos) result(field_E)
         field_E = field_E + w(k) * kd_data(:, kd_results(k)%idx)
     end do
     !field_E = field_E * 4.0d0 ! Debug to make field larger
+
+    ! Add field enhancement factor
+    field_E = field_E * enhancment_factor_torus(pos)
 end function field_E_Torus
+
+function enhancment_factor_torus(pos) result(beta)
+    ! Input variables
+    double precision, dimension(1:3), intent(in) :: pos ! Position to calculate the electric field at
+
+    ! Output variables
+    double precision                          :: beta ! Enhancement factor at the point
+
+    beta = 1.0d0
+end function enhancment_factor_torus
 
 !-------------------------------------------!
 ! Calculate the electric field at a point in the system for 1 V
