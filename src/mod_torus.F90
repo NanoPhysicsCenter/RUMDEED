@@ -123,8 +123,8 @@ subroutine Init_Torus()
     !call Add_Particle(pos_test, vel_test, species_elec, 0, 1, -1)
 
     ! Output field along a curve on top of the looped CNT
-    !call Calc_E_Along_Top()
-    !call Calc_E_Around_Top()
+    call Calc_E_Along_Top()
+    call Calc_E_Around_Top()
 
     !stop
 end subroutine Init_Torus
@@ -336,7 +336,7 @@ end subroutine Create_KD_Tree
 subroutine Calc_E_Along_Top(per)
   implicit none
   integer :: k
-  integer, parameter :: N_p = 10000
+  integer, parameter :: N_p = 100000
   integer, intent(in), optional :: per
 
   real(kdkind), dimension(1:3) :: p, p_torus, E_vec, E_vec_image
@@ -419,7 +419,7 @@ end subroutine Calc_E_Along_Top
 subroutine Calc_E_Around_Top(per)
   implicit none
   integer :: k
-  integer, parameter :: N_p = 10000
+  integer, parameter :: N_p = 100000
   integer, intent(in), optional :: per
 
   real(kdkind), dimension(1:3) :: p, p_torus, E_vec, E_vec_image
@@ -609,19 +609,32 @@ function enhancment_factor_torus(pos, org_pos) result(beta)
     double precision                          :: beta ! Enhancement factor at the point
 
     ! Local variables
+    double precision, dimension(1:3) :: org_pos_shifted
     double precision, dimension(1:3) :: mean, diff
     double precision :: std
     double precision :: Amp
 
     ! Calculate the mean and standard deviation of the angles
-    mean = 0.0d0
-    std = 1.0d0
-    Amp = 1.0d0
-    diff = org_pos - mean
+    mean(1) = rho ! Ignore rho since we are at the surface
+    mean(2) = pi/2.0d0 ! Peak at phi = pi/2
+    mean(3) = 0.0d0 ! Peak at theta = 0, note periodicity
+
+    std = pi/42.0d0 ! Standard deviation
+    Amp = 0.25d0 ! Amplitude of the enhancement
+
+    ! Change theta from [0, 2pi] to [-pi, pi] for mean calculation
+    ! Needs to be done because of periodicity
+    org_pos_shifted = org_pos
+    if (org_pos_shifted(2) > pi) then
+        org_pos_shifted(2) = org_pos_shifted(2) - 2.0d0*pi
+    end if
+    diff = org_pos_shifted - mean
 
     ! Calculate the enhancement factor
     ! Gaussian 1 + Amp * exp(-1/std^2 * diff^2)
-    beta = 1.0d0 + Amp * exp(-1.0d0/std**2 * (diff(1)**2 + diff(2)**2 + diff(3)**2))
+    beta = 1.0d0 + Amp * exp(-1.0d0/std**2 * (diff(2)**2 + diff(3)**2))
+
+    !beta = 1.0d0 ! Disable for now
 end function enhancment_factor_torus
 
 !-------------------------------------------!
