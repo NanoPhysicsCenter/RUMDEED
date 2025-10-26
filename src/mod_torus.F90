@@ -595,12 +595,12 @@ function field_E_Torus(pos_xyz, org_pos, is_surface) result(field_E)
     ! Add field enhancement factor if at surface
     if (present(is_surface)) then
         if (is_surface) then
-            field_E = field_E * enhancment_factor_torus(pos_xyz, org_pos)
+            field_E = field_E * enhancement_factor_torus(pos_xyz, org_pos)
         end if
     end if
 end function field_E_Torus
 
-function enhancment_factor_torus(pos, org_pos) result(beta)
+function enhancement_factor_torus(pos, org_pos) result(beta)
     ! Input variables
     double precision, dimension(1:3), intent(in) :: pos ! Position to calculate the electric field at
     double precision, dimension(1:3), intent(in) :: org_pos ! Original position
@@ -635,7 +635,7 @@ function enhancment_factor_torus(pos, org_pos) result(beta)
     beta = 1.0d0 + Amp * exp(-1.0d0/std**2 * (diff(2)**2 + diff(3)**2))
 
     !beta = 1.0d0 ! Disable for now
-end function enhancment_factor_torus
+end function enhancement_factor_torus
 
 !-------------------------------------------!
 ! Calculate the electric field at a point in the system for 1 V
