@@ -112,11 +112,13 @@ contains
   end function Field_normal
 
   !pure function field_E_Hyperboloid(pos_xyz)
-  pure function field_E_Hyperboloid(pos_xyz)
-    double precision, dimension(1:3), intent(in) :: pos_xyz
-    double precision, dimension(1:3)             :: pos_pro !xi, eta, phi
-    double precision, dimension(1:3)             :: field_E_Hyperboloid
-    double precision                             :: pre_fac_E_tip_xyz, fac_E_xy
+  pure function field_E_Hyperboloid(pos_xyz, org_pos, is_surface)
+    double precision, dimension(1:3), intent(in)           :: pos_xyz
+    double precision, dimension(1:3), intent(in), optional :: org_pos
+    logical, intent(in), optional                          :: is_surface
+    double precision, dimension(1:3)                       :: pos_pro !xi, eta, phi
+    double precision, dimension(1:3)                       :: field_E_Hyperboloid
+    double precision                                       :: pre_fac_E_tip_xyz, fac_E_xy
 
     pos_pro(1) = xi_coor(pos_xyz(1), pos_xyz(2), pos_xyz(3))
     pos_pro(2) = eta_coor(pos_xyz(1), pos_xyz(2), pos_xyz(3))

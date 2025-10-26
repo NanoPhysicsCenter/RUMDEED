@@ -322,9 +322,11 @@ module mod_global
       integer, intent(in) :: i
     end subroutine Check_Boundary
 
-    function Electric_Field(pos) result(field_E)
-      double precision, dimension(1:3), intent(in) :: pos
-      double precision, dimension(1:3)             :: field_E
+    function Electric_Field(pos_xyz, org_pos, is_surface) result(field_E)
+      double precision, dimension(1:3), intent(in)           :: pos_xyz
+      double precision, dimension(1:3), intent(in), optional :: org_pos
+      logical, intent(in), optional                          :: is_surface
+      double precision, dimension(1:3)                       :: field_E
     end function Electric_Field
 
     subroutine Do_Emission(step)

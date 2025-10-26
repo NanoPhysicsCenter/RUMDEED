@@ -422,12 +422,14 @@ subroutine Create_KD_Tree()
 
 end subroutine Create_KD_Tree
 
-function field_E_cylinder(pos) result(field_E)
+function field_E_cylinder(pos_xyz, org_pos, is_surface) result(field_E)
     ! Input variables
-    double precision, dimension(1:3), intent(in) :: pos ! Position to calculate the electric field at
+    double precision, dimension(1:3), intent(in)           :: pos_xyz ! Position to calculate the electric field at
+    double precision, dimension(1:3), intent(in), optional :: org_pos ! Original position
+    logical, intent(in), optional                          :: is_surface ! Flag indicating if the position is on the surface
 
     ! Output variables
-    double precision, dimension(1:3)             :: field_E ! Electric field at the point
+    double precision, dimension(1:3)                       :: field_E ! Electric field at the point
 
     ! Local variables
     integer, parameter                        :: nn = 4 ! number of nearest neighbors to find
@@ -444,7 +446,7 @@ function field_E_cylinder(pos) result(field_E)
     !print *, 'pos = ', pos
     ! Note: The kd-tree is not thread safe, so we have to use a critical section
     !$omp critical (kdtree2)
-    call kdtree2_n_nearest(tp=kd_tree, qv=pos, nn=nn, results=kd_results)
+    call kdtree2_n_nearest(tp=kd_tree, qv=pos_xyz, nn=nn, results=kd_results)
     !$omp end critical (kdtree2)
 
     ! Interpolate the electric field at the point using the nearest neighbors and the inverse distance to each as weights

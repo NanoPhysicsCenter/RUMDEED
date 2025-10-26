@@ -433,9 +433,11 @@ contains
   !-----------------------------------------------------------------------------
   ! Find field in a point
   ! Returns the electric field in V/m
-  function Calc_Field_at(pos)
-    double precision, dimension(1:3)             :: Calc_Field_at
-    double precision, dimension(1:3), intent(in) :: pos
+  function Calc_Field_at(pos_xyz, org_pos, is_surface)
+    double precision, dimension(1:3)                       :: Calc_Field_at
+    double precision, dimension(1:3), intent(in)           :: pos_xyz
+    double precision, dimension(1:3), intent(in), optional :: org_pos
+    logical, intent(in), optional                          :: is_surface
 
     double precision, dimension(1:3) :: force_c, force_tot, force_ic
     double precision, dimension(1:3) :: pos_1, pos_2, diff
@@ -445,10 +447,10 @@ contains
     integer                          :: j
 
     ! Position of the particle we are calculating the force/acceleration on
-    pos_1 = pos
+    pos_1 = pos_xyz
 
     ! Electric field in the system
-    force_tot = ptr_field_E(pos_1)
+    force_tot = ptr_field_E(pos_1, org_pos, is_surface)
     !print *, force_tot
 
     !$OMP PARALLEL DO DEFAULT(NONE) PRIVATE(j, pos_2, diff, r, force_c, force_ic, q_2, pre_fac_c) &
@@ -552,9 +554,11 @@ contains
 
   ! ----------------------------------------------------------------------------
   ! The vacuum electric field
-  pure function field_E_planar(pos) result(field_E)
-    double precision, dimension(1:3), intent(in) :: pos
-    double precision, dimension(1:3)             :: field_E
+  pure function field_E_planar(pos_xyz, org_pos, is_surface) result(field_E)
+    double precision, dimension(1:3), intent(in)           :: pos_xyz
+    double precision, dimension(1:3), intent(in), optional :: org_pos
+    logical, intent(in), optional                          :: is_surface
+    double precision, dimension(1:3)                       :: field_E
 
     ! Electric field
     ! x

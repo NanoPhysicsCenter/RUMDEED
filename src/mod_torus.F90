@@ -339,7 +339,7 @@ subroutine Calc_E_Along_Top(per)
   integer, parameter :: N_p = 10000
   integer, intent(in), optional :: per
 
-  real(kdkind), dimension(1:3) :: p, E_vec, E_vec_image
+  real(kdkind), dimension(1:3) :: p, p_torus, E_vec, E_vec_image
   double precision :: phi, theta
   integer :: ud_cyl_around, IFAIL
   !character (len=*), parameter :: filename_cyl_circle="cyl_E_circle.dt"
@@ -362,6 +362,12 @@ subroutine Calc_E_Along_Top(per)
     ! Right corner
     phi = (k-1)*1.0d0*pi/(N_p-1)
     theta = 0.0d0
+
+    p_torus(1) = rho
+    p_torus(2) = phi
+    p_torus(3) = theta
+
+    ! Convert to Cartesian coordinates
     p(1) = 0.0d0
     p(2) = (R_y + rho*cos(theta))*cos(phi)
     p(3) = (R_z + rho*cos(theta))*sin(phi)
@@ -369,8 +375,8 @@ subroutine Calc_E_Along_Top(per)
     p_cyl_around(:, k) = p(:)
     len_cyl_around(k) = phi
 
-    E_vec = field_E_Torus(p) ! Vacuum field 
-    E_vec_image = Calc_Field_at(p) ! Total field
+    E_vec = field_E_Torus(p, p_torus, .True.) ! Vacuum field
+    E_vec_image = Calc_Field_at(p, p_torus, .True.) ! Total field
     ! Store data in array
     data_cyl_around(1, :, k) = E_vec_image ! Total field
     data_cyl_around(2, :, k) = E_vec(:) ! Vacuum field
@@ -416,7 +422,7 @@ subroutine Calc_E_Around_Top(per)
   integer, parameter :: N_p = 10000
   integer, intent(in), optional :: per
 
-  real(kdkind), dimension(1:3) :: p, E_vec, E_vec_image
+  real(kdkind), dimension(1:3) :: p, p_torus, E_vec, E_vec_image
   double precision :: phi, theta
   integer :: ud_cyl_around, IFAIL
   !character (len=*), parameter :: filename_cyl_circle="cyl_E_circle.dt"
@@ -439,6 +445,10 @@ subroutine Calc_E_Around_Top(per)
     ! Right corner
     phi = pi/2.0d0
     theta = (k-1)*1.0d0*pi/(N_p-1)
+    p_torus(1) = rho
+    p_torus(2) = phi
+    p_torus(3) = theta
+    ! Convert to Cartesian coordinates
     p(1) = rho*sin(theta)
     p(2) = (R_y + rho*cos(theta))*cos(phi)
     p(3) = (R_z + rho*cos(theta))*sin(phi)
@@ -446,8 +456,8 @@ subroutine Calc_E_Around_Top(per)
     p_cyl_around(:, k) = p(:)
     len_cyl_around(k) = phi
 
-    E_vec = field_E_Torus(p) ! Vacuum field 
-    E_vec_image = Calc_Field_at(p) ! Total field
+    E_vec = field_E_Torus(p, p_torus, .True.) ! Vacuum field
+    E_vec_image = Calc_Field_at(p, p_torus, .True.) ! Total field
     ! Store data in array
     data_cyl_around(1, :, k) = E_vec_image ! Total field
     data_cyl_around(2, :, k) = E_vec(:) ! Vacuum field
@@ -539,12 +549,14 @@ end subroutine Check_Boundary_Torus
 
 !-------------------------------------------!
 ! Calculate the electric field at a point in the system
-function field_E_Torus(pos) result(field_E)
+function field_E_Torus(pos_xyz, org_pos, is_surface) result(field_E)
     ! Input variables
-    double precision, dimension(1:3), intent(in) :: pos ! Position to calculate the electric field at
+    double precision, dimension(1:3), intent(in)           :: pos_xyz ! Position to calculate the electric field at
+    double precision, dimension(1:3), intent(in), optional :: org_pos ! Original position
+    logical, intent(in), optional                          :: is_surface
 
     ! Output variables
-    double precision, dimension(1:3)             :: field_E ! Electric field at the point
+    double precision, dimension(1:3)          :: field_E ! Electric field at the point
 
     ! Local variables
     integer, parameter                        :: nn = 4 ! number of nearest neighbors to find
@@ -561,7 +573,7 @@ function field_E_Torus(pos) result(field_E)
     !print *, 'pos = ', pos
     ! Note: The kd-tree is not thread safe, so we have to use a critical section
     !$omp critical (kdtree2)
-    call kdtree2_n_nearest(tp=kd_tree, qv=pos, nn=nn, results=kd_results)
+    call kdtree2_n_nearest(tp=kd_tree, qv=pos_xyz, nn=nn, results=kd_results)
     !$omp end critical (kdtree2)
 
     ! Interpolate the electric field at the point using the nearest neighbors and the inverse distance to each as weights
@@ -580,18 +592,36 @@ function field_E_Torus(pos) result(field_E)
     end do
     !field_E = field_E * 4.0d0 ! Debug to make field larger
 
-    ! Add field enhancement factor
-    field_E = field_E * enhancment_factor_torus(pos)
+    ! Add field enhancement factor if at surface
+    if (present(is_surface)) then
+        if (is_surface) then
+            field_E = field_E * enhancment_factor_torus(pos_xyz, org_pos)
+        end if
+    end if
 end function field_E_Torus
 
-function enhancment_factor_torus(pos) result(beta)
+function enhancment_factor_torus(pos, org_pos) result(beta)
     ! Input variables
     double precision, dimension(1:3), intent(in) :: pos ! Position to calculate the electric field at
+    double precision, dimension(1:3), intent(in) :: org_pos ! Original position
 
     ! Output variables
     double precision                          :: beta ! Enhancement factor at the point
 
-    beta = 1.0d0
+    ! Local variables
+    double precision, dimension(1:3) :: mean, diff
+    double precision :: std
+    double precision :: Amp
+
+    ! Calculate the mean and standard deviation of the angles
+    mean = 0.0d0
+    std = 1.0d0
+    Amp = 1.0d0
+    diff = org_pos - mean
+
+    ! Calculate the enhancement factor
+    ! Gaussian 1 + Amp * exp(-1/std^2 * diff^2)
+    beta = 1.0d0 + Amp * exp(-1.0d0/std**2 * (diff(1)**2 + diff(2)**2 + diff(3)**2))
 end function enhancment_factor_torus
 
 !-------------------------------------------!
@@ -988,7 +1018,7 @@ subroutine Metropolis_Hastings_Torus(ndim_in, F_out, F_norm_out, pos_xyz_out, n_
     do
         call Get_Random_Surface_Pos(pos_cur, pos_cur_torus)
 
-        F_cur = Calc_Field_at(pos_cur)
+        F_cur = Calc_Field_at(pos_cur, pos_cur_torus, .True.)
         F_norm_cur = Field_Normal(pos_cur, pos_cur_torus, F_cur)
 
         if (F_norm_cur < 0.0d0) then
@@ -1052,7 +1082,7 @@ function Get_Jump_Probability(pos, pos_torus, F_norm_cur, F_norm_new) result(alp
     double precision, dimension(1:3) :: F_new
 
     ! Calculate the electric field at the new position
-    F_new = Calc_Field_at(pos)
+    F_new = Calc_Field_at(pos, pos_torus, .True.)
     F_norm_new = Field_Normal(pos, pos_torus, F_new)
 
     ! Calculate the jump probability
@@ -1454,7 +1484,7 @@ end subroutine Do_Surface_Integration_simple
     integrand_cuba_torus_simple = 0 ! Return value to Cuba, 0 = success
 
     ! Calculate the electric field on the surface
-    field = Calc_Field_at(par_pos)
+    field = Calc_Field_at(par_pos, par_pos_org, .True.)
     field_norm = Field_normal(par_pos, par_pos_org, field)
 
     ! Add to the average field
