@@ -289,8 +289,8 @@ subroutine Create_KD_Tree()
                               kd_image_q(k), kd_elec_pos(1, k), kd_elec_pos(2, k), kd_elec_pos(3, k)
 
       ! Convert from mm to m
-      kd_elec_pos(:, k) = kd_elec_pos(:, k) * 1.0d-3
-      kd_image_pos(:, k) = kd_image_pos(:, k) * 1.0d-3
+      ! kd_elec_pos(:, k) = kd_elec_pos(:, k) * 1.0d-3
+      ! kd_image_pos(:, k) = kd_image_pos(:, k) * 1.0d-3
 
       ! Find the min and max coordinates for the electron positions
       if (k == 1) then
@@ -815,7 +815,7 @@ function Image_Charge_Torus_four(pos_1, pos_2)
 
     double precision, dimension(1:3) :: pos_1_ic, pos_2_ic, pos_3_ic, pos_4_ic, pos_ic ! Position of the image charge
     double precision                 :: q_1_ic, q_2_ic, q_3_ic, q_4_ic, q_ic ! Charge of the image charge
-    double precision                 :: w1, w2, w3, w4 ! Weights for the interpolation
+    double precision                 :: w1, w2, w3, w4, w ! Weights for the interpolation
     double precision, dimension(1:3) :: diff ! Vector from pos_1 to pos_ic
     double precision                 :: r ! Distance from pos_1 to pos_ic
     integer, parameter               :: nn = 4 ! number of nearest neighbors to find
@@ -853,10 +853,11 @@ function Image_Charge_Torus_four(pos_1, pos_2)
       w4 = 1.0d0 / (kd_results(4)%dis + eps)**p
 
       ! Normalize the weights
-      w1 = w1 / (w1 + w2 + w3 + w4)
-      w2 = w2 / (w1 + w2 + w3 + w4)
-      w3 = w3 / (w1 + w2 + w3 + w4)
-      w4 = w4 / (w1 + w2 + w3 + w4)
+      w = w1 + w2 + w3 + w4
+      w1 = w1 / w
+      w2 = w2 / w
+      w3 = w3 / w
+      w4 = w4 / w
 
       ! Interpolate the image charge position and charge using inverse distance weighting
       q_ic = w1*q_1_ic + w2*q_2_ic + w3*q_3_ic + w4*q_4_ic
@@ -877,6 +878,7 @@ subroutine Get_Random_Surface_Pos(pos, pos_torus)
     double precision, dimension(1:2) :: phi_theta
 
     double precision, dimension(1:2) :: rnd
+    double precision :: rad
 
     ! Get random numbers
     call random_number(rnd)
@@ -896,18 +898,25 @@ subroutine Get_Random_Surface_Pos(pos, pos_torus)
     !! Warp phi to be in [0, pi] using modulo
     !phi_theta(1) = modulo(phi_theta(1), pi)
 
-    ! Warp phi to be in [pi/4, 3pi/4]
-    if (phi_theta(1) < pi/4.0d0) then
-      phi_theta(1) = -1.0d0*phi_theta(1) + pi/2.0d0
-    else if (phi_theta(1) > 3.0d0*pi/4.0d0) then
-      phi_theta(1) = -1.0d0*phi_theta(1) + 3.0d0*pi/2.0d0
+    ! Warp phi to be in +-rad around pi/2
+    rad = 10.0d0*pi/180.0d0 ! 10 degrees in radians
+    if (phi_theta(1) < (pi/2.0d0 - rad)) then
+        phi_theta(1) = pi - rad - modulo( (pi - rad) - phi_theta(1), 2.0d0*rad )
+    else if (phi_theta(1) > (pi/2.0d0 + rad)) then
+        phi_theta(1) = rad + modulo( phi_theta(1) - (pi/2.0d0 + rad), 2.0d0*rad )
     end if
 
     !! Warp theta to be in [0, 2pi] using modulo
     !phi_theta(2) = modulo(phi_theta(2), 2.0d0*pi)
 
     ! Constrain theta to be [-pi/4, pi/4] using modulo
-    phi_theta(2) = modulo(phi_theta(2) + pi/4.0d0, pi/2.0d0) - pi/4.0d0
+    !phi_theta(2) = modulo(phi_theta(2) + pi/4.0d0, pi/2.0d0) - pi/4.0d0
+    ! Constrain theta to be [-rad, rad]
+    if (phi_theta(2) < -rad) then
+        phi_theta(2) = -rad + modulo( -rad - phi_theta(2), 2.0d0*rad )
+    else if (phi_theta(2) > rad) then
+        phi_theta(2) = rad - modulo( phi_theta(2) - rad, 2.0d0*rad )
+    end if
 
     ! theta uniformly distributed in [0, 2pi]
     !theta = 2.0d0 * pi * rnd(2)
@@ -1117,6 +1126,8 @@ subroutine Jump_MH(pos_cur, pos_torus, pos_new, pos_new_torus, std_xy)
     double precision, dimension(1:3), intent(out) :: pos_new_torus
     double precision, dimension(1:2), intent(in)  :: std_xy
 
+    double precision :: rad
+
     ! Generate a new position on the surface from the current position
     pos_new_torus(2:3) = box_muller(pos_torus(2:3), std_xy) ! Jump in phi and theta
 
@@ -1150,21 +1161,22 @@ subroutine Jump_MH(pos_cur, pos_torus, pos_new, pos_new_torus, std_xy)
     !  pos_new_torus(2) = 2.0d0*pi - pos_new_torus(2) ! Reflect back, d = P - L, P' = L - d = 2L - P
     !end if
 
-    ! phi is between pi/4 and 3pi/4, reflect back if out of bounds
-    if (pos_new_torus(2) < pi/4.0d0) then
-      pos_new_torus(2) = -1.0d0*pos_new_torus(2) + pi/2.0d0
-    else if (pos_new_torus(2) > 3.0d0*pi/4.0d0) then
-      pos_new_torus(2) = -1.0d0*pos_new_torus(2) + 3.0d0*pi/2.0d0
+    ! keep phi around pi/2 +- rad, reflect back if out of bounds
+    rad = 10.0d0*pi/180.0d0 ! 10 degrees in radians
+    if (pos_new_torus(2) < (pi/2.0d0 - rad)) then
+      pos_new_torus(2) = pi - rad - ( (pi - rad) - pos_new_torus(2) )
+    else if (pos_new_torus(2) > (pi/2.0d0 + rad)) then
+      pos_new_torus(2) = rad + ( pos_new_torus(2) - (pi/2.0d0 + rad) )
     end if
 
     !! theta is between 0 and 2*pi, use modulo
     !pos_new_torus(3) = modulo(pos_new_torus(3), 2.0d0*pi)
 
-    ! theta is between -pi/4 and pi/4, reflect back if out of bounds
-    if (pos_new_torus(3) < -pi/4.0d0) then
-      pos_new_torus(3) = -1.0d0*pos_new_torus(3) - pi
-    else if (pos_new_torus(3) > pi/4.0d0) then
-      pos_new_torus(3) = -1.0d0*pos_new_torus(3) + pi
+    ! theta is between +-rad, reflect back if out of bounds
+    if (pos_new_torus(3) < -rad) then
+      pos_new_torus(3) = -rad + ( -rad - pos_new_torus(3) )
+    else if (pos_new_torus(3) > rad) then
+      pos_new_torus(3) = rad - ( pos_new_torus(3) - rad )
     end if
 
     ! Calculate the x and y coordinates
