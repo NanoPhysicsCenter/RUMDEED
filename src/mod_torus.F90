@@ -118,15 +118,15 @@ subroutine Init_Torus()
     ! Debugging
     ! Add a test particle
     ! -2.810000e-06	0.000000	0.000114 ! Line 30
-    !pos_test = [-2.81d-6, 0.0d0, 0.114d-3]
-    !vel_test = [0.0d0, 0.0d0, 0.0d0]
-    !call Add_Particle(pos_test, vel_test, species_elec, 0, 1, -1)
+    pos_test = [-2.81d-6, 0.0d0, 0.114d-3]
+    vel_test = [0.0d0, 0.0d0, 0.0d0]
+    call Add_Particle(pos_test, vel_test, species_elec, 0, 1, -1)
 
     ! Output field along a curve on top of the looped CNT
     call Calc_E_Along_Top()
     call Calc_E_Around_Top()
 
-    !stop
+    stop
 end subroutine Init_Torus
 
 !-------------------------------------------!
@@ -824,10 +824,12 @@ function Image_Charge_Torus_four(pos_1, pos_2)
     type(kdtree2_result)             :: kd_results(1:nn) ! results from the kd-tree
 
     ! Check if the position is within the bounds of the image charge data
-    if (pos_2(1) < image_min_x .or. pos_2(1) > image_max_x .or. &
-        pos_2(2) < image_min_y .or. pos_2(2) > image_max_y .or. &
-        pos_2(3) < image_min_z .or. pos_2(3) > image_max_z) then
+    !if (pos_2(1) < image_min_x .or. pos_2(1) > image_max_x .or. &
+    !    pos_2(2) < image_min_y .or. pos_2(2) > image_max_y .or. &
+    !    pos_2(3) < image_min_z .or. pos_2(3) > image_max_z) then
+    if (pos_2(3) > image_max_z) then
         Image_Charge_Torus_four = 0.0d0
+    !    print *, 'Position out of bounds for image charge lookup: ', pos_2
     else
 
       ! Look up the nearest electron position
@@ -862,6 +864,10 @@ function Image_Charge_Torus_four(pos_1, pos_2)
       ! Interpolate the image charge position and charge using inverse distance weighting
       q_ic = w1*q_1_ic + w2*q_2_ic + w3*q_3_ic + w4*q_4_ic
       pos_ic = w1*pos_1_ic + w2*pos_2_ic + w3*pos_3_ic + w4*pos_4_ic
+
+      ! Debugging prints
+      print *, 'Image charge position: ', pos_ic
+      print *, 'Image charge value: ', q_ic
 
       ! Calculate the force/acceleration on the particle at pos_1 due to the image charge
       diff = pos_1 - pos_ic
