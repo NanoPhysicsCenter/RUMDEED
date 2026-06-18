@@ -288,9 +288,7 @@ subroutine Create_KD_Tree()
       read(ud_imagedata, *) kd_image_pos(1, k), kd_image_pos(2, k), kd_image_pos(3, k), &
                               kd_image_q(k), kd_elec_pos(1, k), kd_elec_pos(2, k), kd_elec_pos(3, k)
 
-      ! Convert from mm to m
-      ! kd_elec_pos(:, k) = kd_elec_pos(:, k) * 1.0d-3
-      ! kd_image_pos(:, k) = kd_image_pos(:, k) * 1.0d-3
+      ! Data file uses meters (no unit conversion needed)
 
       ! Find the min and max coordinates for the electron positions
       if (k == 1) then
@@ -532,7 +530,7 @@ subroutine Check_Boundary_Torus(i)
         ! Calculate the distance from the particle to the center of the torus
         d = sqrt((pos(1) - x_c)**2 + (pos(2) - y_c)**2 + (pos(3) - z_c)**2)
         if (d <= rho) then
-            ! The particle is outside the torus
+            ! The particle is inside the torus tube
             call Mark_Particles_Remove(i, remove_bot)
         end if
     end if
@@ -824,12 +822,10 @@ function Image_Charge_Torus_four(pos_1, pos_2)
     type(kdtree2_result)             :: kd_results(1:nn) ! results from the kd-tree
 
     ! Check if the position is within the bounds of the image charge data
-    !if (pos_2(1) < image_min_x .or. pos_2(1) > image_max_x .or. &
-    !    pos_2(2) < image_min_y .or. pos_2(2) > image_max_y .or. &
-    !    pos_2(3) < image_min_z .or. pos_2(3) > image_max_z) then
-    if (pos_2(3) > image_max_z) then
+    if (pos_2(1) < image_min_x .or. pos_2(1) > image_max_x .or. &
+        pos_2(2) < image_min_y .or. pos_2(2) > image_max_y .or. &
+        pos_2(3) < image_min_z .or. pos_2(3) > image_max_z) then
         Image_Charge_Torus_four = 0.0d0
-    !    print *, 'Position out of bounds for image charge lookup: ', pos_2
     else
 
       ! Look up the nearest electron position
@@ -906,11 +902,7 @@ subroutine Get_Random_Surface_Pos(pos, pos_torus)
 
     ! Warp phi to be in +-rad around pi/2
     rad = 10.0d0*pi/180.0d0 ! 10 degrees in radians
-    if (phi_theta(1) < (pi/2.0d0 - rad)) then
-        phi_theta(1) = pi - rad - modulo( (pi - rad) - phi_theta(1), 2.0d0*rad )
-    else if (phi_theta(1) > (pi/2.0d0 + rad)) then
-        phi_theta(1) = rad + modulo( phi_theta(1) - (pi/2.0d0 + rad), 2.0d0*rad )
-    end if
+    phi_theta(1) = (pi/2.0d0 - rad) + modulo(phi_theta(1) - (pi/2.0d0 - rad), 2.0d0*rad)
 
     !! Warp theta to be in [0, 2pi] using modulo
     !phi_theta(2) = modulo(phi_theta(2), 2.0d0*pi)
@@ -1030,7 +1022,7 @@ subroutine Metropolis_Hastings_Torus(ndim_in, F_out, F_norm_out, pos_xyz_out, n_
     double precision :: alpha, rnd
 
     integer :: IFAIL, k
-    integer :: accepted, rejected
+    integer :: accepted = 0, rejected = 0
 
     ! Initialize the output variables
     F_out = 0.0d0
@@ -1066,7 +1058,9 @@ subroutine Metropolis_Hastings_Torus(ndim_in, F_out, F_norm_out, pos_xyz_out, n_
     do
         call Jump_MH(pos_cur, pos_cur_torus, pos_new, pos_new_torus, std_xy)
 
-        alpha = Get_Jump_Probability(pos_cur, pos_cur_torus, F_norm_cur, F_norm_new)
+        F_new = Calc_Field_at(pos_new, pos_new_torus, .True.)
+        F_norm_new = Field_Normal(pos_new, pos_new_torus, F_new)
+        alpha = Get_Jump_Probability(F_norm_cur, F_norm_new)
 
         ! Accept or reject the jump
         call random_number(rnd)
@@ -1099,23 +1093,12 @@ subroutine Metropolis_Hastings_Torus(ndim_in, F_out, F_norm_out, pos_xyz_out, n_
     F_norm_out = F_norm_cur
 end subroutine Metropolis_Hastings_Torus
 
-function Get_Jump_Probability(pos, pos_torus, F_norm_cur, F_norm_new) result(alpha)
-    double precision, dimension(1:3), intent(in) :: pos ! Position to calculate the jump probability at
-    double precision, dimension(1:3), intent(in) :: pos_torus ! Position of in toroidal coordinates
-    double precision, intent(in)                 :: F_norm_cur ! Electric field at the current position
-    double precision, intent(out)                 :: F_norm_new ! Electric field at the new position
+function Get_Jump_Probability(F_norm_cur, F_norm_new) result(alpha)
+    double precision, intent(in) :: F_norm_cur ! Normal field at current position
+    double precision, intent(in) :: F_norm_new ! Normal field at proposed position
     double precision :: alpha
 
-    ! Local variables
-    double precision, dimension(1:3) :: F_new
-
-    ! Calculate the electric field at the new position
-    F_new = Calc_Field_at(pos, pos_torus, .True.)
-    F_norm_new = Field_Normal(pos, pos_torus, F_new)
-
-    ! Calculate the jump probability
-    ! Calculate the jump probability
-    if (F_norm_new >= 0.0d0) then ! If the field is positive, then the jump probability is zero
+    if (F_norm_new >= 0.0d0) then
       alpha = 0.0d0
     else
       alpha = F_norm_new / F_norm_cur
@@ -1170,9 +1153,9 @@ subroutine Jump_MH(pos_cur, pos_torus, pos_new, pos_new_torus, std_xy)
     ! keep phi around pi/2 +- rad, reflect back if out of bounds
     rad = 10.0d0*pi/180.0d0 ! 10 degrees in radians
     if (pos_new_torus(2) < (pi/2.0d0 - rad)) then
-      pos_new_torus(2) = pi - rad - ( (pi - rad) - pos_new_torus(2) )
+      pos_new_torus(2) = (pi - 2.0d0*rad) - pos_new_torus(2) ! reflect at pi/2 - rad
     else if (pos_new_torus(2) > (pi/2.0d0 + rad)) then
-      pos_new_torus(2) = rad + ( pos_new_torus(2) - (pi/2.0d0 + rad) )
+      pos_new_torus(2) = (pi + 2.0d0*rad) - pos_new_torus(2) ! reflect at pi/2 + rad
     end if
 
     !! theta is between 0 and 2*pi, use modulo
