@@ -358,7 +358,7 @@ subroutine Create_KD_Tree()
     !print *, 'n_points = ', n_points
 
     ! Rewind to the start of the file
-    rewind(ud_meshdata)
+    rewind(ud_imagedata)
 
     ! Allocate the arrays to hold the file
     allocate(kd_image_elec_pos(1:3, 1:n_points))
@@ -505,7 +505,7 @@ function E_zunit_cylinder(pos) result(E_zunit)
     ! Calculate the interpolated electric field
     E_zunit = 0.0d0
     do k = 1, nn
-        E_zunit = E_zunit + w(k) * kd_data(:, kd_results(k)%idx)
+        E_zunit = E_zunit + w(k) * kd_data_1V(:, kd_results(k)%idx)
     end do
 end function E_zunit_cylinder
 
@@ -606,7 +606,7 @@ logical function Check_Boundary_Cylinder_pos(par_pos, sec, do_pad_in)
     end if
 
     ! Check the top of the corner
-    RR = radius_cyl - radius_cor + sqrt(radius_cor**2 - (z - (height_cyl - radius_cor))**2)
+    RR = radius_cyl - radius_cor + sqrt(max(0.0d0, radius_cor**2 - (z - (height_cyl - radius_cor))**2))
     if (r2 < RR**2) then
       !print *, 'RUMDEED: Particle inside the corner 2 (Check_Boundary_Cylinder)'
       !print *, 'x = ', par_pos(1)
@@ -774,6 +774,7 @@ subroutine Do_Field_Emission_Cylinder_simple(step)
 
   Df_avg = 0.0d0
   i = 0
+  par_vel = 0.0d0
   ! Loop over the electrons to be emitted.
   do s = 1, N_round
       ! Get the position of the particle
@@ -1184,6 +1185,8 @@ function Get_Jump_Probability(F_norm_cur, F_new, F_norm_new, pos_new, pos_xyz_ne
 
     ! Calculate the jump probability
     if (F_norm_new >= 0.0d0) then ! If the field is positive, then the jump probability is zero
+      alpha = 0.0d0
+    else if (abs(F_norm_cur) < tiny(F_norm_cur)) then
       alpha = 0.0d0
     else
       alpha = F_norm_new / F_norm_cur
