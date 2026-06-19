@@ -329,6 +329,7 @@ subroutine Do_Photo_Emission_Tip(step)
 
   emit = 1
   nrElecEmit = 0
+  nrTry = 0
 
   ! Check if we are doing a Gaussian distributed emission
   ! and set the max number of electrons allowed to be emitted if we are.
@@ -512,6 +513,8 @@ end subroutine Do_Photo_Emission_Tip
     !print *, len_y, len_y / length
 
     nrElecEmit = 0
+    n_s = 0.0d0
+    F_avg = 0.0d0
 
     !print *, 'Integration loop'
     do i = 1, nr_xi
@@ -767,7 +770,7 @@ end subroutine Do_Photo_Emission_Tip
 
     ! Calculate the escape probability at this location
     if (eta_f < 0.0d0) then
-      df_cur = Escape_Prob_tip(field(3), cur_pos)
+      df_cur = Escape_Prob_tip(eta_f, cur_pos)
     else
       df_cur = 0.0d0 ! Zero escape probability if field is not favorable
     end if
@@ -1174,7 +1177,7 @@ end subroutine Do_Photo_Emission_Tip
     end if
 
     if (xi < 1.0d0) then
-      d_xi = 1.0 - xi
+      d_xi = 1.0d0 - xi
       if (d_xi > max_d) then
         xi = 1.0d0
       else
@@ -1289,8 +1292,8 @@ end subroutine Do_Photo_Emission_Tip
       new_pos(2) = y_coor(xi, eta_1, phi)
       new_pos(3) = z_coor(xi, eta_1, phi)
 
-      field = Calc_Field_at(par_pos)
-      eta_f = Field_normal(par_pos, field)
+      field = Calc_Field_at(new_pos)
+      eta_f = Field_normal(new_pos, field)
       !new_val = norm2(par_elec%accel)
       new_val = eta_f
 
@@ -1360,7 +1363,7 @@ end subroutine Do_Photo_Emission_Tip
     end if
 
     if (xi < 1.0d0) then
-      d_xi = 1.0 - xi
+      d_xi = 1.0d0 - xi
       if (d_xi > max_d) then
         xi = 1.0d0
       else
@@ -1923,7 +1926,7 @@ end function Elec_supply_tip
 
     Gauss_Emission = A * exp( -1.0d0*b*(step - mu)**2 )
 
-    write (ud_gauss, "(i6, tr2, i6)", iostat=IFAIL) step, Gauss_Emission
+    write (ud_gauss, "(i6, tr2, E16.8)", iostat=IFAIL) step, Gauss_Emission
   end function Gauss_Emission
 
   double precision function Photon_Emission(photon_energy, freq_var)
