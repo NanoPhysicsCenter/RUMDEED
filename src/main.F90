@@ -196,8 +196,10 @@ program RUMDEED
       end if
 
     end do
-  
-    call PrintProgress(10)
+
+    if (cought_stop_signal .eqv. .false.) then
+      call PrintProgress(10)
+    end if
     print '(a)', 'RUMDEED: Main loop finished'
 
 
@@ -297,6 +299,13 @@ contains
     ! Close the 'input' file
     close(unit=ud_input, iostat=IFAIL, status='keep')
 
+    ! planes_z and planes_ud are sized 1:planes_N_max, guard against overflow
+    if (planes_N > planes_N_max) then
+      print '(a, i0, a, i0)', 'RUMDEED: ERROR planes_N = ', planes_N, &
+            ' exceeds planes_N_max = ', planes_N_max
+      stop
+    end if
+
     ! box_dim: Dimensions of the system
     ! d: Gap spacingelse
     box_dim = box_dim * length_scale
@@ -375,18 +384,22 @@ contains
     allocate(life_time(1:MAX_LIFE_TIME, 1:2))
     allocate(ramo_current(1:nrSpecies))
 
-    particles_cur_pos     = 0.0d0
-    particles_prev_pos    = 0.0d0
-    particles_cur_vel     = 0.0d0
-    particles_cur_accel   = 0.0d0
-    particles_prev_accel  = 0.0d0
-    particles_prev2_accel = 0.0d0
-    particles_charge      = 0.0d0
-    particles_species     = 0
-    particles_mass        = 0.0d0
-    particles_step        = 0
-    particles_mask        = .true.
-    particles_id          = 0
+    particles_cur_pos      = 0.0d0
+    particles_prev_pos     = 0.0d0
+    particles_last_col_pos = 0.0d0
+    particles_cur_vel      = 0.0d0
+    particles_cur_accel    = 0.0d0
+    particles_prev_accel   = 0.0d0
+    particles_prev2_accel  = 0.0d0
+    particles_charge       = 0.0d0
+    particles_species      = 0
+    particles_mass         = 0.0d0
+    particles_step         = 0
+    particles_emitter      = 0
+    particles_section      = 0
+    particles_life         = 0
+    particles_mask         = .true.
+    particles_id           = 0
 
     ramo_current = 0.0d0
     ramo_current_emit(1:MAX_SECTIONS, 1:MAX_EMITTERS) = 0.0d0
@@ -431,7 +444,7 @@ contains
     ! Register a subroutine to catch the SIGINT signal
 #if defined(__GNUC__)
     IFAIL = SIGNAL(SIGINT, Signal_Handler) ! SIGINT is used by to stop the simulations by ctrl+c
-    IFAIL = SIGNAL(16, Signal_Handler) ! SIGUSR1=16 is used by slurm to stop the simulation
+    IFAIL = SIGNAL(SIGUSR1, Signal_Handler) ! SIGUSR1=10 is used by slurm to stop the simulation
 #endif
 
     ! Create folder for output files
@@ -736,7 +749,7 @@ contains
     write(ud_init, *) '---------------------------------------------------------'
     write(ud_init, fmt_int) 'MAX_PARTICLES       = ', MAX_PARTICLES, 'Maximum number of electrons in the system'
     !write(ud_init, fmt_int) 'SEED                = ', SEED,          'Seed value used in the random number generator'
-    write(ud_init, fmt_int)  'my_seed             = ', my_seed(:),    'Seed value used in the random number generator'
+    write(ud_init, '(a, tr8, *(i12))') 'my_seed             = ', my_seed(:)
     !write(ud_init, fmt_int) 'MAX_EMISSION_TRY    = ', MAX_EMISSION_TRY,    'Maximum number of failed emission attempts'
     !write(ud_init, fmt_int) 'MAX_TIME_STEP_WRITE = ', MAX_TIME_STEP_WRITE, 'Maximum number of times steps to output data'
     write(ud_init, *) '---------------------------------------------------------'
@@ -837,6 +850,9 @@ contains
 
     deallocate(ramo_current)
     deallocate(life_time)
+
+    if (allocated(N2_tot_cross)) deallocate(N2_tot_cross)
+    if (allocated(N2_ion_cross)) deallocate(N2_ion_cross)
 
     deallocate(my_seed)
 

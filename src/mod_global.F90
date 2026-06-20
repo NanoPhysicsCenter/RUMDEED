@@ -244,8 +244,9 @@ module mod_global
   ! Planes where to record information about particles when they pass through
   integer                                     :: planes_N = 10
   integer, parameter                          :: planes_N_max = 10
+  ! Given in length_scale (nm); scaled to meters once in Read_Input_Variables.
   double precision, dimension(1:planes_N_max) :: planes_z = &
-                    & (/ 5.0d0, 10.0d0, 25.0d0, 50.0d0, 75.0d0, 100.0d0, 125.0d0, 250.0d0, 500.0d0, 750.0d0 /) * length_scale
+                    & (/ 5.0d0, 10.0d0, 25.0d0, 50.0d0, 75.0d0, 100.0d0, 125.0d0, 250.0d0, 500.0d0, 750.0d0 /)
   integer, dimension(1:planes_N_max)          :: planes_ud
 
 
@@ -295,6 +296,7 @@ module mod_global
   ! Other
   logical            :: cought_stop_signal = .false. ! If true we stop the main loop
   integer, parameter :: SIGINT = 2 ! Interrupt signal (Ctrl+C)
+  integer, parameter :: SIGUSR1 = 10 ! User signal 1 (Linux/x86), used by slurm to stop the simulation
   integer            :: nthreads ! Number of OpenMP threads
 
   ! Units tests
@@ -386,17 +388,13 @@ contains
    flush(ud_density_absorb_bot)
   end subroutine Flush_Data
 
-  ! Check if a number is infinit.
+  ! Check if a number is infinite.
   logical function isinf(a)
+    use, intrinsic :: ieee_arithmetic
     double precision, intent(in) :: a
 
-    ! if the number is infinity then the results is always infinity,
-    ! .i.e inf - 1 = inf
-    if ((a-1.0d0) == a) then
-      isinf = .true.
-    else
-      isinf = .false.
-    end if
+    ! A value is infinite if it is neither finite nor NaN.
+    isinf = (.not. ieee_is_finite(a)) .and. (.not. ieee_is_nan(a))
   end
 
 ! PGI compiler does not have is isnan function
@@ -445,7 +443,7 @@ function box_muller(mean, std)
    x = 2.0d0*x - 1.0d0
    w = x(1)**2 + x(2)**2
 
-   if (w < 1.0d0) exit
+   if ((w < 1.0d0) .and. (w > 0.0d0)) exit
   end do
   
   y = x*sqrt( (-2.0d0 * log( w ) ) / w )
@@ -505,7 +503,7 @@ end function Rand_Poisson
     ! It will return the index to the nearest value. The optional arguments
     ! i1 and i2 will be the two elements that the value falls between in the list.
 integer function BinarySearch(list, value, i1, i2)
-   double precision, dimension(:), target, intent(in) :: list(:)
+   double precision, dimension(:), target, intent(in) :: list
    double precision, intent(in)               :: value
    integer, intent(out), optional             :: i1, i2
    integer                                    :: first, last, mid
@@ -513,6 +511,14 @@ integer function BinarySearch(list, value, i1, i2)
    ! Get the upper and lower bounds of the list
    first = lbound(list, 1)
    last = ubound(list, 1)
+
+   ! Degenerate list (0 or 1 elements): nothing to narrow down
+   if ((last - first) < 1) then
+      if (present(i1)) i1 = first
+      if (present(i2)) i2 = last
+      BinarySearch = first
+      return
+   end if
 
    do
    ! Check if we have narrowed down our list to two elements
