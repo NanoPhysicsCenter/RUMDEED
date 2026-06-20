@@ -23,7 +23,7 @@ Module mod_field_emission_v2
   !integer                            :: nrEmitted
   double precision, dimension(1:3)   :: F_avg = 0.0d0
   integer, parameter                 :: N_MH_step = 10*3 ! Number of steps to do in the MH algorithm
-  double precision                   :: residual = 0.0d0 ! Should be a array the size of the number of emitters
+  double precision, dimension(:), allocatable :: residual ! Rounding residual, one per emitter
 
   ! Cuba
   !double precision, allocatable :: xgiven(:,:) ! xgiven(ldxgiven,ngiven) <in>, a list of points where the integrand
@@ -95,9 +95,11 @@ contains
   subroutine Init_Field_Emission_v2()
     ! Allocate the number of emitters
     allocate(nrEmitted_emitters(1:nrEmit))
+    allocate(residual(1:nrEmit))
 
     ! Initialize variables
     nrEmitted_emitters = 0 ! Number of electrons emitted from emitter number i in this time step
+    residual = 0.0d0 ! Rounding residual carried over between time steps, per emitter
 
     ! Function that checks the boundary conditions for the System
     ptr_Check_Boundary => Check_Boundary_Planar
@@ -128,6 +130,7 @@ contains
 
   subroutine Clean_Up_Field_Emission_v2()
     deallocate(nrEmitted_emitters)
+    deallocate(residual)
 
     call Work_fun_cleanup()
 
@@ -195,8 +198,10 @@ contains
     ! Do integration
     call Do_Cuba_Suave_Simple(emit, N_sup)
 
-    N_round = nint(N_sup + residual) ! Round to whole number
-    residual = N_sup - N_round
+    N_round = nint(N_sup + residual(emit)) ! Round to whole number
+    residual(emit) = N_sup - N_round
+
+    nrElecEmit = 0
 
     ! Loop over all electrons and place them
     do i = 1, N_round
@@ -241,8 +246,8 @@ contains
     double precision, dimension(1:3) :: par_pos, par_vel
 
     call Do_Surface_Integration_FE(emit, N_sup)
-    N_round = nint(N_sup + residual)
-    residual = N_sup - N_round
+    N_round = nint(N_sup + residual(emit))
+    residual(emit) = N_sup - N_round
 
     !call Calc_Field_old_method(step, emit)
 
@@ -359,7 +364,7 @@ contains
       l = l_const * (-1.0d0*F) / w_theta_xy(pos, emit)**2 ! l = y^2, y = 3.79E-4 * sqrt(F_old) / w_theta
       if (l > 1.0d0) then
         print *, 'Error: l > 1.0'
-        print *, 'l = ', l, ', F = ', F, ', t_y = ', t_y
+        print *, 'l = ', l, ', F = ', F
         print *, 'x = ', pos(1)/length_scale, 'y = ', pos(2)/length_scale, ' z = ,', pos(3)/length_scale
         l = 1.0d0
         !call Write_Current_Position()
@@ -1097,15 +1102,18 @@ end function Escape_Prob_log
     !integer                                       :: jump_a, jump_r ! Number of jumps accepted and rejected
     double precision                              :: ratio_change
 
-    !jump_a = 0
-    !jump_r = 0
+    ! Reset the accepted/rejected jump counters so the acceptance rate
+    ! (and the adaptive MH_std it drives) is computed per call rather than
+    ! accumulating over the whole simulation.
+    jump_a = 0
+    jump_r = 0
     !ndim = ndim_in
     ndim_in = 0
 
     !ndim = nint( 2.0d0/(MH_std*sqrt(2.0d0/pi)) )
     ndim = 25*8
     ratio_change = 0.5d0*100.0d0/maxval(emitters_dim(:, emit))
-    std(1:2) = emitters_dim(1:2, emit)*0.10d0 ! 5% of emitter size
+    std(1:2) = emitters_dim(1:2, emit)*0.10d0 ! 10% of emitter size
 
     ! Get a random initial position on the surface.
     ! We pick this location from a uniform distribution.
@@ -1172,7 +1180,7 @@ end function Escape_Prob_log
           MH_std = 0.00005d0
         end if
 
-        std(1:2) = emitters_dim(1:2, emit)*MH_std ! Standard deviation for the normal distribution is 0.075% of the emitter length.
+        std(1:2) = emitters_dim(1:2, emit)*MH_std ! Standard deviation for the normal distribution is MH_std of the emitter length.
         ! This means that 68% of jumps are less than this value.
         ! The expected value of the absolute value of the normal distribution is std*sqrt(2/pi).
       end if
@@ -1210,7 +1218,7 @@ end function Escape_Prob_log
       ! Calculate the escape probability at the new position, to compair with
       ! the current position.
       !df_new = Get_Kevin_Jgtf(field(3), T_temp, new_w)
-      df_new = Escape_Prob_log(field(3), cur_pos, emit)
+      df_new = Escape_Prob_log(field(3), new_pos, emit)
 
       ! if (abs(cur_w - new_w) > 0.25) then
       !   print *, df_new / df_cur
@@ -1322,7 +1330,7 @@ end function Escape_Prob_log
       par_pos(2) = d_y + y_min
 
       if(d_y > emitters_dim(2, emit)) then
-        print *, 'Warning: d_x to large <'
+        print *, 'Warning: d_y to large <'
         print *, d_y
       end if
     end if

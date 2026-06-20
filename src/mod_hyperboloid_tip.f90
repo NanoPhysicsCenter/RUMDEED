@@ -68,7 +68,7 @@ contains
   double precision elemental function phi_coor(x, y, z)
     double precision, intent(in) :: x, y, z
 
-    if (abs(x) < 1E-18) then
+    if ((abs(x) < 1.0d-18) .and. (abs(y) < 1.0d-18)) then
       phi_coor = 0.0d0
     else
       phi_coor = atan2(y, x)

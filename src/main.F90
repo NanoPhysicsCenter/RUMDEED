@@ -307,7 +307,7 @@ contains
     end if
 
     ! box_dim: Dimensions of the system
-    ! d: Gap spacingelse
+    ! d: Gap spacing
     box_dim = box_dim * length_scale
     d = box_dim(3)
 
