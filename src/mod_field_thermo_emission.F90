@@ -33,8 +33,6 @@ Module mod_field_thermo_emission
   double precision :: a_rate = 1.0d0
   double precision :: MH_std = 0.125d0
 
-  integer          :: jump_a = 0, jump_r = 0 ! Number of jumps accepted and rejected
-
   ! ----------------------------------------------------------------------------
   ! Constants for field emission
   ! Fyrst Fowler-Nordheim constant in units [ A eV V^{-2} ]
@@ -205,19 +203,17 @@ subroutine Init_Field_Thermo_Emission()
     double precision                              :: rnd, alpha
     double precision, dimension(1:2)              :: std
     double precision, dimension(1:3)              :: cur_pos, new_pos, field
-    double precision                              :: df_cur, df_new, F_out
+    double precision                              :: df_cur, df_new
     double precision                              :: cur_w, new_w
-    !integer                                       :: jump_a, jump_r ! Number of jumps accepted and rejected
-    double precision                              :: ratio_change
+    integer                                       :: jump_a, jump_r ! Number of jumps accepted and rejected
 
-    !jump_a = 0
-    !jump_r = 0
+    jump_a = 0
+    jump_r = 0
     !ndim = ndim_in
     ndim_in = 0
 
     ! Try to keep the acceptance ratio around 50% by
     ! changing the standard deviation.
-    ratio_change = 0.5d0*100.0d0/maxval(emitters_dim(:, emit))
     CALL RANDOM_NUMBER(rnd) ! Change be a random number
     if (a_rate < 0.525d0) then
       MH_std = MH_std * (1.0d0 - rnd*0.00025d0)
@@ -263,11 +259,9 @@ subroutine Init_Field_Thermo_Emission()
       end if
     end do
 
-    F_out = field(3)
-
     ! Calculate the escape probability at this location
     if (field(3) < 0.0d0) then
-      df_cur = Get_Kevin_Jgtf(field(3), T_temp, cur_w)
+      df_cur = max(Get_Kevin_Jgtf(field(3), T_temp, cur_w), 1.0d-12) ! Floor to avoid div-by-zero in alpha
     else
       df_cur = 1.0d-12 ! Zero escape probabilty if field is not favourable
     end if
@@ -298,7 +292,7 @@ subroutine Init_Field_Thermo_Emission()
 
       ! Calculate the escape probability at the new position, to compair with
       ! the current position.
-      df_new = Get_Kevin_Jgtf(field(3), T_temp, new_w)
+      df_new = max(Get_Kevin_Jgtf(field(3), T_temp, new_w), 1.0d-12) ! Floor to avoid div-by-zero in alpha
 
       ! if (abs(cur_w - new_w) > 0.25) then
       !   print *, df_new / df_cur
@@ -316,7 +310,6 @@ subroutine Init_Field_Thermo_Emission()
         cur_pos = new_pos
         df_cur = df_new
         cur_w = new_w
-        F_out = field(3)
         jump_a = jump_a + 1
       else
         CALL RANDOM_NUMBER(rnd)
@@ -324,7 +317,6 @@ subroutine Init_Field_Thermo_Emission()
           cur_pos = new_pos
           df_cur = df_new
           cur_w = new_w
-          F_out = field(3)
           jump_a = jump_a + 1
         else
           jump_r = jump_r + 1
@@ -352,8 +344,10 @@ subroutine Init_Field_Thermo_Emission()
       ! end if
     end do
 
-    ! Acceptance rate
-    a_rate = DBLE(jump_a) / DBLE(jump_r + jump_a)
+    ! Acceptance rate (only update when at least one jump was attempted, to avoid 0/0)
+    if ((jump_a + jump_r) > 0) then
+      a_rate = DBLE(jump_a) / DBLE(jump_r + jump_a)
+    end if
     !print *, jump_a
     !print *, jump_r
     !print *, a_rate
