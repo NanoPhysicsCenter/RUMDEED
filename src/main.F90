@@ -381,7 +381,7 @@ contains
     allocate(particles_life(1:MAX_PARTICLES))
     allocate(particles_id(1:MAX_PARTICLES))
 
-    allocate(life_time(1:MAX_LIFE_TIME, 1:2))
+    allocate(life_time(1:MAX_LIFE_TIME, 1:nrSpecies))
     allocate(ramo_current(1:nrSpecies))
 
     particles_cur_pos      = 0.0d0
