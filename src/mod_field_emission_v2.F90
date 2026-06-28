@@ -14,7 +14,7 @@ Module mod_field_emission_v2
 
   PRIVATE
   PUBLIC :: Init_Field_Emission_v2, Clean_Up_Field_Emission_v2, t_y, v_y, Escape_Prob, F_avg, Elec_Supply_V2, &
-            Test_Field_Emission_Module
+            Test_Field_Emission_Module, E_zunit_planar
 
   ! ----------------------------------------------------------------------------
   ! Variables
@@ -1335,10 +1335,15 @@ end function Escape_Prob_log
     
   !end subroutine
 
-  subroutine Test_Field_Emission_Module()
+  ! Test the field emission module.
+  ! The optional argument v_y_ok reports whether the v_y check passed, so that
+  ! the caller (mod_tests) can fold the result into the global pass/fail count.
+  subroutine Test_Field_Emission_Module(v_y_ok)
+    logical, intent(out), optional :: v_y_ok
     double precision :: results_scalar, F
     double precision, dimension(1:3) :: pos
     integer :: emit, sec
+    logical :: ok
     ! Test v_y
     ! Test t_y
     ! Test Escape_Prob
@@ -1353,15 +1358,21 @@ end function Escape_Prob_log
     ! v_y(F, pos, emit)
 
     ! Test 1 for v_y. Normal test
-    F = 2.0d3 / (1000.0d-9) ! V/d, 2 kV and 1000 nm
+    ! The field in a planar diode is E_z = -V/d, i.e. it points towards the
+    ! cathode and is therefore negative. v_y must be evaluated with this
+    ! (negative) field, matching how it is called from the emission routines.
+    F = -2.0d3 / (1000.0d-9) ! E_z = -V/d, 2 kV across 1000 nm
     pos = (/ 0.0d0, 0.0d0, 0.0d0 /)
     emit = 1
     results_scalar = v_y(F, pos, emit)
-    if (abs(results_scalar - 0.8253581935658024) < tolerance_abs) then
+    ok = (abs(results_scalar - 0.8253581935658024) < tolerance_abs)
+    if (ok .eqv. .true.) then
       print *, 'v_y PASSED'
     else
       print *, 'v_y FAILED'
     end if
+
+    if (present(v_y_ok)) v_y_ok = ok
 
   end subroutine Test_Field_Emission_Module
 
