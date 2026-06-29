@@ -12,12 +12,17 @@ module mod_tests
   implicit none
 
   PRIVATE
-  PUBLIC :: Init_Test, Clean_Up_Test, Run_Tests
+  PUBLIC :: Init_Test, Clean_Up_Test, Run_Tests, tests_passed, tests_failed
 
   ! ----------------------------------------------------------------------------
   ! Variables
   integer, dimension(:), allocatable :: nrEmitted_emitters
   integer                            :: nrElecEmitAll
+
+  ! Test result counters. These are made public so that the main program can
+  ! query them after the tests have run and set a non-zero exit code on failure.
+  integer :: tests_passed = 0
+  integer :: tests_failed = 0
 
   ! Constant used in MC integration
   double precision :: time_step_div_q0
@@ -49,6 +54,11 @@ contains
     ! The function to do image charge effects
     ptr_Image_Charge_effect => Force_Image_charges_v2
 
+    ! The unit electric field used by the Verlet integrator (Ramo current).
+    ! Without this the integrator dereferences a null procedure pointer in the
+    ! transit time test.
+    ptr_E_zunit => E_zunit_planar
+
     ! Parameters used in the module
     time_step_div_q0 = time_step / q_0
 
@@ -60,6 +70,84 @@ contains
   subroutine Clean_Up_Test()
     deallocate(nrEmitted_emitters)
   end subroutine Clean_Up_Test
+
+  !-----------------------------------------------------------------------------
+  ! Shared assertion helpers
+  !
+  ! These keep track of how many checks have passed or failed in the module
+  ! level counters tests_passed / tests_failed. The main program inspects
+  ! tests_failed after the tests have run and sets a non-zero exit code if any
+  ! check failed. This is what allows the test suite to gate automation (CI).
+  !-----------------------------------------------------------------------------
+
+  ! Assert that a logical condition is true.
+  subroutine Assert_True(cond, label)
+    logical, intent(in)          :: cond
+    character(len=*), intent(in) :: label
+
+    if (cond .eqv. .true.) then
+      tests_passed = tests_passed + 1
+      print *, trim(label)//passed_str
+    else
+      tests_failed = tests_failed + 1
+      print *, trim(label)//failed_str
+    end if
+  end subroutine Assert_True
+
+  ! Assert that a scalar value is close to an expected value.
+  ! Uses a relative tolerance (tolerance_rel), falling back to an absolute
+  ! tolerance (tolerance_abs) when the expected value is (near) zero.
+  subroutine Assert_Close(actual, expected, label)
+    double precision, intent(in) :: actual, expected
+    character(len=*), intent(in) :: label
+    logical                      :: ok
+
+    if (abs(expected) < tolerance_abs) then
+      ok = (abs(actual - expected) < tolerance_abs)
+    else
+      ok = (abs(actual - expected)/abs(expected) < tolerance_rel)
+    end if
+
+    if (ok .eqv. .true.) then
+      tests_passed = tests_passed + 1
+      print *, trim(label)//passed_str
+    else
+      tests_failed = tests_failed + 1
+      print *, trim(label)//failed_str
+      print *, '  actual   = ', actual
+      print *, '  expected = ', expected
+    end if
+  end subroutine Assert_Close
+
+  ! Assert that a 3-vector is close to an expected 3-vector.
+  ! Each component is compared with a relative tolerance (tolerance_rel),
+  ! falling back to an absolute tolerance (tolerance_abs) for (near) zero
+  ! components. This matches the component-wise idiom used throughout the file.
+  subroutine Assert_Close_Vec(actual, expected, label)
+    double precision, dimension(1:3), intent(in) :: actual, expected
+    character(len=*), intent(in)                 :: label
+    logical                                      :: ok
+    integer                                      :: k
+
+    ok = .true.
+    do k = 1, 3
+      if (abs(expected(k)) < tolerance_abs) then
+        if (abs(actual(k) - expected(k)) >= tolerance_abs) ok = .false.
+      else
+        if (abs(actual(k) - expected(k))/abs(expected(k)) >= tolerance_rel) ok = .false.
+      end if
+    end do
+
+    if (ok .eqv. .true.) then
+      tests_passed = tests_passed + 1
+      print *, trim(label)//passed_str
+    else
+      tests_failed = tests_failed + 1
+      print *, trim(label)//failed_str
+      print *, '  actual   = ', actual
+      print *, '  expected = ', expected
+    end if
+  end subroutine Assert_Close_Vec
 
     !-----------------------------------------------------------------------------
     ! This subroutine gets called from main when the emitters should emit the electrons
@@ -128,9 +216,16 @@ contains
   end subroutine Do_Test_Emission
 
   subroutine Run_Tests()
+    logical :: fe_v_y_ok
+
+    ! Reset the counters in case the tests are run more than once.
+    tests_passed = 0
+    tests_failed = 0
+
     print *, ''
-    call Test_Field_Emission_Module()
-      
+    call Test_Field_Emission_Module(fe_v_y_ok)
+    call Assert_True(fe_v_y_ok, 'Field emission v_y')
+
     print *, ''
     call Test_Acceleration_Without_Image_Charge()
 
@@ -139,6 +234,13 @@ contains
 
     !call Test_Acceleration_With_Image_Charge()
 
+    print *, ''
+    call Test_Particle_Bookkeeping()
+
+    print *, ''
+    call Test_Planar_Field()
+
+    print *, ''
     call Test_Transit_Time()
 
     !call Test_Many_Particles()
@@ -148,6 +250,19 @@ contains
 #else
     print '(a)', 'Do Serial test'
 #endif
+
+    ! Print a summary of the results.
+    print *, ''
+    print '(a)', '----------------------------------------'
+    print '(a, i0, a, i0, a)', 'RUMDEED: Test summary: ', tests_passed, ' passed, ', &
+                             & tests_failed, ' failed'
+    print '(a, i0)', 'RUMDEED: Total checks: ', (tests_passed + tests_failed)
+    if (tests_failed > 0) then
+      print *, achar(27)//'[31mRUMDEED: ONE OR MORE TESTS FAILED'//achar(27)//'[0m'
+    else
+      print *, achar(27)//'[32mRUMDEED: ALL TESTS PASSED'//achar(27)//'[0m'
+    end if
+    print '(a)', '----------------------------------------'
   end subroutine Run_Tests
 
   !-----------------------------------------------------------------------------
@@ -312,69 +427,14 @@ contains
     a_2_res = particles_cur_accel(:, 2)
     a_3_res = particles_cur_accel(:, 3)
 
-    if (all(abs(a_1 - a_1_res)/a_1 < tolerance_rel)) then
-      print *, 'Particle 1'//passed_str
-    else
-      print *, 'Particle 1'//failed_str
-      print *, a_1_res
-      print *, a_1
-      print *, ''
-    end if
+    call Assert_Close_Vec(a_1_res, a_1, 'Acceleration (no IC) particle 1')
+    call Assert_Close_Vec(a_2_res, a_2, 'Acceleration (no IC) particle 2')
+    call Assert_Close_Vec(a_3_res, a_3, 'Acceleration (no IC) particle 3')
 
-    if (all(abs(a_2 - a_2_res)/a_2 < tolerance_rel)) then
-      print *, 'Particle 2'//passed_str
-    else
-      print *, 'Particle 2'//failed_str
-      print *, 'Results'
-      print *, a_2_res
-      print *, 'Expected'
-      print *, a_2
-      print *, 'Difference'
-      print *, abs(a_2 - a_2_res)
-      print *, all(abs(a_2 - a_2_res) < tolerance_rel)
-      print *, ''
-    end if
-
-    if (all(abs(a_3 - a_3_res)/a_3 < tolerance_rel)) then
-      print *, 'Particle 3'//passed_str
-    else
-      print *, 'Particle 3'//failed_str
-      print *, 'Results'
-      print *, a_3_res
-      print *, 'Expected'
-      print *, a_3
-      print *, 'Difference'
-      print *, abs(a_3 - a_3_res)
-      print *, all(abs(a_3 - a_3_res) < tolerance_rel)
-      print *, ''
-    end if
-
-    if (abs(E_test(3) - E_F(3))/E_test(3) < tolerance_rel) then
-      if ( (abs(E_test(1) - 0.0d0) < tolerance_abs) .and. (abs(E_test(2) - 0.0d0) < tolerance_abs) ) then
-        print *, 'Electric field without particles in planar case'//passed_str
-      else
-        print *, 'Electric field without particles in planar case'//failed_str
-        print *, 'x and y component not zero'
-      end if
-    else
-      print *, 'Electric field without particles in planar case'//failed_str
-      print *, 'z component not correct'
-      print *, 'E_test = ', E_test
-      print *, 'E_F = ', E_F
-      print *, 'abs(E_test - E_F)/E_test = ', abs(E_test - E_F)/E_test
-      print *, ''
-    end if
+    call Assert_Close_Vec(E_F, E_test, 'Electric field without particles in planar case')
 
     E_python = (/ -314559.29097098, 1423979.07058996, -20246038.87978313 /) ! Results from Python script (no image charge)
-    if (all(abs(E_python - E_pos)/E_python < tolerance_rel)) then
-      print *, 'Electric field with particles'//passed_str
-    else
-      print *, 'Electric field with particles'//failed_str
-      print *, 'E_python = ', E_python
-      print *, 'E_pos = ', E_pos
-      print *, 'abs(E_python - E_pos)/E_python = ', abs(E_python - E_pos)/E_python
-      print *, ''
-    end if
+    call Assert_Close_Vec(E_pos, E_python, 'Electric field with particles')
 
     print *, 'Acceleration test without image charge finished'
     print *, ''
@@ -426,48 +486,16 @@ contains
     F_R1 = 0.0d0
     F_R1(3) = -1.0d0*q_1**2/(4.0d0*pi*epsilon_0)*1.0d0/sqrt(2.0d0*R_1(3))
 
-    if (abs(force_ic_11(3) - F_R1(3))/F_R1(3) < tolerance_rel) then
-      if ( (abs(force_ic_11(1) - 0.0d0) < tolerance_abs) .and. (abs(force_ic_11(2) - 0.0d0) < tolerance_abs) ) then
-        print *, 'Self interaction on particle 1 PASSED'
-      else
-        print *, 'Self interaction on particle 1 FAILED'
-        print *, 'x and y component are not zero'
-        print *, 'force_ic_11(1) = ', force_ic_11(1)
-        print *, 'force_ic_11(2) = ', force_ic_11(2)
-      endif
-    else
-      print *, 'Self interaction on image charge particle 1 FAILED'
-      print *, 'z component not correct'
-      print *, 'F_R1 = ', F_R1(3)
-      print *, 'force_ic_11 = ', force_ic_11(3)
-      print *, 'abs(force_ic_11 - F_R1)/F_R1 = ', abs(F_R1(3) - force_ic_11(3))/F_R1(3)
-      print *, ''
-    end if
+    call Assert_Close_Vec(force_ic_11, F_R1, 'Self interaction on particle 1')
 
-    force_ic_22 = q_2**2 * div_fac_c * Force_Image_charges_v2(R_1, R_1)
+    force_ic_22 = q_2**2 * div_fac_c * Force_Image_charges_v2(R_2, R_2)
 
     ! F_R2 = -q_1**2/(4*pi*epsilon_0) * 2z/(2z)^(3/2) 1/(4*pi*epsilon_0) * 1/sqrt(2z)
 
     F_R2 = 0.0d0
     F_R2(3) = -1.0d0*q_2**2/(4.0d0*pi*epsilon_0)*1.0d0/sqrt(2.0d0*R_2(3))
 
-    if (abs(force_ic_22(3) - F_R2(3))/F_R2(3) < tolerance_rel) then
-      if ( (abs(force_ic_22(1) - 0.0d0) < tolerance_abs) .and. (abs(force_ic_22(2) - 0.0d0) < tolerance_abs) ) then
-        print *, 'Self interaction on particle 2 PASSED'
-      else
-        print *, 'Self interaction on particle 2 FAILED'
-        print *, 'x and y component are not zero'
-        print *, 'force_ic_22(1) = ', force_ic_22(1)
-        print *, 'force_ic_22(2) = ', force_ic_22(2)
-      endif
-    else
-      print *, 'Self interaction on image charge particle 2 FAILED'
-      print *, 'z component not correct'
-      print *, 'F_R2 = ', F_R2(3)
-      print *, 'force_ic_22 = ', force_ic_22(3)
-      print *, 'abs(force_ic_22 - F_R1)/F_R1 = ', abs(F_R2(3) - force_ic_22(3))/F_R2(3)
-      print *, ''
-    end if
+    call Assert_Close_Vec(force_ic_22, F_R2, 'Self interaction on particle 2')
 
     ! Test image charge force on particle 1 from particle 2
     ! Image charge of particle 2 is located at -z
@@ -478,15 +506,7 @@ contains
 
     force_ic_12 = q_1*q_2 * div_fac_c * Force_Image_charges_v2(R_1, R_2)
 
-    if (all(abs(force_ic_12 - F_IC_12)/F_IC_12 < tolerance_rel)) then
-      print *, 'Image charge interaction on particle 1 from particle 2 PASSED'
-    else
-      print *, 'Image charge interaction on particle 1 from particle 2 FAILED'
-      print *, 'F_IC_12 = ', F_IC_12(3)
-      print *, 'force_ic_12 = ', force_ic_12(3)
-      print *, 'abs(force_ic_12 - F_IC_12)/F_IC_12 = ', abs(force_ic_12 - F_IC_12)/F_IC_12
-      print *, ''
-    end if
+    call Assert_Close_Vec(force_ic_12, F_IC_12, 'Image charge interaction on particle 1 from particle 2')
 
     ! Test image charge force on particle 2 from particle 1
     ! Image charge of particle 1 is located at -z
@@ -497,15 +517,7 @@ contains
 
     force_ic_21 = q_2*q_1 * div_fac_c * Force_Image_charges_v2(R_2, R_1)
 
-    if (all(abs(force_ic_21 - F_IC_21)/F_IC_21 < tolerance_rel)) then
-      print *, 'Image charge interaction on particle 2 from particle 1 PASSED'
-    else
-      print *, 'Image charge interaction on particle 2 from particle 1 FAILED'
-      print *, 'F_IC_21 = ', F_IC_21
-      print *, 'force_ic_21 = ', force_ic_21
-      print *, 'abs(force_ic_21 - F_IC_21)/F_IC_21 = ', abs(force_ic_21 - F_IC_21)/F_IC_21
-      print *, ''
-    end if
+    call Assert_Close_Vec(force_ic_21, F_IC_21, 'Image charge interaction on particle 2 from particle 1')
 
     !-------------------------------------------------------------------------------------------
     ! Test 5 image charge partners of each particle
@@ -546,22 +558,7 @@ contains
 
     force_ic_11 = q_1**2 * div_fac_c * Force_Image_charges_v2(R_1, R_1)
 
-    if (abs(force_ic_11(3) - F_R1(3))/F_R1(3) < tolerance_rel) then
-      if ( (abs(force_ic_11(1) - 0.0d0) < tolerance_abs) .and. (abs(force_ic_11(2) - 0.0d0) < tolerance_abs) ) then
-        print *, 'Self interaction on particle 1 (N_IC_MAX = 1) PASSED'
-      else
-        print *, 'x and y component are not zero'
-        print *, 'force_ic_11(1) = ', force_ic_11(1)
-        print *, 'force_ic_11(2) = ', force_ic_11(2)
-      end if
-    else
-      print *, 'Self interaction on particle 1 (N_IC_MAX = 1) FAILED'
-      print *, 'z component if not correct'
-      print *, 'F_R1(3) = ', F_R1(3)
-      print *, 'force_ic_11(3) = ', force_ic_11(3)
-      print *, 'abs(force_ic_11(3) - F_R1(3))/F_R1(3) = ', abs(force_ic_11(3) - F_R1(3))/F_R1(3)
-      print *, ''
-    end if
+    call Assert_Close_Vec(force_ic_11, F_R1, 'Self interaction on particle 1 (N_IC_MAX = 1)')
 
     ! Test self interaction of particle 2 (+)
     ! n =  0: z = -z_0 (-)
@@ -598,22 +595,7 @@ contains
 
     force_ic_22 = q_2**2 * div_fac_c * Force_Image_charges_v2(R_2, R_2)
 
-    if (abs(force_ic_22(3) - F_R2(3))/F_R2(3) < tolerance_rel) then
-      if ( (abs(force_ic_22(1) - 0.0d0) < tolerance_abs) .and. (abs(force_ic_22(2) - 0.0d0) < tolerance_abs) ) then
-        print *, 'Self interaction on particle 2 (N_IC_MAX = 1) PASSED'
-      else
-        print *, 'x and y component are not zero'
-        print *, 'force_ic_11(1) = ', force_ic_22(1)
-        print *, 'force_ic_11(2) = ', force_ic_22(2)
-      end if
-    else
-      print *, 'Self interaction on particle 2 (N_IC_MAX = 1) FAILED'
-      print *, 'z component if not correct'
-      print *, 'F_R2 = ', F_R2
-      print *, 'force_ic_22 = ', force_ic_22
-      print *, 'abs(force_ic_22(3) - F_R2(3))/F_R2(3) = ', abs(force_ic_22(3) - F_R2(3))/F_R2(3)
-      print *, ''
-    end if
+    call Assert_Close_Vec(force_ic_22, F_R2, 'Self interaction on particle 2 (N_IC_MAX = 1)')
 
     !--------------------------------------------------------------------------------------
     ! Testing interaction on particle 1 from particle 2 with N_IC_MAX = 1
@@ -628,15 +610,7 @@ contains
 
     force_ic_12 = q_1*q_2 * div_fac_c * Force_Image_charges_v2(R_1, R_2)
 
-    if (all(abs(force_ic_12 - F_R1)/F_R1 < tolerance_rel)) then
-      print *, 'Image charge interaction on particle 1 from particle 2 (N_IC_MAX = 1) PASSED'
-    else
-      print *, 'Image charge interaction on particle 1 from particle 2 (N_IC_MAX = 1) FAILED'
-      print *, 'F_IC_21 = ', F_R1
-      print *, 'force_ic_12 = ', force_ic_12
-      print *, 'abs(force_ic_12 - F_R1)/F_R1 = ', abs(force_ic_12 - F_R1)/F_R1
-      print *, ''
-    end if
+    call Assert_Close_Vec(force_ic_12, F_R1, 'Image charge interaction on particle 1 from particle 2 (N_IC_MAX = 1)')
 
     print *, 'Image charge function "Force_Image_charges_v2(pos_1, pos_2)" test finished'
     print *, ''
@@ -908,19 +882,75 @@ contains
 
       print *, 'Transit time = ', steps_res
       print *, 'Exptected time = ', steps_exp
-      if (abs(steps_exp - steps_res)/steps_exp < 0.01) then
-      !if (steps_res == steps_exp) then
-        print *, 'Transit time test'//passed_str
-        print *, 'Difference was less than 1% or ', abs(steps_res - steps_exp)
-      else
-        print *, 'Transit time test'//failed_str
-        print *, 'Expected = ', steps_exp
-        print *, 'Results = ', steps_res
-      end if
+      ! The transit time should be within 1% of the expected number of steps.
+      call Assert_True((abs(steps_exp - steps_res) < 0.01d0*steps_exp), 'Transit time test')
 
       print *, 'Transit time test finished'
       print *, ''
   end subroutine Test_Transit_Time
+
+  !-----------------------------------------------------------------------------
+  ! Test the particle bookkeeping in mod_pair.
+  ! Add a known mix of electrons and ions to an empty system and check that the
+  ! particle counters (nrElec, nrIon, nrElecIon, nrPart) are updated correctly.
+  subroutine Test_Particle_Bookkeeping()
+    double precision, parameter      :: d_test = 100.0d0*length_scale
+    double precision, parameter      :: V_test = 2.0d0 ! V
+    double precision, parameter      :: delta_t_test = 0.25d-15 ! Time step
+    double precision, dimension(1:3) :: R, par_vel
+
+    print *, 'Starting particle bookkeeping test'
+
+    ! Start with an empty system
+    call Setup_Test_System(d_test, delta_t_test, 100, V_test, .false., 0)
+    call Assert_True((nrPart == 0), 'Bookkeeping: empty system has no particles')
+
+    par_vel = 0.0d0
+
+    ! Add two electrons
+    R = (/  3.0d0, -10.0d0,  2.0d0 /) * length_scale
+    call Add_Particle(R, par_vel, species_elec, 1, 0, -1)
+    R = (/ -9.0d0,  26.0d0, 80.0d0 /) * length_scale
+    call Add_Particle(R, par_vel, species_elec, 1, 0, -1)
+
+    ! Add one ion
+    R = (/  6.0d0, -24.0d0, 56.53d0 /) * length_scale
+    call Add_Particle(R, par_vel, species_ion, 1, 0, -1)
+
+    call Assert_True((nrElec == 2),    'Bookkeeping: electron count')
+    call Assert_True((nrIon == 1),     'Bookkeeping: ion count')
+    call Assert_True((nrElecIon == 3), 'Bookkeeping: electron + ion count')
+    call Assert_True((nrPart == 3),    'Bookkeeping: total particle count')
+
+    print *, 'Particle bookkeeping test finished'
+    print *, ''
+  end subroutine Test_Particle_Bookkeeping
+
+  !-----------------------------------------------------------------------------
+  ! Test the planar electric field with an empty system.
+  ! For a planar diode the field is uniform and given by E = -V/d in the
+  ! z-direction with no x or y component.
+  subroutine Test_Planar_Field()
+    double precision, parameter      :: d_test = 100.0d0*length_scale
+    double precision, parameter      :: V_test = 2.0d0 ! V
+    double precision, parameter      :: delta_t_test = 0.25d-15 ! Time step
+    double precision, dimension(1:3) :: pos, E_res, E_expected
+
+    print *, 'Starting planar field test'
+
+    ! Empty system, no image charge
+    call Setup_Test_System(d_test, delta_t_test, 100, V_test, .false., 0)
+
+    ! Evaluate the field at an arbitrary point inside the diode
+    pos = (/ -4.55d0, -2.34d0, 96.44d0 /) * length_scale
+    E_res = Calc_Field_at(pos)
+
+    E_expected = (/ 0.0d0, 0.0d0, -1.0d0*V_test/d_test /)
+    call Assert_Close_Vec(E_res, E_expected, 'Planar field with empty system')
+
+    print *, 'Planar field test finished'
+    print *, ''
+  end subroutine Test_Planar_Field
 
   !-----------------------------------------------------------------------------
   ! A test with 1000 particles

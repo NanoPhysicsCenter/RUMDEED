@@ -241,6 +241,15 @@ program RUMDEED
         'RUMDEED: Ended (d/m/y) ', values(3), '/', values(2), '/', values(1), &
         ' - (h:m:s) ', values(5), ':', values(6), ':', values(7)
   print '(a)', 'RUMDEED: Program finished'
+
+  ! If we were running the unit and integration tests, exit with a non-zero
+  ! status code when any test failed. This lets automation (e.g. CI) detect
+  ! failures, since all clean up has already been done at this point.
+  if (EMISSION_MODE == EMISSION_TEST) then
+    if (tests_failed > 0) then
+      error stop 1
+    end if
+  end if
 contains
 
   subroutine PrintProgress(i)

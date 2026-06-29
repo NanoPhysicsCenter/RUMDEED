@@ -1,0 +1,51 @@
+name: tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  unit-tests:
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        openmp: [no, yes]
+
+    name: GNU (OpenMP=${{ matrix.openmp }})
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gfortran gcc make wget
+
+      - name: Download Cuba library
+        # The makefile would normally call the interactive cuba/get-cuba.sh
+        # script. By placing the tarball here ahead of time, make sees the file
+        # already exists and skips the interactive download.
+        run: |
+          wget -q https://feynarts.de/cuba/Cuba-4.2.2.tar.gz -O cuba/Cuba-4.2.2.tar.gz
+          cd cuba && md5sum -c md5hash.md5
+
+      - name: Build RUMDEED in testing mode
+        run: |
+          cd build
+          make all CC=gcc FC=gfortran TESTING_MODE=1 OPENMP=${{ matrix.openmp }}
+
+      - name: Run unit and integration tests
+        # tests/input sets EMISSION_MODE = 0 (EMISSION_TEST), so running the
+        # binary executes Run_Tests(). The program exits with a non-zero status
+        # when any assertion fails, which fails this step.
+        run: |
+          rundir=tests/run_ci
+          rm -rf "$rundir"
+          mkdir -p "$rundir/pos" "$rundir/accel"
+          cp tests/input "$rundir/input"
+          cp build/RUMDEED.out "$rundir/RUMDEED.out"
+          cd "$rundir"
+          ./RUMDEED.out
