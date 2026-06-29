@@ -17,6 +17,8 @@ program RUMDEED
   use mod_field_emission_2D
   use mod_field_thermo_emission
   !use mod_therminoic_emission
+  use mod_cylindrical_tip
+  use mod_torus
   use mod_pair
   use mod_tests
   use mod_manual_emission
@@ -39,17 +41,37 @@ program RUMDEED
 #endif
 
 
-  integer                 :: i, nthreads
+  integer                 :: i
   integer, dimension(1:9) :: progress
   integer, dimension(8)   :: values ! Date and time
 
   call date_and_time(VALUES=values)
 
+  ! Print the logo
+  !######  #     # #     # ######  ####### ####### ######  
+  !#     # #     # ##   ## #     # #       #       #     # 
+  !#     # #     # # # # # #     # #       #       #     # 
+  !######  #     # #  #  # #     # #####   #####   #     # 
+  !#   #   #     # #     # #     # #       #       #     # 
+  !#    #  #     # #     # #     # #       #       #     # 
+  !#     #  #####  #     # ######  ####### ####### ######   
+
+  print '(a)', '  ######  #     # #     # ######  ####### ####### ######  '
+  print '(a)', '  #     # #     # ##   ## #     # #       #       #     # '
+  print '(a)', '  #     # #     # # # # # #     # #       #       #     # '
+  print '(a)', '  ######  #     # #  #  # #     # #####   #####   #     # '
+  print '(a)', '  #   #   #     # #     # #     # #       #       #     # '
+  print '(a)', '  #    #  #     # #     # #     # #       #       #     # '
+  print '(a)', '  #     #  #####  #     # ######  ####### ####### ######  '
+  print '(a)', ''
+
+  ! Print the version and date
   print '(a)', 'Reykjavík University Molecular Dynamics code for Electron Emission and Dynamics'
   print '(a, i0.2, a, i0.2, a, i4, a, i0.2, a, i0.2, a, i0.2)', &
         'RUMDEED: Starting (d/m/y) ', values(3), '/', values(2), '/', values(1), &
         ' - (h:m:s) ', values(5), ':', values(6), ':', values(7)
 
+  ! Print the compiler version and options
   print '(4a)', 'This program was compiled by ', &
                 compiler_version(), ' using the options ', &
                 compiler_options()
@@ -103,6 +125,12 @@ program RUMDEED
   case(EMISSION_FIELD_V2)
     print '(a)', 'RUMDEED: Doing Field emission V2'
     call Init_Field_Emission_v2()
+  case(EMISSION_FIELD_CYL_TIP)
+    print '(a)', 'RUMDEED: Doing Field emission from a cylindrical tip'
+    call Init_Cylindrical_Tip()
+  case(EMISSION_FIELD_TORUS)
+    print '(a)', 'RUMDEED: Doing Field emission from a torus'
+    call Init_Torus()
   case(EMISSION_MANUAL)
     print '(a)', 'Vacuum: Doing manual emission'
     call Init_Manual()
@@ -111,6 +139,8 @@ program RUMDEED
     print *, EMISSION_MODE
     stop
   END SELECT
+
+  call Check_Pointers()
 
   print '(tr1, a, i0)', 'Number of emitters ', nrEmit
 
@@ -128,7 +158,7 @@ program RUMDEED
 
     print *, ''
 
-    cur_time = 0
+    cur_time = 0.0d0
     call Set_Voltage(0) ! Set voltage for time step 0
 
     do i = 1, steps
@@ -166,8 +196,10 @@ program RUMDEED
       end if
 
     end do
-  
-    call PrintProgress(10)
+
+    if (cought_stop_signal .eqv. .false.) then
+      call PrintProgress(10)
+    end if
     print '(a)', 'RUMDEED: Main loop finished'
 
 
@@ -194,6 +226,10 @@ program RUMDEED
     call Clean_Up_Field_Thermo_Emission()
   case(EMISSION_FIELD_V2)
     call Clean_Up_Field_Emission_v2()
+  case(EMISSION_FIELD_CYL_TIP)
+    call Clean_Up_Cylindrical_Tip()
+  case (EMISSION_FIELD_TORUS)
+    call Clean_Up_Torus()
   case(EMISSION_MANUAL)
     call Clean_Up_Manual()
   END SELECT
@@ -272,8 +308,15 @@ contains
     ! Close the 'input' file
     close(unit=ud_input, iostat=IFAIL, status='keep')
 
+    ! planes_z and planes_ud are sized 1:planes_N_max, guard against overflow
+    if (planes_N > planes_N_max) then
+      print '(a, i0, a, i0)', 'RUMDEED: ERROR planes_N = ', planes_N, &
+            ' exceeds planes_N_max = ', planes_N_max
+      stop
+    end if
+
     ! box_dim: Dimensions of the system
-    ! d: Gap spacingelse
+    ! d: Gap spacing
     box_dim = box_dim * length_scale
     d = box_dim(3)
 
@@ -347,21 +390,25 @@ contains
     allocate(particles_life(1:MAX_PARTICLES))
     allocate(particles_id(1:MAX_PARTICLES))
 
-    allocate(life_time(1:MAX_LIFE_TIME, 1:2))
+    allocate(life_time(1:MAX_LIFE_TIME, 1:nrSpecies))
     allocate(ramo_current(1:nrSpecies))
 
-    particles_cur_pos     = 0.0d0
-    particles_prev_pos    = 0.0d0
-    particles_cur_vel     = 0.0d0
-    particles_cur_accel   = 0.0d0
-    particles_prev_accel  = 0.0d0
-    particles_prev2_accel = 0.0d0
-    particles_charge      = 0.0d0
-    particles_species     = 0
-    particles_mass        = 0.0d0
-    particles_step        = 0
-    particles_mask        = .true.
-    particles_id          = 0
+    particles_cur_pos      = 0.0d0
+    particles_prev_pos     = 0.0d0
+    particles_last_col_pos = 0.0d0
+    particles_cur_vel      = 0.0d0
+    particles_cur_accel    = 0.0d0
+    particles_prev_accel   = 0.0d0
+    particles_prev2_accel  = 0.0d0
+    particles_charge       = 0.0d0
+    particles_species      = 0
+    particles_mass         = 0.0d0
+    particles_step         = 0
+    particles_emitter      = 0
+    particles_section      = 0
+    particles_life         = 0
+    particles_mask         = .true.
+    particles_id           = 0
 
     ramo_current = 0.0d0
     ramo_current_emit(1:MAX_SECTIONS, 1:MAX_EMITTERS) = 0.0d0
@@ -406,7 +453,7 @@ contains
     ! Register a subroutine to catch the SIGINT signal
 #if defined(__GNUC__)
     IFAIL = SIGNAL(SIGINT, Signal_Handler) ! SIGINT is used by to stop the simulations by ctrl+c
-    IFAIL = SIGNAL(16, Signal_Handler) ! SIGUSR1=16 is used by slurm to stop the simulation
+    IFAIL = SIGNAL(SIGUSR1, Signal_Handler) ! SIGUSR1=10 is used by slurm to stop the simulation
 #endif
 
     ! Create folder for output files
@@ -625,6 +672,42 @@ contains
 
   ! end subroutine Flush_Data
 
+  !----------------------------------------------------------------------------
+  ! Check that all needed procedure pointers are associated
+  ! ptr_Check_Boundary
+  ! ptr_Do_Emission
+  ! ptr_field_E
+  ! ptr_Image_Charge_effect
+  ! ptr_E_zunit
+  subroutine Check_Pointers()
+    implicit none
+
+    if (.not. associated(ptr_Do_Emission)) then
+      print *, 'RUMDEED: ERROR ptr_Do_Emission not associated'
+      stop
+    end if
+
+    if (.not. associated(ptr_field_E)) then
+      print *, 'RUMDEED: ERROR ptr_field_E not associated'
+      stop
+    end if
+
+    if (.not. associated(ptr_Check_Boundary)) then
+      print *, 'RUMDEED: ERROR ptr_Check_Boundary not associated'
+      stop
+    end if
+
+    if (.not. associated(ptr_E_zunit)) then
+      print *, 'RUMDEED: ERROR ptr_E_zunit not associated'
+      stop
+    end if
+
+    if (.not. associated(ptr_Image_Charge_effect)) then
+      print *, 'RUMDEED: ERROR ptr_Image_Charge_effect not associated'
+      stop
+    end if
+  end subroutine Check_Pointers
+
 
   ! ----------------------------------------------------------------------------
   ! Write out parameters, constants and initial variables used when the program starts
@@ -675,6 +758,7 @@ contains
     write(ud_init, *) '---------------------------------------------------------'
     write(ud_init, fmt_int) 'MAX_PARTICLES       = ', MAX_PARTICLES, 'Maximum number of electrons in the system'
     !write(ud_init, fmt_int) 'SEED                = ', SEED,          'Seed value used in the random number generator'
+    write(ud_init, '(a, tr8, *(i12))') 'my_seed             = ', my_seed(:)
     !write(ud_init, fmt_int) 'MAX_EMISSION_TRY    = ', MAX_EMISSION_TRY,    'Maximum number of failed emission attempts'
     !write(ud_init, fmt_int) 'MAX_TIME_STEP_WRITE = ', MAX_TIME_STEP_WRITE, 'Maximum number of times steps to output data'
     write(ud_init, *) '---------------------------------------------------------'
@@ -775,6 +859,9 @@ contains
 
     deallocate(ramo_current)
     deallocate(life_time)
+
+    if (allocated(N2_tot_cross)) deallocate(N2_tot_cross)
+    if (allocated(N2_ion_cross)) deallocate(N2_ion_cross)
 
     deallocate(my_seed)
 

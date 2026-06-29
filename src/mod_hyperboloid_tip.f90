@@ -15,7 +15,7 @@ Module mod_hyperboloid_tip
   double precision            :: eta_1 ! eta_1 = -cos(theta) defines the surface of the tip
   double precision, parameter :: eta_2 = 0.0d0 ! Defines the anode plane (should be 0)
   double precision            :: max_xi ! Max value for xi variable for the surface (tip height)
-  double precision            :: shift_z ! shift_z = a_foci*eta_1*max_xi Shift the z-coordinate uppwards. Base of tip at z = 0
+  double precision            :: shift_z ! shift_z = a_foci*eta_1*max_xi Shift the z-coordinate upwards. Base of tip at z = 0
   double precision            :: h_tip ! Height of the tip from base
   double precision            :: R_base ! Base radius
   double precision            :: pre_fac_E_tip, pre_fac_E_tip_unit_voltage
@@ -68,7 +68,7 @@ contains
   double precision elemental function phi_coor(x, y, z)
     double precision, intent(in) :: x, y, z
 
-    if (abs(x) < 1E-18) then
+    if ((abs(x) < 1.0d-18) .and. (abs(y) < 1.0d-18)) then
       phi_coor = 0.0d0
     else
       phi_coor = atan2(y, x)
@@ -112,11 +112,13 @@ contains
   end function Field_normal
 
   !pure function field_E_Hyperboloid(pos_xyz)
-  pure function field_E_Hyperboloid(pos_xyz)
-    double precision, dimension(1:3), intent(in) :: pos_xyz
-    double precision, dimension(1:3)             :: pos_pro !xi, eta, phi
-    double precision, dimension(1:3)             :: field_E_Hyperboloid
-    double precision                             :: pre_fac_E_tip_xyz, fac_E_xy
+  pure function field_E_Hyperboloid(pos_xyz, org_pos, is_surface)
+    double precision, dimension(1:3), intent(in)           :: pos_xyz
+    double precision, dimension(1:3), intent(in), optional :: org_pos
+    logical, intent(in), optional                          :: is_surface
+    double precision, dimension(1:3)                       :: pos_pro !xi, eta, phi
+    double precision, dimension(1:3)                       :: field_E_Hyperboloid
+    double precision                                       :: pre_fac_E_tip_xyz, fac_E_xy
 
     pos_pro(1) = xi_coor(pos_xyz(1), pos_xyz(2), pos_xyz(3))
     pos_pro(2) = eta_coor(pos_xyz(1), pos_xyz(2), pos_xyz(3))
@@ -128,7 +130,7 @@ contains
 !       stop
 !     end if
 
-    ! Electric field for the hyperboloid gemoetry
+    ! Electric field for the hyperboloid geometry
     pre_fac_E_tip_xyz = pre_fac_E_tip * 1.0d0/(pos_pro(1)**2 - pos_pro(2)**2)
 
     ! if we are near the tip then the x and y components should be zero

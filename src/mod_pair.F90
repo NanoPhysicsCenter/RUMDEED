@@ -77,7 +77,7 @@ contains
         ! Write out the x and y position of the emitted particle
         ! along with which emitter and section it came from.
         !if (abs(par_pos(3) - 1.0d0*length_scale) < 1.0E-3) then
-          write(unit=ud_density_emit) (par_pos(1) / length_scale), (par_pos(2) / length_scale), emit, sec, nrID
+          write(unit=ud_density_emit) (par_pos(1:3) / length_scale),  emit, sec, nrID
         !end if
       else if (par_species == species_ion) then ! Ion
         particles_charge(nrPart+1) = +1.0d0*q_0
@@ -113,6 +113,15 @@ contains
     ! if so just return
     if (particles_mask(i) .eqv. .false.) return
 
+    ! Refuse to remove a particle of unknown species. Removing it would mask it
+    ! out (so it gets compacted away), but neither nrElec_remove nor nrIon_remove
+    ! would be incremented, leaving nrPart = nrElec + nrIon overcounted by one.
+    if ((particles_species(i) /= species_elec) .and. (particles_species(i) /= species_ion)) then
+      print *, 'Error: Refusing to remove particle of unknown species'
+      print *, 'particles_species(i) = ', particles_species(i)
+      return
+    end if
+
     ! Mark the particle for removal
     ! The particle is actually removed later when Remove_Particles is called.
     particles_mask(i) = .false.
@@ -139,8 +148,14 @@ contains
 
           emit = particles_emitter(i)
 
-          !$OMP ATOMIC UPDATE
-          nrElec_remove_top_emit(emit) = nrElec_remove_top_emit(emit) + 1
+          ! Guard against an out-of-range emitter index before indexing the
+          ! per-emitter counter (which is allocated 1:MAX_EMITTERS).
+          if ((emit >= 1) .and. (emit <= MAX_EMITTERS)) then
+            !$OMP ATOMIC UPDATE
+            nrElec_remove_top_emit(emit) = nrElec_remove_top_emit(emit) + 1
+          else
+            print *, 'RUMDEED: WARNING invalid emitter index in Mark_Particles_Remove ', emit
+          end if
 
           ! Write out the transverse position of the particle, its velocity and which emitter/section it came from.
           !$OMP CRITICAL(DENSITY_ABSORB_TOP)
@@ -185,11 +200,8 @@ contains
         CASE DEFAULT
           print *, 'Error unkown remove case ', m
       END SELECT
-    else
-      ! This should probably never happen
-      print *, 'Error: Removing unknow particle'
-      print *, 'particles_species(i) = ', particles_species(i)
     end if
+    ! Unknown species are rejected by the guard at the top of this routine.
   end subroutine Mark_Particles_Remove
 
 
@@ -361,7 +373,7 @@ contains
     & nrPart_remove, nrElec_remove, nrIon_remove
 
     write (ud_absorb_top, "(ES12.4, *(tr2, i8))", iostat=IFAIL) cur_time, step, &
-    & nrPart_remove_top, nrElec_remove_top, nrIon_remove_top, (nrElec_remove_top_emit(i), i = 1, nrEmit)
+    & nrPart_remove_top, nrElec_remove_top, nrIon_remove_top, (nrElec_remove_top_emit(i), i = 1, min(nrEmit, MAX_EMITTERS))
 
     write (ud_absorb_bot, "(ES12.4, *(tr2, i8))", iostat=IFAIL) cur_time, step, &
     & nrPart_remove_bot, nrElec_remove_bot, nrIon_remove_bot
@@ -400,7 +412,7 @@ contains
   subroutine Write_Position(step)
     integer, intent(in)              :: step
     integer                          :: i
-    integer, parameter               :: N_steps = 10
+    integer, parameter               :: N_steps = 1
     double precision, dimension(1:3) :: par_pos
 
     if (write_position_file .eqv. .True.) then
@@ -462,7 +474,7 @@ contains
           ! Get particle species, i.e. electron, ion, hole, ...
           par_species = particles_species(i)
 
-          write(unit=ud_pos_data, fmt="(F6.2, F6.2, F6.2, i2, ES12.4, ES12.4, ES12.4, ES12.4)", iostat=IFAIL) &
+          write(unit=ud_pos_data, fmt="(ES12.4, ES12.4, ES12.4, i2, ES12.4, ES12.4, ES12.4, ES12.4)", iostat=IFAIL) &
             par_pos(1), par_pos(2), par_pos(3), par_species, par_vel(1), par_vel(2), par_vel(3), par_speed
         end do
 
@@ -530,7 +542,10 @@ contains
 
         s = particles_species(i)
 
-        life_time(lt, s) = life_time(lt, s) + 1
+        ! Only record species that have a column in life_time (1:nrSpecies).
+        if ((s >= 1) .and. (s <= nrSpecies)) then
+          life_time(lt, s) = life_time(lt, s) + 1
+        end if
 
       end if
     end do

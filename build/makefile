@@ -1,3 +1,5 @@
+.PHONY: all clean install
+
 # makefile for RUMDEED
 # Kristinn Torfason
 # 12.10.09
@@ -60,7 +62,10 @@ FFLAGS=-O3 -march=native -flto=auto
 #FFLAGS=-g -fcheck=all -Wall -fbacktrace -ffpe-trap=invalid,zero,overflow,underflow
 ifneq (,$(findstring yes,$(OPENMP)))
 FFLAGS+=-fopenmp
+else
+FFLAGS+=-fno-openmp
 endif
+$(info $$OPENMP is [${OPENMP}])
 endif
 
 # PGI FORTRAN
@@ -112,18 +117,25 @@ $(PROJECT_NAME).out: ../src/main.F90 ../cuba/lib/libcuba.a \
 			mod_field_emission_v2.mod mod_field_emission_v2.o \
 			mod_field_thermo_emission.mod mod_field_thermo_emission.o \
 			mod_field_emission_2D.mod mod_field_emission_2D.o \
+			mod_hyperboloid_tip.mod mod_hyperboloid_tip.o \
+			mod_ic.mod mod_ic.o \
+			mod_cylindrical_tip.mod mod_cylindrical_tip.o \
+			mod_torus.mod mod_torus.o \
 			mod_work_function.mod mod_work_function.o \
 			mod_collisions.mod mod_collisions.o \
 			mod_kevin_rjgtf.mod mod_kevin_rjgtf.o \
 			mod_velocity.mod mod_velocity.o \
-			mod_manual_emission.mod mod_manual_emission.o
+			mod_manual_emission.mod mod_manual_emission.o \
+			kdtree2.o kdtree2_module.mod
 		$(FC) $(FFLAGS) -D_GIT_VERSION_=\"${GIT_VERSION}\" -D_TESTING_MODE_=${TESTING_MODE} \
 		    ../src/main.F90 mod_global.o mod_verlet.o mod_pair.o \
 			mod_tests.o mod_photo_emission.o mod_field_emission.o mod_field_emission_v2.o \
 			mod_field_thermo_emission.o mod_kevin_rjgtf.o \
-			mod_emission_tip.o mod_hyperboloid_tip.o mod_field_emission_2D.o \
+			mod_emission_tip.o mod_hyperboloid_tip.o mod_ic.o mod_field_emission_2D.o \
+			mod_cylindrical_tip.o mod_torus.o \
 			mod_work_function.o mod_collisions.o \
 			mod_velocity.o mod_manual_emission.o \
+			kdtree2.o \
 			$(CUBA_LIB) -lpthread -lm -ldl -o $(PROJECT_NAME).out
 
 ../cuba/Cuba-4.2.2.tar.gz:
@@ -174,6 +186,12 @@ mod_emission_tip.mod mod_emission_tip.o: ../src/mod_emission_tip.f90 mod_global.
 mod_hyperboloid_tip.mod mod_hyperboloid_tip.o: ../src/mod_hyperboloid_tip.f90 mod_global.mod
 		$(FC) -c $(FFLAGS) ../src/mod_hyperboloid_tip.f90
 
+mod_cylindrical_tip.mod mod_cylindrical_tip.o: ../src/mod_cylindrical_tip.F90 mod_global.mod mod_verlet.mod mod_pair.mod mod_velocity.mod kdtree2_module.mod
+		$(FC) -c $(FFLAGS) ../src/mod_cylindrical_tip.F90
+
+mod_torus.mod mod_torus.o: ../src/mod_torus.F90 mod_global.mod mod_verlet.mod mod_pair.mod mod_velocity.mod
+		$(FC) -c $(FFLAGS) ../src/mod_torus.F90
+
 mod_manual_emission.mod mod_manual_emission.o: ../src/mod_manual_emission.f90 mod_global.mod mod_verlet.mod mod_pair.mod
 		$(FC) -c $(FFLAGS) ../src/mod_manual_emission.f90
 
@@ -185,6 +203,9 @@ mod_velocity.mod mod_velocity.o: ../src/mod_velocity.f90
 
 mod_collisions.mod mod_collisions.o: ../src/mod_collisions.F90 mod_global.mod mod_pair.mod mod_velocity.mod
 		$(FC) -c $(FFLAGS) ../src/mod_collisions.F90
+
+kdtree2.o kdtree2_module.mod: ../src/kdtree2/kdtree2.f90
+		$(FC) -c $(FFLAGS) ../src/kdtree2/kdtree2.f90
 
 clean:
 		rm -f *.o

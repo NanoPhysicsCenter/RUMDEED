@@ -22,24 +22,26 @@ module mod_global
   ! ----------------------------------------------------------------------------
   ! Define physical constants
   ! See http://physics.nist.gov/cuu/Constants/index.html
-  double precision, parameter :: pi = 3.14159265358979324d0 ! Pi
-  double precision, parameter :: h = 6.626070040d-34 ! Planck's constant, h (Js)
-  double precision, parameter :: k_b = 1.38064852d-23 ! Boltzmann constant (J/K)
+  ! Last updated 14.10.2023
+  double precision, parameter :: pi = 3.141592653589793238462643383279502884197169399375105820974944592307816406286d0 ! Pi with 75 digits
+  double precision, parameter :: h = 6.62607015d-34 ! Planck's constant, h (Js)
+  double precision, parameter :: k_b = 1.380649d-23 ! Boltzmann constant (J/K)
   double precision, parameter :: c = 299792458.0d0 ! Speed of light (m/s)
-  double precision, parameter :: mu_0 = 4.0d0*pi * 1.0d-7 ! Vacuum permeability (H/m)
+  !double precision, parameter :: mu_0 = 4*pi * 1.0d-7 ! Vacuum permeability (H/m)
+  double precision, parameter :: mu_0 = 1.25663706212d-6 ! Vacuum permeability (H/m) (N/A^2)
   double precision, parameter :: epsilon_0 = 1.0d0/(mu_0 * c**2) ! Vacuum permittivity (F/m)
   !double precision, parameter :: epsilon_0 = 8.854187817d-12 ! Farads / meters
   double precision, parameter :: epsilon = epsilon_r * epsilon_0 ! Permittivity
-  double precision, parameter :: m_u = 1.660539040d-27 ! Atomic mass unit (kg)
-  double precision, parameter :: h_bar = 1.054571726d-34 ! Planck's constant, h/(2*pi) (Js)
+  double precision, parameter :: m_u = 1.66053906660d-27 ! Atomic mass unit (kg)
+  double precision, parameter :: h_bar = h/(2.0d0*pi) ! Reduced Planck's constant, h/(2*pi) (Js)
 
-  double precision, parameter :: m_0 = 9.10938356d-31 ! Free electron mass (kg)
+  double precision, parameter :: m_0 = 9.1093837015d-31 ! Free electron mass (kg)
   !double precision, parameter :: m_e = m_eeff * m_0 ! m_e* Effective electron mass (kg)
   !double precision, parameter :: m_h = m_heff * m_0! m_h* Effective hole mass (kg)
 
-  double precision, parameter :: m_N2p = 14.0067d0*m_u - m_0 ! Mass of N_2^+ ion (kg)
+  double precision, parameter :: m_N2p = 2*14.00674d0*m_u - m_0 ! Mass of N_2^+ ion (kg)
 
-  double precision, parameter :: q_0 = 1.6021766208d-19 ! Elementary charge (C)
+  double precision, parameter :: q_0 = 1.602176634d-19 ! Elementary charge (C)
   double precision, parameter :: q_02 = q_0**2 ! Elementary charge squared (C)
 
   double precision, parameter :: T_ntp = 293.15d0 ! Normal temperature in Kelvin (NIST)
@@ -56,13 +58,16 @@ module mod_global
 
   ! ----------------------------------------------------------------------------
   ! Parameters for the surface integration using CUBA
-  integer            :: cuba_method = 1 ! Method to use
   integer, parameter :: cuba_method_suave = 1
   integer, parameter :: cuba_method_divonne = 2
-  double precision   :: cuba_epsabs = 1.0d-4 ! Requested absolute error
-  double precision   :: cuba_epsrel = 1.0d-2 ! Requested relative error
-  integer            :: cuba_maxeval = 10000000 ! Maximum number of integrand evaluations
-  integer            :: cuba_mineval = 1000 ! Minimum number of integrand evaluations
+  integer            :: cuba_method = cuba_method_divonne ! Method to use
+
+  double precision   :: cuba_epsabs = 0.5d0 ! Requested absolute error
+  double precision   :: cuba_epsrel = 0.0d0 ! Requested relative error
+  !double precision   :: cuba_epsabs = 1.0d-8 ! Requested absolute error
+  !double precision   :: cuba_epsrel = 1.0d-14 ! Requested relative error
+  integer            :: cuba_maxeval = 5000000 ! Maximum number of integrand evaluations
+  integer            :: cuba_mineval = 1000    ! Minimum number of integrand evaluations
 
 
   ! ----------------------------------------------------------------------------
@@ -210,6 +215,8 @@ module mod_global
   integer, parameter :: EMISSION_FIELD_2D_DIRAC_NC = 8 ! Field emission from 2D material
   integer, parameter :: EMISSION_FIELD_THERMO      = 9 ! Planar Field + Thermionic emission
   integer, parameter :: EMISSION_FIELD_V2          = 10 ! Development emission
+  integer, parameter :: EMISSION_FIELD_CYL_TIP     = 11 ! Field emission from a cylindrical tip
+  integer, parameter :: EMISSION_FIELD_TORUS       = 12 ! Field emission from a torus
   integer, parameter :: EMISSION_MANUAL            = 999 ! Manual placement of electrons for testing/debuging
 
   integer            :: EMISSION_MODE           ! Parameter that defines the emission mode
@@ -237,8 +244,9 @@ module mod_global
   ! Planes where to record information about particles when they pass through
   integer                                     :: planes_N = 10
   integer, parameter                          :: planes_N_max = 10
+  ! Given in length_scale (nm); scaled to meters once in Read_Input_Variables.
   double precision, dimension(1:planes_N_max) :: planes_z = &
-                    & (/ 5.0d0, 10.0d0, 25.0d0, 50.0d0, 75.0d0, 100.0d0, 125.0d0, 250.0d0, 500.0d0, 750.0d0 /) * length_scale
+                    & (/ 5.0d0, 10.0d0, 25.0d0, 50.0d0, 75.0d0, 100.0d0, 125.0d0, 250.0d0, 500.0d0, 750.0d0 /)
   integer, dimension(1:planes_N_max)          :: planes_ud
 
 
@@ -288,6 +296,8 @@ module mod_global
   ! Other
   logical            :: cought_stop_signal = .false. ! If true we stop the main loop
   integer, parameter :: SIGINT = 2 ! Interrupt signal (Ctrl+C)
+  integer, parameter :: SIGUSR1 = 10 ! User signal 1 (Linux/x86), used by slurm to stop the simulation
+  integer            :: nthreads ! Number of OpenMP threads
 
   ! Units tests
   double precision, parameter :: tolerance_rel = 0.02d0 ! 2% relative error tolerance
@@ -306,7 +316,7 @@ module mod_global
                    planes_N, planes_z
 
   ! ----------------------------------------------------------------------------
-  ! Prodecure interfaces and pointers
+  ! Procedure interfaces and pointers
   ! These are subroutines/functions that change depending on the type of
   ! emission / geometry used.
   interface
@@ -314,9 +324,11 @@ module mod_global
       integer, intent(in) :: i
     end subroutine Check_Boundary
 
-    pure function Electric_Field(pos) result(field_E)
-      double precision, dimension(1:3), intent(in) :: pos
-      double precision, dimension(1:3)             :: field_E
+    function Electric_Field(pos_xyz, org_pos, is_surface) result(field_E)
+      double precision, dimension(1:3), intent(in)           :: pos_xyz
+      double precision, dimension(1:3), intent(in), optional :: org_pos
+      logical, intent(in), optional                          :: is_surface
+      double precision, dimension(1:3)                       :: field_E
     end function Electric_Field
 
     subroutine Do_Emission(step)
@@ -325,8 +337,8 @@ module mod_global
 
     function Image_Charge_effect(pos_1, pos_2)
       double precision, dimension(1:3)             :: Image_Charge_effect
-      double precision, dimension(1:3), intent(in) :: pos_1, pos_2
-   end function Image_Charge_effect
+      double precision, dimension(1:3), intent(in) :: pos_1, pos_2 ! Image charge effects of pos_2 on pos_1
+    end function Image_Charge_effect
 
    function E_zunit(pos)
       double precision, dimension(1:3), intent(in) :: pos
@@ -335,11 +347,11 @@ module mod_global
 
    function Get_Emission_Velocity()
       double precision, dimension(1:3) :: Get_Emission_Velocity
-   end function Get_Emission_Velocity
+    end function Get_Emission_Velocity
 
-   function Get_Photo_Emission_Energy()
+    function Get_Photo_Emission_Energy()
       double precision                 :: Get_Photo_Emission_Energy
-   end function Get_Photo_Emission_Energy
+    end function Get_Photo_Emission_Energy
   end interface
 
   ! Pointers
@@ -376,17 +388,13 @@ contains
    flush(ud_density_absorb_bot)
   end subroutine Flush_Data
 
-  ! Check if a number is infinit.
+  ! Check if a number is infinite.
   logical function isinf(a)
+    use, intrinsic :: ieee_arithmetic
     double precision, intent(in) :: a
 
-    ! if the number is infinity then the results is always infinity,
-    ! .i.e inf - 1 = inf
-    if ((a-1.0d0) == a) then
-      isinf = .true.
-    else
-      isinf = .false.
-    end if
+    ! A value is infinite if it is neither finite nor NaN.
+    isinf = (.not. ieee_is_finite(a)) .and. (.not. ieee_is_nan(a))
   end
 
 ! PGI compiler does not have is isnan function
@@ -435,7 +443,7 @@ function box_muller(mean, std)
    x = 2.0d0*x - 1.0d0
    w = x(1)**2 + x(2)**2
 
-   if (w < 1.0d0) exit
+   if ((w < 1.0d0) .and. (w > 0.0d0)) exit
   end do
   
   y = x*sqrt( (-2.0d0 * log( w ) ) / w )
@@ -445,7 +453,7 @@ end function box_muller
 ! Random poission variable with mean lambda.
 ! See
 ! https://en.wikipedia.org/wiki/Poisson_distribution#Generating_Poisson-distributed_random_variables
-integer function Rand_Poission(lambda)
+integer function Rand_Poisson(lambda)
 double precision, intent(in) :: lambda
 double precision             :: lambda_left, p, u
 integer                      :: k
@@ -470,7 +478,7 @@ do while (p >= 1.0d0)
   end do
 end do
 
-Rand_Poission = k - 1
+Rand_Poisson = k - 1
 
 ! From Wikipedia
 ! algorithm poisson random number (Junhao, based on Knuth):
@@ -488,14 +496,14 @@ Rand_Poission = k - 1
 !                  λLeft ← 0
 !   while p > 1.
 !   return k − 1.
-end function Rand_Poission
+end function Rand_Poisson
 
     ! ----------------------------------------------------------------------------
     ! A function that does a binary search of the list for the value.
     ! It will return the index to the nearest value. The optional arguments
     ! i1 and i2 will be the two elements that the value falls between in the list.
 integer function BinarySearch(list, value, i1, i2)
-   double precision, dimension(:), target, intent(in) :: list(:)
+   double precision, dimension(:), target, intent(in) :: list
    double precision, intent(in)               :: value
    integer, intent(out), optional             :: i1, i2
    integer                                    :: first, last, mid
@@ -503,6 +511,14 @@ integer function BinarySearch(list, value, i1, i2)
    ! Get the upper and lower bounds of the list
    first = lbound(list, 1)
    last = ubound(list, 1)
+
+   ! Degenerate list (0 or 1 elements): nothing to narrow down
+   if ((last - first) < 1) then
+      if (present(i1)) i1 = first
+      if (present(i2)) i2 = last
+      BinarySearch = first
+      return
+   end if
 
    do
    ! Check if we have narrowed down our list to two elements

@@ -97,6 +97,10 @@ contains
       !particles_cur_pos(:, i)  = particles_cur_pos(:, i) + particles_cur_vel(:, i)*time_step &
       !                       & + 0.5d0*particles_cur_accel(:, i)*time_step2
 
+      !print *, particles_cur_pos(:, i)
+      !print *, particles_cur_vel(:, i)
+      !print *, particles_cur_accel(:, i)
+      !print *, particles_prev_accel(:, i)
       ! Beeman
       particles_prev_pos(:, i) = particles_cur_pos(:, i) ! Store the previous position
       particles_cur_pos(:, i)  = particles_cur_pos(:, i) + particles_cur_vel(:, i)*time_step &
@@ -429,9 +433,11 @@ contains
   !-----------------------------------------------------------------------------
   ! Find field in a point
   ! Returns the electric field in V/m
-  function Calc_Field_at(pos)
-    double precision, dimension(1:3)             :: Calc_Field_at
-    double precision, dimension(1:3), intent(in) :: pos
+  function Calc_Field_at(pos_xyz, org_pos, is_surface)
+    double precision, dimension(1:3)                       :: Calc_Field_at
+    double precision, dimension(1:3), intent(in)           :: pos_xyz
+    double precision, dimension(1:3), intent(in), optional :: org_pos
+    logical, intent(in), optional                          :: is_surface
 
     double precision, dimension(1:3) :: force_c, force_tot, force_ic
     double precision, dimension(1:3) :: pos_1, pos_2, diff
@@ -441,10 +447,10 @@ contains
     integer                          :: j
 
     ! Position of the particle we are calculating the force/acceleration on
-    pos_1 = pos
+    pos_1 = pos_xyz
 
     ! Electric field in the system
-    force_tot = ptr_field_E(pos_1)
+    force_tot = ptr_field_E(pos_1, org_pos, is_surface)
     !print *, force_tot
 
     !$OMP PARALLEL DO DEFAULT(NONE) PRIVATE(j, pos_2, diff, r, force_c, force_ic, q_2, pre_fac_c) &
@@ -495,7 +501,8 @@ contains
   ! F = (pos_1 - pos_ic)/r**3
   ! i.e. without q_1*q_2/(4\pi\epsilon_0)
   function Force_Image_charges_v2(pos_1, pos_2)
-    double precision, intent(in), dimension(1:3) :: pos_1, pos_2
+    double precision, intent(in), dimension(1:3) :: pos_1 ! Position of the particle we are calculating the force/acceleration on
+    double precision, intent(in), dimension(1:3) :: pos_2 ! Position of the particle that is acting on the particle at pos_1
     double precision, dimension(1:3)             :: Force_Image_charges_v2
     integer                                      :: n
     double precision, dimension(1:3)             :: pos_ic, diff
@@ -547,9 +554,11 @@ contains
 
   ! ----------------------------------------------------------------------------
   ! The vacuum electric field
-  pure function field_E_planar(pos) result(field_E)
-    double precision, dimension(1:3), intent(in) :: pos
-    double precision, dimension(1:3)             :: field_E
+  pure function field_E_planar(pos_xyz, org_pos, is_surface) result(field_E)
+    double precision, dimension(1:3), intent(in)           :: pos_xyz
+    double precision, dimension(1:3), intent(in), optional :: org_pos
+    logical, intent(in), optional                          :: is_surface
+    double precision, dimension(1:3)                       :: field_E
 
     ! Electric field
     ! x

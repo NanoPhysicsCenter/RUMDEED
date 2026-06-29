@@ -23,14 +23,14 @@ Module mod_field_emission_v2
   !integer                            :: nrEmitted
   double precision, dimension(1:3)   :: F_avg = 0.0d0
   integer, parameter                 :: N_MH_step = 10*3 ! Number of steps to do in the MH algorithm
-  double precision                   :: residual = 0.0d0 ! Should be a array the size of the number of emitters
+  double precision, dimension(:), allocatable :: residual ! Rounding residual, one per emitter
 
   ! Cuba
   !double precision, allocatable :: xgiven(:,:) ! xgiven(ldxgiven,ngiven) <in>, a list of points where the integrand
 
   ! ----------------------------------------------------------------------------
   ! Constants for field emission
-  ! Fyrst Fowler-Nordheim constant in units [ A eV V^{-2} ]
+  ! First Fowler-Nordheim constant in units [ A eV V^{-2} ]
   double precision, parameter :: a_FN = q_02/(16.0d0*pi**2*h_bar)
 
   ! Second Fowler-Nodheim constant in units [ eV^{-3/2} V m^{-1} ]
@@ -95,9 +95,11 @@ contains
   subroutine Init_Field_Emission_v2()
     ! Allocate the number of emitters
     allocate(nrEmitted_emitters(1:nrEmit))
+    allocate(residual(1:nrEmit))
 
     ! Initialize variables
     nrEmitted_emitters = 0 ! Number of electrons emitted from emitter number i in this time step
+    residual = 0.0d0 ! Rounding residual carried over between time steps, per emitter
 
     ! Function that checks the boundary conditions for the System
     ptr_Check_Boundary => Check_Boundary_Planar
@@ -128,6 +130,7 @@ contains
 
   subroutine Clean_Up_Field_Emission_v2()
     deallocate(nrEmitted_emitters)
+    deallocate(residual)
 
     call Work_fun_cleanup()
 
@@ -195,8 +198,10 @@ contains
     ! Do integration
     call Do_Cuba_Suave_Simple(emit, N_sup)
 
-    N_round = nint(N_sup + residual) ! Round to whole number
-    residual = N_sup - N_round
+    N_round = nint(N_sup + residual(emit)) ! Round to whole number
+    residual(emit) = N_sup - N_round
+
+    nrElecEmit = 0
 
     ! Loop over all electrons and place them
     do i = 1, N_round
@@ -241,8 +246,8 @@ contains
     double precision, dimension(1:3) :: par_pos, par_vel
 
     call Do_Surface_Integration_FE(emit, N_sup)
-    N_round = nint(N_sup + residual)
-    residual = N_sup - N_round
+    N_round = nint(N_sup + residual(emit))
+    residual(emit) = N_sup - N_round
 
     !call Calc_Field_old_method(step, emit)
 
@@ -276,7 +281,7 @@ contains
       !print *, ''
       !pause
 
-      ! Check if the field is favourable for emission or not
+      ! Check if the field is favorable for emission or not
       if (F >= 0.0d0) then
         D_f = -huge(1.0d0)
         print *, 'Warning: F > 0.0d0'
@@ -359,7 +364,7 @@ contains
       l = l_const * (-1.0d0*F) / w_theta_xy(pos, emit)**2 ! l = y^2, y = 3.79E-4 * sqrt(F_old) / w_theta
       if (l > 1.0d0) then
         print *, 'Error: l > 1.0'
-        print *, 'l = ', l, ', F = ', F, ', t_y = ', t_y
+        print *, 'l = ', l, ', F = ', F
         print *, 'x = ', pos(1)/length_scale, 'y = ', pos(2)/length_scale, ' z = ,', pos(3)/length_scale
         l = 1.0d0
         !call Write_Current_Position()
@@ -462,18 +467,18 @@ end function Escape_Prob_log
     ! Add to the average field
     F_avg = F_avg + field
 
-    ! Check if the field is favourable for emission
+    ! Check if the field is favorable for emission
     if (field(3) < 0.0d0) then
-      ! The field is favourable for emission
+      ! The field is favorable for emission
       ! Calculate the electron supply at this point
       ff(1) = Elec_Supply_V2(field(3), par_pos, userdata)
     else
-      ! The field is NOT favourable for emission
+      ! The field is NOT favorable for emission
       ! This point does not contribute
       ff(1) = 0.0d0
     end if
 
-    ! We mutiply with the area of the emitter because Cuba does the 
+    ! We multiply with the area of the emitter because Cuba does the 
     ! integration over the hybercube, i.e. from 0 to 1.
     ff(1) = A*ff(1)
     
@@ -558,7 +563,7 @@ end function Escape_Prob_log
   ! Output
   character          :: statefile = "" ! File to save the state in. Empty string means don't do it.
   integer            :: spin = -1 ! Spinning cores
-  integer            :: nregions ! <out> The actual number of subregions nedded
+  integer            :: nregions ! <out> The actual number of subregions needed
   integer            :: neval ! <out> The actual number of integrand evaluations needed
   integer            :: fail ! <out> Error flag (0 = Success, -1 = Dimension out of range, >0 = Accuracy goal was not met)
   double precision, dimension(1:ncomp) :: integral ! <out> The integral of the integrand over the unit hybercube
@@ -568,7 +573,7 @@ end function Escape_Prob_log
     ! Initialize the average field to zero
     F_avg = 0.0d0
 
-    ! Pass the number of the emitter being integraded over to the integrand as userdata
+    ! Pass the number of the emitter being integrated over to the integrand as userdata
     userdata = emit
 
     !seed = sum(my_seed(:))
@@ -667,7 +672,7 @@ end function Escape_Prob_log
     ! Initialize the average field to zero
     F_avg = 0.0d0
 
-    ! Pass the number of the emitter being integraded over to the integrand as userdata
+    ! Pass the number of the emitter being integrated over to the integrand as userdata
     userdata = emit
 
     call suave(ndim, ncomp, integrand_cuba_fe, userdata, nvec, &
@@ -730,13 +735,13 @@ end function Escape_Prob_log
     ! Add to the average field
     F_avg = F_avg + field
 
-    ! Check if the field is favourable for emission
+    ! Check if the field is favorable for emission
     if (field(3) < 0.0d0) then
-      ! The field is favourable for emission
+      ! The field is favorable for emission
       ! Calculate the current density at this point
       ff(1) = Elec_Supply_V2(field(3), par_pos, userdata) * Escape_Prob(field(3), par_pos, userdata)
     else
-      ! The field is NOT favourable for emission
+      ! The field is NOT favorable for emission
       ! This point does not contribute
       ff(1) = 0.0d0
     end if
@@ -783,7 +788,7 @@ end function Escape_Prob_log
     ! Initialize the average field to zero
     F_avg = 0.0d0
 
-    ! Pass the number of the emitter being integraded over to the integrand as userdata
+    ! Pass the number of the emitter being integrated over to the integrand as userdata
     userdata = emit
 
     call suave(ndim, ncomp, integrand_cuba_simple, userdata, nvec, &
@@ -851,7 +856,7 @@ end function Escape_Prob_log
       ! Calculate the field on the emitter surface
       field = Calc_Field_at(par_pos)
 
-      ! Check if the field is favourable for emission
+      ! Check if the field is favorable for emission
       if (field(3) < 0.0d0) then
         Nmc_try = 0
         F_avg(1:3) = F_avg(1:3) + field(1:3)
@@ -883,10 +888,10 @@ end function Escape_Prob_log
       else ! field(3) < 0.0d0
         Nmc_try = Nmc_try + 1
 
-        ! Stop if we are taking to long to find a favourable point.
+        ! Stop if we are taking to long to find a favorable point.
         ! This should be rare in field emission.
         if (Nmc_try > 1000) then
-          print *, 'RUMDEED: Warning to many field attempts at finding a favourable location in MC integration'
+          print *, 'RUMDEED: Warning to many field attempts at finding a favorable location in MC integration'
           print *, 'mc_err = ', mc_err
           !print *, 'step = ', step
           exit
@@ -925,7 +930,7 @@ end function Escape_Prob_log
     ! Get a random initial position on the surface.
     ! We pick this location from a uniform distribution.
     count = 0
-    do ! Infinite loop, we try to find a favourable position to start from
+    do ! Infinite loop, we try to find a favorable position to start from
       CALL RANDOM_NUMBER(cur_pos(1:2))
       cur_pos(1:2) = cur_pos(1:2)*emitters_dim(1:2, emit) + emitters_pos(1:2, emit)
       cur_pos(3) = 0.0d0 ! On the surface
@@ -937,7 +942,7 @@ end function Escape_Prob_log
       else
         count = count + 1
         if (count > 10000) then ! The loop is infnite, must stop it at some point.
-          print *, 'WARNING: MH was unable to find a favourable spot for emission!'
+          print *, 'WARNING: MH was unable to find a favorable spot for emission!'
           exit
         end if
         ! In field emission it is rare the we reach the CL limit.
@@ -950,7 +955,7 @@ end function Escape_Prob_log
     if (field(3) < 0.0d0) then
       df_cur = Escape_Prob(field(3), cur_pos, emit)
     else
-      df_cur = 0.0d0 ! Zero escape probabilty if field is not favourable
+      df_cur = 0.0d0 ! Zero escape probabilty if field is not favorable
     end if
 
     !---------------------------------------------------------------------------
@@ -968,7 +973,7 @@ end function Escape_Prob_log
       ! Calculate the field at the new position
       field = Calc_Field_at(new_pos)
 
-      ! Check if the field is favourable for emission at the new position.
+      ! Check if the field is favorable for emission at the new position.
       ! If it is not then cycle, i.e. we reject this location and
       ! pick another one.
       if (field(3) > 0.0d0) cycle ! Do the next loop iteration, i.e. find a new position.
@@ -1022,7 +1027,7 @@ end function Escape_Prob_log
     ! Get a random initial position on the surface.
     ! We pick this location from a uniform distribution.
     count = 0
-    do ! Infinite loop, we try to find a favourable position to start from
+    do ! Infinite loop, we try to find a favorable position to start from
       CALL RANDOM_NUMBER(cur_pos(1:2))
       cur_pos(1:2) = cur_pos(1:2)*emitters_dim(1:2, emit) + emitters_pos(1:2, emit)
       cur_pos(3) = 0.0d0 ! On the surface
@@ -1050,13 +1055,13 @@ end function Escape_Prob_log
       ! Calculate the field at the new position
       new_field = Calc_Field_at(new_pos)
 
-      ! Check if the field is favourable for emission at the new position.
+      ! Check if the field is favorable for emission at the new position.
       ! If it is not then cycle, i.e. we reject this location and
       ! pick another one.
       if (new_field(3) > 0.0d0) cycle ! Do the next loop iteration, i.e. find a new position.
 
       ! Keep in mind that the field is negative
-      ! -2 < -1 = True (More negative field is more favourable for emission)
+      ! -2 < -1 = True (More negative field is more favorable for emission)
       if (new_field(3) < cur_field(3)) then
         cur_pos = new_pos ! New position becomes the current position
         cur_field = new_field
@@ -1097,20 +1102,23 @@ end function Escape_Prob_log
     !integer                                       :: jump_a, jump_r ! Number of jumps accepted and rejected
     double precision                              :: ratio_change
 
-    !jump_a = 0
-    !jump_r = 0
+    ! Reset the accepted/rejected jump counters so the acceptance rate
+    ! (and the adaptive MH_std it drives) is computed per call rather than
+    ! accumulating over the whole simulation.
+    jump_a = 0
+    jump_r = 0
     !ndim = ndim_in
     ndim_in = 0
 
     !ndim = nint( 2.0d0/(MH_std*sqrt(2.0d0/pi)) )
     ndim = 25*8
     ratio_change = 0.5d0*100.0d0/maxval(emitters_dim(:, emit))
-    std(1:2) = emitters_dim(1:2, emit)*0.10d0 ! 5% of emitter size
+    std(1:2) = emitters_dim(1:2, emit)*0.10d0 ! 10% of emitter size
 
     ! Get a random initial position on the surface.
     ! We pick this location from a uniform distribution.
     count = 0
-    do ! Infinite loop, we try to find a favourable position to start from
+    do ! Infinite loop, we try to find a favorable position to start from
       CALL RANDOM_NUMBER(cur_pos(1:2))
       cur_pos(1:2) = cur_pos(1:2)*emitters_dim(1:2, emit) + emitters_pos(1:2, emit)
       cur_pos(3) = 0.0d0 ! On the surface
@@ -1139,7 +1147,7 @@ end function Escape_Prob_log
       !df_cur = Get_Kevin_Jgtf(field(3), T_temp, cur_w)
       df_cur = Escape_Prob_log(field(3), cur_pos, emit)
     else
-      df_cur = -huge(1.0d0)! Zero escape probabilty if field is not favourable
+      df_cur = -huge(1.0d0)! Zero escape probabilty if field is not favorable
     end if
 
     !write(unit=ud_mh) ndim
@@ -1172,7 +1180,7 @@ end function Escape_Prob_log
           MH_std = 0.00005d0
         end if
 
-        std(1:2) = emitters_dim(1:2, emit)*MH_std ! Standard deviation for the normal distribution is 0.075% of the emitter length.
+        std(1:2) = emitters_dim(1:2, emit)*MH_std ! Standard deviation for the normal distribution is MH_std of the emitter length.
         ! This means that 68% of jumps are less than this value.
         ! The expected value of the absolute value of the normal distribution is std*sqrt(2/pi).
       end if
@@ -1189,13 +1197,13 @@ end function Escape_Prob_log
       field = Calc_Field_at(new_pos)
       new_w = w_theta_xy(new_pos, emit)
 
-      ! Check if the field is favourable for emission at the new position.
+      ! Check if the field is favorable for emission at the new position.
       ! If it is not then cycle, i.e. we reject this location and
       ! pick another one.
       if (field(3) >= 0.0d0) then
         !write(unit=ud_mh) cur_pos(1), cur_pos(2), std(1), std(2)
         !print *, i, cur_pos(1)/1.0d-9, cur_pos(2)/1.0d-9, std(1)/1.0d-9, std(2)/1.0d-9
-        !print *, 'WARNING UNFAVOURABLE FIELD'
+        !print *, 'WARNING UNFAVORABLE FIELD'
         !print *, field
         !print *, new_pos/1.0E-9
         !print *, nrPart
@@ -1210,7 +1218,7 @@ end function Escape_Prob_log
       ! Calculate the escape probability at the new position, to compair with
       ! the current position.
       !df_new = Get_Kevin_Jgtf(field(3), T_temp, new_w)
-      df_new = Escape_Prob_log(field(3), cur_pos, emit)
+      df_new = Escape_Prob_log(field(3), new_pos, emit)
 
       ! if (abs(cur_w - new_w) > 0.25) then
       !   print *, df_new / df_cur
@@ -1322,7 +1330,7 @@ end function Escape_Prob_log
       par_pos(2) = d_y + y_min
 
       if(d_y > emitters_dim(2, emit)) then
-        print *, 'Warning: d_x to large <'
+        print *, 'Warning: d_y to large <'
         print *, d_y
       end if
     end if

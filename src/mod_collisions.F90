@@ -10,10 +10,10 @@ module mod_collisions
 
     implicit none
 
-    double precision, dimension(:), pointer                :: cross_tot_energy => null()
-    double precision, dimension(:), pointer                :: cross_tot_data => null()
-    double precision, dimension(:), pointer                :: cross_ion_energy => null()
-    double precision, dimension(:), pointer                :: cross_ion_data => null()
+    double precision, dimension(:), contiguous, pointer                :: cross_tot_energy => null()
+    double precision, dimension(:), contiguous, pointer                :: cross_tot_data => null()
+    double precision, dimension(:), contiguous, pointer                :: cross_ion_energy => null()
+    double precision, dimension(:), contiguous, pointer                :: cross_ion_data => null()
 
     !double precision :: cross_sum
 
@@ -87,7 +87,7 @@ contains
           mean_path_avg = mean_path_avg + mean_path
           count_n = count_n + 1
 
-          ! Calculate the ratio between the distance travled and the mean free path
+          ! Calculate the ratio between the distance traveled and the mean free path
           alpha = d/mean_path
           ! if (alpha > 1.0d0) then
           !   print *, 'WARNING: alpha > 1 in mean path'
@@ -129,7 +129,7 @@ contains
             !mean_actual_avg = mean_actual_avg + d
 
             !---------------------------------------------
-            ! Check if the collision ionizes the N2 or not  
+            ! Check if the collision ionizes the N2 or not
             cross_ion = Find_Cross_ion_data(KE)
             
             alpha = cross_ion/cross_tot

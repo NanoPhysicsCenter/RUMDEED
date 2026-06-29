@@ -174,7 +174,7 @@ subroutine Do_GTF_Emission_Tip(step)
 
   call Do_Cuba_Suave_GTF_Tip(1, N_sup)
 
-  N_round = Rand_Poission(N_sup)
+  N_round = Rand_Poisson(N_sup)
   !res_s = N_sup - N_round
 
   do i = 1, N_round
@@ -329,13 +329,14 @@ subroutine Do_Photo_Emission_Tip(step)
 
   emit = 1
   nrElecEmit = 0
+  nrTry = 0
 
   ! Check if we are doing a Gaussian distributed emission
   ! and set the max number of electrons allowed to be emitted if we are.
   ! We treat the number from the gauss distribution as a mean number of a
-  ! poission random number generator.
+  ! poisson random number generator.
   if (EmitGauss .eqv. .TRUE.) then
-    maxElecEmit = Rand_Poission( Gauss_Emission(step) )
+    maxElecEmit = Rand_Poisson( Gauss_Emission(step) )
   end if
 
   do while (nrTry <= MAX_EMISSION_TRY_PHOTO)
@@ -512,6 +513,8 @@ end subroutine Do_Photo_Emission_Tip
     !print *, len_y, len_y / length
 
     nrElecEmit = 0
+    n_s = 0.0d0
+    F_avg = 0.0d0
 
     !print *, 'Integration loop'
     do i = 1, nr_xi
@@ -742,7 +745,7 @@ end subroutine Do_Photo_Emission_Tip
     ! Get a random initial position on the surface of the tip.
     ! We pick this location from a uniform distribution.
     count = 0
-    do ! Infinite loop, we try to find a favourable position to start from
+    do ! Infinite loop, we try to find a favorable position to start from
       CALL RANDOM_NUMBER(cur_pos(1:2))
 
       xi = (max_xi - 1.0d0)*cur_pos(1) + 1.0d0
@@ -760,16 +763,16 @@ end subroutine Do_Photo_Emission_Tip
         exit ! We found a nice spot so we exit the loop
       else
         count = count + 1
-        if (count > 10000) exit ! The loop is infnite, must stop it at some point.
+        if (count > 10000) exit ! The loop is infinite, must stop it at some point.
         ! In field emission it is rare the we reach the CL limit.
       end if
     end do
 
     ! Calculate the escape probability at this location
     if (eta_f < 0.0d0) then
-      df_cur = Escape_Prob_tip(field(3), cur_pos)
+      df_cur = Escape_Prob_tip(eta_f, cur_pos)
     else
-      df_cur = 0.0d0 ! Zero escape probabilty if field is not favourable
+      df_cur = 0.0d0 ! Zero escape probability if field is not favorable
     end if
 
     !---------------------------------------------------------------------------
@@ -792,18 +795,18 @@ end subroutine Do_Photo_Emission_Tip
       field = Calc_Field_at(new_pos)
       new_eta_f = Field_normal(new_pos, field)
 
-      ! Check if the field is favourable for emission at the new position.
+      ! Check if the field is favorable for emission at the new position.
       ! If it is not then cycle, i.e. we reject this location and
       ! pick another one.
       if (new_eta_f > 0.0d0) cycle ! Do the next loop iteration, i.e. find a new position.
 
-      ! Calculate the escape probability at the new position, to compair with
+      ! Calculate the escape probability at the new position, to compar with
       ! the current position.
       df_new = Escape_Prob_Tip(new_eta_f, new_pos)
 
       ! If the escape probability is higher in the new location,
       ! then we jump to that location. If it is not then we jump to that
-      ! location with the probabilty df_new / df_cur.
+      ! location with the probability df_new / df_cur.
       if (df_new > df_cur) then
         cur_pos = new_pos ! New position becomes the current position
         df_cur = df_new
@@ -840,13 +843,14 @@ end subroutine Do_Photo_Emission_Tip
     double precision                 :: sigma_xiphi = 1.0d0 ! Standard deviations for the normal distribution
     double precision                 :: gamma = 0.01 ! Tuning parameter for the Robbins-Monro algorithm
     double precision, dimension(1:3) :: std, new_pos, cur_pos, par_pos, field
-    integer                          :: i, count, max_tune = 1000
+    integer                          :: count, max_tune = 1000
     integer                          :: accepted = 0 ! Number of accepted jumps
     integer                          :: rejected = 0 ! Number of rejected jumps
     double precision                 :: accepted_rate
     logical                          :: done_tune = .false. ! Flag to indicate if we are tuning the parameters
     integer                          :: iter_after_tuning = 0 ! Number of iterations after tuning is done
     integer                          :: iter_before_tuning = 0 ! Number of iterations before tuning is done
+    integer                          :: total_iter = 0 ! Total number of iterations
 
     ! Find a starting position on the tip
     count = 0
@@ -956,16 +960,16 @@ end subroutine Do_Photo_Emission_Tip
       end if
 
       ! Every 100 iterations we adjust the standard deviation
-      if (mod(i, 100) == 0) then
+      if (mod(total_iter, 100) == 0) then
         accepted_rate = DBLE(accepted) / DBLE(accepted + rejected)
         ! Adjust the standard deviation based on the acceptance rate
         sigma_xiphi = sigma_xiphi * exp(gamma*((accepted_rate - 0.234d0)))
-        print *, 'Iteration: ', i, ' Accepted rate: ', accepted_rate, ' Alpha xiphi: ', sigma_xiphi
+        print *, 'Iteration: ', total_iter, ' Accepted rate: ', accepted_rate, ' Alpha xiphi: ', sigma_xiphi
 
 
         if (abs(accepted_rate - 0.234d0) < 0.05d0) then
           done_tune = .true. ! If the acceptance rate is close to 0.234, we stop tuning
-          print *, 'Tuning done after ', i, ' iterations.'
+          print *, 'Tuning done after ', total_iter, ' iterations.'
           !iter_before_tuning = 0 ! Reset the counter for iterations
         end if
       end if
@@ -975,6 +979,8 @@ end subroutine Do_Photo_Emission_Tip
         print *, 'Warning: Maximum tuning iterations reached without convergence.'
         exit
       end if
+
+      total_iter = total_iter + 1
     end do
 
   end subroutine Metro_algo_tip_gtf_v2
@@ -1171,7 +1177,7 @@ end subroutine Do_Photo_Emission_Tip
     end if
 
     if (xi < 1.0d0) then
-      d_xi = 1.0 - xi
+      d_xi = 1.0d0 - xi
       if (d_xi > max_d) then
         xi = 1.0d0
       else
@@ -1286,12 +1292,12 @@ end subroutine Do_Photo_Emission_Tip
       new_pos(2) = y_coor(xi, eta_1, phi)
       new_pos(3) = z_coor(xi, eta_1, phi)
 
-      field = Calc_Field_at(par_pos)
-      eta_f = Field_normal(par_pos, field)
+      field = Calc_Field_at(new_pos)
+      eta_f = Field_normal(new_pos, field)
       !new_val = norm2(par_elec%accel)
       new_val = eta_f
 
-      ! Check if this point is favourable for emission
+      ! Check if this point is favorable for emission
       if ((eta_f < 0.0d0) .and. (field(3) < 0.0d0)) then
         new_val_s = +1
       else
@@ -1357,7 +1363,7 @@ end subroutine Do_Photo_Emission_Tip
     end if
 
     if (xi < 1.0d0) then
-      d_xi = 1.0 - xi
+      d_xi = 1.0d0 - xi
       if (d_xi > max_d) then
         xi = 1.0d0
       else
@@ -1443,8 +1449,8 @@ end subroutine Do_Photo_Emission_Tip
   ! J = a_FN*F^2/(t_y^2*w_theta)*exp(-b_FN*w_theta^(3/2)*v_y/F)
   ! We break it into two parts
   ! J = Elec_Supply*Escape_Prob .
-  ! Elec_supply is the the part before the exponental
-  ! and Escape_prob is the exponental.
+  ! Elec_supply is the the part before the exponential
+  ! and Escape_prob is the exponential.
 
   ! The electron supply part
   ! This functions returns the number of electrons
@@ -1532,7 +1538,7 @@ end function Elec_supply_tip
   !A = Tip_Area(1.0d0, max_xi, 0.0d0, 2.0d0*pi)
 
   ! Surface position
-  ! Cuba does the intergration over the hybercube.
+  ! Cuba does the integration over the hybercube.
   ! It gives us coordinates between 0 and 1.
   xi = (max_xi - 1.0d0)*xx(1) + 1.0d0
   phi = 2.0d0*pi*xx(2)
@@ -1549,9 +1555,9 @@ end function Elec_supply_tip
   ! Add to the average field
   !F_avg = F_avg + field
 
-  ! Check if the field is favourable for emission
+  ! Check if the field is favorable for emission
   if (eta_f < 0.0d0) then
-    ! The field is favourable for emission
+    ! The field is favorable for emission
 
     ! Calculate the scale factors
     h_xi = a_foci*sqrt((xi**2 - eta_1**2)/(xi**2 - 1.0d0))
@@ -1560,12 +1566,12 @@ end function Elec_supply_tip
     ! Calculate the current density at this point
     ff(1) = Elec_Supply_tip(eta_f, par_pos) * h_xi * h_phi
   else
-    ! The field is NOT favourable for emission
+    ! The field is NOT favorable for emission
     ! This point does not contribute
     ff(1) = 0.0d0
   end if
 
-  ! We mutiply with 2.0*pi (max_xi - 1.0) because Cuba does the 
+  ! We multiply with 2.0*pi (max_xi - 1.0) because Cuba does the 
   ! integration over the hybercube, i.e. from 0 to 1.
   ff(1) = 2.0d0*pi*(max_xi - 1.0d0)*ff(1)
   
@@ -1594,7 +1600,7 @@ end function Elec_supply_tip
     !A = Tip_Area(1.0d0, max_xi, 0.0d0, 2.0d0*pi)
 
     ! Surface position
-    ! Cuba does the intergration over the hybercube.
+    ! Cuba does the integration over the hybercube.
     ! It gives us coordinates between 0 and 1.
     xi = (max_xi - 1.0d0)*xx(1) + 1.0d0
     phi = 2.0d0*pi*xx(2)
@@ -1611,9 +1617,9 @@ end function Elec_supply_tip
     ! Add to the average field
     !F_avg = F_avg + field
 
-    ! Check if the field is favourable for emission
+    ! Check if the field is favorable for emission
     if (eta_f < 0.0d0) then
-      ! The field is favourable for emission
+      ! The field is favorable for emission
 
       ! Calculate the scale factors
       h_xi = a_foci*sqrt((xi**2 - eta_1**2)/(xi**2 - 1.0d0))
@@ -1622,12 +1628,12 @@ end function Elec_supply_tip
       ! Calculate the current density at this point
       ff(1) = Elec_Supply_tip(eta_f, par_pos)*Escape_Prob_Tip(eta_f, par_pos) * h_xi * h_phi
     else
-      ! The field is NOT favourable for emission
+      ! The field is NOT favorable for emission
       ! This point does not contribute
       ff(1) = 0.0d0
     end if
 
-    ! We mutiply with 2.0*pi (max_xi - 1.0) because Cuba does the 
+    ! We multiply with 2.0*pi (max_xi - 1.0) because Cuba does the 
     ! integration over the hybercube, i.e. from 0 to 1.
     ff(1) = 2.0d0*pi*(max_xi - 1.0d0)*ff(1)
     
@@ -1716,7 +1722,7 @@ end function Elec_supply_tip
                                            ! with high peaks.
     character          :: statefile = "" ! File to save the state in. Empty string means don't do it.
     integer            :: spin = -1 ! Spinning cores
-    integer            :: nregions ! <out> The actual number of subregions nedded
+    integer            :: nregions ! <out> The actual number of subregions needed
     integer            :: neval ! <out> The actual number of integrand evaluations needed
     integer            :: fail ! <out> Error flag (0 = Success, -1 = Dimension out of range, >0 = Accuracy goal was not met)
     double precision, dimension(1:ncomp) :: integral ! <out> The integral of the integrand over the unit hybercube
@@ -1727,7 +1733,7 @@ end function Elec_supply_tip
     ! Initialize the average field to zero
     !F_avg = 0.0d0
 
-    ! Pass the number of the emitter being integraded over to the integrand as userdata
+    ! Pass the number of the emitter being integrated over to the integrand as userdata
     userdata = emit
 
     call suave(ndim, ncomp, integrand_cuba_fe_tip, userdata, nvec, &
@@ -1920,7 +1926,7 @@ end function Elec_supply_tip
 
     Gauss_Emission = A * exp( -1.0d0*b*(step - mu)**2 )
 
-    write (ud_gauss, "(i6, tr2, i6)", iostat=IFAIL) step, Gauss_Emission
+    write (ud_gauss, "(i6, tr2, E16.8)", iostat=IFAIL) step, Gauss_Emission
   end function Gauss_Emission
 
   double precision function Photon_Emission(photon_energy, freq_var)
@@ -1931,7 +1937,7 @@ end function Elec_supply_tip
     Freq = freq_var*10000
     call random_number(rand_photon)
     photon_rand = (Photon_power-Freq) + FLOOR(((Photon_power+Freq)-(Photon_power-Freq))*rand_photon)
-    Photo_pois = Rand_Poission(photon_rand)
+    Photo_pois = Rand_Poisson(photon_rand)
     Photon_Emission = Photo_pois/10000
 
   end function Photon_Emission
