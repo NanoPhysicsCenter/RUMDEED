@@ -13,7 +13,7 @@ integer, parameter :: VELOCITY_MB     = 2
 integer, parameter :: VELOCITY_PHOTON = 3
 
 PRIVATE
-PUBLIC Init_Emission_Velocity, VELOCITY_ZERO, VELOCITY_MB
+PUBLIC Init_Emission_Velocity, VELOCITY_ZERO, VELOCITY_MB, VELOCITY_PHOTON
 
 contains
 
@@ -73,8 +73,11 @@ contains
     function Get_Photon_Velocity()
         double precision, dimension(1:3) :: Get_Photon_Velocity
 
-        Get_Photon_Velocity(1:2) = 0.0d0
-        Get_Photon_Velocity(3) = 0.0d0 !sqrt((2.0d0 * ((p_eV - w_theta_xy(par_pos, emit))*q_0))/m_0)
+        ! *TODO* Move the photon-energy -> velocity calculation here from the photo_emission module.
+        ! sqrt((2.0d0 * ((p_eV - w_theta_xy(par_pos, emit))*q_0))/m_0)
+        Get_Photon_Velocity = 0.0d0
+        print '(a)', 'RUMDEED: ERROR Get_Photon_Velocity not implemented'
+        stop
     end function Get_Photon_Velocity
 
 end module mod_velocity
