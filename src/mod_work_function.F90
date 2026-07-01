@@ -430,7 +430,7 @@ contains
 
       ! Scale x, y to unit square
       if (emitters_Type(emit) == 1) then ! Check if circle or rectange
-        pos_scaled(1:2) = (pos(1:2) - emitters_pos(1:2, emit)) / (2.0d0 * emitters_dim(1:2, emit)) ! Circle
+        pos_scaled(1:2) = (pos(1:2) - emitters_pos(1:2, emit)) / emitters_dim(1:2, emit) ! Circle
       else
         pos_scaled(1:2) = (pos(1:2) - emitters_pos(1:2, emit)) / emitters_dim(1:2, emit) ! Rectange
       end if
@@ -483,12 +483,12 @@ contains
 
   end function w_theta_checkerboard
   
-  double precision function w_theta_checkerboard_2x2(pos, sec)
+  double precision function w_theta_checkerboard_2x2(pos, emit, sec)
     double precision, intent(in), dimension(1:3) :: pos
+    integer, intent(in)                          :: emit
     integer, intent(out), optional               :: sec
     double precision,             dimension(1:3) :: pos_scaled
     double precision                             :: x, y
-    integer, parameter                           :: emit = 1
 
     ! Scale x, y to unit square
     pos_scaled(1:2) = (pos(1:2) - emitters_pos(1:2, emit)) / emitters_dim(1:2, emit)
@@ -554,6 +554,13 @@ contains
       end if
     end do
 
+    ! Guard against an invalid index (e.g. no sites defined). Without this a
+    ! non-positive num_vor_sites would leave k = -1 and index out of bounds below.
+    if (k < 1) then
+      print '(a)', 'RUMDEED: ERROR no Voronoi site found (num_vor_sites < 1?). ABORTING'
+      stop
+    end if
+
     ! Set the work function to the value of the closest site to pos
     w_theta_voronoi = vor_w_theta(k)
 
@@ -568,8 +575,11 @@ contains
     integer                          :: sec
     double precision                 :: res
     
-    ! Set to true and then fail it later if necessary 
+    ! Set to true and then fail it later if necessary
     unit_test_voronoi = .true.
+
+    ! Initialize to an invalid value so an unset section is caught
+    sec = -1
 
     ! Set number of sites
     num_vor_sites = 9
@@ -590,7 +600,7 @@ contains
     ! Set the test point
     pos = (/ 1.5d0, 1.0d0, 0.0d0/)
 
-    res = w_theta_voronoi(pos, sec) ! Should return 8.0d0 for the work function and also 8 for the section.
+    res = w_theta_voronoi(pos, 1, sec) ! Should return 8.0d0 for the work function and also 8 for the section.
 
     ! Check the values
     if (abs(res - 8.0d0) > 1.0d-3) unit_test_voronoi = .false.
@@ -599,7 +609,7 @@ contains
     ! Try another point
     pos = (/ 1.0d0/3.0d0, 5.0d0/3.0d0, 0.0d0 /)
 
-    res = w_theta_voronoi(pos, sec) ! Should return 3.0d0 for the work function and also 3 for the section.
+    res = w_theta_voronoi(pos, 1, sec) ! Should return 3.0d0 for the work function and also 3 for the section.
 
     ! Check the values
     if (abs(res - 3.0d0) > 1.0d-3) unit_test_voronoi = .false.

@@ -60,11 +60,16 @@ module mod_manual_emission
     ! This subroutine gets called from main when the emitters should emit the electrons
   subroutine Do_Manual_Emission(step)
     integer, intent(in)              :: step
-    integer                          :: i, u, v, IFAIL = 0, emit_step, species
-    double precision                 :: cur_time, x, y, z
-    integer                          :: ud_file
+    integer                          :: i, u, v, IFAIL, species
+    integer                          :: Manual_Num_per
+    double precision                 :: cur_time
     double precision, dimension(1:3) :: par_pos, par_vel, per_pos
-    integer                          :: Manual_Num_per = 0
+
+    ! Note: the commented-out file-reading block below uses additional locals
+    ! (x, y, z, emit_step, ud_file); re-add their declarations if it is enabled.
+
+    IFAIL = 0
+    Manual_Num_per = 0
 
     nrElecEmitAll = 0
     nrEmitted_emitters = 0
@@ -109,6 +114,8 @@ module mod_manual_emission
           per_pos(3) = par_pos(3)
 
           call Add_Particle(per_pos, par_vel, species, step, 1, -1, 1)
+          nrEmitted_emitters(1) = nrEmitted_emitters(1) + 1
+          nrElecEmitAll = nrElecEmitAll + 1
           print *, 'Adding particle at ', per_pos/length_scale
           print *, 'u = ', u
           print *, 'v = ', v

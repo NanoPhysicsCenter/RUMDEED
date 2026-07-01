@@ -27,7 +27,7 @@ contains
   ! the temperature and pressure.
   subroutine Do_Ion_Collisions(step)
     integer, intent(in)              :: step
-    double precision, dimension(1:3) :: cur_pos, prev_pos, par_vec, old_vel
+    double precision, dimension(1:3) :: cur_pos, prev_pos, par_vec, old_vel, pos_new
     double precision, parameter      :: v2_min      = (2.0d0*q_0*0.1d0/m_0) ! Minimum velocity squared
     double precision, parameter      :: v2_max      = (2.0d0*q_0*5000.0d0/m_0) ! Maximum velocity squared
     double precision                 :: mean_path, mean_path_avg, mean_actual_avg ! Mean free path
@@ -37,13 +37,13 @@ contains
     double precision                 :: rnd, alpha
     double precision                 :: vel2             ! Squared velocity of the current particle
     double precision, parameter      :: e_max = 0.10d0    ! Max value of the coefficient of restitution
-    integer                          :: i, nrColl, IFAIL, nrIon
+    integer                          :: i, nrColl, IFAIL, nrIonColl
     double precision                 :: KE ! Kinetic energy
     double precision                 :: cur_time
     integer                          :: life_time
 
     nrColl = 0
-    nrIon = 0
+    nrIonColl = 0
     count_n = 0
     mean_path_avg = 0.0d0
     mean_actual_avg = 0.0d0
@@ -52,10 +52,10 @@ contains
 
     !$OMP PARALLEL DO DEFAULT(NONE) &
     !$OMP& PRIVATE(i, cur_pos, prev_pos, d, alpha, rnd, par_vec, vel2, KE, mean_path, cross_tot, cross_ion) &
-    !$OMP& PRIVATE(old_vel, life_time) &
+    !$OMP& PRIVATE(old_vel, life_time, pos_new) &
     !$OMP& SHARED(nrPart, particles_species, particles_life, step, particles_cur_pos) &
-    !$OMP& SHARED(particles_prev_pos, particles_cur_vel, time_step, n_d, ion_life_time) &
-    !$OMP& REDUCTION(+:nrColl, count_n, mean_path_avg, nrIon)
+    !$OMP& SHARED(particles_prev_pos, particles_cur_vel, time_step, n_d, ion_life_time, particles_last_col_pos) &
+    !$OMP& REDUCTION(+:nrColl, count_n, mean_path_avg, mean_actual_avg, nrIonColl)
     do i = 1, nrPart
       if (particles_species(i) /= species_elec) then
         if (step >= particles_life(i)) then
@@ -101,66 +101,63 @@ contains
           !   !pause
           ! end if
 
-          ! Check if we do a collision or not
+          ! Check if we do a collision or not. The probability of at least one
+          ! collision over the distance travelled is 1 - exp(-d/mean_path). This
+          ! reduces to alpha for small alpha but, unlike alpha, never exceeds 1.
           call random_number(rnd)
-          if (rnd < alpha) then
-            ! Pick a new random direction for the particle
+          if (rnd < (1.0d0 - exp(-alpha))) then
+            ! Pick a new random direction for the scattered electron
             par_vec = Get_Injected_Vec(KE, old_vel)
-            !call random_number(par_vec)
-            !par_vec(1:2) = par_vec(1:2) - 0.5d0
-            !par_vec(3) = par_vec(3) - 0.25d0
-            !par_vec = par_vec - 0.5d0
             par_vec = par_vec / sqrt(par_vec(1)**2 + par_vec(2)**2 + par_vec(3)**2)
 
-            ! Set the new velocity
+            ! Set the new velocity of the scattered electron. It keeps a random
+            ! fraction of its original speed (random inelastic energy loss).
             call random_number(rnd)
+            particles_cur_vel(:, i) = par_vec*sqrt(vel2)*rnd
 
-            particles_cur_vel(:, i) = par_vec*sqrt(vel2)*rnd*1.0d0
-
-            call random_number(rnd)
-            !par_vec = par_vec*sqrt(vel2)*(1.0d0 - rnd)
-
-            rnd = rnd*0.80d0 + (1.0d0-0.80d0)
-            par_vec = par_vec*sqrt(2.0d0*q_0*rnd*40.0d0/m_0) ! Give the electron an initial energy between 8 and 40 eV
-
-            !prev_pos(:) = particles_last_col_pos(:, i)
-            !d = sqrt( (cur_pos(1) - prev_pos(1))**2 + (cur_pos(2) - prev_pos(2))**2 + (cur_pos(3) - prev_pos(3))**2 )
-            !particles_last_col_pos(:, i) = cur_pos(:)
-            !mean_actual_avg = mean_actual_avg + d
+            ! Record the distance actually travelled since the previous collision
+            ! for diagnostics, then update the last-collision position.
+            prev_pos(:) = particles_last_col_pos(:, i)
+            mean_actual_avg = mean_actual_avg + sqrt( (cur_pos(1) - prev_pos(1))**2 &
+                            + (cur_pos(2) - prev_pos(2))**2 + (cur_pos(3) - prev_pos(3))**2 )
+            particles_last_col_pos(:, i) = cur_pos(:)
 
             !---------------------------------------------
             ! Check if the collision ionizes the N2 or not
             cross_ion = Find_Cross_ion_data(KE)
-            
+
             alpha = cross_ion/cross_tot
-            !alpha = 0.20d0
-            ! if (alpha > 1.0d0) then
-            !   print *, 'WARNING: alpha > 1 in cross section'
-            ! end if
-            
+
             call random_number(rnd)
             if (rnd < alpha) then ! Check if we ionize or not
 
               ! We ionize
-              ! Pick a position for the new electron to appear at some where close to where the collision occurred
+              ! Pick a position for the new electron close to where the collision
+              ! occurred. Offset from the collision site (cur_pos) itself, which is
+              ! left unchanged so the ion below is also placed relative to it.
               call random_number(prev_pos)
               prev_pos = prev_pos - 0.5d0
-              cur_pos = cur_pos + prev_pos*length_scale
+              pos_new = cur_pos + prev_pos*length_scale
 
-              ! Pick a direction for the new electron to go in
+              ! Pick a direction for the new electron and scale it to a physical
+              ! energy (between 8 and 40 eV). Get_Ejected_Vec returns a unit vector,
+              ! so without this scaling the electron would be born essentially at rest.
               par_vec = Get_Ejected_Vec(KE, KE, old_vel)
+              call random_number(rnd)
+              rnd = rnd*0.80d0 + (1.0d0-0.80d0)
+              par_vec = par_vec*sqrt(2.0d0*q_0*rnd*40.0d0/m_0)
 
               !$OMP CRITICAL
               ! Add the new electron to the system
-              call Add_Particle(cur_pos, par_vec, species_elec, step, 1, -1) ! Electron
+              call Add_Particle(pos_new, par_vec, species_elec, step, 1, -1) ! Electron
               !$OMP END CRITICAL
 
               par_vec = 0.0d0
 
-              ! Pick a position for the ion to appear at some where close to where the collision occurred
+              ! Pick a position for the ion close to where the collision occurred
               call random_number(prev_pos)
               prev_pos = prev_pos - 0.5d0
-              cur_pos = cur_pos + prev_pos*length_scale
+              pos_new = cur_pos + prev_pos*length_scale
 
               ! Calculate the life time of the Ion
               ! This number is drawn from an exponential distribution
@@ -171,11 +168,11 @@ contains
               life_time = ion_life_time
 
               !$OMP CRITICAL
-              ! Add the new positively charged ion to the system
-              call Add_Particle(cur_pos, par_vec, species_ion, step, 1, step+life_time) ! Ion
+              ! Add the new positively charged ion to the system (starts at rest)
+              call Add_Particle(pos_new, par_vec, species_ion, step, 1, step+life_time) ! Ion
               !$OMP END CRITICAL
 
-              nrIon = nrIon + 1
+              nrIonColl = nrIonColl + 1
             end if
 
             ! Update the number of collisions
@@ -198,13 +195,15 @@ contains
     if (count_n > 1) then
       mean_path_avg = mean_path_avg / count_n
     end if
-    mean_actual_avg = 0.0d0
+    if (nrColl > 0) then
+      mean_actual_avg = mean_actual_avg / nrColl
+    end if
 
     cur_time = time_step * step / time_scale ! Scaled in units of time_scale
 
     ! Write data
     write(ud_coll, '(i6, tr2, ES12.4, tr2, i6, tr2, i6, tr2, i6, tr2, ES12.4, tr2, ES12.4)', iostat=IFAIL) &
-             step, cur_time, nrColl, nrIon, count_n, &
+             step, cur_time, nrColl, nrIonColl, count_n, &
              (mean_path_avg/length_scale), (mean_actual_avg/length_scale)
   end subroutine Do_Ion_Collisions
 
@@ -219,8 +218,12 @@ contains
     double precision, dimension(1:3)             :: par_vec
     integer                                      :: n_tries
 
-    !m_factor = 1.0d0/(sqrt(2.0d0*pi)*sigma)
-    m_factor = folded_normal_dist(mu, sigma, mu)
+    ! Envelope constant for acceptance-rejection: the maximum of the folded normal
+    ! over [0, 180]. The mode is generally not at mu, so using the value at mu here
+    ! would let the acceptance ratio exceed 1 and bias the sampled angles.
+    m_factor = folded_normal_max(mu, sigma)
+    ! The reference velocity is fixed across iterations, so compute its length once.
+    len_vel = sqrt(par_vel(1)**2 + par_vel(2)**2 + par_vel(3)**2)
     n_tries = 0
 
     do
@@ -228,20 +231,26 @@ contains
       call random_number(par_vec)
       ! Convert this to random numbers between -0.5 and 0.5
       par_vec = par_vec - 0.5d0
-      ! Dot product
-      dot_p = par_vel(1)*par_vec(1) + par_vel(2)*par_vec(2) + par_vel(3)*par_vec(3)
 
-      ! Length of the vectors
+      ! Length of the candidate vector
       len_vec = sqrt(par_vec(1)**2 + par_vec(2)**2 + par_vec(3)**2)
-      len_vel = sqrt(par_vel(1)**2 + par_vel(2)**2 + par_vel(3)**2)
 
-      ! Calculate the angle between the two vector using the dot product.
-      ! We want the angle in degrees.
-      angle = acos(dot_p/(len_vec*len_vel)) * 180.0d0/pi
+      if ((len_vel > 0.0d0) .and. (len_vec > 0.0d0)) then
+        ! Dot product
+        dot_p = par_vel(1)*par_vec(1) + par_vel(2)*par_vec(2) + par_vel(3)*par_vec(3)
 
-      ! Get the acceptance/rejection criteria. We use a folded normal distribution
-      ! because the angle between two vector is always positive. [0, pi]/[0, 180]. 
-      alpha = folded_normal_dist(mu, sigma, angle) / m_factor
+        ! Calculate the angle between the two vector using the dot product.
+        ! We want the angle in degrees.
+        angle = acos(dot_p/(len_vec*len_vel)) * 180.0d0/pi
+
+        ! Get the acceptance/rejection criteria. We use a folded normal distribution
+        ! because the angle between two vector is always positive. [0, pi]/[0, 180].
+        alpha = folded_normal_dist(mu, sigma, angle) / m_factor
+      else
+        ! The reference velocity has zero length; the angle is undefined, so accept
+        ! any random direction.
+        alpha = 1.0d0
+      end if
 
       call random_number(rnd)
       if (rnd < alpha) then
@@ -287,20 +296,26 @@ contains
       angle_max = a*T**b + c
     end if
 
-    !m_factor = 1.0d0/(sqrt(2.0d0*pi)*sigma)
-    m_factor = folded_normal_dist(angle_max, sigma, angle_max)
+    ! Envelope constant for acceptance-rejection: the maximum of the folded normal
+    ! over [0, 180] (the mode is generally not exactly at angle_max).
+    m_factor = folded_normal_max(angle_max, sigma)
+    ! The reference velocity is fixed across iterations, so compute its length once.
+    len_vel = sqrt(par_vel(1)**2 + par_vel(2)**2 + par_vel(3)**2)
     n_tries = 0
 
     do
       call random_number(par_vec)
       par_vec = par_vec - 0.5d0
-      dot_p = par_vel(1)*par_vec(1) + par_vel(2)*par_vec(2) + par_vel(3)*par_vec(3)
       len_vec = sqrt(par_vec(1)**2 + par_vec(2)**2 + par_vec(3)**2)
-      len_vel = sqrt(par_vel(1)**2 + par_vel(2)**2 + par_vel(3)**2)
 
-      angle = acos(dot_p/(len_vec*len_vel)) * 180.0d0/pi
-
-      alpha = folded_normal_dist(angle_max, sigma, angle) / m_factor
+      if ((len_vel > 0.0d0) .and. (len_vec > 0.0d0)) then
+        dot_p = par_vel(1)*par_vec(1) + par_vel(2)*par_vec(2) + par_vel(3)*par_vec(3)
+        angle = acos(dot_p/(len_vec*len_vel)) * 180.0d0/pi
+        alpha = folded_normal_dist(angle_max, sigma, angle) / m_factor
+      else
+        ! Reference velocity has zero length; accept any random direction.
+        alpha = 1.0d0
+      end if
 
       call random_number(rnd)
       if (rnd < alpha) then
@@ -333,6 +348,24 @@ contains
     sigma2 = sigma**2
     folded_normal_dist = sqrt(2.0d0/(pi*sigma2)) * exp(-1.0d0*(mu**2 + x**2)/(2.0d0*sigma2))*cosh(mu*x/sigma2)
   end function folded_normal_dist
+
+  ! Maximum of the folded normal distribution over the angular domain [0, 180].
+  ! Used as the envelope constant for acceptance-rejection sampling so the
+  ! acceptance ratio never exceeds 1. The mode of the folded normal is generally
+  ! not at mu, so its value at mu is not a valid bound. We evaluate on a fine grid.
+  double precision function folded_normal_max(mu, sigma)
+    double precision, intent(in) :: mu, sigma
+    integer, parameter           :: n_grid = 1801 ! 0.1 degree resolution over [0, 180]
+    integer                      :: k
+    double precision             :: x, f
+
+    folded_normal_max = 0.0d0
+    do k = 0, n_grid-1
+      x = 180.0d0 * k / (n_grid - 1)
+      f = folded_normal_dist(mu, sigma, x)
+      if (f > folded_normal_max) folded_normal_max = f
+    end do
+  end function folded_normal_max
 
 
     ! --------------------------------------------------------------------------
@@ -416,14 +449,19 @@ contains
   double precision function Find_Cross_tot_data(energy)
     double precision, intent(in) :: energy
     double precision, parameter  :: a = 7.98d0, b = -0.005845d0, c = 4.628d0, d = -0.0007864d0
-    double precision             :: x1, x2, y1, y2, h, q
-    integer                      :: i, i1, i2
+    double precision             :: x1, x2, y1, y2, h, q, e
+    integer                      :: i, i1, i2, n
 
     if ((energy > 70.0d0) .and. (energy <= 3000.0d0)) then
       ! Use fitted data
       Find_Cross_tot_data = (a*exp(b*energy) + c*exp(d*energy)) * 1.0d-20
     else
-      i = BinarySearch(cross_tot_energy, energy, i1, i2)
+      ! Clamp to the tabulated range before interpolating. Outside the table the
+      ! linear fit would extrapolate and can return zero or negative cross sections.
+      n = size(cross_tot_energy)
+      e = min(max(energy, cross_tot_energy(1)), cross_tot_energy(n))
+
+      i = BinarySearch(cross_tot_energy, e, i1, i2)
       y1 = cross_tot_data(i1)
       y2 = cross_tot_data(i2)
       x1 = cross_tot_energy(i1)
@@ -432,7 +470,7 @@ contains
       h = (y1 - y2)/(x1 - x2)
       q = (y2*x1 - y1*x2)/(x1 - x2)
 
-      Find_Cross_tot_data = (h*energy + q)*1.0d-20
+      Find_Cross_tot_data = (h*e + q)*1.0d-20
       !Find_Cross_tot_data = cross_tot_data(i) * 1.0d-20 ! Data is in 10^-16 cm^2 to m^2
     end if
   end function Find_Cross_tot_data
@@ -440,13 +478,17 @@ contains
   double precision function Find_Cross_ion_data(energy)
     double precision, intent(in) :: energy
     double precision, parameter  :: a = 2.251d0, b = -0.00311d0, c = 1.04d0, d = -0.0003378d0
-    double precision             :: x1, x2, y1, y2, h, q
-    integer                      :: i, i1, i2
+    double precision             :: x1, x2, y1, y2, h, q, e
+    integer                      :: i, i1, i2, n
 
     if ((energy > 180.0d0) .and. (energy <= 3000.0d0)) then
       Find_Cross_ion_data = (a*exp(b*energy) + c*exp(d*energy)) * 1.0d-20
     else
-      i = BinarySearch(cross_ion_energy, energy, i1, i2)
+      ! Clamp to the tabulated range before interpolating (see Find_Cross_tot_data).
+      n = size(cross_ion_energy)
+      e = min(max(energy, cross_ion_energy(1)), cross_ion_energy(n))
+
+      i = BinarySearch(cross_ion_energy, e, i1, i2)
       y1 = cross_ion_data(i1)
       y2 = cross_ion_data(i2)
       x1 = cross_ion_energy(i1)
@@ -455,7 +497,7 @@ contains
       h = (y1 - y2)/(x1 - x2)
       q = (y2*x1 - y1*x2)/(x1 - x2)
 
-      Find_Cross_ion_data = (h*energy + q)*1.0d-20
+      Find_Cross_ion_data = (h*e + q)*1.0d-20
 
       !Find_Cross_ion_data = cross_ion_data(i) * 1.0d-20 ! Data is in 10^-16 cm^2 to m^2
     end if

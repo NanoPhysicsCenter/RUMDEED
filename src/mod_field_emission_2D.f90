@@ -138,14 +138,10 @@ contains
     integer, intent(in)              :: step, emit
 
     ! MC integration variables
-    double precision                 :: mc_err ! Error in the Monte Carlo integration
-    integer                          :: N_mc, Nmc_try
     double precision                 :: A ! Area of the emitter
     double precision, dimension(1:3) :: par_pos, field, F_avg
-    double precision                 :: e_sup, e_sup_avg, e_sup_res
-    double precision                 :: e_sup2, e_sup_avg2
     double precision                 :: N_sup_db
-    integer                          :: N_sup, N_res
+    integer                          :: N_sup
 
     ! Emission variables
     double precision                 :: D_f, Df_avg, F, rnd
@@ -174,11 +170,12 @@ contains
     nrElecEmit = 0
     nrEmitted_emitters(emit) = 0
 
-    ! Set the average escape probability to zero.
+    ! Set the average escape probability and field to zero.
     df_avg = 0.0d0
+    F_avg = 0.0d0
 
     ! Loop over the electrons to be emitted.
-    !$OMP PARALLEL DO PRIVATE(s, par_pos, field, F, D_f, rnd, par_vel) REDUCTION(+:df_avg)
+    !$OMP PARALLEL DO PRIVATE(s, par_pos, field, F, D_f, rnd, par_vel) REDUCTION(+:df_avg, F_avg)
     do s = 1, N_sup
 
       par_pos = Metropolis_Hastings_rectangle_v2(30, emit, D_f, F)
@@ -198,6 +195,7 @@ contains
         end if
       end if
       df_avg = df_avg + D_f
+      F_avg(3) = F_avg(3) + F ! Average z-field at the emission sites
 
       CALL RANDOM_NUMBER(rnd)
       if (rnd <= D_f) then
@@ -217,7 +215,10 @@ contains
     end do
     !$OMP END PARALLEL DO
 
-    df_avg = df_avg / N_sup
+    if (N_sup > 0) then
+      df_avg = df_avg / N_sup
+      F_avg = F_avg / N_sup
+    end if
 
     write (ud_debug, "(i8, tr2, E16.8, tr2, E16.8, tr2, E16.8, tr2, i8, tr2, E16.8)", iostat=IFAIL) &
                                       step, F_avg(1), F_avg(2), F_avg(3), N_sup, df_avg
@@ -421,7 +422,6 @@ contains
 
       ! Calculate the field at the new position
       field = Calc_Field_at(new_pos)
-      F_out = field(3)
 
       ! Check if the field is favourable for emission at the new position.
       ! If it is not then cycle, i.e. we reject this location and
@@ -440,7 +440,11 @@ contains
         df_cur = df_new
         F_out = field(3)
       else
-        alpha = df_new / df_cur
+        if (df_cur > 0.0d0) then
+          alpha = df_new / df_cur
+        else
+          alpha = 1.0d0 ! df_cur == 0: always accept to keep the walk moving
+        end if
 
         CALL RANDOM_NUMBER(rnd)
         if (rnd < alpha) then
