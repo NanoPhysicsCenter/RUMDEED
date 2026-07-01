@@ -7,6 +7,7 @@
 module mod_mc_integration
   use mod_global
   use mod_verlet
+  use mod_field_emission_v2, only: Elec_Supply_V2
 
   implicit none
 
@@ -20,7 +21,7 @@ contains
     integer, intent(in)           :: emit ! The emitter to do the integration on
     double precision, intent(out) :: N_sup ! Number of electrons
 
-    !call Do_2D_MC_plain(emit, N_sup)
+    !call Do_2D_MC_plain_FE(emit, N_sup)
     call Do_Cuba_Suave_FE(emit, N_sup)
   end subroutine Do_Surface_Integration_FE
 
@@ -58,7 +59,7 @@ contains
     if (field(3) < 0.0d0) then
       ! The field is favourable for emission
       ! Calculate the electron supply at this point
-      ff(1) = Elec_Supply_V2(field(3), par_pos)
+      ff(1) = Elec_Supply_V2(field(3), par_pos, userdata)
     else
       ! The field is NOT favourable for emission
       ! This point does not contribute
@@ -167,6 +168,8 @@ contains
     mc_err = 1.0d0 ! Set the error in the MC integration to some thing higher than 0.5
     N_mc = 0 ! Number of points in the MC integration
     e_sup = 0.0d0
+    e_sup2 = 0.0d0
+    e_sup_avg = 0.0d0
     F_avg = 0.0d0 ! The average field on the surface
     Nmc_try = 0
 
@@ -186,7 +189,7 @@ contains
         N_mc = N_mc + 1
 
         !Calculate <f> and <f^2>
-        e_sup_res = Elec_Supply_V2(field(3), par_pos)
+        e_sup_res = Elec_Supply_V2(field(3), par_pos, emit)
         e_sup = e_sup + e_sup_res
         e_sup2 = e_sup2 + e_sup_res**2
 
@@ -223,12 +226,18 @@ contains
       end if ! field(3) < 0.0d0
     end do
 
-    ! Finish calculating the average field on the surface
-    F_avg = F_avg / N_mc
+    if (N_mc > 0) then
+      ! Finish calculating the average field on the surface
+      F_avg = F_avg / N_mc
 
-    ! Calculate the electron supply
-    N_sup_db = A*e_sup_avg
-    N_sup = nint(N_sup_db) ! Round the number to integer
+      ! Calculate the electron supply
+      N_sup_db = A*e_sup_avg
+      N_sup = nint(N_sup_db) ! Round the number to integer
+    else
+      ! No favourable point was ever found, avoid dividing by zero
+      F_avg = 0.0d0
+      N_sup = 0
+    end if
   end subroutine Do_2D_MC_plain_FE
 
 end module mod_mc_integration

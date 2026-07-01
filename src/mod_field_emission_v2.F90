@@ -844,6 +844,7 @@ end function Escape_Prob_log
     mc_err = 1.0d0 ! Set the error in the MC integration to some thing higher than 0.5
     N_mc = 0 ! Number of points in the MC integration
     e_sup = 0.0d0
+    e_sup2 = 0.0d0
     F_avg = 0.0d0 ! The average field on the surface
     Nmc_try = 0
 

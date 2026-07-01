@@ -255,7 +255,7 @@ contains
         exit
       end if
 
-      if (nrElec == MAX_PARTICLES-1) then
+      if (nrElec >= MAX_PARTICLES-1) then
         print *, 'WARNING: Reached maximum number of electrons!!!'
         exit
       end if
@@ -291,6 +291,7 @@ contains
               par_vel(3) = sqrt((2.0d0 * ((p_eV - w_theta_xy(par_pos, emit))*q_0))/m_0) ! <-- Newtonian
             else
               print *, "WARNING: Unknown photon velocity mode!"
+              cycle ! Skip emission when velocity mode is unknown (par_vel undefined)
             end if
 
             call Add_Particle(par_pos, par_vel, species_elec, step, emit, -1)
@@ -403,14 +404,14 @@ contains
     do while (nrTry <= MAX_EMISSION_TRY)
       ! Check if we have reached the max number of electrons to be emitted,
       ! if we are using Gaussian limited emission.
-      if ((nrElecEmit >= maxElecEmit) .and. (EmitGauss .eqv. .True.)) then
+      if ((nrElecEmit >= maxElecEmit) .and. (maxElecEmit /= -1)) then
        exit
       end if
 
       ! Check if we have reached the maximum number of electrons.
       ! If this happends then the parameter MAX_PARTICLES (in mod_gobal)
       ! needs to be increased and the code recompiled.
-      if (nrElec == MAX_PARTICLES-1) then
+      if (nrElec >= MAX_PARTICLES-1) then
        print *, 'WARNING: Reached maximum number of electrons!!!'
        exit
       end if
@@ -452,6 +453,7 @@ contains
               par_vel(3) = sqrt((2.0d0 * ((p_eV - schk_wf)*q_0))/m_0) ! <-- Newtonian
             else
               print *, "WARNING: Unknown photon velocity mode!"
+              cycle ! Skip emission when velocity mode is unknown (par_vel undefined)
             end if
 
             ! Escape velocity from image charge partner
@@ -496,7 +498,7 @@ contains
       end if
 
 
-      if (nrElec == MAX_PARTICLES-1) then
+      if (nrElec >= MAX_PARTICLES-1) then
         print *, 'WARNING: Reached maximum number of electrons!!!'
         exit
       end if
@@ -526,6 +528,7 @@ contains
               par_vel(3) = sqrt((2.0d0 * ((p_eV - w_theta_xy(par_pos, emit))*q_0))/m_0) ! <-- Newtonian
             else
               print *, "WARNING: Unknown photon velocity mode!"
+              cycle ! Skip emission when velocity mode is unknown (par_vel undefined)
             end if
             
             call Add_Particle(par_pos, par_vel, species_elec, step, emit, -1)
@@ -565,7 +568,7 @@ contains
       end if
 
 
-      if (nrElec == MAX_PARTICLES-1) then
+      if (nrElec >= MAX_PARTICLES-1) then
         print *, 'WARNING: Reached maximum number of electrons!!!'
         exit
       end if
@@ -595,6 +598,7 @@ contains
               par_vel(3) = sqrt((2.0d0 * ((p_eV - w_theta_xy(par_pos, emit))*q_0))/m_0) ! <-- Newtonian
             else
               print *, "WARNING: Unknown photon velocity mode!"
+              cycle ! Skip emission when velocity mode is unknown (par_vel undefined)
             end if
             
             call Add_Particle(par_pos, par_vel, species_elec, step, emit, -1)
@@ -694,7 +698,7 @@ contains
     !else
     !  Gauss_Emission = A * exp( -1.0d0 * b * (step - mu2)**2 )
     !end if
-    write (ud_gauss, "(i6, tr2, i6)", iostat=IFAIL) step, Gauss_Emission
+    write (ud_gauss, "(i6, tr2, es14.6)", iostat=IFAIL) step, Gauss_Emission
   end function Gauss_Emission
 
   ! ----------------------------------------------------------------------------
