@@ -15,16 +15,16 @@ The updated positions are calculated with:
 
 See the ``Update_ElecHole_Position`` subroutine.
 
-Then the force on each particle is calculate using Coulomb's law,
+Then the force on each particle is calculated using Coulomb's law,
 
 .. math::
     \mathbf{a}_n(t + \Delta t) = \frac{q_n}{m_n} \left( E_0(\mathbf{x}_n(t+\Delta t))
     + \frac{q_n}{4\pi \epsilon_0} \sum_{k\neq n} q_k\frac{\hat{\mathbf{r}}_{nk}}{\mathbf{r}_{nk}^2}
     + \frac{q_n}{4\pi\epsilon_0}\sum_j Q_j\frac{\hat{\mathbf{r}}_{nj}}{\mathbf{r}_{nj}^2} \right)
 
-The force calculation takes into account the vaccum field :math:`E_0` and the field from other particles. Image charges are also taken into account.
+The force calculation takes into account the vacuum field :math:`E_0` and the field from other particles. Image charges are also taken into account.
 See the ``Calculate_Acceleration_Particles`` subroutine and also the ``Calc_Field_at`` subroutine.
-After the force calculate the velocity is update using:
+After the force calculation the velocity is updated using:
 
 .. math::
     \mathbf{v}_{n}(t+\Delta t) = \mathbf{v}_n(t) + \frac{1}{6}\left( 2\mathbf{a}_{n}(t + \Delta t) + 5\mathbf{a}_n(t) - \mathbf{a}_n(t - \Delta t) \right)\Delta t
@@ -94,7 +94,7 @@ The functions :math:`\nu(\ell)` and :math:`t(\ell)` arise due to image charge ef
 .. math::
     \ell = \frac{F}{F_\phi} = \frac{e^3}{4\pi\epsilon_0} \frac{F}{\phi^2}
 
-If \(\phi\) is in eV and \(F\) in V/m then
+If :math:`\phi` is in eV and :math:`F` in V/m then
 
 .. math::
   \ell = \frac{e}{4\pi\epsilon_0} \frac{F}{\phi^2}

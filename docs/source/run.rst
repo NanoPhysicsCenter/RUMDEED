@@ -3,7 +3,7 @@
 Input files and running the code
 ================================
 
-Once you have :ref:`downloaded the source code and build the executable <build>` you can run program using the instructions below.
+Once you have :ref:`downloaded the source code and built the executable <build>` you can run the program using the instructions below.
 
 Input files
 -----------
@@ -23,7 +23,7 @@ BOX_DIM(1:3)
 TIME_STEP
     The size of the timestep Δt in the simulation given in pico-seconds [ps].
 STEPS
-    Number of timesteps to do in the simulations. Should be an integer number large than zero.
+    Number of timesteps to do in the simulations. Should be an integer number larger than zero.
 EMISSION_MODE
     The emission mode controls the type of emission from the cathode. It should given as one of the following integer numbers:
     
@@ -40,10 +40,10 @@ IMAGE_CHARGE
     Boolean (.TRUE. / .FALSE.) if system should include image charge effects.
 EMITTERS_DIM(1:3, <EMITTER NUMBER>)
     Dimensions of the emitter given as three numbers in nano-meters [nm].
-    If the emitter is a circle the first number is interpreted as the radius of the emitter, 
+    If the emitter is a circle, the first number is interpreted as the radius of the emitter,
     second is used for workfunction definitions and should be identical to the first number.
     For a rectangular emitter the first two numbers represent the length in the x and y directions respectively.
-    Is the emitter is a hyperboloid tip the first number distance from the peak of the tip to the anode. The second number is the base radius of the tip
+    If the emitter is a hyperboloid tip, the first number is the distance from the peak of the tip to the anode. The second number is the base radius of the tip
     and the last number is the height of the tip. See :ref:`Field emission from a hyperboloid tip <field-tip>` in the code description for more details.
     Here **<EMITTER NUMBER>** should be replaced by the number of the emitter.
     This line should be given for all emitters in the system.
@@ -78,7 +78,7 @@ An example :download:`input file <files/input>` with one emitter doing planar fi
     NREMIT = 1,
     IMAGE_CHARGE = .TRUE.
 
-    EMITTERS_DIM(1:3, 1) 1000.0d0, 1000.0d0, 0.0d0,
+    EMITTERS_DIM(1:3, 1) = 1000.0d0, 1000.0d0, 0.0d0,
     EMITTERS_POS(1:3, 1) = -500.0d0, -500.0d0, 0.0d0,
     EMITTERS_TYPE(1) = 2,
     EMITTERS_DELAY(1) = 0,
@@ -111,7 +111,7 @@ An example checkerboard :download:`work input function file <files/work>` can be
 Laser
 +++++
 
-Laser file
+The laser input file controls photoemission pulse parameters. An example is shown below:
 
 .. code-block:: console
 
@@ -119,21 +119,19 @@ Laser file
     4.7 0.02
     10000 1000 5
 
-.. Photoemission Input Warning
-.. +++++++++++++++++++++++++++
+The first line sets the following parameters:
 
-The header/first line sets parameters;
-The first number enables Gaussian electron emission pulse, 1 = on, 2 = off.
-Second number selects type of laser input, 1 for fixed photon energy, 2 for Poisson distributed photon energy.
-Third number picks velocity profile for electrons, 1 being zero initial velocity, 2 for work function dependant inital velocity.
-    
-Second line is laser (photon) energy and variation, first being the laser 'mean' energy level in electronVolts (eV) and second being standard deviation of the laser (in eV's as well). 
-This is normal distribution with Box-Muller method.
-For work function dependant initial velocity the energy is compared to the work function with the excess making way for Newtonian velocity given to the electrons.
+- The first number enables Gaussian electron emission pulse: 1 = on, 2 = off.
+- The second number selects the type of laser input: 1 for fixed photon energy, 2 for Poisson distributed photon energy.
+- The third number picks the velocity profile for electrons: 1 for zero initial velocity, 2 for work function-dependent initial velocity.
 
-Third line is gauss pulse parameters, center (mu), width (sigma) and A(mplitude) of the pulse. 
-The gaussian pulse is simulated with output restriction of electrons according to normal distribution.
-This should in theory simulate the Quantum Efficiency and Intensity via amplitude modulation.
+The second line specifies the laser (photon) energy and its spread. The first value is the laser mean photon energy in electronvolts (eV) and the second is the standard deviation (also in eV).
+This uses a normal distribution with the Box-Muller method.
+For work function-dependent initial velocity, the photon energy is compared to the work function, with the excess converted to Newtonian velocity given to the electrons.
+
+The third line contains the Gaussian pulse parameters: center (mu), width (sigma), and amplitude (A) of the pulse.
+The Gaussian pulse is simulated by restricting electron output according to a normal distribution.
+This controls the Quantum Efficiency and intensity via amplitude modulation.
 
 Examples
 --------
@@ -173,7 +171,7 @@ Thermal-field
 Running the code
 -----------------
 
-To run the code place the necessary input files into the same folder as the executable file :ref:`"RUMDEED.out" <build>`. The execute the code by running the following command
+To run the code, place the necessary input files into the same folder as the executable file :ref:`RUMDEED.out <build>`. Then execute the code by running the following command
 inside the folder
 
 .. code-block:: console

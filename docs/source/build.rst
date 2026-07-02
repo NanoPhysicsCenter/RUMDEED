@@ -8,7 +8,7 @@ it is recommended to utilize the Windows Subsystem for Linux (WSL)
 for running the code. You can find installation instructions for WSL at the following link:
 `Windows Subsystem for Linux (WSL) <https://docs.microsoft.com/en-us/windows/wsl/install>`_.
 
-To obtain the RUMDEED code, you can access it from the NanoPhysics Centers Github repository.
+To obtain the RUMDEED code, you can access it from the NanoPhysics Center's GitHub repository.
 Prior to cloning the repository, ensure that you have the **git** tool installed.
 Use the following command to clone the repository:
 
@@ -40,7 +40,7 @@ For instance, if you want to compile using the Intel compilers, utilize the foll
 
    make CC=icx FC=ifx
 
-Please refer to the :ref:`"Input files and running the code" <run>` in the documentation for further instructions on running the code.
+Please refer to the :ref:`Input files and running the code <run>` section in the documentation for further instructions on running the code.
 
 Cuba library
 ------------
@@ -53,13 +53,13 @@ After acquiring the file, please place it into the cuba folder. To build the lib
 
 Documentation
 -------------
-This documentation can also be generate using the make file with the command:
+This documentation can also be generated using the make file with the command:
 
 .. code-block:: console
 
    make docs
 
 This will produce html and pdf files in the docs/build directory. You must have **Python** and **venv** installed to generate the HTML documentation.
-To make the pdf file **xelatex** and **xindy** must be installed.
+To make the PDF file, **xelatex** and **xindy** must be installed.
 
 .. index:: build, make, git, compiler, gfortran, github, Intel, ifort, ifx, Cuba library, Windows Subsystem for Linux (WSL), Python, venv, xelatex, xindy

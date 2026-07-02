@@ -5,9 +5,9 @@
 
 RUMDEED's documentation (|today|)
 =====================================
-RUMDEED is a molecular dynamics program for simulations of vaccum diodes. It was developed at by the `NanoPhysics group <http://nano.ru.is>`_ at Reykjavík University.
+RUMDEED is a molecular dynamics program for simulations of vacuum diodes. It was developed by the `NanoPhysics group <http://nano.ru.is>`_ at Reykjavík University.
 RUMDEED stands for **R**\ eykjavík **U**\ niversity **M**\ olecular **D**\ ynamics code for **E**\ lectron **E**\ mission and **D**\ ynamics.
-It is an open-source software distributed under the terms of the GNU Public License Version 3 (GPLv3). The code can be obtained from the NanoPhysics group Github page
+It is an open-source software distributed under the terms of the GNU Public License Version 3 (GPLv3). The code can be obtained from the NanoPhysics Group's GitHub page
 | https://github.com/NanoPhysicsCenter/RUMDEED
 
 .. toctree::

@@ -1,13 +1,13 @@
 Data analysis examples
 ======================
 
-The example directory contains a number of examples with Python Jupiter notebooks that show data analysis.
+The example directory contains a number of examples with Python Jupyter notebooks that show data analysis.
 The output of the example notebook for the thermal-field emission example is shown below.
 
 Checkerboard
-============
+------------
 
-Thermal field emission
+Thermal-field emission
 ----------------------
 
 .. code:: ipython3
@@ -237,10 +237,12 @@ Calculates the emittance
 
 Input is a pandas dataframe that has columns called x and x’.
 
-It returns the Emittance, sigma_w, sigma_wp and theta. \* emittance
-[units of x \* x’] [nm-mrad] \* sigma_w is the semi-major axis of the
-ellipse [units of x] \* sigma_wp is the semi-minor axis of the ellipse
-[units of x’] \* theta is the rotation of the ellipse [deg]
+It returns the following values:
+
+- emittance [units of x × x’] [nm-mrad]
+- sigma_w: semi-major axis of the ellipse [units of x]
+- sigma_wp: semi-minor axis of the ellipse [units of x’]
+- theta: rotation of the ellipse [deg]
 
 | See http://uspas.fnal.gov/materials/10MIT/Emittance.pdf or J. Buon,
   “Beam phase space and emittance”.
@@ -302,4 +304,4 @@ ellipse [units of x] \* sigma_wp is the semi-minor axis of the ellipse
 
 .. image:: files/data_tf/output_16_0.png
 
-.. index:: python, data analysis, Jupiter notebook, examples
+.. index:: python, data analysis, Jupyter notebook, examples
