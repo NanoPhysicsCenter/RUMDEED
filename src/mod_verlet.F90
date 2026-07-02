@@ -231,9 +231,9 @@ contains
 
     !$OMP PARALLEL DO DEFAULT(NONE) PRIVATE(i, q, k, emit, sec, E_zu, EzV) &
     !$OMP& SHARED(nrPart, particles_cur_vel, particles_prev_accel, particles_cur_accel, time_step) &
-    !$OMP& SHARED(ramo_current, ramo_current_emit, particles_section, particles_charge, particles_cur_pos) &
+    !$OMP& SHARED(particles_section, particles_charge, particles_cur_pos) &
     !$OMP& SHARED(particles_species, particles_emitter, particles_prev2_accel, ptr_E_zunit) &
-    !$OMP& REDUCTION(+:avg_vel)
+    !$OMP& REDUCTION(+:avg_vel, ramo_current, ramo_current_emit)
     do i = 1, nrPart
       ! Verlet
       !particles_cur_vel(:, i) = particles_cur_vel(:, i) &
@@ -251,7 +251,6 @@ contains
       emit = particles_emitter(i)
       sec  = particles_section(i)
 
-      ! We use OMP ATOMIC here because the index k is not a loop index
       ! Dot product the velocity with the electric field unit vector
       !E_zu = dot_product(ptr_E_zunit(particles_cur_pos(:, i)), particles_cur_vel(:, i))
       E_zu = ptr_E_zunit(particles_cur_pos(:, i))
@@ -259,13 +258,10 @@ contains
         & + particles_cur_vel(2, i) * E_zu(2) &
         & + particles_cur_vel(3, i) * E_zu(3)
       
-      ! Update the ramo current
-      ! We use OMP ATOMIC here because the index k is not a loop index
-      !$OMP ATOMIC UPDATE
+      ! Update the ramo current. These small arrays are accumulated with an OpenMP
+      ! array REDUCTION (see the directive above) rather than per-iteration atomics,
+      ! since k, sec and emit are not loop indices and atomics would serialize.
       ramo_current(k) = ramo_current(k) + q * EzV
-
-      ! We use OMP ATOMIC here because the indexes sec and emit are not loop indexes
-      !$OMP ATOMIC UPDATE
       ramo_current_emit(sec, emit) = ramo_current_emit(sec, emit) + q * EzV
 
       avg_vel(:) = avg_vel(:) + particles_cur_vel(:, i) ! Calculate the sum for the average
@@ -289,24 +285,35 @@ contains
   subroutine Calculate_Acceleration_Particles()
     double precision, dimension(1:3) :: force_E, force_c, force_ic, force_ic_N, force_ic_self
     double precision, dimension(1:3) :: pos_1, pos_2, diff, pos_ic
-    double precision                 :: r
-    double precision                 :: q_1, q_2
+    double precision                 :: r, inv_r3
+    double precision                 :: q_1, q_2, qd_1
     double precision                 :: im_1, im_2
     double precision                 :: pre_fac_c
     integer                          :: i, j, k_1, k_2
+    double precision, allocatable    :: inv_mass(:)
+
+    ! Precompute the inverse masses once (O(N)) so the inner O(N^2) loop below
+    ! does array loads instead of a division per pair.
+    allocate(inv_mass(1:nrPart))
+    !$OMP PARALLEL DO PRIVATE(i) SHARED(inv_mass, particles_mass, nrPart)
+    do i = 1, nrPart
+      inv_mass(i) = 1.0d0 / particles_mass(i)
+    end do
+    !$OMP END PARALLEL DO
 
     ! We do not use GUIDED scheduling in OpenMP here because the inner loop changes size.
-    !$OMP PARALLEL DO DEFAULT(NONE) PRIVATE(i, j, k_1, k_2, pos_1, pos_2, diff, r, pos_ic) &
-    !$OMP& PRIVATE(force_E, force_c, force_ic, force_ic_N, force_ic_self, im_1, q_1, im_2, q_2, pre_fac_c) &
-    !$OMP SHARED(nrPart, particles_cur_pos, particles_mass, particles_species, ptr_field_E, box_dim) &
-    !$OMP SHARED(ptr_Image_Charge_effect, particles_charge, d) &
+    !$OMP PARALLEL DO DEFAULT(NONE) PRIVATE(i, j, k_1, k_2, pos_1, pos_2, diff, r, inv_r3, pos_ic) &
+    !$OMP& PRIVATE(force_E, force_c, force_ic, force_ic_N, force_ic_self, im_1, q_1, qd_1, im_2, q_2, pre_fac_c) &
+    !$OMP& SHARED(nrPart, particles_cur_pos, particles_mass, inv_mass, particles_species, ptr_field_E, box_dim) &
+    !$OMP& SHARED(ptr_Image_Charge_effect, particles_charge, d) &
     !$OMP& SCHEDULE(DYNAMIC, 1) &
     !$OMP& REDUCTION(+:particles_cur_accel)
     do i = 1, nrPart
       ! Information about the particle we are calculating the force/acceleration on
       pos_1 = particles_cur_pos(:, i)
-      im_1 = 1.0d0 / particles_mass(i)
+      im_1 = inv_mass(i)
       q_1 = particles_charge(i)
+      qd_1 = q_1 * div_fac_c ! Loop-invariant part of the Coulomb prefactor
       k_1 = particles_species(i)
 
       ! Acceleration due to electric field
@@ -330,12 +337,12 @@ contains
         !if (particles_mass(j) == 0.0d0) then
         !  print *, 'Hi'
         !end if
-        im_2 = 1.0d0 / particles_mass(j)
+        im_2 = inv_mass(j)
         q_2 = particles_charge(j)
         k_2 = particles_species(j)
 
         ! Prefactor for Coloumb's law
-        pre_fac_c = q_1*q_2 * div_fac_c ! q_1*q_2 / (4*pi*epsilon)
+        pre_fac_c = qd_1 * q_2 ! q_1*q_2 / (4*pi*epsilon)
 
         ! Calculate the distance between the two particles
         diff = pos_1 - pos_2
@@ -359,7 +366,9 @@ contains
         ! F = (r_1 - r_2) / |r_1 - r_2|^3
         ! F = (diff / r) * 1/r^2
         ! (diff / r) is a unit vector
-        force_c = pre_fac_c * diff / r**3
+        ! One reciprocal + multiplies instead of three element-wise divisions.
+        inv_r3 = 1.0d0 / (r*r*r)
+        force_c = (pre_fac_c*inv_r3) * diff
 
         ! Do image charge
         force_ic = pre_fac_c * ptr_Image_Charge_effect(pos_1, pos_2)
@@ -385,8 +394,8 @@ contains
 
 
         !!!$OMP CRITICAL(ACCEL_UPDATE)
-        particles_cur_accel(:, j) = particles_cur_accel(:, j) - force_c * im_2 + force_ic_N * im_2
-        particles_cur_accel(:, i) = particles_cur_accel(:, i) + force_c * im_1 + force_ic   * im_1
+        particles_cur_accel(:, j) = particles_cur_accel(:, j) + im_2*(force_ic_N - force_c)
+        particles_cur_accel(:, i) = particles_cur_accel(:, i) + im_1*(force_c + force_ic)
         !!!$OMP END CRITICAL(ACCEL_UPDATE)
       end do
 
@@ -447,7 +456,7 @@ contains
 
     double precision, dimension(1:3) :: force_c, force_tot, force_ic
     double precision, dimension(1:3) :: pos_1, pos_2, diff
-    double precision                 :: r
+    double precision                 :: r, inv_r3
     double precision                 :: q_1, q_2
     double precision                 :: pre_fac_c
     integer                          :: j
@@ -459,7 +468,7 @@ contains
     force_tot = ptr_field_E(pos_1, org_pos, is_surface)
     !print *, force_tot
 
-    !$OMP PARALLEL DO DEFAULT(NONE) PRIVATE(j, pos_2, diff, r, force_c, force_ic, q_2, pre_fac_c) &
+    !$OMP PARALLEL DO DEFAULT(NONE) PRIVATE(j, pos_2, diff, r, inv_r3, force_c, force_ic, q_2, pre_fac_c) &
     !$OMP& SHARED(nrPart, particles_cur_pos, particles_charge, ptr_Image_Charge_effect, pos_1, box_dim) &
     !$OMP& REDUCTION(+:force_tot)
     do j = 1, nrPart
@@ -480,14 +489,14 @@ contains
       ! F = (r_1 - r_2) / |r_1 - r_2|^3
       ! F = (diff / r) * 1/r^2
       ! (diff / r) is a unit vector
-      force_c = diff / r**3
-      !force_c = diff / (r*r*r)
+      inv_r3 = 1.0d0 / (r*r*r)
+      force_c = diff * inv_r3
 
       ! Image charge effect
       force_ic = ptr_Image_Charge_effect(pos_1, pos_2)
 
       ! The total force
-      force_tot = force_tot + pre_fac_c * force_c + pre_fac_c * force_ic
+      force_tot = force_tot + pre_fac_c * (force_c + force_ic)
     end do
     !$OMP END PARALLEL DO
 
@@ -512,7 +521,7 @@ contains
     double precision, dimension(1:3)             :: Force_Image_charges_v2
     integer                                      :: n
     double precision, dimension(1:3)             :: pos_ic, diff
-    double precision                             :: r
+    double precision                             :: r, inv_r3
 
     ! Check if we are doing image charge or not
     if (image_charge .eqv. .false.) then
@@ -526,7 +535,8 @@ contains
 
       diff = pos_1 - pos_ic
       r = sqrt( sum(diff**2) ) + length_scale**2
-      Force_Image_charges_v2 = (-1.0d0)*diff/r**3 ! -1.0d0 because of the opposite charge
+      inv_r3 = 1.0d0 / (r*r*r)
+      Force_Image_charges_v2 = (-1.0d0)*diff*inv_r3 ! -1.0d0 because of the opposite charge
 
       do n = 1, N_ic_max
         ! The charges with the opposite charges first
@@ -534,26 +544,30 @@ contains
         pos_ic(3) = 2.0d0*n*d - pos_2(3) ! Change z
         diff = pos_1 - pos_ic
         r = sqrt( sum(diff**2) ) + length_scale**2
-        Force_Image_charges_v2 = Force_Image_charges_v2 + (-1.0d0)*diff/r**3 ! -1.0d0 because of the opposite charge
+        inv_r3 = 1.0d0 / (r*r*r)
+        Force_Image_charges_v2 = Force_Image_charges_v2 + (-1.0d0)*diff*inv_r3 ! -1.0d0 because of the opposite charge
 
         ! Negative n
         pos_ic(3) = -2.0d0*n*d - pos_2(3) ! Change z
         diff = pos_1 - pos_ic
         r = sqrt( sum(diff**2) ) + length_scale**2
-        Force_Image_charges_v2 = Force_Image_charges_v2 + (-1.0d0)*diff/r**3 ! -1.0d0 because of the opposite charge
+        inv_r3 = 1.0d0 / (r*r*r)
+        Force_Image_charges_v2 = Force_Image_charges_v2 + (-1.0d0)*diff*inv_r3 ! -1.0d0 because of the opposite charge
 
         ! Now do the charges with the same charge
         ! Plus n
         pos_ic(3) = 2.0d0*n*d + pos_2(3) ! Change z
         diff = pos_1 - pos_ic
         r = sqrt( sum(diff**2) ) + length_scale**2
-        Force_Image_charges_v2 = Force_Image_charges_v2 + (+1.0d0)*diff/r**3 ! +1.0d0 because of the same charge
+        inv_r3 = 1.0d0 / (r*r*r)
+        Force_Image_charges_v2 = Force_Image_charges_v2 + (+1.0d0)*diff*inv_r3 ! +1.0d0 because of the same charge
 
         ! Negative n
         pos_ic(3) = -2.0d0*n*d + pos_2(3) ! Change z
         diff = pos_1 - pos_ic
         r = sqrt( sum(diff**2) ) + length_scale**2
-        Force_Image_charges_v2 = Force_Image_charges_v2 + (+1.0d0)*diff/r**3 ! +1.0d0 because of the same charge
+        inv_r3 = 1.0d0 / (r*r*r)
+        Force_Image_charges_v2 = Force_Image_charges_v2 + (+1.0d0)*diff*inv_r3 ! +1.0d0 because of the same charge
       end do
     end if
   end function Force_Image_charges_v2
