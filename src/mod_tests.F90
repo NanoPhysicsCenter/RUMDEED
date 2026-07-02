@@ -481,19 +481,19 @@ contains
     ! The image charge is located below emitter. The force should only be in the z-direction,
     ! F_R1 = 1/(4*pi*epsilon_0) * (-q_1)*(+q_1)*(z - z')/|z - z'|^3 .
     ! We know that z' = -z so z - z' = z - (-z) = 2z, or,
-    ! F_R1 = -q_1**2/(4*pi*epsilon_0) * 2z/(2z)^(3/2) 1/(4*pi*epsilon_0) * 1/sqrt(2z)
+    ! F_R1 = -q_1**2/(4*pi*epsilon_0) * 2z/(2z)^3 = -q_1**2/(4*pi*epsilon_0) * 1/(2z)^2
 
     F_R1 = 0.0d0
-    F_R1(3) = -1.0d0*q_1**2/(4.0d0*pi*epsilon_0)*1.0d0/sqrt(2.0d0*R_1(3))
+    F_R1(3) = -1.0d0*q_1**2/(4.0d0*pi*epsilon_0)*1.0d0/(2.0d0*R_1(3))**2
 
     call Assert_Close_Vec(force_ic_11, F_R1, 'Self interaction on particle 1')
 
     force_ic_22 = q_2**2 * div_fac_c * Force_Image_charges_v2(R_2, R_2)
 
-    ! F_R2 = -q_1**2/(4*pi*epsilon_0) * 2z/(2z)^(3/2) 1/(4*pi*epsilon_0) * 1/sqrt(2z)
+    ! F_R2 = -q_2**2/(4*pi*epsilon_0) * 2z/(2z)^3 = -q_2**2/(4*pi*epsilon_0) * 1/(2z)^2
 
     F_R2 = 0.0d0
-    F_R2(3) = -1.0d0*q_2**2/(4.0d0*pi*epsilon_0)*1.0d0/sqrt(2.0d0*R_2(3))
+    F_R2(3) = -1.0d0*q_2**2/(4.0d0*pi*epsilon_0)*1.0d0/(2.0d0*R_2(3))**2
 
     call Assert_Close_Vec(force_ic_22, F_R2, 'Self interaction on particle 2')
 

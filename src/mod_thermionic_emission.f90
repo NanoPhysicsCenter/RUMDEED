@@ -1,10 +1,10 @@
 !-------------------------------------------!
-! Module for photo emission                 !
+! Module for thermionic emission            !
 ! Kristinn Torfason                         !
 ! 05.04.13                                  !
 !-------------------------------------------!
 
-Module mod_therminoic_emission
+Module mod_thermionic_emission
   use mod_global
   use mod_verlet
   use mod_pair
@@ -121,8 +121,15 @@ contains
     double precision, dimension(1:3), intent(in) :: pos
     double precision                             :: delta_W ! Schottky effect
 
-    delta_W = sqrt(B_Sch_eV_prefix*(-1.0d0*F)) ! Units: mV*V/m = V^2, sqrt(V^2) = V = J/C = eV
-    Escape_Prob = exp( -1.0d0*(w_theta - delta_W)/(k_b_eV*T_k) )
+    ! The field must be favourable for emission (F < 0 in this codebase's
+    ! sign convention). Otherwise the Schottky term sqrt(-F) is imaginary and
+    ! there is effectively no emission, so return a negligible probability.
+    if (F < 0.0d0) then
+      delta_W = sqrt(B_Sch_eV_prefix*(-1.0d0*F)) ! Units: mV*V/m = V^2, sqrt(V^2) = V = J/C = eV
+      Escape_Prob = exp( -1.0d0*(w_theta - delta_W)/(k_b_eV*T_k) )
+    else
+      Escape_Prob = 0.0d0
+    end if
 
   end function Escape_Prob
 
@@ -139,4 +146,4 @@ contains
 
     Richardson_Dushman = Elec_Supply(F, pos) * Escape_Prob(F, pos)
   end function Richardson_Dushman
-end module mod_therminoic_emission
+end module mod_thermionic_emission

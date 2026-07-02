@@ -16,7 +16,7 @@ PUBLIC :: Get_Kevin_Jgtf
 ! terms with different units are combinations of Units
 ! eg: [rmo] = [eV]/c ̂ 2, [c] = nm/fs
 !––––––––––––––––––––––––––––––––––––––––––––––––-
-    double precision, parameter :: pi = 3.14159265359, &
+    double precision, parameter :: pi = 3.14159265359d0, &
     & rmo = 5.685629853d0, rkb = 1.0d0/11604.5192d0, &
     & rhbar = 0.658211899d0, &
     & alpha = 7.29735257d-3, c = 299.7924580d0, &
@@ -39,6 +39,14 @@ double precision function Get_Kevin_Jgtf(F, T, w_theta)
   double precision             :: F_evnm
 
   F_evnm = abs(F) * 1.0d-9 ! Kevin wants the field in eV/nm see note above (Basically we convert to GV/m).
+
+  ! Guard against a negligible field: RJgtf divides by the field and takes log(y) with
+  ! y ~ sqrt(field), both of which blow up to NaN/Inf as field -> 0. No field means no emission.
+  if (F_evnm < 1.0d-9) then
+    Get_Kevin_Jgtf = 0.0d0
+    return
+  end if
+
   Get_Kevin_Jgtf = RJgtf(w_theta, Chem, F_evnm, T) * 1.0d4 ! Kevin returns in A/cm² convert to A/m²
 end function Get_Kevin_Jgtf
 

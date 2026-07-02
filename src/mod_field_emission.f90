@@ -128,7 +128,7 @@ contains
     len_x = emitters_dim(1, emit) / nr_x ! Size of each section in x
     len_y = emitters_dim(2, emit) / nr_y ! Size of each section in y
 
-    A_f = len_x*len_y ! Total area of the emitter
+    A_f = len_x*len_y ! Area of one section (total area = nr_x*nr_y*A_f)
 
     n_s = 0.0d0 ! Set the number of electrons to be emitted in this time step to zero.
     F_avg = 0.0d0 ! Set the avereage field to zero before we start.
@@ -234,7 +234,11 @@ contains
 
     !!!$OMP END PARALLEL
 
-    df_avg = df_avg / n_r
+    if (n_r > 0) then
+      df_avg = df_avg / n_r
+    else
+      df_avg = 0.0d0
+    end if
 
     write (ud_debug, "(i8, tr2, E16.8, tr2, E16.8, tr2, E16.8, tr2, i8, tr2, E16.8)", iostat=IFAIL) &
                                       step, F_avg(1), F_avg(2), F_avg(3), n_r, df_avg
@@ -276,7 +280,7 @@ contains
       l = l_const * (-1.0d0*F) / w_theta_xy(pos)**2 ! l = y^2, y = 3.79E-4 * sqrt(F_old) / w_theta
       if (l > 1.0d0) then
         print *, 'Error: l > 1.0'
-        print *, 'l = ', l, ', F = ', F, ', t_y = ', t_y
+        print *, 'l = ', l, ', F = ', F
         print *, 'x = ', pos(1), 'y = ', pos(2)
         l = 1.0d0
         !call Write_Current_Position()
@@ -362,7 +366,7 @@ contains
       new_pos(1:2) = box_muller(par_pos(1:2), std)
       call check_limits_metro_rec(new_pos, emit)
 
-      field = Calc_Field_at(par_pos)*(-1.0d0) ! This code assumes it is using the acceleration
+      field = Calc_Field_at(new_pos)*(-1.0d0) ! This code assumes it is using the acceleration
       new_val = norm2(field)
 
       if (field(3) > 0.0d0) then
@@ -381,7 +385,6 @@ contains
         alpha = new_val / old_val
       end if
 
-      alpha = new_val / old_val
       CALL RANDOM_NUMBER(rnd)
       if (rnd < alpha) then
         old_val = new_val
