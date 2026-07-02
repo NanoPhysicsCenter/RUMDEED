@@ -42,6 +42,36 @@ For instance, if you want to compile using the Intel compilers, utilize the foll
 
 Please refer to the :ref:`Input files and running the code <run>` section in the documentation for further instructions on running the code.
 
+Building for NVIDIA GPUs (OpenACC)
+----------------------------------
+The particle-particle interaction kernel (the :math:`O(N^2)` Coulomb and image charge
+force calculation in *mod_verlet.F90*) can be offloaded to an NVIDIA GPU using OpenACC.
+This requires the **nvfortran** compiler from the
+`NVIDIA HPC SDK <https://developer.nvidia.com/hpc-sdk>`_. To build with GPU offload, use:
+
+.. code-block:: console
+
+   make CC=gcc FC=nvfortran ACC=gpu
+
+This can be combined with OpenMP (which is enabled by default): the offloaded kernel runs
+on the GPU while the remaining parallel loops (emission, position and velocity updates)
+keep running on the CPU cores. The regular CPU-only builds are unaffected, when compiling
+with gfortran or without the **ACC** variable the OpenACC directives are ignored and the
+OpenMP code path is used as before.
+
+The GPU kernel implements the planar geometry (the vacuum field *field_E_planar* together
+with the image charge partners of *Force_Image_charges_v2*), which covers the planar
+emission modes (photo, field, thermionic, field-thermo, 2D and manual emission). Runs
+using the tip, cylindrical tip, or torus geometries automatically fall back to the OpenMP
+code path at runtime.
+
+For testing the OpenACC code path on a machine without a GPU, the kernels can be compiled
+to run on the CPU cores instead:
+
+.. code-block:: console
+
+   make CC=gcc FC=nvfortran ACC=multicore OPENMP=no
+
 Cuba library
 ------------
 The code uses the `Cuba library <https://feynarts.de/cuba/>`_ for numerical integration :cite:p:`HAHN200578`.
@@ -62,4 +92,4 @@ This documentation can also be generated using the make file with the command:
 This will produce html and pdf files in the docs/build directory. You must have **Python** and **venv** installed to generate the HTML documentation.
 To make the PDF file, **xelatex** and **xindy** must be installed.
 
-.. index:: build, make, git, compiler, gfortran, github, Intel, ifort, ifx, Cuba library, Windows Subsystem for Linux (WSL), Python, venv, xelatex, xindy
+.. index:: build, make, git, compiler, gfortran, github, Intel, ifort, ifx, Cuba library, Windows Subsystem for Linux (WSL), Python, venv, xelatex, xindy, GPU, OpenACC, nvfortran, NVIDIA HPC SDK

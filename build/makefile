@@ -87,6 +87,19 @@ FFLAGS=-O3 -fastsse
 ifneq (,$(findstring yes,$(OPENMP)))
 FFLAGS+=-mp
 endif
+# OpenACC offload of the N-body kernels (see mod_verlet.F90).
+# ACC=gpu       Offload to an NVIDIA GPU (can be combined with OPENMP=yes,
+#               the OpenMP loops stay on the CPU).
+# ACC=multicore Run the OpenACC kernels on the CPU cores instead, useful for
+#               testing on machines without a GPU. Use with OPENMP=no.
+ifeq ($(ACC),gpu)
+$(info Using OpenACC on GPU)
+FFLAGS+=-acc=gpu -Minfo=accel
+endif
+ifeq ($(ACC),multicore)
+$(info Using OpenACC on CPU cores)
+FFLAGS+=-acc=multicore -Minfo=accel
+endif
 endif
 
 ifeq ($(FC),flang)

@@ -292,6 +292,18 @@ contains
     integer                          :: i, j, k_1, k_2
     double precision, allocatable    :: inv_mass(:)
 
+#ifdef _OPENACC
+    ! GPU path: only the planar geometry (vacuum field + planar image charge
+    ! partners) is implemented on the device, because the procedure pointers
+    ! ptr_field_E / ptr_Image_Charge_effect cannot be called inside a GPU
+    ! kernel. Other geometries (tip, cylinder, torus) fall back to the
+    ! OpenMP loop below.
+    if (Using_Planar_Geometry() .eqv. .true.) then
+      call Calculate_Acceleration_Particles_Planar_ACC()
+      return
+    end if
+#endif
+
     ! Precompute the inverse masses once (O(N)) so the inner O(N^2) loop below
     ! does array loads instead of a division per pair.
     allocate(inv_mass(1:nrPart))
@@ -414,6 +426,174 @@ contains
     !print *, nrPart
     !stop
   end subroutine Calculate_Acceleration_Particles
+
+  ! ----------------------------------------------------------------------------
+  ! Returns .true. if the geometry procedure pointers are set to the planar
+  ! versions (field_E_planar and Force_Image_charges_v2), i.e. if the OpenACC
+  ! kernel below computes the same physics as the generic OpenMP loop.
+  !
+  ! Note: this would normally be written as
+  !   associated(ptr_field_E, field_E_planar)
+  ! but that form triggers an internal compiler error in nvfortran (seen with
+  ! version 26.5, "mk_id: invalid symbol table index"), so the procedure
+  ! addresses are compared through c_funloc instead.
+  logical function Using_Planar_Geometry()
+    use, intrinsic :: iso_c_binding, only: c_associated, c_funloc
+
+    Using_Planar_Geometry = &
+      &      c_associated(c_funloc(ptr_field_E), c_funloc(field_E_planar)) &
+      & .and. c_associated(c_funloc(ptr_Image_Charge_effect), c_funloc(Force_Image_charges_v2))
+  end function Using_Planar_Geometry
+
+  ! ----------------------------------------------------------------------------
+  ! OpenACC (GPU) version of Calculate_Acceleration_Particles for the planar
+  ! geometry (field_E_planar + Force_Image_charges_v2).
+  !
+  ! The OpenMP version loops over unique pairs (i, j > i) and scatters the
+  ! force to both particles, which needs an array reduction over
+  ! particles_cur_accel. That pattern does not map to a GPU. Here every
+  ! particle instead gathers the full force sum over all other particles:
+  ! twice the flops, but embarrassingly parallel and race free, which is the
+  ! standard formulation for N-body kernels on GPUs.
+  !
+  ! The image charge force on particle i is evaluated directly as
+  ! Force_Image_charges_v2(pos_i, pos_j) for every ordered pair (i, j).
+  ! For N_ic_max = 0 (the default) this is identical to the OpenMP path.
+  ! For N_ic_max >= 1 the OpenMP path approximates the reverse force of a
+  ! pair by mirroring the x and y components; the direct evaluation used
+  ! here does not, so the z-component of the same-charge partner terms can
+  ! differ slightly between the two paths.
+  !
+  ! When compiled without OpenACC the !$acc directives are comments and this
+  ! subroutine simply runs serially, it is only called from the _OPENACC
+  ! branch in Calculate_Acceleration_Particles.
+  subroutine Calculate_Acceleration_Particles_Planar_ACC()
+    integer          :: i, j, n, Np, Nic
+    logical          :: do_ic
+    double precision :: Ez_loc, d_loc
+    double precision :: x_1, y_1, z_1, q_1, qd_1, im_1
+    double precision :: x_2, y_2, z_2, q_2, pre_fac_c
+    double precision :: a_x, a_y, a_z, f_x, f_y, f_z
+    double precision :: diff_x, diff_y, diff_z, dxy2, z_ic
+    double precision :: r, inv_r3
+
+    Np = nrPart
+    if (Np < 1) return
+
+    ! Local copies of module scalars, so they become firstprivate in the kernel
+    Ez_loc = E_z
+    d_loc  = d
+    Nic    = N_ic_max
+    do_ic  = image_charge
+
+    !$acc parallel loop gang vector &
+    !$acc& copyin(particles_cur_pos(1:3, 1:Np), particles_charge(1:Np), particles_mass(1:Np)) &
+    !$acc& copyout(particles_cur_accel(1:3, 1:Np))
+    do i = 1, Np
+      x_1 = particles_cur_pos(1, i)
+      y_1 = particles_cur_pos(2, i)
+      z_1 = particles_cur_pos(3, i)
+      q_1 = particles_charge(i)
+      qd_1 = q_1 * div_fac_c ! q_1 / (4*pi*epsilon)
+
+      ! Accumulated force on particle i
+      a_x = 0.0d0
+      a_y = 0.0d0
+      a_z = 0.0d0
+
+      !$acc loop seq
+      do j = 1, Np
+        if (j == i) cycle ! No self interaction (See force_ic_self in the OpenMP version)
+
+        x_2 = particles_cur_pos(1, j)
+        y_2 = particles_cur_pos(2, j)
+        z_2 = particles_cur_pos(3, j)
+        q_2 = particles_charge(j)
+
+        pre_fac_c = qd_1 * q_2 ! q_1*q_2 / (4*pi*epsilon)
+
+        ! Coulomb force, F = pre_fac_c * (r_1 - r_2) / |r_1 - r_2|^3.
+        ! As in the OpenMP version we add length_scale**2 to r to guard
+        ! against division by zero.
+        diff_x = x_1 - x_2
+        diff_y = y_1 - y_2
+        diff_z = z_1 - z_2
+        dxy2 = diff_x**2 + diff_y**2 ! The x/y offsets are the same for all image charge partners
+
+        r = sqrt( dxy2 + diff_z**2 ) + length_scale**2
+        inv_r3 = 1.0d0 / (r*r*r)
+        a_x = a_x + pre_fac_c*inv_r3*diff_x
+        a_y = a_y + pre_fac_c*inv_r3*diff_y
+        a_z = a_z + pre_fac_c*inv_r3*diff_z
+
+        ! Image charge partners of particle j acting on particle i
+        ! (Force_Image_charges_v2 inlined, see that function for details).
+        if (do_ic .eqv. .true.) then
+          f_x = 0.0d0
+          f_y = 0.0d0
+          f_z = 0.0d0
+
+          ! n = 0: Opposite charge partner below the bottom plane
+          z_ic = -1.0d0*z_2
+          diff_z = z_1 - z_ic
+          r = sqrt( dxy2 + diff_z**2 ) + length_scale**2
+          inv_r3 = 1.0d0 / (r*r*r)
+          f_x = f_x - diff_x*inv_r3
+          f_y = f_y - diff_y*inv_r3
+          f_z = f_z - diff_z*inv_r3
+
+          !$acc loop seq
+          do n = 1, Nic
+            ! Opposite charge partners, plus and minus n
+            z_ic = 2.0d0*n*d_loc - z_2
+            diff_z = z_1 - z_ic
+            r = sqrt( dxy2 + diff_z**2 ) + length_scale**2
+            inv_r3 = 1.0d0 / (r*r*r)
+            f_x = f_x - diff_x*inv_r3
+            f_y = f_y - diff_y*inv_r3
+            f_z = f_z - diff_z*inv_r3
+
+            z_ic = -2.0d0*n*d_loc - z_2
+            diff_z = z_1 - z_ic
+            r = sqrt( dxy2 + diff_z**2 ) + length_scale**2
+            inv_r3 = 1.0d0 / (r*r*r)
+            f_x = f_x - diff_x*inv_r3
+            f_y = f_y - diff_y*inv_r3
+            f_z = f_z - diff_z*inv_r3
+
+            ! Same charge partners, plus and minus n
+            z_ic = 2.0d0*n*d_loc + z_2
+            diff_z = z_1 - z_ic
+            r = sqrt( dxy2 + diff_z**2 ) + length_scale**2
+            inv_r3 = 1.0d0 / (r*r*r)
+            f_x = f_x + diff_x*inv_r3
+            f_y = f_y + diff_y*inv_r3
+            f_z = f_z + diff_z*inv_r3
+
+            z_ic = -2.0d0*n*d_loc + z_2
+            diff_z = z_1 - z_ic
+            r = sqrt( dxy2 + diff_z**2 ) + length_scale**2
+            inv_r3 = 1.0d0 / (r*r*r)
+            f_x = f_x + diff_x*inv_r3
+            f_y = f_y + diff_y*inv_r3
+            f_z = f_z + diff_z*inv_r3
+          end do
+
+          a_x = a_x + pre_fac_c*f_x
+          a_y = a_y + pre_fac_c*f_y
+          a_z = a_z + pre_fac_c*f_z
+        end if
+      end do
+
+      ! Add the vacuum electric field (field_E_planar), F = q*(0, 0, E_z),
+      ! and convert the total force to acceleration.
+      im_1 = 1.0d0 / particles_mass(i)
+      particles_cur_accel(1, i) = a_x * im_1
+      particles_cur_accel(2, i) = a_y * im_1
+      particles_cur_accel(3, i) = (a_z + q_1*Ez_loc) * im_1
+    end do
+    !$acc end parallel loop
+  end subroutine Calculate_Acceleration_Particles_Planar_ACC
 
   subroutine Write_Acceleration_Test(step)
     integer, intent(in)              :: step
