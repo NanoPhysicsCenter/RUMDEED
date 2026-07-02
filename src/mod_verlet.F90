@@ -136,6 +136,7 @@ contains
       print '(a)', 'RUMDEED: ERROR UNABLE TO OPEN file for position'
       print *, filename
       print *, step
+      return
     end if
 
     do i = 1, nrPart
@@ -213,7 +214,7 @@ contains
 
     ! Do periodic boundary conditions
     particles_cur_pos(1, i) = modulo(x, box_dim(1))
-    particles_cur_pos(1, i) = modulo(y, box_dim(2))
+    particles_cur_pos(2, i) = modulo(y, box_dim(2))
 
   end subroutine Check_Boundary_Periodic
 
@@ -274,7 +275,11 @@ contains
     if (nrPart /= 0) then ! Check that we don't divide by zero
       avg_vel(:) = avg_vel(:) / nrPart ! Take the average
     end if
-    avg_mob = sqrt(avg_vel(1)**2 + avg_vel(2)**2 + avg_vel(3)**2) / (-1.0d0*E_z)
+    if (E_z /= 0.0d0) then ! Check that we don't divide by zero
+      avg_mob = sqrt(avg_vel(1)**2 + avg_vel(2)**2 + avg_vel(3)**2) / (-1.0d0*E_z)
+    else
+      avg_mob = 0.0d0
+    end if
   end subroutine Update_Velocity
 
 
@@ -343,12 +348,12 @@ contains
         ! often similar in speed. The difference is small and they fluctuate a lot,
         ! with no clear winner.
         !
-        ! We add a small number (length_scale**3) to the results to
-        ! prevent a singularity when calulating 1/r**3
+        ! We add a small number (length_scale**2) to the results to
+        ! guard against r = 0 (division by zero) when calculating 1/r**3
         !
-        r = sqrt( sum(diff**2) ) + length_scale**3
-        !r = sqrt( dot_product(diff, diff) ) + length_scale**3
-        !r = NORM2(diff) + length_scale**3
+        r = sqrt( sum(diff**2) ) + length_scale**2
+        !r = sqrt( dot_product(diff, diff) ) + length_scale**2
+        !r = NORM2(diff) + length_scale**2
 
         ! Calculate the Coulomb force
         ! F = (r_1 - r_2) / |r_1 - r_2|^3
@@ -417,6 +422,7 @@ contains
       print '(a)', 'RUMDEED: ERROR UNABLE TO OPEN file for acceleration'
       print *, filename
       print *, step
+      return
     end if
 
     do i = 1, nrPart
@@ -466,9 +472,9 @@ contains
 
       ! Calculate the distance between the two particles
       diff = pos_1 - pos_2
-      r = sqrt( sum(diff**2) ) + length_scale**3
-      !r = sqrt( dot_product(diff, diff) ) + length_scale**3
-      !r = NORM2(diff) + length_scale**3 ! distance + Prevent singularity
+      r = sqrt( sum(diff**2) ) + length_scale**2
+      !r = sqrt( dot_product(diff, diff) ) + length_scale**2
+      !r = NORM2(diff) + length_scale**2 ! distance + guard against r = 0 (division by zero)
 
       ! Calculate the Coulomb force
       ! F = (r_1 - r_2) / |r_1 - r_2|^3
