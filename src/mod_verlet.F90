@@ -685,6 +685,153 @@ contains
   end function Calc_Field_at
 
   !-----------------------------------------------------------------------------
+  ! Batched version of Calc_Field_at: computes the electric field at M points
+  ! in one call. The emission code (surface integration and Metropolis-
+  ! Hastings sampling in mod_field_emission_v2) evaluates the field at
+  ! thousands of surface points per time step, each an O(N) sum over all
+  ! particles. Evaluating them in batches turns that into one M x N kernel,
+  ! which is the pattern a GPU needs; on the CPU it also parallelizes better
+  ! (one parallel region over the points instead of one region per point).
+  !
+  ! The OpenACC path implements the planar geometry (field_E_planar +
+  ! Force_Image_charges_v2), like Calculate_Acceleration_Particles_Planar_ACC.
+  ! All other geometries use the generic fallback, which parallelizes over
+  ! the points with OpenMP and calls Calc_Field_at for each one (the parallel
+  ! region inside Calc_Field_at becomes nested and therefore runs serially).
+  subroutine Calc_Field_at_Batch(M, pos_in, field_out)
+    integer, intent(in)                                :: M ! Number of points
+    double precision, dimension(1:3, 1:M), intent(in)  :: pos_in ! Points to calculate the field at
+    double precision, dimension(1:3, 1:M), intent(out) :: field_out ! The electric field in V/m at those points
+
+    integer          :: m_i, j, n, Np, Nic
+    logical          :: do_ic
+    double precision :: Ez_loc, d_loc
+    double precision :: x_1, y_1, z_1
+    double precision :: x_2, y_2, z_2, pre_fac_c
+    double precision :: f_x, f_y, f_z
+    double precision :: diff_x, diff_y, diff_z, dxy2, z_ic
+    double precision :: r, inv_r3
+
+    if (M < 1) return
+
+#ifdef _OPENACC
+    if (Using_Planar_Geometry() .eqv. .true.) then
+      Np = nrPart
+      Ez_loc = E_z
+      d_loc  = d
+      Nic    = N_ic_max
+      do_ic  = image_charge
+
+      if (Np < 1) then
+        ! Empty system, only the vacuum field
+        field_out(1:2, :) = 0.0d0
+        field_out(3, :)   = Ez_loc
+        return
+      end if
+
+      !$acc parallel loop gang &
+      !$acc& copyin(pos_in(1:3, 1:M), particles_cur_pos(1:3, 1:Np), particles_charge(1:Np)) &
+      !$acc& copyout(field_out(1:3, 1:M))
+      do m_i = 1, M
+        x_1 = pos_in(1, m_i)
+        y_1 = pos_in(2, m_i)
+        z_1 = pos_in(3, m_i)
+
+        f_x = 0.0d0
+        f_y = 0.0d0
+        f_z = 0.0d0
+
+        !$acc loop vector reduction(+:f_x, f_y, f_z)
+        do j = 1, Np
+          x_2 = particles_cur_pos(1, j)
+          y_2 = particles_cur_pos(2, j)
+          z_2 = particles_cur_pos(3, j)
+
+          pre_fac_c = particles_charge(j) * div_fac_c ! q_2 / (4*pi*epsilon)
+
+          ! Field from the particle itself (Coulomb)
+          diff_x = x_1 - x_2
+          diff_y = y_1 - y_2
+          diff_z = z_1 - z_2
+          dxy2 = diff_x**2 + diff_y**2 ! Same for all image charge partners
+
+          r = sqrt( dxy2 + diff_z**2 ) + length_scale**2
+          inv_r3 = 1.0d0 / (r*r*r)
+          f_x = f_x + pre_fac_c*inv_r3*diff_x
+          f_y = f_y + pre_fac_c*inv_r3*diff_y
+          f_z = f_z + pre_fac_c*inv_r3*diff_z
+
+          ! Field from the image charge partners of the particle
+          ! (Force_Image_charges_v2 inlined, see that function for details).
+          if (do_ic .eqv. .true.) then
+            ! n = 0: Opposite charge partner below the bottom plane
+            z_ic = -1.0d0*z_2
+            diff_z = z_1 - z_ic
+            r = sqrt( dxy2 + diff_z**2 ) + length_scale**2
+            inv_r3 = 1.0d0 / (r*r*r)
+            f_x = f_x - pre_fac_c*diff_x*inv_r3
+            f_y = f_y - pre_fac_c*diff_y*inv_r3
+            f_z = f_z - pre_fac_c*diff_z*inv_r3
+
+            !$acc loop seq
+            do n = 1, Nic
+              ! Opposite charge partners, plus and minus n
+              z_ic = 2.0d0*n*d_loc - z_2
+              diff_z = z_1 - z_ic
+              r = sqrt( dxy2 + diff_z**2 ) + length_scale**2
+              inv_r3 = 1.0d0 / (r*r*r)
+              f_x = f_x - pre_fac_c*diff_x*inv_r3
+              f_y = f_y - pre_fac_c*diff_y*inv_r3
+              f_z = f_z - pre_fac_c*diff_z*inv_r3
+
+              z_ic = -2.0d0*n*d_loc - z_2
+              diff_z = z_1 - z_ic
+              r = sqrt( dxy2 + diff_z**2 ) + length_scale**2
+              inv_r3 = 1.0d0 / (r*r*r)
+              f_x = f_x - pre_fac_c*diff_x*inv_r3
+              f_y = f_y - pre_fac_c*diff_y*inv_r3
+              f_z = f_z - pre_fac_c*diff_z*inv_r3
+
+              ! Same charge partners, plus and minus n
+              z_ic = 2.0d0*n*d_loc + z_2
+              diff_z = z_1 - z_ic
+              r = sqrt( dxy2 + diff_z**2 ) + length_scale**2
+              inv_r3 = 1.0d0 / (r*r*r)
+              f_x = f_x + pre_fac_c*diff_x*inv_r3
+              f_y = f_y + pre_fac_c*diff_y*inv_r3
+              f_z = f_z + pre_fac_c*diff_z*inv_r3
+
+              z_ic = -2.0d0*n*d_loc + z_2
+              diff_z = z_1 - z_ic
+              r = sqrt( dxy2 + diff_z**2 ) + length_scale**2
+              inv_r3 = 1.0d0 / (r*r*r)
+              f_x = f_x + pre_fac_c*diff_x*inv_r3
+              f_y = f_y + pre_fac_c*diff_y*inv_r3
+              f_z = f_z + pre_fac_c*diff_z*inv_r3
+            end do
+          end if
+        end do
+
+        ! Add the vacuum electric field (field_E_planar)
+        field_out(1, m_i) = f_x
+        field_out(2, m_i) = f_y
+        field_out(3, m_i) = f_z + Ez_loc
+      end do
+      !$acc end parallel loop
+      return
+    end if
+#endif
+
+    ! Generic fallback for any geometry: parallelize over the points.
+    ! The OpenMP region inside Calc_Field_at is nested here and runs serially.
+    !$OMP PARALLEL DO DEFAULT(NONE) PRIVATE(m_i) SHARED(M, pos_in, field_out)
+    do m_i = 1, M
+      field_out(:, m_i) = Calc_Field_at(pos_in(:, m_i))
+    end do
+    !$OMP END PARALLEL DO
+  end subroutine Calc_Field_at_Batch
+
+  !-----------------------------------------------------------------------------
   ! We have a particle at location pos_1 and we want to calculate the effects of
   ! the image charge partners of the particle at location pos_2.
   ! For particle 2, its image charge partners are located at the same x and y coordinates

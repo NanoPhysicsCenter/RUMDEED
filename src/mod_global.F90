@@ -236,6 +236,17 @@ module mod_global
   integer           :: N_ic_max = 0
 
   ! ----------------------------------------------------------------------------
+  ! mh_batch: Run the Metropolis-Hastings chains of the field emission
+  ! (mod_field_emission_v2) in lockstep, evaluating the surface field for all
+  ! chains in one batch per jump (see Calc_Field_at_Batch in mod_verlet).
+  ! This is much faster, especially with OpenACC GPU offload, but all chains
+  ! see the particle configuration from the start of the time step: electrons
+  ! emitted within the current step do not affect the remaining chains, unlike
+  ! the serial algorithm where each chain sees the electrons added before it.
+  ! Set to .false. in the input file to recover the serial behaviour.
+  logical           :: mh_batch = .true.
+
+  ! ----------------------------------------------------------------------------
   ! Define constants
   ! The constant in front of Coulomb's law, often called k
   double precision, parameter :: div_fac_c = 1.0d0/(4.0d0*pi*epsilon_0*epsilon_r) ! 1/(4*pi*epsilon_0*epsilon_r)
@@ -313,7 +324,7 @@ module mod_global
                    image_charge, N_ic_max, collisions, T_temp, P_abs, &
                    write_ramo_sec, write_position_file, R_s, &
                    R_p, L_p, C_p, ion_life_time, &
-                   planes_N, planes_z
+                   planes_N, planes_z, mh_batch
 
   ! ----------------------------------------------------------------------------
   ! Procedure interfaces and pointers

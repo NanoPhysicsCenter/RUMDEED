@@ -245,6 +245,9 @@ contains
     integer                          :: nrElecEmit
     double precision, dimension(1:3) :: par_pos, par_vel
 
+    ! Batched Metropolis-Hastings results (used when mh_batch is .true.)
+    double precision, allocatable    :: mh_df(:), mh_F(:), mh_pos(:, :)
+
     call Do_Surface_Integration_FE(emit, N_sup)
     N_round = nint(N_sup + residual(emit))
     residual(emit) = N_sup - N_round
@@ -268,18 +271,34 @@ contains
     ! Set the average escape probability to zero.
     df_avg = 0.0d0
 
+    ! Run the Metropolis-Hastings chains for all electrons in the supply.
+    ! With mh_batch the chains advance in lockstep and the surface field of
+    ! all chains is evaluated in batches (one GPU kernel per jump iteration
+    ! in OpenACC builds). Otherwise each chain runs to completion in turn,
+    ! doing one field evaluation per jump.
+    if ((mh_batch .eqv. .true.) .and. (N_round > 0)) then
+      allocate(mh_df(1:N_round), mh_F(1:N_round), mh_pos(1:3, 1:N_round))
+      call Metropolis_Hastings_rectangle_J_batch(N_round, emit, mh_df, mh_F, mh_pos)
+    end if
+
     ! Loop over the electrons to be emitted.
     !!$OMP PARALLEL DO DEFAULT(NONE) PRIVATE(s, par_pos, F, D_f, rnd, par_vel) REDUCTION(+:df_avg) SCHEDULE(GUIDED, CHUNK_SIZE)
     do s = 1, N_round
 
-      !call Metropolis_Hastings_rectangle_v2(N_MH_step, emit, D_f, F, par_pos)
-      i = N_MH_step
-      call Metropolis_Hastings_rectangle_J(i, emit, D_f, F, par_pos)
-      !call Metropolis_Hastings_rectangle_v2_field(N_MH_step, emit, D_f, F, par_pos)
-      !print *, 'D_f = ', D_f
-      !print *, 'F = ', F
-      !print *, ''
-      !pause
+      if (mh_batch .eqv. .true.) then
+        D_f = mh_df(s)
+        F = mh_F(s)
+        par_pos = mh_pos(:, s)
+      else
+        !call Metropolis_Hastings_rectangle_v2(N_MH_step, emit, D_f, F, par_pos)
+        i = N_MH_step
+        call Metropolis_Hastings_rectangle_J(i, emit, D_f, F, par_pos)
+        !call Metropolis_Hastings_rectangle_v2_field(N_MH_step, emit, D_f, F, par_pos)
+        !print *, 'D_f = ', D_f
+        !print *, 'F = ', F
+        !print *, ''
+        !pause
+      end if
 
       ! Check if the field is favorable for emission or not
       if (F >= 0.0d0) then
@@ -319,6 +338,10 @@ contains
       end if
     end do
     !!$OMP END PARALLEL DO
+
+    if (allocated(mh_df)) then
+      deallocate(mh_df, mh_F, mh_pos)
+    end if
 
     df_avg = df_avg / N_sup
 
@@ -485,6 +508,67 @@ end function Escape_Prob_log
     integrand_cuba_fe = 0 ! Return value to Cuba, 0 = success
   end function integrand_cuba_fe
 
+  ! ----------------------------------------------------------------------------
+  ! Vectorized version of integrand_cuba_fe.
+  ! When Cuba is called with nvec > 1 it passes blocks of up to nvec
+  ! integration points to the integrand in one call, with the actual number of
+  ! points in the block as an extra argument (Cuba also appends further
+  ! arguments, core and phase, which we do not need and therefore do not
+  ! declare, exactly like the scalar integrand above ignores nvec).
+  ! The integration points and results are the same as with the scalar
+  ! integrand, but the electric field for the whole block is computed in one
+  ! batch, which runs as a single kernel on the GPU in OpenACC builds.
+  integer function integrand_cuba_fe_v(ndim, xx, ncomp, ff, userdata, nvec)
+    ! Input / output variables
+    integer, intent(in) :: ndim ! Number of dimensions (Should be 2)
+    integer, intent(in) :: ncomp ! Number of vector-components in the integrand (Always 1 here)
+    integer, intent(in) :: userdata ! Additional data passed to the integral function (In our case the number of the emitter)
+    integer, intent(in) :: nvec ! Number of integration points in this block
+    double precision, intent(in), dimension(1:ndim, 1:nvec)   :: xx ! Integration points, between 0 and 1
+    double precision, intent(out), dimension(1:ncomp, 1:nvec) :: ff ! Results of the integrand function
+
+    ! Variables used for calculations
+    double precision, dimension(1:3, 1:nvec) :: par_pos, field
+    double precision                         :: A ! Emitter area
+    integer                                  :: k
+
+    ! Emitter area
+    A = emitters_dim(1, userdata)*emitters_dim(2, userdata)
+
+    ! Surface positions
+    ! Cuba does the intergration over the hybercube.
+    ! It gives us coordinates between 0 and 1.
+    do k = 1, nvec
+      par_pos(1:2, k) = emitters_pos(1:2, userdata) + xx(1:2, k)*emitters_dim(1:2, userdata) ! x and y position on the surface
+      par_pos(3, k) = 0.0d0 ! Height, i.e. on the surface
+    end do
+
+    ! Calculate the electric field on the surface for the whole block
+    call Calc_Field_at_Batch(nvec, par_pos, field)
+
+    do k = 1, nvec
+      ! Add to the average field
+      F_avg = F_avg + field(:, k)
+
+      ! Check if the field is favorable for emission
+      if (field(3, k) < 0.0d0) then
+        ! The field is favorable for emission
+        ! Calculate the electron supply at this point
+        ff(1, k) = Elec_Supply_V2(field(3, k), par_pos(:, k), userdata)
+      else
+        ! The field is NOT favorable for emission
+        ! This point does not contribute
+        ff(1, k) = 0.0d0
+      end if
+
+      ! We multiply with the area of the emitter because Cuba does the
+      ! integration over the hybercube, i.e. from 0 to 1.
+      ff(1, k) = A*ff(1, k)
+    end do
+
+    integrand_cuba_fe_v = 0 ! Return value to Cuba, 0 = success
+  end function integrand_cuba_fe_v
+
   subroutine Do_Cuba_Divonne_FE(emit,  N_sup)
   implicit none
   integer, intent(in)           :: emit
@@ -497,7 +581,11 @@ end function Escape_Prob_log
   integer, parameter :: ndim = 2 ! Number of dimensions
   integer, parameter :: ncomp = 1 ! Number of components in the integrand
   integer            :: userdata = 0 ! User data passed to the integrand
-  integer, parameter :: nvec = 1 ! Number of points given to the integrand function
+  integer, parameter :: nvec = 256 ! Number of points given to the integrand function per call.
+                                   ! The integration points and result do not depend on this,
+                                   ! Cuba just delivers the points in blocks, which the
+                                   ! vectorized integrand evaluates as one batch (one GPU
+                                   ! kernel per block in OpenACC builds).
   !double precision   :: epsrel = 1.0d-4 ! Requested relative error
   !double precision   :: epsabs = 0.25d0 ! Requested absolute error
   integer            :: flags = 0+4 ! Flags
@@ -594,7 +682,7 @@ end function Escape_Prob_log
     !!$OMP END PARALLEL DO
     !ngiven = nrPart
 
-    call divonne(ndim, ncomp, integrand_cuba_fe, userdata, nvec,&
+    call divonne(ndim, ncomp, integrand_cuba_fe_v, userdata, nvec,&
               cuba_epsrel, cuba_epsabs, flags, seed, cuba_mineval, cuba_maxeval,&
               key1, key2, key3, maxpass,&
               border, maxchisq, mindeviation,&
@@ -1278,6 +1366,209 @@ end function Escape_Prob_log
     !close(unit=ud_mh)
     !stop
   end subroutine Metropolis_Hastings_rectangle_J
+
+  ! ----------------------------------------------------------------------------
+  ! Batched (lockstep) version of Metropolis_Hastings_rectangle_J.
+  ! All M chains advance together: in every jump iteration the proposals of
+  ! all chains are collected and the surface field is evaluated for the whole
+  ! set in one call to Calc_Field_at_Batch (a single GPU kernel in OpenACC
+  ! builds), instead of one O(N) field sum per chain per jump.
+  !
+  ! Differences from running Metropolis_Hastings_rectangle_J M times
+  ! (enabled with mh_batch = .true. in the input file, the default):
+  !  * All chains sample the particle configuration from the start of the
+  !    time step. In the serial version each chain sees the electrons that
+  !    earlier chains emitted within the same step.
+  !  * The adaptive step size MH_std is nudged once per active chain per
+  !    iteration (same magnitude and count as the serial per-jump updates),
+  !    but the acceptance rate a_rate that drives it is updated from the
+  !    aggregate accept/reject counts of the running batch instead of at the
+  !    end of each chain.
+  !  * The random number stream is consumed in a different order, so
+  !    individual positions differ; the sampled distribution is the same.
+  subroutine Metropolis_Hastings_rectangle_J_batch(M, emit, df_out, F_out, pos_out)
+    integer, intent(in)                              :: M ! Number of chains
+    integer, intent(in)                              :: emit
+    double precision, dimension(1:M), intent(out)    :: df_out, F_out
+    double precision, dimension(1:3, 1:M), intent(out) :: pos_out
+
+    integer                                       :: ndim, ndim_first
+    integer                                       :: i, k, mc, count, n_act
+    double precision                              :: rnd, alpha, df_new
+    double precision, dimension(1:2)              :: std
+    integer,          dimension(1:M)              :: act ! Chains active in the current batch
+    double precision, dimension(1:3, 1:M)         :: cur_pos, w_pos
+    double precision, dimension(1:3, 1:M)         :: w_field
+    double precision, dimension(1:M)              :: df_cur
+    logical,          dimension(1:M)              :: ok ! Chain has a favorable position
+
+    ! Reset the accepted/rejected jump counters, as in the serial version.
+    jump_a = 0
+    jump_r = 0
+
+    ndim = 25*8
+    ndim_first = nint(ndim*0.25d0)
+    std(1:2) = emitters_dim(1:2, emit)*0.10d0 ! 10% of emitter size
+
+    !---------------------------------------------------------------------------
+    ! Get random initial positions on the surface for all chains.
+    ! We keep proposing uniformly distributed positions for the chains that
+    ! have not yet found a spot with a favorable field.
+    ok = .false.
+    n_act = M
+    do k = 1, M
+      act(k) = k
+    end do
+
+    count = 0
+    do while (n_act > 0)
+      do k = 1, n_act
+        CALL RANDOM_NUMBER(w_pos(1:2, k))
+        w_pos(1:2, k) = w_pos(1:2, k)*emitters_dim(1:2, emit) + emitters_pos(1:2, emit)
+        w_pos(3, k) = 0.0d0 ! On the surface
+      end do
+
+      call Calc_Field_at_Batch(n_act, w_pos(:, 1:n_act), w_field(:, 1:n_act))
+
+      i = n_act ! Old count, reuse i as a temporary
+      n_act = 0
+      do k = 1, i
+        mc = act(k)
+        if (w_field(3, k) < 0.0d0) then
+          ! We found a nice spot for this chain
+          cur_pos(:, mc) = w_pos(:, k)
+          F_out(mc) = w_field(3, k)
+          df_cur(mc) = Escape_Prob_log(w_field(3, k), w_pos(:, k), emit)
+          ok(mc) = .true.
+        else
+          n_act = n_act + 1
+          act(n_act) = mc
+        end if
+      end do
+
+      count = count + 1
+      if ((count > 10000) .and. (n_act > 0)) then
+        ! The loop is infinite, must stop it at some point.
+        ! In field emission it is rare the we reach the CL limit.
+        print *, 'Failed to find spot for emission'
+        do k = 1, n_act
+          mc = act(k)
+          ! Mark the chain as failed: unfavorable field and zero
+          ! escape probability, so no electron is emitted from it.
+          F_out(mc) = 1.0d0
+          df_cur(mc) = -huge(1.0d0)
+          cur_pos(1:2, mc) = emitters_pos(1:2, emit)
+          cur_pos(3, mc) = 0.0d0
+        end do
+        exit
+      end if
+    end do
+
+    !---------------------------------------------------------------------------
+    ! We now pick a random distance and direction to jump to from the
+    ! current location of each chain. We do this ndim times, advancing all
+    ! chains together.
+    do i = 1, ndim
+
+      ! Make first 25% of jumps with std as 10% of emitter length.
+      if (i > ndim_first) then
+
+        ! Try to keep the acceptance ratio around 25% by changing the
+        ! standard deviation. One nudge per active chain, which matches the
+        ! per-jump updates of the serial version.
+        do mc = 1, M
+          if (ok(mc) .eqv. .false.) cycle
+          CALL RANDOM_NUMBER(rnd)
+          if (a_rate < 0.2525d0) then
+            MH_std = MH_std * (1.0d0 - rnd*0.00025d0)
+          else
+            MH_std = MH_std * (1.0d0 + rnd*0.00025d0)
+          end if
+        end do
+        ! Limits on how big or low the standard deviation can be.
+        if (MH_std > 0.1250d0) then
+          MH_std = 0.1250d0
+        else if (MH_std < 0.00005d0) then
+          MH_std = 0.00005d0
+        end if
+
+        std(1:2) = emitters_dim(1:2, emit)*MH_std
+      end if
+
+      ! Collect the proposed positions of all active chains.
+      n_act = 0
+      do mc = 1, M
+        if (ok(mc) .eqv. .false.) cycle
+        n_act = n_act + 1
+        act(n_act) = mc
+
+        ! Find a new position using a normal distribution.
+        w_pos(1:2, n_act) = box_muller(cur_pos(1:2, mc), std)
+        w_pos(3, n_act) = 0.0d0 ! At the surface
+
+        ! Make sure that the new position is within the limits of the emitter area.
+        call check_limits_metro_rec(w_pos(:, n_act), emit)
+      end do
+
+      if (n_act == 0) exit ! All chains failed in the initialization
+
+      ! Calculate the field at the new positions of all chains in one batch.
+      call Calc_Field_at_Batch(n_act, w_pos(:, 1:n_act), w_field(:, 1:n_act))
+
+      ! Do the Metropolis accept/reject step for each chain.
+      do k = 1, n_act
+        mc = act(k)
+
+        ! Check if the field is favorable for emission at the new position.
+        ! If it is not we reject this location.
+        if (w_field(3, k) >= 0.0d0) then
+          if (i > ndim_first) then
+            jump_r = jump_r + 1
+          end if
+          cycle
+        end if
+
+        ! Calculate the escape probability at the new position, to compair
+        ! with the current position.
+        df_new = Escape_Prob_log(w_field(3, k), w_pos(:, k), emit)
+
+        alpha = df_new - df_cur(mc)
+
+        if (df_new >= df_cur(mc)) then
+          cur_pos(:, mc) = w_pos(:, k)
+          df_cur(mc) = df_new
+          F_out(mc) = w_field(3, k)
+          if (i > ndim_first) then
+            jump_a = jump_a + 1
+          end if
+        else
+          CALL RANDOM_NUMBER(rnd)
+          if (log(rnd) <= alpha) then
+            cur_pos(:, mc) = w_pos(:, k)
+            df_cur(mc) = df_new
+            F_out(mc) = w_field(3, k)
+            if (i > ndim_first) then
+              jump_a = jump_a + 1
+            end if
+          else
+            if (i > ndim_first) then
+              jump_r = jump_r + 1
+            end if
+          end if
+        end if
+      end do
+
+      ! Update the acceptance rate from the aggregate counts so the MH_std
+      ! adaptation above sees a live value.
+      if ((i > ndim_first) .and. (jump_a + jump_r > 0)) then
+        a_rate = DBLE(jump_a) / DBLE(jump_r + jump_a)
+      end if
+    end do
+
+    ! Return the current positions
+    pos_out = cur_pos
+    df_out = df_cur
+  end subroutine Metropolis_Hastings_rectangle_J_batch
 
   ! Adaptive MH in log space
   !subroutine Adpative_MH_log()
