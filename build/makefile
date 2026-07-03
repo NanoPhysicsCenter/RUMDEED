@@ -95,6 +95,12 @@ endif
 ifeq ($(ACC),gpu)
 $(info Using OpenACC on GPU)
 FFLAGS+=-acc=gpu -Minfo=accel
+# Optional GPU compute capability, e.g. make ACC=gpu GPU_CC=cc80 for an A100.
+# Needed when compiling on a machine without a GPU (e.g. a cluster login
+# node), where nvfortran cannot auto-detect the target architecture.
+ifdef GPU_CC
+FFLAGS+=-gpu=$(GPU_CC)
+endif
 endif
 ifeq ($(ACC),multicore)
 $(info Using OpenACC on CPU cores)
