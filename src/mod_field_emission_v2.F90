@@ -248,6 +248,12 @@ contains
     ! Batched Metropolis-Hastings results (used when mh_batch is .true.)
     double precision, allocatable    :: mh_df(:), mh_F(:), mh_pos(:, :)
 
+    ! The particle configuration does not change during the surface
+    ! integration and the Metropolis-Hastings sampling, so upload it to the
+    ! device once and let all the batched field evaluations reuse it
+    ! (a no-op in builds without OpenACC).
+    call Particles_To_Device()
+
     call Do_Surface_Integration_FE(emit, N_sup)
     N_round = nint(N_sup + residual(emit))
     residual(emit) = N_sup - N_round
@@ -280,6 +286,10 @@ contains
       allocate(mh_df(1:N_round), mh_F(1:N_round), mh_pos(1:3, 1:N_round))
       call Metropolis_Hastings_rectangle_J_batch(N_round, emit, mh_df, mh_F, mh_pos)
     end if
+
+    ! Close the device residency window: from here on electrons are added to
+    ! the system, so the particle configuration changes.
+    call Release_Device_Particles()
 
     ! Loop over the electrons to be emitted.
     !!$OMP PARALLEL DO DEFAULT(NONE) PRIVATE(s, par_pos, F, D_f, rnd, par_vel) REDUCTION(+:df_avg) SCHEDULE(GUIDED, CHUNK_SIZE)

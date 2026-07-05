@@ -14,7 +14,62 @@ Module mod_verlet
   double precision :: V_rf = 0.0d0, V_rf_prev = 0.0d0, V_rf_next = 0.0d0
   double precision :: I_cur = 0.0d0, I_prev = 0.0d0
 
+  ! ----------------------------------------------------------------------------
+  ! Device-resident particle data (OpenACC builds).
+  ! The particle arrays are created on the device once (their full
+  ! MAX_PARTICLES size) and the 1:nrPart slices are re-uploaded with
+  ! "update device" when needed. The host is always the master copy; nothing
+  ! is ever copied back. acc_par_resident marks a window in which the device
+  ! copy of particles_cur_pos/particles_charge is known to be current, so
+  ! repeated Calc_Field_at_Batch calls (e.g. the Metropolis-Hastings jump
+  ! iterations) can skip the upload. Open such a window with
+  ! Particles_To_Device and close it with Release_Device_Particles BEFORE
+  ! anything changes the particle arrays on the host again.
+  logical, private :: acc_par_alloc = .false.    ! Whole arrays created on the device
+  logical, private :: acc_par_resident = .false. ! Device copy is current
+  integer, private :: acc_par_np = 0             ! Number of particles in the device copy
+
 contains
+
+  ! ----------------------------------------------------------------------------
+  ! Create the particle arrays on the device (once).
+  subroutine Ensure_Device_Particles()
+#ifdef _OPENACC
+    if (acc_par_alloc .eqv. .false.) then
+      !$acc enter data create(particles_cur_pos, particles_charge, particles_mass)
+      acc_par_alloc = .true.
+    end if
+#endif
+  end subroutine Ensure_Device_Particles
+
+  ! ----------------------------------------------------------------------------
+  ! Upload the current particle positions and charges to the device and open
+  ! a residency window: subsequent Calc_Field_at_Batch calls reuse the device
+  ! copy without re-uploading. Only meaningful for the planar geometry in
+  ! OpenACC builds; a no-op otherwise.
+  subroutine Particles_To_Device()
+#ifdef _OPENACC
+    integer :: np
+
+    if ((Using_Planar_Geometry() .eqv. .true.) .and. (nrPart > 0)) then
+      call Ensure_Device_Particles()
+      np = nrPart
+      !$acc update device(particles_cur_pos(1:3, 1:np), particles_charge(1:np))
+      acc_par_resident = .true.
+      acc_par_np = np
+    end if
+#endif
+  end subroutine Particles_To_Device
+
+  ! ----------------------------------------------------------------------------
+  ! Close the residency window. Call before the particle arrays change on the
+  ! host (adding, removing or moving particles).
+  subroutine Release_Device_Particles()
+#ifdef _OPENACC
+    acc_par_resident = .false.
+    acc_par_np = 0
+#endif
+  end subroutine Release_Device_Particles
 
   ! ----------------------------------------------------------------------------
   ! Call the method used to update the positions
@@ -486,8 +541,15 @@ contains
     Nic    = N_ic_max
     do_ic  = image_charge
 
+    ! The particles have just been moved by the Verlet step, so the device
+    ! copy is always refreshed here, and any residency window that is still
+    ! open is stale by definition.
+    call Ensure_Device_Particles()
+    call Release_Device_Particles()
+    !$acc update device(particles_cur_pos(1:3, 1:Np), particles_charge(1:Np), particles_mass(1:Np))
+
     !$acc parallel loop gang vector &
-    !$acc& copyin(particles_cur_pos(1:3, 1:Np), particles_charge(1:Np), particles_mass(1:Np)) &
+    !$acc& present(particles_cur_pos, particles_charge, particles_mass) &
     !$acc& copyout(particles_cur_accel(1:3, 1:Np))
     do i = 1, Np
       x_1 = particles_cur_pos(1, i)
@@ -703,7 +765,9 @@ contains
     double precision, dimension(1:3, 1:M), intent(in)  :: pos_in ! Points to calculate the field at
     double precision, dimension(1:3, 1:M), intent(out) :: field_out ! The electric field in V/m at those points
 
-    integer          :: m_i, j, n, Np, Nic
+    integer          :: m_i
+#ifdef _OPENACC
+    integer          :: j, n, Np, Nic
     logical          :: do_ic
     double precision :: Ez_loc, d_loc
     double precision :: x_1, y_1, z_1
@@ -711,6 +775,7 @@ contains
     double precision :: f_x, f_y, f_z
     double precision :: diff_x, diff_y, diff_z, dxy2, z_ic
     double precision :: r, inv_r3
+#endif
 
     if (M < 1) return
 
@@ -729,9 +794,16 @@ contains
         return
       end if
 
+      ! Upload the particle data unless a residency window
+      ! (Particles_To_Device) has already put the current copy there.
+      call Ensure_Device_Particles()
+      if ((acc_par_resident .eqv. .false.) .or. (acc_par_np /= Np)) then
+        !$acc update device(particles_cur_pos(1:3, 1:Np), particles_charge(1:Np))
+      end if
+
       !$acc parallel loop gang &
-      !$acc& copyin(pos_in(1:3, 1:M), particles_cur_pos(1:3, 1:Np), particles_charge(1:Np)) &
-      !$acc& copyout(field_out(1:3, 1:M))
+      !$acc& copyin(pos_in(1:3, 1:M)) copyout(field_out(1:3, 1:M)) &
+      !$acc& present(particles_cur_pos, particles_charge)
       do m_i = 1, M
         x_1 = pos_in(1, m_i)
         y_1 = pos_in(2, m_i)
