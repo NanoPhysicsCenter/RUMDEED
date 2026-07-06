@@ -172,13 +172,13 @@ mod_global.mod mod_global.o: ../src/mod_global.F90
 mod_ic.mod mod_ic.o: ../src/mod_ic.f90 mod_global.o mod_hyperboloid_tip.o mod_verlet.o
 		$(FC) -c $(FFLAGS) ../src/mod_ic.f90
 
-mod_verlet.mod mod_verlet.o: ../src/mod_verlet.F90 mod_global.mod mod_pair.mod mod_collisions.mod
+mod_verlet.mod mod_verlet.o: ../src/mod_verlet.F90 mod_global.mod mod_pair.mod mod_collisions.mod mod_hyperboloid_tip.mod
 		$(FC) -c $(FFLAGS) ../src/mod_verlet.F90
 
 mod_pair.mod mod_pair.o: ../src/mod_pair.F90 mod_global.mod
 		$(FC) -c $(FFLAGS) ../src/mod_pair.F90
 
-mod_tests.mod mod_tests.o: ../src/mod_tests.F90 mod_global.mod mod_verlet.mod mod_pair.mod mod_field_emission_v2.mod
+mod_tests.mod mod_tests.o: ../src/mod_tests.F90 mod_global.mod mod_verlet.mod mod_pair.mod mod_field_emission_v2.mod mod_emission_tip.mod
 		$(FC) -c $(FFLAGS) ../src/mod_tests.F90
 
 mod_photo_emission.mod mod_photo_emission.o: ../src/mod_photo_emission.f90 mod_global.mod mod_verlet.mod mod_pair.mod mod_velocity.mod

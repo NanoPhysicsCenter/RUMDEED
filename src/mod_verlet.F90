@@ -8,6 +8,10 @@ Module mod_verlet
   use mod_global
   use mod_pair
   use mod_collisions
+  ! The hyperboloid tip geometry functions and parameters, needed for the
+  ! OpenACC geometry dispatch (see ACC_Geometry and the *_dev helpers below).
+  use mod_hyperboloid_tip, only: field_E_Hyperboloid, Sphere_IC_field, &
+                               & a_foci, shift_z, pre_fac_E_tip, h_tip, r_tip
   implicit none
 
   ! RLC
@@ -29,6 +33,11 @@ Module mod_verlet
   logical, private :: acc_par_resident = .false. ! Device copy is current
   integer, private :: acc_par_np = 0             ! Number of particles in the device copy
 
+  ! Geometries implemented by the OpenACC kernels (see ACC_Geometry)
+  integer, parameter :: ACC_GEOM_OTHER  = 0 ! Not implemented, use the OpenMP code path
+  integer, parameter :: ACC_GEOM_PLANAR = 1 ! field_E_planar + Force_Image_charges_v2
+  integer, parameter :: ACC_GEOM_TIP    = 2 ! field_E_Hyperboloid + Sphere_IC_field
+
 contains
 
   ! ----------------------------------------------------------------------------
@@ -45,13 +54,13 @@ contains
   ! ----------------------------------------------------------------------------
   ! Upload the current particle positions and charges to the device and open
   ! a residency window: subsequent Calc_Field_at_Batch calls reuse the device
-  ! copy without re-uploading. Only meaningful for the planar geometry in
-  ! OpenACC builds; a no-op otherwise.
+  ! copy without re-uploading. Only meaningful in OpenACC builds for the
+  ! geometries implemented by the kernels; a no-op otherwise.
   subroutine Particles_To_Device()
 #ifdef _OPENACC
     integer :: np
 
-    if ((Using_Planar_Geometry() .eqv. .true.) .and. (nrPart > 0)) then
+    if ((ACC_Geometry() /= ACC_GEOM_OTHER) .and. (nrPart > 0)) then
       call Ensure_Device_Particles()
       np = nrPart
       !$acc update device(particles_cur_pos(1:3, 1:np), particles_charge(1:np))
@@ -348,13 +357,13 @@ contains
     double precision, allocatable    :: inv_mass(:)
 
 #ifdef _OPENACC
-    ! GPU path: only the planar geometry (vacuum field + planar image charge
-    ! partners) is implemented on the device, because the procedure pointers
-    ! ptr_field_E / ptr_Image_Charge_effect cannot be called inside a GPU
-    ! kernel. Other geometries (tip, cylinder, torus) fall back to the
-    ! OpenMP loop below.
-    if (Using_Planar_Geometry() .eqv. .true.) then
-      call Calculate_Acceleration_Particles_Planar_ACC()
+    ! GPU path: the planar and hyperboloid tip geometries are implemented on
+    ! the device, because the procedure pointers ptr_field_E /
+    ! ptr_Image_Charge_effect cannot be called inside a GPU kernel. The
+    ! cylindrical tip and torus geometries interpolate their fields from a
+    ! mesh with kd-tree searches and fall back to the OpenMP loop below.
+    if (ACC_Geometry() /= ACC_GEOM_OTHER) then
+      call Calculate_Acceleration_Particles_ACC(ACC_Geometry())
       return
     end if
 #endif
@@ -483,26 +492,38 @@ contains
   end subroutine Calculate_Acceleration_Particles
 
   ! ----------------------------------------------------------------------------
-  ! Returns .true. if the geometry procedure pointers are set to the planar
-  ! versions (field_E_planar and Force_Image_charges_v2), i.e. if the OpenACC
-  ! kernel below computes the same physics as the generic OpenMP loop.
+  ! Identifies which geometry the procedure pointers are set to, so the
+  ! OpenACC kernels below (which cannot call procedure pointers) know which
+  ! inlined field / image charge math computes the same physics as the
+  ! generic OpenMP loops. Returns ACC_GEOM_OTHER for geometries the kernels
+  ! do not implement; the callers then fall back to the OpenMP code paths.
+  ! The cylindrical tip and torus geometries are ACC_GEOM_OTHER by design:
+  ! their fields are interpolated from a mesh with kd-tree nearest-neighbour
+  ! searches, which cannot run inside a GPU kernel.
   !
   ! Note: this would normally be written as
   !   associated(ptr_field_E, field_E_planar)
   ! but that form triggers an internal compiler error in nvfortran (seen with
   ! version 26.5, "mk_id: invalid symbol table index"), so the procedure
   ! addresses are compared through c_funloc instead.
-  logical function Using_Planar_Geometry()
+  integer function ACC_Geometry()
     use, intrinsic :: iso_c_binding, only: c_associated, c_funloc
 
-    Using_Planar_Geometry = &
-      &      c_associated(c_funloc(ptr_field_E), c_funloc(field_E_planar)) &
-      & .and. c_associated(c_funloc(ptr_Image_Charge_effect), c_funloc(Force_Image_charges_v2))
-  end function Using_Planar_Geometry
+    if (      c_associated(c_funloc(ptr_field_E), c_funloc(field_E_planar)) &
+      & .and. c_associated(c_funloc(ptr_Image_Charge_effect), c_funloc(Force_Image_charges_v2))) then
+      ACC_Geometry = ACC_GEOM_PLANAR
+    else if ( c_associated(c_funloc(ptr_field_E), c_funloc(field_E_Hyperboloid)) &
+      & .and. c_associated(c_funloc(ptr_Image_Charge_effect), c_funloc(Sphere_IC_field))) then
+      ACC_Geometry = ACC_GEOM_TIP
+    else
+      ACC_Geometry = ACC_GEOM_OTHER
+    end if
+  end function ACC_Geometry
+
 
   ! ----------------------------------------------------------------------------
-  ! OpenACC (GPU) version of Calculate_Acceleration_Particles for the planar
-  ! geometry (field_E_planar + Force_Image_charges_v2).
+  ! OpenACC (GPU) version of Calculate_Acceleration_Particles for the
+  ! geometries in ACC_Geometry (planar and hyperboloid tip).
   !
   ! The OpenMP version loops over unique pairs (i, j > i) and scatters the
   ! force to both particles, which needs an array reduction over
@@ -511,26 +532,41 @@ contains
   ! twice the flops, but embarrassingly parallel and race free, which is the
   ! standard formulation for N-body kernels on GPUs.
   !
-  ! The image charge force on particle i is evaluated directly as
-  ! Force_Image_charges_v2(pos_i, pos_j) for every ordered pair (i, j).
-  ! For N_ic_max = 0 (the default) this is identical to the OpenMP path.
-  ! For N_ic_max >= 1 the OpenMP path approximates the reverse force of a
-  ! pair by mirroring the x and y components; the direct evaluation used
-  ! here does not, so the z-component of the same-charge partner terms can
-  ! differ slightly between the two paths.
+  ! The OpenMP pair loop evaluates the image charge force of a pair once, as
+  ! ptr_Image_Charge_effect(pos_i, pos_j) with j > i, and applies it to
+  ! particle j with the x and y components mirrored (see force_ic_N there).
+  ! The gather below replicates that exactly: for j > i it evaluates the
+  ! image charge effect at (pos_i, pos_j), and for j < i at (pos_j, pos_i)
+  ! with the x and y components of the result mirrored (sgn_xy), so both
+  ! code paths compute the same accelerations up to summation order.
+  !
+  ! The geometry field and image charge functions (field_E_planar /
+  ! Force_Image_charges_v2 and field_E_Hyperboloid / Sphere_IC_field) are
+  ! inlined rather than called: procedure pointers cannot be used on the
+  ! device, and !$acc routine helpers are not inlined by nvfortran, which
+  ! makes calls in this O(N^2) inner loop far too expensive. (Passing local
+  ! scalars to !$acc routines from inside a parallel region also miscompiles
+  ! with nvfortran 26.5 in multicore mode, the values arrive as garbage.)
   !
   ! When compiled without OpenACC the !$acc directives are comments and this
   ! subroutine simply runs serially, it is only called from the _OPENACC
   ! branch in Calculate_Acceleration_Particles.
-  subroutine Calculate_Acceleration_Particles_Planar_ACC()
+  subroutine Calculate_Acceleration_Particles_ACC(geom)
+    integer, intent(in) :: geom ! Geometry to use, see ACC_Geometry
+
     integer          :: i, j, n, Np, Nic
     logical          :: do_ic
     double precision :: Ez_loc, d_loc
+    double precision :: af, sz, pre_E_tip, z_0_tip, Rsp_tip ! Tip geometry parameters
     double precision :: x_1, y_1, z_1, q_1, qd_1, im_1
     double precision :: x_2, y_2, z_2, q_2, pre_fac_c
-    double precision :: a_x, a_y, a_z, f_x, f_y, f_z
+    double precision :: a_x, a_y, a_z, f_x, f_y, f_z, sgn_xy
+    double precision :: x_a, y_a, z_a, x_b, y_b, z_b ! Image charge pair roles
+    double precision :: fE_x, fE_y, fE_z
     double precision :: diff_x, diff_y, diff_z, dxy2, z_ic
     double precision :: r, inv_r3
+    double precision :: r_p, r_m, xi, eta, phi, pre_fac_xyz, fac_xy ! Tip field
+    double precision :: x_im, y_im, z_im, dis_a, tmp_dis_a, tmp_dis_b ! Tip image charge
 
     Np = nrPart
     if (Np < 1) return
@@ -540,6 +576,13 @@ contains
     d_loc  = d
     Nic    = N_ic_max
     do_ic  = image_charge
+
+    ! Hyperboloid tip parameters (from mod_hyperboloid_tip), unused for planar
+    af        = a_foci
+    sz        = shift_z
+    pre_E_tip = pre_fac_E_tip
+    z_0_tip   = h_tip - r_tip
+    Rsp_tip   = r_tip
 
     ! The particles have just been moved by the Verlet step, so the device
     ! copy is always refreshed here, and any residency window that is still
@@ -580,82 +623,155 @@ contains
         diff_x = x_1 - x_2
         diff_y = y_1 - y_2
         diff_z = z_1 - z_2
-        dxy2 = diff_x**2 + diff_y**2 ! The x/y offsets are the same for all image charge partners
 
-        r = sqrt( dxy2 + diff_z**2 ) + length_scale**2
+        r = sqrt( diff_x**2 + diff_y**2 + diff_z**2 ) + length_scale**2
         inv_r3 = 1.0d0 / (r*r*r)
         a_x = a_x + pre_fac_c*inv_r3*diff_x
         a_y = a_y + pre_fac_c*inv_r3*diff_y
         a_z = a_z + pre_fac_c*inv_r3*diff_z
 
-        ! Image charge partners of particle j acting on particle i
-        ! (Force_Image_charges_v2 inlined, see that function for details).
+        ! Image charge force on particle i from the pair (i, j), evaluated
+        ! exactly like the OpenMP pair loop (see the comment above): the
+        ! image charge effect is always evaluated at the (a, b) positions
+        ! with a the lower-indexed particle, and the x and y components of
+        ! the result are mirrored (sgn_xy) when the force acts on the
+        ! higher-indexed particle.
         if (do_ic .eqv. .true.) then
-          f_x = 0.0d0
-          f_y = 0.0d0
-          f_z = 0.0d0
+          if (j > i) then
+            x_a = x_1
+            y_a = y_1
+            z_a = z_1
+            x_b = x_2
+            y_b = y_2
+            z_b = z_2
+            sgn_xy = 1.0d0
+          else
+            x_a = x_2
+            y_a = y_2
+            z_a = z_2
+            x_b = x_1
+            y_b = y_1
+            z_b = z_1
+            sgn_xy = -1.0d0
+          end if
 
-          ! n = 0: Opposite charge partner below the bottom plane
-          z_ic = -1.0d0*z_2
-          diff_z = z_1 - z_ic
-          r = sqrt( dxy2 + diff_z**2 ) + length_scale**2
-          inv_r3 = 1.0d0 / (r*r*r)
-          f_x = f_x - diff_x*inv_r3
-          f_y = f_y - diff_y*inv_r3
-          f_z = f_z - diff_z*inv_r3
+          if (geom == ACC_GEOM_TIP) then
+            ! Image charge effects of the sphere at the top of the tip
+            ! (Sphere_IC_field inlined, see mod_hyperboloid_tip). Note that
+            ! unlike the planar case this includes the q_0/(4*pi*epsilon_0)
+            ! factor, exactly like the original function does.
+            dis_a = sqrt(x_a**2 + y_a**2 + (z_a - z_0_tip)**2)
 
-          !$acc loop seq
-          do n = 1, Nic
-            ! Opposite charge partners, plus and minus n
-            z_ic = 2.0d0*n*d_loc - z_2
-            diff_z = z_1 - z_ic
+            z_im = z_0_tip + Rsp_tip**2 / ( sqrt(1 + x_a**2/(z_a - z_0_tip)**2 + y_a**2/(z_a - z_0_tip)**2) * dis_a )
+            x_im = (z_im - z_0_tip) * x_a / (z_a - z_0_tip)
+            y_im = (z_im - z_0_tip) * y_a / (z_a - z_0_tip)
+
+            tmp_dis_a = ( (x_b - x_a)**2 + (y_b - y_a)**2 + (z_b - z_a)**2 )**(3.0d0/2.0d0)
+            tmp_dis_b = ( (x_b - x_im)**2 + (y_b - y_im)**2 + (z_b - z_im)**2 )**(3.0d0/2.0d0)
+
+            f_x = 1.0d0*q_0/(4.0d0*pi*epsilon_0) * ( (x_a - x_b)/tmp_dis_a - (Rsp_tip*(x_im - x_b))/(dis_a*tmp_dis_b) )
+            f_y = 1.0d0*q_0/(4.0d0*pi*epsilon_0) * ( (y_a - y_b)/tmp_dis_a - (Rsp_tip*(y_im - y_b))/(dis_a*tmp_dis_b) )
+            f_z = 1.0d0*q_0/(4.0d0*pi*epsilon_0) * ( (z_a - z_b)/tmp_dis_a - (Rsp_tip*(z_im - z_b))/(dis_a*tmp_dis_b) )
+          else
+            ! Image charge partners of particle b acting at position a
+            ! (Force_Image_charges_v2 inlined, see that function for details).
+            diff_x = x_a - x_b
+            diff_y = y_a - y_b
+            dxy2 = diff_x**2 + diff_y**2 ! Same for all image charge partners
+
+            ! n = 0: Opposite charge partner below the bottom plane
+            z_ic = -1.0d0*z_b
+            diff_z = z_a - z_ic
             r = sqrt( dxy2 + diff_z**2 ) + length_scale**2
             inv_r3 = 1.0d0 / (r*r*r)
-            f_x = f_x - diff_x*inv_r3
-            f_y = f_y - diff_y*inv_r3
-            f_z = f_z - diff_z*inv_r3
+            f_x = -diff_x*inv_r3
+            f_y = -diff_y*inv_r3
+            f_z = -diff_z*inv_r3
 
-            z_ic = -2.0d0*n*d_loc - z_2
-            diff_z = z_1 - z_ic
-            r = sqrt( dxy2 + diff_z**2 ) + length_scale**2
-            inv_r3 = 1.0d0 / (r*r*r)
-            f_x = f_x - diff_x*inv_r3
-            f_y = f_y - diff_y*inv_r3
-            f_z = f_z - diff_z*inv_r3
+            !$acc loop seq
+            do n = 1, Nic
+              ! Opposite charge partners, plus and minus n
+              z_ic = 2.0d0*n*d_loc - z_b
+              diff_z = z_a - z_ic
+              r = sqrt( dxy2 + diff_z**2 ) + length_scale**2
+              inv_r3 = 1.0d0 / (r*r*r)
+              f_x = f_x - diff_x*inv_r3
+              f_y = f_y - diff_y*inv_r3
+              f_z = f_z - diff_z*inv_r3
 
-            ! Same charge partners, plus and minus n
-            z_ic = 2.0d0*n*d_loc + z_2
-            diff_z = z_1 - z_ic
-            r = sqrt( dxy2 + diff_z**2 ) + length_scale**2
-            inv_r3 = 1.0d0 / (r*r*r)
-            f_x = f_x + diff_x*inv_r3
-            f_y = f_y + diff_y*inv_r3
-            f_z = f_z + diff_z*inv_r3
+              z_ic = -2.0d0*n*d_loc - z_b
+              diff_z = z_a - z_ic
+              r = sqrt( dxy2 + diff_z**2 ) + length_scale**2
+              inv_r3 = 1.0d0 / (r*r*r)
+              f_x = f_x - diff_x*inv_r3
+              f_y = f_y - diff_y*inv_r3
+              f_z = f_z - diff_z*inv_r3
 
-            z_ic = -2.0d0*n*d_loc + z_2
-            diff_z = z_1 - z_ic
-            r = sqrt( dxy2 + diff_z**2 ) + length_scale**2
-            inv_r3 = 1.0d0 / (r*r*r)
-            f_x = f_x + diff_x*inv_r3
-            f_y = f_y + diff_y*inv_r3
-            f_z = f_z + diff_z*inv_r3
-          end do
+              ! Same charge partners, plus and minus n
+              z_ic = 2.0d0*n*d_loc + z_b
+              diff_z = z_a - z_ic
+              r = sqrt( dxy2 + diff_z**2 ) + length_scale**2
+              inv_r3 = 1.0d0 / (r*r*r)
+              f_x = f_x + diff_x*inv_r3
+              f_y = f_y + diff_y*inv_r3
+              f_z = f_z + diff_z*inv_r3
 
-          a_x = a_x + pre_fac_c*f_x
-          a_y = a_y + pre_fac_c*f_y
+              z_ic = -2.0d0*n*d_loc + z_b
+              diff_z = z_a - z_ic
+              r = sqrt( dxy2 + diff_z**2 ) + length_scale**2
+              inv_r3 = 1.0d0 / (r*r*r)
+              f_x = f_x + diff_x*inv_r3
+              f_y = f_y + diff_y*inv_r3
+              f_z = f_z + diff_z*inv_r3
+            end do
+          end if
+
+          a_x = a_x + pre_fac_c*sgn_xy*f_x
+          a_y = a_y + pre_fac_c*sgn_xy*f_y
           a_z = a_z + pre_fac_c*f_z
         end if
       end do
 
-      ! Add the vacuum electric field (field_E_planar), F = q*(0, 0, E_z),
-      ! and convert the total force to acceleration.
+      ! Add the vacuum electric field, F = q*field_E(pos), and convert the
+      ! total force to acceleration.
+      if (geom == ACC_GEOM_TIP) then
+        ! field_E_Hyperboloid inlined (see mod_hyperboloid_tip), with the
+        ! prolate spheroidal coordinates xi_coor / eta_coor / phi_coor.
+        r_p = sqrt(x_1**2 + y_1**2 + (z_1 + af - sz)**2)
+        r_m = sqrt(x_1**2 + y_1**2 + (z_1 - af - sz)**2)
+        xi  = (r_p + r_m) / (2.0d0*af)
+        eta = (r_p - r_m) / (2.0d0*af)
+        if ((abs(x_1) < 1.0d-18) .and. (abs(y_1) < 1.0d-18)) then
+          phi = 0.0d0
+        else
+          phi = atan2(y_1, x_1)
+        end if
+
+        pre_fac_xyz = pre_E_tip * 1.0d0/(xi**2 - eta**2)
+
+        ! If we are near the tip then the x and y components should be zero
+        if (abs(xi - 1.0d0) < 1.0d-6) then
+          fac_xy = 0.0d0
+        else
+          fac_xy = eta * sqrt( (xi**2 - 1.0d0)/(1.0d0 - eta**2) )
+        end if
+
+        fE_x = -1.0d0*pre_fac_xyz * fac_xy * cos(phi)
+        fE_y = -1.0d0*pre_fac_xyz * fac_xy * sin(phi)
+        fE_z = pre_fac_xyz * xi
+      else
+        fE_x = 0.0d0 ! field_E_planar
+        fE_y = 0.0d0
+        fE_z = Ez_loc
+      end if
+
       im_1 = 1.0d0 / particles_mass(i)
-      particles_cur_accel(1, i) = a_x * im_1
-      particles_cur_accel(2, i) = a_y * im_1
-      particles_cur_accel(3, i) = (a_z + q_1*Ez_loc) * im_1
+      particles_cur_accel(1, i) = (a_x + q_1*fE_x) * im_1
+      particles_cur_accel(2, i) = (a_y + q_1*fE_y) * im_1
+      particles_cur_accel(3, i) = (a_z + q_1*fE_z) * im_1
     end do
     !$acc end parallel loop
-  end subroutine Calculate_Acceleration_Particles_Planar_ACC
+  end subroutine Calculate_Acceleration_Particles_ACC
 
   subroutine Write_Acceleration_Test(step)
     integer, intent(in)              :: step
@@ -755,11 +871,11 @@ contains
   ! which is the pattern a GPU needs; on the CPU it also parallelizes better
   ! (one parallel region over the points instead of one region per point).
   !
-  ! The OpenACC path implements the planar geometry (field_E_planar +
-  ! Force_Image_charges_v2), like Calculate_Acceleration_Particles_Planar_ACC.
-  ! All other geometries use the generic fallback, which parallelizes over
-  ! the points with OpenMP and calls Calc_Field_at for each one (the parallel
-  ! region inside Calc_Field_at becomes nested and therefore runs serially).
+  ! The OpenACC path implements the geometries in ACC_Geometry (planar and
+  ! hyperboloid tip), like Calculate_Acceleration_Particles_ACC. All other
+  ! geometries use the generic fallback, which parallelizes over the points
+  ! with OpenMP and calls Calc_Field_at for each one (the parallel region
+  ! inside Calc_Field_at becomes nested and therefore runs serially).
   subroutine Calc_Field_at_Batch(M, pos_in, field_out)
     integer, intent(in)                                :: M ! Number of points
     double precision, dimension(1:3, 1:M), intent(in)  :: pos_in ! Points to calculate the field at
@@ -767,30 +883,48 @@ contains
 
     integer          :: m_i
 #ifdef _OPENACC
-    integer          :: j, n, Np, Nic
+    integer          :: j, n, Np, Nic, geom
     logical          :: do_ic
     double precision :: Ez_loc, d_loc
+    double precision :: af, sz, pre_E_tip, z_0_tip, Rsp_tip ! Tip geometry parameters
     double precision :: x_1, y_1, z_1
     double precision :: x_2, y_2, z_2, pre_fac_c
-    double precision :: f_x, f_y, f_z
+    double precision :: f_x, f_y, f_z, ic_x, ic_y, ic_z
+    double precision :: fE_x, fE_y, fE_z
     double precision :: diff_x, diff_y, diff_z, dxy2, z_ic
     double precision :: r, inv_r3
+    double precision :: r_p, r_m, xi, eta, phi, pre_fac_xyz, fac_xy ! Tip field
+    double precision :: x_im, y_im, z_im, dis_a, tmp_dis_a, tmp_dis_b ! Tip image charge
 #endif
 
     if (M < 1) return
 
 #ifdef _OPENACC
-    if (Using_Planar_Geometry() .eqv. .true.) then
+    geom = ACC_Geometry()
+    if (geom /= ACC_GEOM_OTHER) then
       Np = nrPart
       Ez_loc = E_z
       d_loc  = d
       Nic    = N_ic_max
       do_ic  = image_charge
 
+      ! Hyperboloid tip parameters (from mod_hyperboloid_tip), unused for planar
+      af        = a_foci
+      sz        = shift_z
+      pre_E_tip = pre_fac_E_tip
+      z_0_tip   = h_tip - r_tip
+      Rsp_tip   = r_tip
+
       if (Np < 1) then
         ! Empty system, only the vacuum field
-        field_out(1:2, :) = 0.0d0
-        field_out(3, :)   = Ez_loc
+        do m_i = 1, M
+          if (geom == ACC_GEOM_TIP) then
+            field_out(:, m_i) = field_E_Hyperboloid(pos_in(:, m_i))
+          else
+            field_out(1:2, m_i) = 0.0d0
+            field_out(3, m_i)   = Ez_loc
+          end if
+        end do
         return
       end if
 
@@ -801,6 +935,10 @@ contains
         !$acc update device(particles_cur_pos(1:3, 1:Np), particles_charge(1:Np))
       end if
 
+      ! The geometry functions are inlined below for the same reasons as in
+      ! Calculate_Acceleration_Particles_ACC (see the comment there). The
+      ! image charge effect is evaluated directly at (point, particle),
+      ! exactly like Calc_Field_at does.
       !$acc parallel loop gang &
       !$acc& copyin(pos_in(1:3, 1:M)) copyout(field_out(1:3, 1:M)) &
       !$acc& present(particles_cur_pos, particles_charge)
@@ -825,69 +963,122 @@ contains
           diff_x = x_1 - x_2
           diff_y = y_1 - y_2
           diff_z = z_1 - z_2
-          dxy2 = diff_x**2 + diff_y**2 ! Same for all image charge partners
 
-          r = sqrt( dxy2 + diff_z**2 ) + length_scale**2
+          r = sqrt( diff_x**2 + diff_y**2 + diff_z**2 ) + length_scale**2
           inv_r3 = 1.0d0 / (r*r*r)
           f_x = f_x + pre_fac_c*inv_r3*diff_x
           f_y = f_y + pre_fac_c*inv_r3*diff_y
           f_z = f_z + pre_fac_c*inv_r3*diff_z
 
           ! Field from the image charge partners of the particle
-          ! (Force_Image_charges_v2 inlined, see that function for details).
           if (do_ic .eqv. .true.) then
-            ! n = 0: Opposite charge partner below the bottom plane
-            z_ic = -1.0d0*z_2
-            diff_z = z_1 - z_ic
-            r = sqrt( dxy2 + diff_z**2 ) + length_scale**2
-            inv_r3 = 1.0d0 / (r*r*r)
-            f_x = f_x - pre_fac_c*diff_x*inv_r3
-            f_y = f_y - pre_fac_c*diff_y*inv_r3
-            f_z = f_z - pre_fac_c*diff_z*inv_r3
+            if (geom == ACC_GEOM_TIP) then
+              ! Image charge effects of the sphere at the top of the tip
+              ! (Sphere_IC_field inlined, see mod_hyperboloid_tip)
+              dis_a = sqrt(x_1**2 + y_1**2 + (z_1 - z_0_tip)**2)
 
-            !$acc loop seq
-            do n = 1, Nic
-              ! Opposite charge partners, plus and minus n
-              z_ic = 2.0d0*n*d_loc - z_2
+              z_im = z_0_tip + Rsp_tip**2 / ( sqrt(1 + x_1**2/(z_1 - z_0_tip)**2 + y_1**2/(z_1 - z_0_tip)**2) * dis_a )
+              x_im = (z_im - z_0_tip) * x_1 / (z_1 - z_0_tip)
+              y_im = (z_im - z_0_tip) * y_1 / (z_1 - z_0_tip)
+
+              tmp_dis_a = ( (x_2 - x_1)**2 + (y_2 - y_1)**2 + (z_2 - z_1)**2 )**(3.0d0/2.0d0)
+              tmp_dis_b = ( (x_2 - x_im)**2 + (y_2 - y_im)**2 + (z_2 - z_im)**2 )**(3.0d0/2.0d0)
+
+              ic_x = 1.0d0*q_0/(4.0d0*pi*epsilon_0) * ( (x_1 - x_2)/tmp_dis_a - (Rsp_tip*(x_im - x_2))/(dis_a*tmp_dis_b) )
+              ic_y = 1.0d0*q_0/(4.0d0*pi*epsilon_0) * ( (y_1 - y_2)/tmp_dis_a - (Rsp_tip*(y_im - y_2))/(dis_a*tmp_dis_b) )
+              ic_z = 1.0d0*q_0/(4.0d0*pi*epsilon_0) * ( (z_1 - z_2)/tmp_dis_a - (Rsp_tip*(z_im - z_2))/(dis_a*tmp_dis_b) )
+            else
+              ! Image charge partners of the particle acting at the point
+              ! (Force_Image_charges_v2 inlined, see that function for details).
+              dxy2 = diff_x**2 + diff_y**2 ! Same for all image charge partners
+
+              ! n = 0: Opposite charge partner below the bottom plane
+              z_ic = -1.0d0*z_2
               diff_z = z_1 - z_ic
               r = sqrt( dxy2 + diff_z**2 ) + length_scale**2
               inv_r3 = 1.0d0 / (r*r*r)
-              f_x = f_x - pre_fac_c*diff_x*inv_r3
-              f_y = f_y - pre_fac_c*diff_y*inv_r3
-              f_z = f_z - pre_fac_c*diff_z*inv_r3
+              ic_x = -diff_x*inv_r3
+              ic_y = -diff_y*inv_r3
+              ic_z = -diff_z*inv_r3
 
-              z_ic = -2.0d0*n*d_loc - z_2
-              diff_z = z_1 - z_ic
-              r = sqrt( dxy2 + diff_z**2 ) + length_scale**2
-              inv_r3 = 1.0d0 / (r*r*r)
-              f_x = f_x - pre_fac_c*diff_x*inv_r3
-              f_y = f_y - pre_fac_c*diff_y*inv_r3
-              f_z = f_z - pre_fac_c*diff_z*inv_r3
+              !$acc loop seq
+              do n = 1, Nic
+                ! Opposite charge partners, plus and minus n
+                z_ic = 2.0d0*n*d_loc - z_2
+                diff_z = z_1 - z_ic
+                r = sqrt( dxy2 + diff_z**2 ) + length_scale**2
+                inv_r3 = 1.0d0 / (r*r*r)
+                ic_x = ic_x - diff_x*inv_r3
+                ic_y = ic_y - diff_y*inv_r3
+                ic_z = ic_z - diff_z*inv_r3
 
-              ! Same charge partners, plus and minus n
-              z_ic = 2.0d0*n*d_loc + z_2
-              diff_z = z_1 - z_ic
-              r = sqrt( dxy2 + diff_z**2 ) + length_scale**2
-              inv_r3 = 1.0d0 / (r*r*r)
-              f_x = f_x + pre_fac_c*diff_x*inv_r3
-              f_y = f_y + pre_fac_c*diff_y*inv_r3
-              f_z = f_z + pre_fac_c*diff_z*inv_r3
+                z_ic = -2.0d0*n*d_loc - z_2
+                diff_z = z_1 - z_ic
+                r = sqrt( dxy2 + diff_z**2 ) + length_scale**2
+                inv_r3 = 1.0d0 / (r*r*r)
+                ic_x = ic_x - diff_x*inv_r3
+                ic_y = ic_y - diff_y*inv_r3
+                ic_z = ic_z - diff_z*inv_r3
 
-              z_ic = -2.0d0*n*d_loc + z_2
-              diff_z = z_1 - z_ic
-              r = sqrt( dxy2 + diff_z**2 ) + length_scale**2
-              inv_r3 = 1.0d0 / (r*r*r)
-              f_x = f_x + pre_fac_c*diff_x*inv_r3
-              f_y = f_y + pre_fac_c*diff_y*inv_r3
-              f_z = f_z + pre_fac_c*diff_z*inv_r3
-            end do
+                ! Same charge partners, plus and minus n
+                z_ic = 2.0d0*n*d_loc + z_2
+                diff_z = z_1 - z_ic
+                r = sqrt( dxy2 + diff_z**2 ) + length_scale**2
+                inv_r3 = 1.0d0 / (r*r*r)
+                ic_x = ic_x + diff_x*inv_r3
+                ic_y = ic_y + diff_y*inv_r3
+                ic_z = ic_z + diff_z*inv_r3
+
+                z_ic = -2.0d0*n*d_loc + z_2
+                diff_z = z_1 - z_ic
+                r = sqrt( dxy2 + diff_z**2 ) + length_scale**2
+                inv_r3 = 1.0d0 / (r*r*r)
+                ic_x = ic_x + diff_x*inv_r3
+                ic_y = ic_y + diff_y*inv_r3
+                ic_z = ic_z + diff_z*inv_r3
+              end do
+            end if
+
+            f_x = f_x + pre_fac_c*ic_x
+            f_y = f_y + pre_fac_c*ic_y
+            f_z = f_z + pre_fac_c*ic_z
           end if
         end do
 
-        ! Add the vacuum electric field (field_E_planar)
-        field_out(1, m_i) = f_x
-        field_out(2, m_i) = f_y
-        field_out(3, m_i) = f_z + Ez_loc
+        ! Add the vacuum electric field
+        if (geom == ACC_GEOM_TIP) then
+          ! field_E_Hyperboloid inlined (see mod_hyperboloid_tip)
+          r_p = sqrt(x_1**2 + y_1**2 + (z_1 + af - sz)**2)
+          r_m = sqrt(x_1**2 + y_1**2 + (z_1 - af - sz)**2)
+          xi  = (r_p + r_m) / (2.0d0*af)
+          eta = (r_p - r_m) / (2.0d0*af)
+          if ((abs(x_1) < 1.0d-18) .and. (abs(y_1) < 1.0d-18)) then
+            phi = 0.0d0
+          else
+            phi = atan2(y_1, x_1)
+          end if
+
+          pre_fac_xyz = pre_E_tip * 1.0d0/(xi**2 - eta**2)
+
+          ! If we are near the tip then the x and y components should be zero
+          if (abs(xi - 1.0d0) < 1.0d-6) then
+            fac_xy = 0.0d0
+          else
+            fac_xy = eta * sqrt( (xi**2 - 1.0d0)/(1.0d0 - eta**2) )
+          end if
+
+          fE_x = -1.0d0*pre_fac_xyz * fac_xy * cos(phi)
+          fE_y = -1.0d0*pre_fac_xyz * fac_xy * sin(phi)
+          fE_z = pre_fac_xyz * xi
+        else
+          fE_x = 0.0d0 ! field_E_planar
+          fE_y = 0.0d0
+          fE_z = Ez_loc
+        end if
+
+        field_out(1, m_i) = f_x + fE_x
+        field_out(2, m_i) = f_y + fE_y
+        field_out(3, m_i) = f_z + fE_z
       end do
       !$acc end parallel loop
       return

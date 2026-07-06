@@ -161,4 +161,51 @@ contains
     fac_2 = xi_2*sqrt(xi_2**2 - eta_1**2) - eta_1**2*log(xi_2 + sqrt(xi_2**2 - eta_1**2))
     Tip_Area = 0.5d0*a_foci**2 * sqrt(1.0d0-eta_1**2) * (phi_2 - phi_1) * (fac_2 - fac_1)
   end function Tip_Area
+  !-----------------------------------------------------------------------------
+  ! Image charge effects of a sphere placed at the top of the tip.
+  ! (Moved here from mod_emission_tip so that mod_verlet can reference it for
+  ! the OpenACC geometry dispatch.)
+  function Sphere_IC_field(pos_1, pos_2)
+    double precision, dimension(1:3)             :: Sphere_IC_field
+    double precision, dimension(1:3), intent(in) :: pos_1, pos_2
+    double precision                 :: x_a, y_a, z_a
+    double precision                 :: x_b, y_b, z_b
+    double precision                 :: x, y, z
+    double precision                 :: z_0, Sphere_R
+    double precision                 :: dis_a, tmp_dis_a, tmp_dis_b
+
+    if (image_charge .eqv. .true.) then
+
+      z_0 = h_tip - r_tip
+      Sphere_R = r_tip
+
+      !print *, 'Sphere_R = ', Sphere_R
+      !print *, 'z_0 = ', z_0
+
+      x_a = pos_1(1)
+      y_a = pos_1(2)
+      z_a = pos_1(3)
+
+      x = pos_2(1)
+      y = pos_2(2)
+      z = pos_2(3)
+
+      dis_a = sqrt(x_a**2 + y_a**2 + (z_a - z_0)**2)
+
+      z_b = z_0 + Sphere_R**2 / ( sqrt(1 + x_a**2/(z_a - z_0)**2 + y_a**2/(z_a - z_0)**2) * dis_a )
+      x_b = (z_b - z_0) * x_a / (z_a - z_0)
+      y_b = (z_b - z_0) * y_a / (z_a - z_0)
+
+      tmp_dis_a = ( (x - x_a)**2 + (y - y_a)**2 + (z - z_a)**2 )**(3.0d0/2.0d0)
+      tmp_dis_b = ( (x - x_b)**2 + (y - y_b)**2 + (z - z_b)**2 )**(3.0d0/2.0d0)
+
+      Sphere_IC_field(1) = 1.0d0*q_0/(4.0d0*pi*epsilon_0) * ( (x_a - x)/tmp_dis_a - (Sphere_R*(x_b - x))/(dis_a*tmp_dis_b) )
+      Sphere_IC_field(2) = 1.0d0*q_0/(4.0d0*pi*epsilon_0) * ( (y_a - y)/tmp_dis_a - (Sphere_R*(y_b - y))/(dis_a*tmp_dis_b) )
+      Sphere_IC_field(3) = 1.0d0*q_0/(4.0d0*pi*epsilon_0) * ( (z_a - z)/tmp_dis_a - (Sphere_R*(z_b - z))/(dis_a*tmp_dis_b) )
+
+    else
+      Sphere_IC_field = 0.0d0
+    end if
+
+  end function Sphere_IC_field
 end Module mod_hyperboloid_tip

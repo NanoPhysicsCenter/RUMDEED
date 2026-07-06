@@ -245,6 +245,9 @@ contains
 
     !call Test_Many_Particles()
 
+    print *, ''
+    call Test_Tip_Acceleration()
+
 #if defined(_OPENMP)
     print '(a)', 'Do OpenMP test'
 #else
@@ -888,6 +891,106 @@ contains
       print *, 'Transit time test finished'
       print *, ''
   end subroutine Test_Transit_Time
+
+  !-----------------------------------------------------------------------------
+  ! Test the acceleration and the batched field evaluation for the
+  ! hyperboloid tip geometry (field_E_Hyperboloid + Sphere_IC_field).
+  ! The expected values are computed here on the host with the same pair
+  ! loop as the generic OpenMP version of Calculate_Acceleration_Particles,
+  ! using direct calls to the geometry functions. In OpenACC builds
+  ! Calculate_Acceleration_Particles and Calc_Field_at_Batch dispatch to the
+  ! GPU kernels for this geometry, so this test verifies the device code
+  ! against the host functions.
+  subroutine Test_Tip_Acceleration()
+    use mod_emission_tip, only: Init_Emission_Tip
+
+    double precision, dimension(1:3)      :: par_vel
+    double precision, dimension(1:3, 1:3) :: R, a_expected
+    double precision, dimension(1:3)      :: pos_1, pos_2, diff, force_c, force_ic, force_ic_N
+    double precision                      :: r_dis, inv_r3, pre_fac_c
+    double precision, dimension(1:3, 1:4) :: field_pos, field_batch
+    double precision, dimension(1:3)      :: field_single
+    integer                               :: i, j, k
+    character(len=64)                     :: label
+
+    print '(a)', 'Starting hyperboloid tip test'
+
+    ! d = 1000 nm gap with a 100 nm high tip: d_tip = 900 nm to the anode,
+    ! base radius 100 nm.
+    call Setup_Test_System(1000.0d0*length_scale, 0.25d-3*time_scale, 100, 2.0d3, .true., 0)
+    emitters_dim(1:3, 1) = (/ 900.0d0, 100.0d0, 100.0d0 /) * length_scale
+    emitters_pos(1:3, 1) = 0.0d0
+
+    ! Sets the tip geometry pointers and computes the tip parameters
+    ! (a_foci, eta_1, r_tip, shift_z, pre_fac_E_tip, ...).
+    call Init_Emission_Tip()
+
+    ! Three particles just above the tip apex (apex at z = h_tip = 100 nm).
+    ! They are placed close to the tip and to each other on purpose: there
+    ! the sphere image charge force is a large fraction of the total force,
+    ! so the test is sensitive to errors in the image charge parameters
+    ! (sphere center and radius) used by the OpenACC kernels.
+    R(:, 1) = (/   2.0d0,   1.0d0, 103.0d0 /) * length_scale
+    R(:, 2) = (/  -2.0d0,   2.5d0, 106.0d0 /) * length_scale
+    R(:, 3) = (/   1.5d0,  -3.0d0, 110.0d0 /) * length_scale
+
+    par_vel = 0.0d0
+    call Add_Particle(R(:, 1), par_vel, species_elec, 1, 0, -1)
+    call Add_Particle(R(:, 2), par_vel, species_elec, 1, 0, -1)
+    call Add_Particle(R(:, 3), par_vel, species_ion, 1, 0, -1)
+
+    ! Expected accelerations: the same pair loop as the OpenMP version of
+    ! Calculate_Acceleration_Particles, using the geometry pointers directly.
+    a_expected = 0.0d0
+    do i = 1, 3
+      pos_1 = particles_cur_pos(:, i)
+
+      do j = i+1, 3
+        pos_2 = particles_cur_pos(:, j)
+        pre_fac_c = particles_charge(i) * particles_charge(j) * div_fac_c
+
+        diff = pos_1 - pos_2
+        r_dis = sqrt( sum(diff**2) ) + length_scale**2
+        inv_r3 = 1.0d0 / (r_dis*r_dis*r_dis)
+        force_c = (pre_fac_c*inv_r3) * diff
+
+        force_ic = pre_fac_c * ptr_Image_Charge_effect(pos_1, pos_2)
+        force_ic_N(1:2) = -1.0d0*force_ic(1:2)
+        force_ic_N(3)   = force_ic(3)
+
+        a_expected(:, j) = a_expected(:, j) + (force_ic_N - force_c) / particles_mass(j)
+        a_expected(:, i) = a_expected(:, i) + (force_c + force_ic) / particles_mass(i)
+      end do
+
+      a_expected(:, i) = a_expected(:, i) &
+                     & + particles_charge(i) * ptr_field_E(pos_1) / particles_mass(i)
+    end do
+
+    ! The acceleration from the kernel (GPU in OpenACC builds)
+    call Calculate_Acceleration_Particles()
+
+    do i = 1, 3
+      write(label, '(a, i0)') 'Tip acceleration particle ', i
+      call Assert_Close_Vec(particles_cur_accel(:, i), a_expected(:, i), trim(label))
+    end do
+
+    ! Batched field evaluation against the point-by-point Calc_Field_at
+    field_pos(:, 1) = (/   0.0d0,   0.0d0, 102.0d0 /) * length_scale
+    field_pos(:, 2) = (/  30.0d0, -10.0d0, 130.0d0 /) * length_scale
+    field_pos(:, 3) = (/ -50.0d0,  40.0d0, 300.0d0 /) * length_scale
+    field_pos(:, 4) = (/  15.0d0,   8.0d0, 500.0d0 /) * length_scale
+
+    call Calc_Field_at_Batch(4, field_pos, field_batch)
+
+    do k = 1, 4
+      field_single = Calc_Field_at(field_pos(:, k))
+      write(label, '(a, i0)') 'Tip batched field point ', k
+      call Assert_Close_Vec(field_batch(:, k), field_single, trim(label))
+    end do
+
+    print '(a)', 'Hyperboloid tip test finished'
+  end subroutine Test_Tip_Acceleration
+
 
   !-----------------------------------------------------------------------------
   ! Test the particle bookkeeping in mod_pair.

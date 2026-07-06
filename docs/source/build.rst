@@ -59,11 +59,13 @@ keep running on the CPU cores. The regular CPU-only builds are unaffected, when 
 with gfortran or without the **ACC** variable the OpenACC directives are ignored and the
 OpenMP code path is used as before.
 
-The GPU kernel implements the planar geometry (the vacuum field *field_E_planar* together
+The GPU kernels implement the planar geometry (the vacuum field *field_E_planar* together
 with the image charge partners of *Force_Image_charges_v2*), which covers the planar
-emission modes (photo, field, thermionic, field-thermo, 2D and manual emission). Runs
-using the tip, cylindrical tip, or torus geometries automatically fall back to the OpenMP
-code path at runtime.
+emission modes (photo, field, thermionic, field-thermo, 2D and manual emission), and the
+hyperboloid tip geometry (*field_E_Hyperboloid* with *Sphere_IC_field*) used by emission
+mode 3. Runs using the cylindrical tip or torus geometries automatically fall back to the
+OpenMP code path at runtime: those geometries interpolate their fields from a mesh with
+kd-tree searches, which cannot run inside a GPU kernel.
 
 For testing the OpenACC code path on a machine without a GPU, the kernels can be compiled
 to run on the CPU cores instead:
