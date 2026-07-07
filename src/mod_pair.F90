@@ -6,6 +6,7 @@
 
 module mod_pair
   use mod_global
+  use omp_lib
   implicit none
 
   ! ----------------------------------------------------------------------------
@@ -52,7 +53,7 @@ contains
       else
         ! To do: Have some default section rules, like 10x10 for square emitters?
         sec = 1
-      end if
+      end if 
 
       ! Add the particle
       particles_cur_pos(:, nrPart+1)      = par_pos
@@ -69,21 +70,45 @@ contains
       particles_section(nrPart+1)         = sec
       particles_life(nrPart+1)            = life
       particles_id(nrPart+1)              = nrID ! ID is updated near the end
+      particles_cur_energy(nrPart+1)      = 0.0d0
+      particles_ion_cross_sec(nrPart+1)   = 0.0d0
+      particles_recom_cross_rad(nrPart+1) = 0.0d0
+      particles_tot_cross_sec(nrPart+1)   = 0.0d0
 
       if (par_species == species_elec) then ! Electron
+        nrElec = nrElec + 1
+
         particles_charge(nrPart+1) = -1.0d0*q_0
         particles_mass(nrPart+1) = m_eeff*m_0
-        nrElec = nrElec + 1
+        particles_elec_pointer(nrElec) = nrPart+1
+        particles_inverse_pointer(nrPart+1) = nrElec
+        particles_elec_mask(nrElec) = .true.
+
         ! Write out the x and y position of the emitted particle
         ! along with which emitter and section it came from.
         !if (abs(par_pos(3) - 1.0d0*length_scale) < 1.0E-3) then
-          write(unit=ud_density_emit) (par_pos(1:3) / length_scale),  emit, sec, nrID
+          write(unit=ud_density_emit_elec) par_pos(:)/length_scale, emit, nrID
         !end if
       else if (par_species == species_ion) then ! Ion
+        nrIon = nrIon + 1
+
         particles_charge(nrPart+1) = +1.0d0*q_0
         particles_mass(nrPart+1) = m_N2p
-        nrIon = nrIon + 1
-        write(unit=ud_density_ion) (par_pos(1) / length_scale), (par_pos(2) / length_scale), (par_pos(3) / length_scale), nrID
+        particles_ion_pointer(nrIon) = nrPart+1
+        particles_inverse_pointer(nrPart+1) = nrIon
+        particles_ion_mask(nrIon) = .true.
+
+        write(unit=ud_density_emit_ion) par_pos(:)/length_scale, emit, nrID
+      else if (par_species == species_atom) then
+        nrAtom = nrAtom + 1
+
+        particles_charge(nrPart+1) = 0.0d0
+        particles_mass(nrPart+1) = m_N2
+        particles_atom_pointer(nrAtom) = nrPart+1
+        particles_inverse_pointer(nrPart+1) = nrAtom
+        particles_atom_mask(nrAtom) = .true.
+        
+        write(unit=ud_density_emit_atom) par_pos(:)/length_scale, emit, nrID 
       else
         print *, 'ERROR UNKNOWN PARTICLE TYPE'
         stop
@@ -91,9 +116,15 @@ contains
 
       ! Update the number of particles in the system
       nrElecIon = nrElec + nrIon
-      nrPart = nrElecIon
-
+      nrPart = nrElecIon + nrAtom
       nrID = nrID + 1
+
+      ! if (laplace .eqv. .true.) then
+      !   ! Calculate the Laplace field for the new particle
+      !   !$OMP CRITICAL(LAPLACE)
+      !   call Calculate_Laplace_Field()
+      !   !$OMP END CRITICAL(LAPLACE)
+      ! end if
     end if
   end subroutine Add_Particle
 
@@ -107,16 +138,17 @@ contains
   ! if particles_mask(i) is .false. then the particle is inactive and should be removed
   subroutine Mark_Particles_Remove(i, m)
     integer, intent(in) :: i, m
-    integer             :: emit
+    integer             :: emit, k
 
     ! Check if the particle has already been marked for removal
     ! if so just return
     if (particles_mask(i) .eqv. .false.) return
 
     ! Refuse to remove a particle of unknown species. Removing it would mask it
-    ! out (so it gets compacted away), but neither nrElec_remove nor nrIon_remove
-    ! would be incremented, leaving nrPart = nrElec + nrIon overcounted by one.
-    if ((particles_species(i) /= species_elec) .and. (particles_species(i) /= species_ion)) then
+    ! out (so it gets compacted away), but none of the species remove counters
+    ! would be incremented, leaving nrPart overcounted by one.
+    if ((particles_species(i) /= species_elec) .and. (particles_species(i) /= species_ion) &
+      & .and. (particles_species(i) /= species_atom)) then
       print *, 'Error: Refusing to remove particle of unknown species'
       print *, 'particles_species(i) = ', particles_species(i)
       return
@@ -125,6 +157,21 @@ contains
     ! Mark the particle for removal
     ! The particle is actually removed later when Remove_Particles is called.
     particles_mask(i) = .false.
+
+    ! Mark the particle for removal in the species array
+    k = particles_inverse_pointer(i)
+    select case (particles_species(i))
+      case (species_elec)
+        particles_elec_mask(k) = .false.
+      case (species_ion)
+        particles_ion_mask(k) = .false.
+      case (species_atom)
+        particles_atom_mask(k) = .false.
+      case default
+        print *, 'Error: Unknown particle species'
+        print *, 'particles_species(i) = ', particles_species(i)
+    end select
+
 
     ! Set the charge to zero. That way it no longer has any effects on calculations.
     particles_charge(i) = 0.0d0
@@ -175,6 +222,26 @@ contains
           write(unit=ud_density_absorb_bot) particles_cur_pos(1, i)/length_scale, particles_cur_pos(2, i)/length_scale, &
                                           & particles_emitter(i), particles_section(i), particles_id(i)
           !$OMP END CRITICAL(DENSITY_ABSORB_BOT)
+        CASE (remove_recom) ! Recombination
+          !$OMP ATOMIC UPDATE
+          nrPart_remove_recom = nrPart_remove_recom + 1
+
+          !$OMP ATOMIC UPDATE
+          nrElec_remove_recom = nrElec_remove_recom + 1
+
+          ! Write out the x and y position of the particle along with which emitter it came from.
+          !$OMP CRITICAL(DENSITY_ABSORB_RECOM)
+          write(unit=ud_density_absorb_recom) &
+            & particles_cur_pos(1,i), particles_cur_pos(2,i), particles_cur_pos(3,i), &
+            & particles_emitter(i), particles_section(i),  particles_id(i), species_elec, &
+            & cur_time/time_step*time_scale
+          !$OMP END CRITICAL(DENSITY_ABSORB_RECOM)
+        CASE (remove_ion) ! Ionization
+          !$OMP ATOMIC UPDATE
+          nrPart_remove_ion = nrPart_remove_ion + 1
+
+          !$OMP ATOMIC UPDATE
+          nrAtom_remove_ion = nrAtom_remove_ion + 1
         CASE DEFAULT
           print *, 'Error unkown remove case ', m
       END SELECT
@@ -197,6 +264,39 @@ contains
 
           !$OMP ATOMIC UPDATE
           nrIon_remove_bot = nrIon_remove_bot + 1
+
+        CASE (remove_recom) ! Recombination
+          !$OMP ATOMIC UPDATE
+          nrPart_remove_recom = nrPart_remove_recom + 1
+
+          !$OMP ATOMIC UPDATE
+          nrIon_remove_recom = nrIon_remove_recom + 1
+
+          ! Write out the x,y,z position of the particle along with which "emitter" it came from.
+          !$OMP CRITICAL(DENSITY_ABSORB_RECOM)
+          write(unit=ud_density_absorb_recom) &
+          & particles_cur_pos(1,i), particles_cur_pos(2,i), particles_cur_pos(3,i), &
+          & particles_emitter(i), particles_section(i),  particles_id(i), species_ion, &
+          & cur_time/time_step*time_scale
+          !$OMP END CRITICAL(DENSITY_ABSORB_RECOM)
+
+        CASE DEFAULT
+          print *, 'Error unkown remove case ', m
+      END SELECT
+
+    else if (particles_species(i) == species_atom) then
+
+      !$OMP ATOMIC UPDATE
+      nrAtom_remove = nrAtom_remove + 1
+
+      SELECT CASE (m)        
+        CASE (remove_ion) ! Recombination
+          !$OMP ATOMIC UPDATE
+          nrPart_remove_ion = nrPart_remove_ion + 1
+
+          !$OMP ATOMIC UPDATE
+          nrAtom_remove_ion = nrAtom_remove_ion + 1
+
         CASE DEFAULT
           print *, 'Error unkown remove case ', m
       END SELECT
@@ -224,12 +324,20 @@ contains
 
     if ((nrPart_remove > 0) .and. (nrPart > 0)) then ! Check if we have some thing to do
 
-      if ((nrPart - nrPart_remove) > 0) then ! Check if we can skip this
+      if ((nrPart - nrPart_remove) > 0) then ! Check if we can skip this    
+
+        if (two_time_step .eqv. .true.) then
+          call Update_Pointer_Arrays_parallel() 
+        end if
+
         !$OMP PARALLEL DEFAULT(NONE) PRIVATE(m, k) &
         !$OMP& SHARED(particles_mask, particles_cur_pos, particles_prev_pos, particles_last_col_pos) &
         !$OMP& SHARED(particles_cur_vel, particles_cur_accel, particles_prev_accel, particles_prev2_accel) &
         !$OMP& SHARED(particles_step, particles_species, step, particles_mass, particles_charge) &
-        !$OMP& SHARED(particles_emitter, particles_section, particles_life, particles_id, nrPart, life_time)
+        !$OMP& SHARED(particles_emitter, particles_section, particles_life, particles_id, nrPart, life_time) &
+        !$OMP& SHARED(particles_cur_energy, particles_ion_cross_sec, particles_ion_cross_rad, particles_tot_cross_sec, particles_recom_cross_rad) &
+        !$OMP& SHARED(particles_elec_pointer, particles_ion_pointer, particles_atom_pointer, particles_inverse_pointer) &
+        !$OMP& SHARED(particles_elec_mask, particles_ion_mask, particles_atom_mask, nrElec, nrIon, nrAtom)
         !$OMP SINGLE
 
         k = 1
@@ -293,12 +401,49 @@ contains
         call compact_array(particles_id, particles_mask, k, m)
         !$OMP END TASK
 
+        !$OMP TASK FIRSTPRIVATE(k, m) SHARED(particles_cur_energy, particles_mask)
+        call compact_array(particles_cur_energy, particles_mask, k, m)
+        !$OMP END TASK
+
+        !$OMP TASK FIRSTPRIVATE(k, m) SHARED(particles_ion_cross_sec, particles_mask)
+        call compact_array(particles_ion_cross_sec, particles_mask, k, m)
+        !$OMP END TASK
+
+        !$OMP TASK FIRSTPRIVATE(k, m) SHARED(particles_ion_cross_rad, particles_mask)
+        call compact_array(particles_ion_cross_rad, particles_mask, k, m)
+        !$OMP END TASK
+
+        !$OMP TASK FIRSTPRIVATE(k, m) SHARED(particles_tot_cross_sec, particles_mask)
+        call compact_array(particles_tot_cross_sec, particles_mask, k, m)
+        !$OMP END TASK
+
+        !$OMP TASK FIRSTPRIVATE(k, m) SHARED(particles_recom_cross_rad, particles_mask)
+        call compact_array(particles_recom_cross_rad, particles_mask, k, m)
+        !$OMP END TASK
+
+        !$OMP TASK FIRSTPRIVATE(k, nrElec) SHARED(particles_elec_pointer, particles_elec_mask)
+        call compact_array(particles_elec_pointer, particles_elec_mask, k, nrElec)
+        !$OMP END TASK
+
+        !$OMP TASK FIRSTPRIVATE(k, nrIon) SHARED(particles_ion_pointer, particles_ion_mask)
+        call compact_array(particles_ion_pointer, particles_ion_mask, k, nrIon)
+        !$OMP END TASK
+
+        !$OMP TASK FIRSTPRIVATE(k, nrAtom) SHARED(particles_atom_pointer, particles_atom_mask)
+        call compact_array(particles_atom_pointer, particles_atom_mask, k, nrAtom)
+        !$OMP END TASK
+
+        !$OMP TASK FIRSTPRIVATE(k, m) SHARED(particles_inverse_pointer, particles_mask)
+        call compact_array(particles_inverse_pointer, particles_mask, k, m)
+        !$OMP END TASK
+
         !$OMP END SINGLE NOWAIT
 
         ! Wait for all tasks to finish
         !$OMP TASKWAIT
 
         !$OMP END PARALLEL
+
       end if
 
       ! !Sanity check
@@ -320,32 +465,230 @@ contains
       !nrPart = nrPart - nrPart_remove
       nrElec = nrElec - nrElec_remove
       nrIon = nrIon - nrIon_remove
+      nrAtom = nrAtom - nrAtom_remove
 
       ! This should not happen, but just in case.
       if (nrElec < 0) nrElec = 0
       if (nrIon < 0) nrIon = 0
 
       nrElecIon = nrElec + nrIon
-      nrPart = nrElecIon
+      nrPart = nrElecIon + nrAtom
 
       particles_mask = .true. ! Reset the mask. .true. means all particles are active.
+      particles_elec_mask = .true. ! Reset the mask. .true. means all particles are active.
+      particles_ion_mask = .true. ! Reset the mask. .true. means all particles are active.
+      particles_atom_mask = .true. ! Reset the mask. .true. means all particles are active.
 
       ! Reset the number of particles to remove
       nrPart_remove = 0
       nrElec_remove = 0
       nrIon_remove = 0
+      nrAtom_remove = 0
 
       nrPart_remove_top = 0
       nrPart_remove_bot = 0
+      nrPart_remove_recom = 0
+      nrPart_remove_ion = 0
       nrElec_remove_top = 0
       nrElec_remove_bot = 0
+      nrElec_remove_recom = 0
       nrIon_remove_top = 0
       nrIon_remove_bot = 0
+      nrIon_remove_recom = 0
+      nrAtom_remove_ion = 0
 
       nrElec_remove_top_emit(1:MAX_EMITTERS) = 0
+
+      ! call Check_Pointer_Arrays() 
+
     end if
 
   end subroutine Remove_Particles
+
+  subroutine Update_Pointer_Arrays_sequential()
+    integer :: i, k
+    integer :: invMove, elecMove, ionMove, atomMove
+
+    invMove = 0
+    elecMove = 0
+    ionMove = 0
+    atomMove = 0
+    
+    do i = 1,nrPart
+      if (particles_mask(i) .eqv. .false.) then
+        invMove = invMove + 1
+        ! print*, 'invMove = ', invMove
+        if (particles_species(i) == species_elec) then
+          elecMove = elecMove + 1
+          ! print*, 'elecMove = ', elecMove
+        else if (particles_species(i) == species_ion) then
+          ionMove = ionMove + 1
+        else if (particles_species(i) == species_atom) then
+          atomMove = atomMove + 1
+        end if
+      end if
+
+      select case (particles_species(i))
+        case (species_elec)
+          k = particles_inverse_pointer(i)
+          particles_elec_pointer(k) = i - invMove
+          particles_inverse_pointer(i) = k - elecMove
+        case (species_ion)
+          k = particles_inverse_pointer(i)
+          particles_ion_pointer(k) = i - invMove
+          particles_inverse_pointer(i) = k - ionMove
+        case (species_atom)
+          k = particles_inverse_pointer(i)
+          particles_atom_pointer(k) = i - invMove
+          particles_inverse_pointer(i) = k - atomMove
+        case default
+          print *, 'Error: Unknown particle species'
+          print *, 'particles_species(i) = ', particles_species(i)
+      end select
+    end do
+
+  end subroutine Update_Pointer_Arrays_sequential
+
+  subroutine Update_Pointer_Arrays_parallel()
+    ! Generated by chatGPT but works remarkably well
+ 
+    integer :: nt, tid, i, k
+    integer, allocatable :: cntInv(:),  cntElec(:),  cntIon(:),  cntAtom(:)
+    integer, allocatable :: baseInv(:), baseElec(:), baseIon(:), baseAtom(:)
+    integer :: invMove, elecMove, ionMove, atomMove
+ 
+    if (nrPart <= 0) return
+ 
+    !------------------------------
+    ! Pass 1 – per‑thread counts
+    !------------------------------
+    nt = omp_get_max_threads()
+    allocate(cntInv (nt), cntElec (nt), cntIon (nt), cntAtom (nt))
+    allocate(baseInv(nt), baseElec(nt), baseIon(nt), baseAtom(nt))
+    cntInv  = 0; cntElec  = 0; cntIon  = 0; cntAtom  = 0
+    baseInv = 0; baseElec = 0; baseIon = 0; baseAtom = 0
+ 
+ !$omp parallel default(none) shared(nrPart,particles_mask,particles_species, &
+ !$omp& cntInv,cntElec,cntIon,cntAtom) private(tid,i)
+ 
+       tid = omp_get_thread_num() + 1   ! 1‑based index for arrays
+ 
+ !$omp do schedule(static)
+       do i = 1, nrPart
+          if (.not. particles_mask(i)) then
+             cntInv(tid) = cntInv(tid) + 1
+             select case (particles_species(i))
+             case (species_elec)
+                cntElec(tid) = cntElec(tid) + 1
+             case (species_ion)
+                cntIon (tid) = cntIon (tid) + 1
+             case (species_atom)
+                cntAtom(tid) = cntAtom(tid) + 1
+             end select
+          end if
+       end do
+ !$omp end do
+ !$omp end parallel
+ 
+    !------------------------------
+    ! Prefix sums (exclusive)
+    !------------------------------
+    do tid = 2, nt
+       baseInv (tid) = baseInv (tid-1) + cntInv (tid-1)
+       baseElec(tid) = baseElec(tid-1) + cntElec(tid-1)
+       baseIon (tid) = baseIon (tid-1) + cntIon (tid-1)
+       baseAtom(tid) = baseAtom(tid-1) + cntAtom(tid-1)
+    end do
+ 
+    !------------------------------
+    ! Pass 2 – repack / update
+    !------------------------------
+ !$omp parallel default(none) shared(nrPart,particles_mask,particles_species,  &
+ !$omp& particles_inverse_pointer, particles_elec_pointer, particles_ion_pointer, &
+ !$omp& particles_atom_pointer, baseInv, baseElec, baseIon, baseAtom)           &
+ !$omp private(tid,i,k,invMove,elecMove,ionMove,atomMove)
+ 
+       tid       = omp_get_thread_num() + 1
+       invMove   = baseInv (tid)
+       elecMove  = baseElec(tid)
+       ionMove   = baseIon (tid)
+       atomMove  = baseAtom(tid)
+ 
+ !$omp do schedule(static)
+       do i = 1, nrPart
+          if (.not. particles_mask(i)) then
+             invMove = invMove + 1
+             select case (particles_species(i))
+             case (species_elec)
+                elecMove = elecMove + 1
+             case (species_ion)
+                ionMove  = ionMove  + 1
+             case (species_atom)
+                atomMove = atomMove + 1
+             end select
+          end if
+ 
+          select case (particles_species(i))
+          case (species_elec)
+             k = particles_inverse_pointer(i)
+             particles_elec_pointer(k) = i - invMove
+             particles_inverse_pointer(i) = k - elecMove
+          case (species_ion)
+             k = particles_inverse_pointer(i)
+             particles_ion_pointer(k)  = i - invMove
+             particles_inverse_pointer(i) = k - ionMove
+          case (species_atom)
+             k = particles_inverse_pointer(i)
+             particles_atom_pointer(k) = i - invMove
+             particles_inverse_pointer(i) = k - atomMove
+          case default
+             ! Unknown species – ignore or handle as needed
+          end select
+       end do
+ !$omp end do
+ !$omp end parallel
+ 
+    deallocate(cntInv ,cntElec ,cntIon ,cntAtom )
+    deallocate(baseInv,baseElec,baseIon,baseAtom)
+ 
+ end subroutine Update_Pointer_Arrays_parallel
+
+  subroutine Check_Pointer_Arrays()
+    integer :: i, j, k
+    logical :: mask
+
+    do i = 1, nrPart
+      k = particles_inverse_pointer(i)
+      select case (particles_species(i))
+        case (species_elec)
+          j = particles_elec_pointer(k)
+          mask = particles_elec_mask(k)
+        case (species_ion)
+          j = particles_ion_pointer(k)
+          mask = particles_ion_mask(k)
+        case (species_atom)
+          j = particles_atom_pointer(k)
+          mask = particles_atom_mask(k)
+      end select
+
+      if (i /= j) then
+        print*,  'pointer mismatch'
+      end if
+      if (mask .neqv. particles_mask(j)) then
+        print*,  'mask mismatch'
+      end if
+    end do
+  end subroutine Check_Pointer_Arrays
+
+  subroutine Check_Mask_Arrays()
+    integer :: i
+
+    do i = 1, nrPart
+      if (particles_mask(i) .neqv. particles_elec_mask(i)) then
+        print*, 'mask array mismatch'
+      end if
+    end do
+  end subroutine Check_Mask_Arrays
 
   ! --------------------------------------------------------------------------
   ! Write out the life time of particles
@@ -377,6 +720,9 @@ contains
 
     write (ud_absorb_bot, "(ES12.4, *(tr2, i8))", iostat=IFAIL) cur_time, step, &
     & nrPart_remove_bot, nrElec_remove_bot, nrIon_remove_bot
+
+    write (ud_absorb_recom, "(ES12.4, *(tr2, i8))", iostat=IFAIL) cur_time, step, &
+    & nrPart_remove_bot, nrElec_remove_recom, nrIon_remove_recom
   end subroutine Write_Absorbed
 
   ! ----------------------------------------------------------------------------
@@ -388,9 +734,11 @@ contains
     integer, intent(in) :: step
     integer             :: IFAIL, i
     double precision    :: ramo_cur
-    double precision    :: avg_speed
+    double precision    :: avg_part_speed, avg_elec_speed, avg_ion_speed
 
-    avg_speed = sqrt(avg_vel(1)**2 + avg_vel(2)**2 + avg_vel(3)**2)
+    avg_part_speed = norm2(avg_part_vel)
+    avg_elec_speed = norm2(avg_elec_vel)
+    avg_ion_speed = norm2(avg_ion_vel)
 
     ! Write out the current for each emitter and section
     if (write_ramo_sec .eqv. .true.) then
@@ -401,9 +749,11 @@ contains
     ! Write the total current along with other data
     ramo_cur = sum(ramo_current) / cur_scale
     write(unit=ud_ramo, &
-    & fmt="(ES12.4, tr2, i8, tr2, ES12.4, tr2, ES12.4, tr2, i6, tr2, i6, tr2, i6, tr2, ES12.4, tr2, ES12.4, *(tr2, ES12.4))", &
+    & fmt="(ES12.4, tr2, i8, tr2, ES12.4, tr2, ES12.4, tr2, i6, tr2, i6, tr2, i6, tr2, ES12.4, tr2, &
+    & ES12.4, tr2, ES12.4, tr2, ES12.4, *(tr2, ES12.4))", &
     & iostat=IFAIL) &
-    & cur_time, step, ramo_cur, V_d, nrPart, nrElec, nrIon, avg_mob, avg_speed, (ramo_current(i), i = 1, nrSpecies)
+    & cur_time, step, ramo_cur, V_d, nrPart, nrElec, nrIon, avg_mob, avg_part_speed, &
+    & avg_elec_speed, avg_ion_speed, (ramo_current(i), i = 1, nrSpecies)
 
   end subroutine Write_Ramo_current
 
@@ -431,11 +781,12 @@ contains
           par_pos(:) = particles_cur_pos(:, i) ! Position of the particle
 
           ! Write out x, y, z and which emitter the particle came from
-          write(unit=ud_pos) par_pos(1), par_pos(2), par_pos(3), particles_emitter(i), particles_section(i), particles_id(i)
+          write(unit=ud_pos) par_pos(:), particles_emitter(i), particles_section(i), particles_id(i)
         end do
       end if
     end if
   end subroutine Write_Position
+
 
   !-----------------------------------------------------------------------------
   ! Write the current position of all particles to a files.
@@ -485,39 +836,214 @@ contains
   end subroutine
 
   !-----------------------------------------------------------------------------
+  ! Write recombination data
+  subroutine Write_Recombination_Data(step, ionPos, elecVel, dist, elecKramers, elecID, ionID, elecEmit)
+    integer, intent(in)           :: step, elecEmit, elecID, ionID
+    double precision, intent(in)  ::  elecVel, dist, elecKramers
+    double precision, dimension(1:3), intent(in) :: ionPos
+    integer                       :: ionLife
+    ionLife = step - particles_step(ionID)
+    write(unit = ud_recombination_data) step, ionPos, elecVel, dist, elecKramers, elecID, ionID, elecEmit, ionLife
+  end subroutine Write_Recombination_Data
+
+  !-----------------------------------------------------------------------------
+  ! Write ionization data
+  subroutine Write_Ionization_Data(step,ionPos,inSpeed,outSpeed,newSpeed,ion_dist,ion_rad,inID,newID,ionID,elecEmit)
+    integer, intent(in)           :: step, elecEmit, inID, newID, ionID
+    double precision, intent(in)  ::  inSpeed, outSpeed, newSpeed, ion_dist, ion_rad
+    double precision, dimension(1:3), intent(in) :: ionPos
+    write(unit = ud_ionization_data) step,ionPos,inSpeed,outSpeed,newSpeed,ion_dist,ion_rad,inID,newID,ionID,elecEmit
+  end subroutine Write_Ionization_Data
+
+  !-----------------------------------------------------------------------------
+  ! Sample ion positions
+  subroutine Sample_Atom_Position(step)
+    integer, intent(in) :: step
+    integer             :: IFAIL, i, k, ud_atom_pos, species
+    character(len=128)  :: filename
+
+    if (sample_atom_file .eqv. .true.) then
+      if (mod(step,sample_atom_rate) == 0) then
+        ! Create the file
+        write(filename, '(a9, i0, a4)') 'out/atom-', step, '.bin'
+        ! Open the file
+        open(newunit=ud_atom_pos, iostat=IFAIL, file=filename, status='REPLACE', action='WRITE', access='STREAM')
+        if (IFAIL /= 0) then
+          print *, 'RUMDEED: Failed to open the atom position file.'
+          return 
+        end if
+        ! Write data
+        do k = 1, nrAtom
+          i = particles_atom_pointer(k)
+          ! print*,'Start writing'
+          write(unit=ud_atom_pos, iostat=IFAIL) particles_cur_pos(:,i), species
+          ! print*,'Stop writing'
+        end do
+        do k = 1, nrIon
+          i = particles_ion_pointer(k)
+          ! print*,'Start writing'
+          write(unit=ud_atom_pos, iostat=IFAIL) particles_cur_pos(:,i), species
+          ! print*,'Stop writing'
+        end do
+        ! Close the file
+        close(unit=ud_atom_pos, iostat=IFAIL, status='keep')
+      end if
+    end if
+  end subroutine Sample_Atom_Position 
+
+  subroutine Sample_Elec_Position(step)
+    integer, intent(in) :: step
+    integer             :: IFAIL, i, j, ud_elec_pos, species
+    character(len=128)  :: filename
+    double precision    :: dist
+
+    particles_nearest_dist = 1000.0d0
+    !$OMP PARALLEL DO DEFAULT(NONE) &
+    !$OMP& PRIVATE(i, j, dist) &
+    !$OMP& SHARED(particles_nearest_dist, particles_nearest_id, particles_cur_pos, particles_species, nrPart) &
+    !$OMP& SCHEDULE(DYNAMIC, 1)
+    do i = 1, nrPart
+      if (particles_species(i) == species_elec) then
+        do j = i+1, nrPart
+          if (particles_species(j) == species_elec) then
+            dist = norm2(particles_cur_pos(:,i) - particles_cur_pos(:,j))
+            if (dist < particles_nearest_dist(i)) then
+              !$OMP CRITICAL
+              particles_nearest_dist(i) = dist
+              !$OMP END CRITICAL
+              !$OMP CRITICAL
+              particles_nearest_id(i) = j
+              !$OMP END CRITICAL
+            end if
+            if (dist < particles_nearest_dist(j)) then
+              !$OMP CRITICAL
+              particles_nearest_dist(j) = dist
+              !$OMP END CRITICAL
+              !$OMP CRITICAL
+              particles_nearest_id(j) = i
+              !$OMP END CRITICAL
+            end if
+          end if
+        end do
+      end if
+    end do
+    !$OMP END PARALLEL DO
+
+    if (sample_elec_file .eqv. .true.) then
+      if (mod(step,sample_elec_rate) == 0) then
+        ! Create the file
+        write(filename, '(a9, i0, a4)') 'out/elec-', step, '.bin'
+        ! Open the file
+        open(newunit=ud_elec_pos, iostat=IFAIL, file=filename, status='REPLACE', action='WRITE', access='STREAM')
+        if (IFAIL /= 0) then
+          print *, 'RUMDEED: Failed to open the electron position file.'
+          return 
+        end if
+        ! Write data
+        do i = 1, nrPart
+          species = particles_species(i)
+          if (species == species_elec) then
+            ! print*,'Start writing'
+            write(unit=ud_elec_pos, iostat=IFAIL) particles_cur_pos(1,i), particles_cur_pos(2,i), particles_cur_pos(3,i), particles_nearest_dist(i)
+            ! print*,'Stop writing'
+          end if
+        end do
+        ! Close the file
+        close(unit=ud_elec_pos, iostat=IFAIL, status='keep')
+      end if
+    end if
+  end subroutine Sample_Elec_Position
+
+  !-----------------------------------------------------------------------------
   ! Write out the positions
   ! Keyword arguments:
   ! step -- The current time step
   subroutine Write_Particle_Data(step)
     integer, intent(in) :: step
-    integer             :: i, IFAIL, ud_data
+    integer             :: i, IFAIL, ud_part_data, ud_elec_data, ud_ion_data
     character(len=128)  :: filename
+    double precision    :: cur_speed, cur_energy
 
-    ! Prepare the name of the output file
-    ! each file is named particles-0.dt where the number
-    ! represents the current time step.
-    write(filename, '(a14, i0, a3)') 'out/particles-', step, '.dt'
+    ! Write a data file containing position, velocity, acceleration, and emitter
+    ! Writes one file for all particles, or one file for either electrons or ions, never two files
+    if (write_particle_data_file .eqv. .true.) then
+      write(filename, '(a14, i0, a3)') 'out/particles-', step, '.dt'
 
-    ! Open the output file
-    open(newunit=ud_data, iostat=IFAIL, file=filename, status='REPLACE', action='write')
-    if (IFAIL /= 0) then
-      print *, 'RUMDEED: Failed to open the data file.'
-      return
+      ! Open the output file
+      open(newunit=ud_part_data, iostat=IFAIL, file=filename, status='REPLACE', action='write')
+      if (IFAIL /= 0) then
+        print *, 'RUMDEED: Failed to open the particle data file.'
+        return
+      end if
+
+      ! The first line in the file is the number of particles
+      write(unit=ud_part_data, fmt="(i8)", iostat=IFAIL) nrElec
+
+      ! All the other lines are data about the particles, with each particle on its
+      ! own line.
+      ! Position, Velocity, Acceleration
+      do i = 1, nrPart
+        write(unit=ud_part_data, fmt='(i8,ES12.4,ES12.4,ES12.4,i8,i8)', iostat=IFAIL) &
+            & particles_id(i), particles_cur_pos(:,i)/length_scale, particles_emitter(i), particles_step(i)
+      end do
+
+      ! Close the file
+      close(unit=ud_part_data, iostat=IFAIL, status='keep')
+    else
+      if (write_electron_data_file .eqv. .true.) then
+        write(filename, '(a14, i0, a3)') 'out/electrons-', step, '.dt'
+
+        ! Open the output file
+        open(newunit=ud_elec_data, iostat=IFAIL, file=filename, status='REPLACE', action='write')
+        if (IFAIL /= 0) then
+          print *, 'RUMDEED: Failed to open the electron data file.'
+          return
+        end if
+
+        ! The first line in the file is the number of particles
+        write(unit=ud_elec_data, fmt="(i8)", iostat=IFAIL) nrElec
+
+        ! All the other lines are data about the particles, with each particle on its
+        ! own line.
+        ! Position, Velocity, Acceleration
+        do i = 1, nrPart
+          if (particles_species(i) == species_elec) then
+            write(unit=ud_elec_data, fmt='(i8,ES12.4,ES12.4,ES12.4,i8,i8)', iostat=IFAIL) &
+            & particles_id(i), particles_cur_pos(:,i), particles_emitter(i), particles_step(i)
+          end if
+        end do
+
+        ! Close the file
+        close(unit=ud_elec_data, iostat=IFAIL, status='keep')
+      end if
+
+      if (write_ion_data_file .eqv. .true.) then
+        write(filename, '(a9 i0, a3)') 'out/ions-', step, '.dt'
+
+        ! Open the output file
+        open(newunit=ud_ion_data, iostat=IFAIL, file=filename, status='REPLACE', action='write')
+        if (IFAIL /= 0) then
+          print *, 'RUMDEED: Failed to open the ion file.'
+          return
+        end if
+
+        ! The first line in the file is the number of particles
+        write(unit=ud_ion_data, fmt="(i8)", iostat=IFAIL) nrIon
+
+        ! All the other lines are data about the particles, with each particle on its
+        ! own line.
+        ! Position, Velocity, Acceleration
+        do i = 1, nrPart
+          if (particles_species(i) == species_ion) then
+            write(unit=ud_ion_data, fmt='(i8,ES12.4,ES12.4,ES12.4,i8,i8)', iostat=IFAIL) &
+            & particles_id(i), particles_cur_pos(:,i), particles_emitter(i), particles_step(i)
+          end if
+        end do
+
+        ! Close the file
+        close(unit=ud_ion_data, iostat=IFAIL, status='keep')
+      end if
     end if
-
-    ! The first line in the file is the number of particles
-    write(unit=ud_data, fmt="(i8)", iostat=IFAIL) nrPart
-
-    ! All the other lines are data about the particles, with each particle on its
-    ! own line.
-    ! Position, Velocity, Acceleration
-    do i = 1, nrPart
-      write(unit=ud_data, fmt="(*(ES12.4))", iostat=IFAIL) &
-        particles_cur_pos(:, i), particles_cur_vel(:, i), particles_cur_accel(:, i)
-    end do
-
-    ! Close the file
-    close(unit=ud_data, iostat=IFAIL, status='keep')
   end subroutine
 
   ! ----------------------------------------------------------------------------

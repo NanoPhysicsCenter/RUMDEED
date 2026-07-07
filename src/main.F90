@@ -16,6 +16,7 @@ program RUMDEED
   use mod_emission_tip
   use mod_field_emission_2D
   use mod_field_thermo_emission
+  use mod_polarso
   !use mod_therminoic_emission
   use mod_cylindrical_tip
   use mod_torus
@@ -44,6 +45,8 @@ program RUMDEED
   integer                 :: i
   integer, dimension(1:9) :: progress
   integer, dimension(8)   :: values ! Date and time
+
+  double precision, dimension(3) :: par_pos, par_vel
 
   call date_and_time(VALUES=values)
 
@@ -153,31 +156,49 @@ program RUMDEED
     call Run_Tests()
   else
 
+    if (use_polarso .eqv. .true.) then
+      print '(a)', 'RUMDEED: Using POLARSO'
+      call PL_Init_Solver()
+    end if
+
+    if (collision_mode /= 0) then
+      call Place_Atoms_Cylinder()
+    end if
+
     print '(a)', 'RUMDEED: Starting main loop'
     print '(tr1, a, i0, a, ES12.4, a)', 'Doing ', steps, ' time steps of size ', time_step/1.0E-12, ' ps'
-
-    print *, ''
 
     cur_time = 0.0d0
     call Set_Voltage(0) ! Set voltage for time step 0
 
+    ! print '(a)', 'RUMDEED: Starting main loop'
     do i = 1, steps
 
+      ! print *, Z_eff
+      ! print *, N_bind
+
+      if (use_polarso .eqv. .true.) then
+        call PL_Calculate_Field()
+      end if
+
       ! Do Emission
-      !print *, 'Emission'
+      ! print *, 'Emission'
       call ptr_Do_Emission(i)
 
       ! Update the position of all particles
-      !print *, 'Update position'
+      ! print *, 'Update position'
       call Update_Position(i)
       call Write_Position(i)
+      call Sample_Atom_Position(i)
+      call Sample_Elec_Position(i)
       !call Write_Position_XYZ_Step(i)
 
       ! Remove particles from the system
-      !print *, 'Remove particles'
+      ! print *, 'Remove particles'
       call Remove_Particles(i)
 
       ! Do Collisions
+      ! print *, 'Do Collisions'
       call Do_Collisions(i)
 
       ! Flush data
@@ -268,7 +289,7 @@ contains
   ! ----------------------------------------------------------------------------
   ! A subroutine to read the input variable from the file 'input'
   subroutine Read_Input_Variables()
-    integer :: ud_input, IFAIL
+    integer :: ud_input, IFAIL, emit
 
 
     !Open the file 'input' for reading and check for errors
@@ -280,12 +301,14 @@ contains
 
     allocate(emitters_pos(1:3, 1:MAX_EMITTERS))
     allocate(emitters_dim(1:3, 1:MAX_EMITTERS))
+    allocate(emitters_ring(1:3, 1:MAX_EMITTERS))
     allocate(emitters_type(1:MAX_EMITTERS))
     allocate(emitters_delay(1:MAX_EMITTERS))
     allocate(nrElec_remove_top_emit(1:MAX_EMITTERS))
     allocate(ramo_current_emit(1:MAX_SECTIONS, 1:MAX_EMITTERS))
 
     emitters_dim = 0.0d0
+    emitters_ring = 0.0d0
     emitters_pos = 0.0d0
     emitters_type = 0
     emitters_delay = 0
@@ -300,7 +323,7 @@ contains
     ! nrEmit: Number of emitters
     ! emitters_pos: Positions of emitters (x and y, z is ignored)
     ! emitters_dim: Dimensions of emitters (x and y, z is ignored)
-    ! emitters_type: Type of emitter (Circle or square)
+    ! emittersf_type: Type of emitter (Circle or square)
     ! emitters_delay: When the emitter should start emitting ()
     ! EMISSION_MODE: What emission to do (Photo/CL, Field emission, e.t.c)
     read(ud_input, NML=input)
@@ -331,6 +354,15 @@ contains
     ! Emitters position and dimensions are given in length_scale (nm)
     emitters_dim = emitters_dim * length_scale
     emitters_pos = emitters_pos * length_scale
+    do emit=1,nrEmit
+      emitters_ring(1,emit) = emitters_dim(1,emit)
+      if (emitters_dim(3,emit) == 0.0d0) then
+        emitters_ring(3,emit) = sqrt((q_0*d)/(pi*epsilon_0*V_s)) ! Thickness of emitter
+      else
+        emitters_ring(3,emit) = emitters_dim(3,emit) ! Thickness of emitter
+      end if
+      emitters_ring(2,emit) = emitters_ring(1,emit) - emitters_ring(3,emit)
+    end do
 
     ! Planes are in length_scale (nm)
     planes_z = planes_z * length_scale
@@ -349,7 +381,15 @@ contains
       stop
     end if
 
+    if (atom_time_interval /= 0) then
+      two_time_step = .true.
+    else
+      two_time_step = .false.
+    end if
+
     call Read_Cross_Section_Data()
+
+    call Read_Polarso_Variables()
 
     open(newunit=ud_debug, iostat=IFAIL, file='debug.dt', status='replace', action='write')
     if (IFAIL /= 0) then
@@ -380,15 +420,33 @@ contains
     allocate(particles_cur_accel(1:3, 1:MAX_PARTICLES))
     allocate(particles_prev_accel(1:3, 1:MAX_PARTICLES))
     allocate(particles_prev2_accel(1:3, 1:MAX_PARTICLES))
+    allocate(particles_nearest_dist(1:MAX_PARTICLES))
+    allocate(particles_nearest_id(1:MAX_PARTICLES))
+
     allocate(particles_charge(1:MAX_PARTICLES))
     allocate(particles_species(1:MAX_PARTICLES))
     allocate(particles_mass(1:MAX_PARTICLES))
     allocate(particles_step(1:MAX_PARTICLES))
-    allocate(particles_mask(1:MAX_PARTICLES))
     allocate(particles_emitter(1:MAX_PARTICLES))
     allocate(particles_section(1:MAX_PARTICLES))
     allocate(particles_life(1:MAX_PARTICLES))
     allocate(particles_id(1:MAX_PARTICLES))
+
+    allocate(particles_mask(1:MAX_PARTICLES))
+    allocate(particles_elec_mask(1:MAX_PARTICLES))
+    allocate(particles_ion_mask(1:MAX_PARTICLES))
+    allocate(particles_atom_mask(1:MAX_PARTICLES))
+
+    allocate(particles_elec_pointer(1:MAX_PARTICLES))
+    allocate(particles_ion_pointer(1:MAX_PARTICLES))
+    allocate(particles_atom_pointer(1:MAX_PARTICLES))
+    allocate(particles_inverse_pointer(1:MAX_PARTICLES))
+
+    allocate(particles_cur_energy(1:MAX_PARTICLES))
+    allocate(particles_ion_cross_sec(1:MAX_PARTICLES))
+    allocate(particles_ion_cross_rad(1:MAX_PARTICLES))
+    allocate(particles_recom_cross_rad(1:MAX_PARTICLES))
+    allocate(particles_tot_cross_sec(1:MAX_PARTICLES))
 
     allocate(life_time(1:MAX_LIFE_TIME, 1:nrSpecies))
     allocate(ramo_current(1:nrSpecies))
@@ -408,6 +466,9 @@ contains
     particles_section      = 0
     particles_life         = 0
     particles_mask         = .true.
+    particles_elec_mask    = .true.
+    particles_ion_mask     = .true.
+    particles_atom_mask    = .true.
     particles_id           = 0
 
     ramo_current = 0.0d0
@@ -421,18 +482,24 @@ contains
     nrPart      = 0
     nrElec      = 0
     nrIon       = 0
+    nrAtom      = 0
     nrElecIon   = 0
 
     nrPart_remove = 0
     nrElec_remove = 0
     nrIon_remove  = 0
+    nrAtom_remove = 0
 
     nrPart_remove_top = 0
     nrPart_remove_bot = 0
+    nrPart_remove_recom = 0
     nrElec_remove_top = 0
     nrElec_remove_bot = 0
+    nrElec_remove_recom = 0
     nrIon_remove_top  = 0
     nrIon_remove_bot  = 0
+    nrIon_remove_recom = 0
+    nrAtom_remove_ion = 0
 
     ! ID starts with 0
     nrID = 0
@@ -503,6 +570,12 @@ contains
       stop
     end if
 
+    open(newunit=ud_absorb_recom, iostat=IFAIL, file='out/absorbed_recom.dt', status='REPLACE', action='write')
+    if (IFAIL /= 0) then
+      print *, 'RUMDEED: Failed to open file absorbed_recom.dt. ABORTING'
+      stop
+    end if
+
     open(newunit=ud_ramo, iostat=IFAIL, file='out/ramo_current.dt', status='REPLACE', action='write')
     if (IFAIL /= 0) then
       print *, 'RUMDEED: Failed to open file ramo_current.dt. ABORTING'
@@ -516,6 +589,20 @@ contains
       stop
     end if
 
+    open(newunit=ud_ionization_data,iostat=IFAIL,file='out/ionization_data.bin',status='REPLACE',action='WRITE', &
+      & access='STREAM')
+    if (IFAIL /= 0) then
+      print*, 'RUMDEED: Failed to open file ionization_data.bin. ABORTING'
+      stop
+    end if
+
+    open(newunit=ud_recombination_data,iostat=IFAIL,file='out/recombination_data.bin',status='REPLACE',action='WRITE', &
+      & access='STREAM')
+    if (IFAIL /= 0) then
+      print*, 'RUMDEED: Failed to open file recombination_data.bin. ABORTING'
+      stop
+    end if
+
     open(newunit=ud_volt, iostat=IFAIL, file='out/volt.dt', status='REPLACE', action='write')
     if (IFAIL /= 0) then
       print *, 'RUMDEED: Failed to open file volt.dt. ABORTING'
@@ -525,6 +612,18 @@ contains
     open(newunit=ud_field, iostat=IFAIL, file='out/field.dt', status='replace', action='write')
     if (IFAIL /= 0) then
       print '(a)', 'RUMDEED: ERROR UNABLE TO OPEN file field.dt'
+      stop
+    end if
+
+    open(newunit=ud_laplace_average_field, iostat=IFAIL, file='out/laplace_average_field.dt', status='replace', action='write')
+    if (IFAIL /= 0) then
+      print '(a)', 'RUMDEED: ERROR UNABLE TO OPEN file laplace_average_field.dt'
+      stop
+    end if
+
+    open(newunit=ud_grid, iostat=IFAIL, file='out/laplace_grid.dt', status='replace', action='write')
+    if (IFAIL /= 0) then
+      print '(a)', 'RUMDEED: ERROR UNABLE TO OPEN file laplace_grid.dt'
       stop
     end if
 
@@ -569,6 +668,27 @@ contains
       stop
     end if
 
+    open(newunit=ud_density_emit_ion, iostat=IFAIL, file='out/density_emit_ion.bin', &
+    status='REPLACE', action='WRITE', access='STREAM')
+    if (IFAIL /= 0) then
+      print *, 'RUMDEED: Failed to open file density_emit_ion.bin. ABORTING'
+      stop
+    end if
+
+    open(newunit=ud_density_emit_elec, iostat=IFAIL, file='out/density_emit_elec.bin', &
+    status='REPLACE', action='WRITE', access='STREAM')
+    if (IFAIL /= 0) then
+      print *, 'RUMDEED: Failed to open file density_emit_elec.bin. ABORTING'
+      stop
+    end if
+
+    open(newunit=ud_density_emit_atom, iostat=IFAIL, file='out/density_emit_atom.bin', &
+    status='REPLACE', action='WRITE', access='STREAM')
+    if (IFAIL /= 0) then
+      print *, 'RUMDEED: Failed to open file density_emit_atom.bin. ABORTING'
+      stop
+    end if
+
     !-------------------------------------------------------------------------------------
     ! Absorbsion density
     open(newunit=ud_density_absorb_top, iostat=IFAIL, file='out/density_absorb_top.bin', &
@@ -582,6 +702,13 @@ contains
          status='REPLACE', action='WRITE', access='STREAM')
     if (IFAIL /= 0) then
       print *, 'RUMDEED: Failed to open file density_absorb_bin.dt. ABORTING'
+      stop
+    end if
+
+    open(newunit=ud_density_absorb_recom, iostat=IFAIL, file='out/density_absorb_recom.bin', &
+         status='REPLACE', action='WRITE', access='STREAM')
+    if (IFAIL /= 0) then
+      print *, 'RUMDEED: Failed to open file density_absorb_recom_bin.dt. ABORTING'
       stop
     end if
 
@@ -813,10 +940,15 @@ contains
     close(unit=ud_absorb,  status='keep')
     close(unit=ud_absorb_top, status='keep')
     close(unit=ud_absorb_bot, status='keep')
+    close(unit=ud_absorb_recom, status='keep')
     close(unit=ud_ramo, status='keep')
     close(unit=ud_ramo_sec, status='keep')
+    close(unit=ud_ionization_data, status='keep')
+    close(unit=ud_recombination_data, status='keep')
     close(unit=ud_volt, status='keep')
     close(unit=ud_field,status='keep')
+    close(unit=ud_laplace_average_field,status='keep')
+    close(unit=ud_grid,status='keep')
     close(unit=ud_coll,status='keep')
     close(unit=ud_integrand, status='keep')
     close(unit=ud_gauss, status='keep')
@@ -824,8 +956,12 @@ contains
 
     close(unit=ud_density_emit, status='keep')
     close(unit=ud_density_ion, status='keep')
+    close(unit=ud_density_emit_ion, status='keep')
+    close(unit=ud_density_emit_elec, status='keep')
+    close(unit=ud_density_emit_atom, status='keep')
     close(unit=ud_density_absorb_top, status='keep')
     close(unit=ud_density_absorb_bot, status='keep')
+    close(unit=ud_density_absorb_recom, status='keep')
 
     do i = 1, planes_N
       close(unit=planes_ud(i), status='keep')
@@ -844,11 +980,25 @@ contains
     deallocate(particles_species)
     deallocate(particles_mass)
     deallocate(particles_mask)
+    deallocate(particles_elec_mask)
+    deallocate(particles_ion_mask)
+    deallocate(particles_atom_mask)
     deallocate(particles_emitter)
     deallocate(particles_section)
     deallocate(particles_life)
     deallocate(particles_id)
     deallocate(particles_step)
+    deallocate(particles_nearest_dist)
+    deallocate(particles_nearest_id)
+    deallocate(particles_elec_pointer)
+    deallocate(particles_ion_pointer)
+    deallocate(particles_atom_pointer)
+    deallocate(particles_inverse_pointer)
+    deallocate(particles_cur_energy)
+    deallocate(particles_ion_cross_sec)
+    deallocate(particles_ion_cross_rad)
+    deallocate(particles_recom_cross_rad)
+    deallocate(particles_tot_cross_sec)
 
     deallocate(emitters_pos)
     deallocate(emitters_dim)
@@ -864,6 +1014,8 @@ contains
     if (allocated(N2_ion_cross)) deallocate(N2_ion_cross)
 
     deallocate(my_seed)
+
+    call PL_Clean_Up()
 
   end subroutine Clean_up
 end program RUMDEED

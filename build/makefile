@@ -7,7 +7,7 @@
 # Compiler to use
 # Override default values if nothing else is set
 ifeq ($(origin FC),default)
-FC = gfortran
+FC = ifx
 endif
 ifeq ($(origin CC),default)
 CC = gcc
@@ -25,6 +25,16 @@ $(info OpenMP disabled)
 endif
 
 TESTING_MODE ?= 2 # Set to 1 to enable testing mode
+
+# MKL
+# MKLROOT = /opt/intel/oneapi/mkl/2025.1
+# MKL_LIBS =  -m64  ${F95ROOT}/lib/libmkl_blas95_ilp64.a ${F95ROOT}/lib/libmkl_lapack95_ilp64.a -L${MKLROOT}/lib -Wl,--no-as-needed -lmkl_gf_ilp64 -lmkl_intel_thread -lmkl_core -liomp5 -lpthread -lm -ldl
+# FFLAGS +=  -I${F95ROOT}/include/mkl/intel64/ilp64 -fdefault-integer-8  -m64  -I"${MKLROOT}/include"
+
+MKLROOT = /opt/intel/oneapi/mkl/2025.1
+MKL_LIBS = -qmkl-ilp64=parallel ${MKLROOT}/lib/libmkl_blas95_ilp64.a ${MKLROOT}/lib/libmkl_lapack95_ilp64.a
+FFLAGS += -I${MKLROOT}/include/mkl/intel64/ilp64 -i8 -qmkl-ilp64=parallel
+
 
 # Compile flags
 # UNKNOWN COMPILERS
@@ -48,9 +58,9 @@ endif
 # NEW INTEL FORTRAN
 ifeq ($(FC),ifx)
 $(info Using New Intel Fortran Compiler)
-FFLAGS=-O2 -xHost -ipo
+FFLAGS = -O2 -xHost -ipo -i8
 ifneq (,$(findstring yes,$(OPENMP)))
-FFLAGS+=-qopenmp
+FFLAGS += -fopenmp
 endif
 endif
 
@@ -58,7 +68,7 @@ endif
 # ifeq ($(FC),gfortran)
 ifneq (,$(findstring gfortran,$(FC)))
 $(info Using GNU Fortran)
-FFLAGS=-O3 -march=native -flto=auto
+FFLAGS = -O3 -march=native -flto=auto -ffree-line-length-none
 #FFLAGS=-g -fcheck=all -Wall -fbacktrace -ffpe-trap=invalid,zero,overflow,underflow
 ifneq (,$(findstring yes,$(OPENMP)))
 FFLAGS+=-fopenmp
@@ -141,21 +151,28 @@ $(PROJECT_NAME).out: ../src/main.F90 ../cuba/lib/libcuba.a \
 			mod_cylindrical_tip.mod mod_cylindrical_tip.o \
 			mod_torus.mod mod_torus.o \
 			mod_work_function.mod mod_work_function.o \
+			mod_polynomialroots.mod mod_polynomialroots.o \
 			mod_collisions.mod mod_collisions.o \
 			mod_kevin_rjgtf.mod mod_kevin_rjgtf.o \
 			mod_velocity.mod mod_velocity.o \
 			mod_manual_emission.mod mod_manual_emission.o \
-			kdtree2.o kdtree2_module.mod
+			kdtree2.o kdtree2_module.mod \
+			mod_polarso.mod mod_polarso.o \
+			mkl_pardiso.mod mkl_pardiso.o \
+			mkl_spblas.mod mkl_spblas.o \
+			mkl_rci.mod mkl_rci.o
 		$(FC) $(FFLAGS) -D_GIT_VERSION_=\"${GIT_VERSION}\" -D_TESTING_MODE_=${TESTING_MODE} \
 		    ../src/main.F90 mod_global.o mod_verlet.o mod_pair.o \
 			mod_tests.o mod_photo_emission.o mod_field_emission.o mod_field_emission_v2.o \
 			mod_field_thermo_emission.o mod_kevin_rjgtf.o \
 			mod_emission_tip.o mod_hyperboloid_tip.o mod_ic.o mod_field_emission_2D.o \
 			mod_cylindrical_tip.o mod_torus.o \
+			mod_polynomialroots.o \
 			mod_work_function.o mod_collisions.o \
 			mod_velocity.o mod_manual_emission.o \
+			mod_polarso.o \
 			kdtree2.o \
-			$(CUBA_LIB) -lpthread -lm -ldl -o $(PROJECT_NAME).out
+			$(CUBA_LIB) $(MKL_LIBS) -lpthread -lm -ldl -o $(PROJECT_NAME).out
 
 ../cuba/Cuba-4.2.2.tar.gz:
 		cd ../cuba/; ./get-cuba.sh; md5sum -c md5hash.md5
@@ -167,6 +184,7 @@ $(PROJECT_NAME).out: ../src/main.F90 ../cuba/lib/libcuba.a \
 		cd ../cuba/; chmod +x ./install-cuba.sh; ./install-cuba.sh ${CC} ${FC}
 
 mod_global.mod mod_global.o: ../src/mod_global.F90
+		$ 
 		$(FC) -c $(FFLAGS) ../src/mod_global.F90
 
 mod_ic.mod mod_ic.o: ../src/mod_ic.f90 mod_global.o mod_hyperboloid_tip.o mod_verlet.o
@@ -175,20 +193,20 @@ mod_ic.mod mod_ic.o: ../src/mod_ic.f90 mod_global.o mod_hyperboloid_tip.o mod_ve
 mod_verlet.mod mod_verlet.o: ../src/mod_verlet.F90 mod_global.mod mod_pair.mod mod_collisions.mod mod_hyperboloid_tip.mod
 		$(FC) -c $(FFLAGS) ../src/mod_verlet.F90
 
-mod_pair.mod mod_pair.o: ../src/mod_pair.F90 mod_global.mod
+mod_pair.mod mod_pair.o: ../src/mod_pair.F90 mod_global.mod 
 		$(FC) -c $(FFLAGS) ../src/mod_pair.F90
 
 mod_tests.mod mod_tests.o: ../src/mod_tests.F90 mod_global.mod mod_verlet.mod mod_pair.mod mod_field_emission_v2.mod mod_emission_tip.mod
 		$(FC) -c $(FFLAGS) ../src/mod_tests.F90
 
-mod_photo_emission.mod mod_photo_emission.o: ../src/mod_photo_emission.f90 mod_global.mod mod_verlet.mod mod_pair.mod mod_velocity.mod
-		$(FC) -c $(FFLAGS) ../src/mod_photo_emission.f90
+mod_photo_emission.mod mod_photo_emission.o: ../src/mod_photo_emission.f90 mod_global.mod mod_verlet.mod mod_pair.mod mod_velocity.mod mod_polarso.mod
+		$(FC) -c $(FFLAGS) $(MKL_LIBS) ../src/mod_photo_emission.f90
 
 mod_field_emission.mod mod_field_emission.o: ../src/mod_field_emission.f90 mod_global.mod mod_verlet.mod mod_pair.mod mod_velocity.mod
 		$(FC) -c $(FFLAGS) ../src/mod_field_emission.f90
 
-mod_field_emission_v2.mod mod_field_emission_v2.o: ../src/mod_field_emission_v2.F90 mod_global.mod mod_verlet.mod mod_pair.mod mod_work_function.mod mod_velocity.mod
-		$(FC) -c $(FFLAGS) ../src/mod_field_emission_v2.F90
+mod_field_emission_v2.mod mod_field_emission_v2.o: ../src/mod_field_emission_v2.F90 mod_global.mod mod_verlet.mod mod_pair.mod mod_work_function.mod mod_velocity.mod mod_polarso.mod
+		$(FC) -c $(FFLAGS) $(MKL_LIBS) ../src/mod_field_emission_v2.F90
 
 mod_field_thermo_emission.mod mod_field_thermo_emission.o: ../src/mod_field_thermo_emission.F90 mod_global.mod mod_verlet.mod mod_pair.mod mod_work_function.mod mod_kevin_rjgtf.mod mod_velocity.mod
 		$(FC) -c $(FFLAGS) ../src/mod_field_thermo_emission.F90
@@ -217,14 +235,33 @@ mod_manual_emission.mod mod_manual_emission.o: ../src/mod_manual_emission.f90 mo
 mod_work_function.mod mod_work_function.o: ../src/mod_work_function.F90
 		$(FC) -c $(FFLAGS) ../src/mod_work_function.F90
 
+mod_polynomialroots.mod mod_polynomialroots.o: ../src/mod_polynomialroots.F90
+		$(FC) -c $(FFLAGS) ../src/mod_polynomialroots.F90
+
+mod_polarso.mod mod_polarso.o: ../src/mod_polarso.F90 mod_global.mod mkl_spblas.mod mkl_pardiso.mod mod_verlet.mod mkl_rci.mod
+		$(FC) -c $(FFLAGS) $(MKL_LIBS) ../src/mod_polarso.F90
+
 mod_velocity.mod mod_velocity.o: ../src/mod_velocity.f90
 		$(FC) -c $(FFLAGS) ../src/mod_velocity.f90
 
-mod_collisions.mod mod_collisions.o: ../src/mod_collisions.F90 mod_global.mod mod_pair.mod mod_velocity.mod
+mod_collisions.mod mod_collisions.o: ../src/mod_collisions.F90 mod_global.mod mod_pair.mod mod_velocity.mod mod_polynomialroots.mod
 		$(FC) -c $(FFLAGS) ../src/mod_collisions.F90
 
 kdtree2.o kdtree2_module.mod: ../src/kdtree2/kdtree2.f90
 		$(FC) -c $(FFLAGS) ../src/kdtree2/kdtree2.f90
+
+# mkl
+mkl_pardiso.mod mkl_pardiso.o: $(MKLROOT)/include/mkl_pardiso.f90
+		$(FC) -c $(FFLAGS) -I$(MKLROOT)/include $< -o mkl_pardiso.o
+		cp mkl_pardiso.mod ../src/ 
+
+mkl_spblas.mod mkl_spblas.o: $(MKLROOT)/include/mkl_spblas.f90
+		$(FC) -c $(FFLAGS) -I$(MKLROOT)/include $< -o mkl_spblas.o
+		cp mkl_spblas.mod ../src/
+
+mkl_rci.mod mkl_rci.o: $(MKLROOT)/include/mkl_rci.f90
+		$(FC) -c $(FFLAGS) -I$(MKLROOT)/include $< -o mkl_rci.o
+		cp mkl_rci.mod ../src/
 
 clean:
 		rm -f *.o

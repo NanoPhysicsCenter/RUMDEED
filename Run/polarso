@@ -1,0 +1,8 @@
+&POLARSO
+  use_polarso = .False.,                                   ! Use laplace solver for the electric field
+  polarso_dim = 10.0d0, 10.0d0, 10.0d0,               ! Grid size for the Laplace box in nanometers
+  polarso_pos = -5.0d0, -5.0d0, 0.0d0,              ! Location of fron lower left corner of Laplace box in nanometers
+  polarso_padding = 5.0d0,
+  polarso_step = 0.5d0,
+  write_field_files = .True.,
+/
