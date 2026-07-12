@@ -6,7 +6,9 @@
 
 module mod_pair
   use mod_global
-  use omp_lib
+  ! The "!$" sentinel compiles the line only when OpenMP is active, so
+  ! OPENMP=no builds neither reference omp_lib nor need its library.
+  !$ use omp_lib
   implicit none
 
   ! ----------------------------------------------------------------------------
@@ -581,7 +583,8 @@ contains
     !------------------------------
     ! Pass 1 – per‑thread counts
     !------------------------------
-    nt = omp_get_max_threads()
+    nt = 1
+    !$ nt = omp_get_max_threads()
     allocate(cntInv (nt), cntElec (nt), cntIon (nt), cntAtom (nt))
     allocate(baseInv(nt), baseElec(nt), baseIon(nt), baseAtom(nt))
     cntInv  = 0; cntElec  = 0; cntIon  = 0; cntAtom  = 0
@@ -590,7 +593,8 @@ contains
  !$omp parallel default(none) shared(nrPart,particles_mask,particles_species, &
  !$omp& cntInv,cntElec,cntIon,cntAtom) private(tid,i)
  
-       tid = omp_get_thread_num() + 1   ! 1‑based index for arrays
+       tid = 1
+       !$ tid = omp_get_thread_num() + 1   ! 1-based index for arrays
  
  !$omp do schedule(static)
        do i = 1, nrPart
@@ -627,7 +631,8 @@ contains
  !$omp& particles_atom_pointer, baseInv, baseElec, baseIon, baseAtom)           &
  !$omp private(tid,i,k,invMove,elecMove,ionMove,atomMove)
  
-       tid       = omp_get_thread_num() + 1
+       tid       = 1
+       !$ tid    = omp_get_thread_num() + 1
        invMove   = baseInv (tid)
        elecMove  = baseElec(tid)
        ionMove   = baseIon (tid)
