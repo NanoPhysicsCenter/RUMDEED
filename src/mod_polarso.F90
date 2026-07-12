@@ -987,12 +987,20 @@ contains
         real(kind=8), dimension(3) :: elec_pos, new_pos, node_pos
         real(kind=8) :: weight, weight_sum
         integer(kind=8) :: g, i, l, m
+        integer(kind=8) :: my_charge ! Column of newCharge_* this call owns
         real(kind=8) :: dx, dy, dz
         real(kind=8) :: wx, wy, wz
 
         elec_pos = particles_cur_pos(:,k)
         if (is_inside(elec_pos) == 1) then
+            ! full_update_charge calls this from inside an OpenMP parallel loop, so
+            ! the counter must be incremented and read as one atomic operation.
+            ! Otherwise two threads take the same column of newCharge_index /
+            ! newCharge_density and one of the charges is lost.
+            !$OMP ATOMIC CAPTURE
             newNrCharge = newNrCharge + 1
+            my_charge = newNrCharge
+            !$OMP END ATOMIC
 
             i = disc_coord(elec_pos(1), elec_pos(2), elec_pos(3))
             cube_id = cube(i)
@@ -1032,8 +1040,8 @@ contains
                         print*, 'Polarso: negative weight:', cube_weight(l,m)
                     end if
                     g = gridPoints(cube_id(l,m))
-                    newCharge_index((l-1)*4+m,newNrCharge) = g
-                    newCharge_density((l-1)*4+m,newNrCharge) = - cube_weight(l,m)*particles_charge(k)/(hz*epsilon_0)
+                    newCharge_index((l-1)*4+m,my_charge) = g
+                    newCharge_density((l-1)*4+m,my_charge) = - cube_weight(l,m)*particles_charge(k)/(hz*epsilon_0)
                     ! print *, newCharge_index((l-1)*4+m,nrCharge), newCharge_density((l-1)*4+m,nrCharge)
                 end do
             end do

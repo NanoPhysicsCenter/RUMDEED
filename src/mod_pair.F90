@@ -338,8 +338,12 @@ contains
 
       if ((nrPart - nrPart_remove) > 0) then ! Check if we can skip this    
 
-        if (two_time_step .eqv. .true.) then
-          call Update_Pointer_Arrays_parallel() 
+        ! The per-species pointer arrays must be re-packed whenever anything reads
+        ! them after a removal. That is the two-time-step integrator, but also the
+        ! POLARSO solver, which walks particles_elec_pointer / particles_ion_pointer
+        ! every step to deposit charge regardless of the integration mode.
+        if ((two_time_step .eqv. .true.) .or. (use_polarso .eqv. .true.)) then
+          call Update_Pointer_Arrays_parallel()
         end if
 
         !$OMP PARALLEL DEFAULT(NONE) PRIVATE(m, k) &
@@ -746,7 +750,7 @@ contains
     & nrPart_remove_bot, nrElec_remove_bot, nrIon_remove_bot
 
     write (ud_absorb_recom, "(ES12.4, *(tr2, i8))", iostat=IFAIL) cur_time, step, &
-    & nrPart_remove_bot, nrElec_remove_recom, nrIon_remove_recom
+    & nrPart_remove_recom, nrElec_remove_recom, nrIon_remove_recom
   end subroutine Write_Absorbed
 
   ! ----------------------------------------------------------------------------
@@ -899,12 +903,14 @@ contains
         ! Write data
         do k = 1, nrAtom
           i = particles_atom_pointer(k)
+          species = particles_species(i)
           ! print*,'Start writing'
           write(unit=ud_atom_pos, iostat=IFAIL) particles_cur_pos(:,i), species
           ! print*,'Stop writing'
         end do
         do k = 1, nrIon
           i = particles_ion_pointer(k)
+          species = particles_species(i)
           ! print*,'Start writing'
           write(unit=ud_atom_pos, iostat=IFAIL) particles_cur_pos(:,i), species
           ! print*,'Stop writing'

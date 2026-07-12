@@ -401,7 +401,39 @@ contains
       call Update_ElecIon_Velocity(step)
     end if
 
+    ! The routines above only accumulate the velocity sums. Turn them into
+    ! averages once, here, after every species has been updated.
+    call Average_Velocities()
+
   end subroutine Update_Particle_Velocity
+
+  ! ----------------------------------------------------------------------------
+  ! Turn the velocity sums accumulated by the routines above into averages and
+  ! calculate the mobility.
+  !
+  ! This must happen once per time step, after all species have been updated.
+  ! Doing it at the end of each per-species routine would divide the electron
+  ! sums a second time on the time steps where the ions are updated as well.
+  subroutine Average_Velocities()
+
+    ! Divide velocity sum by the number of particles to get the average
+    if (nrPart /= 0) then ! Check that we don't divide by zero
+      avg_part_vel(:) = avg_part_vel(:) / nrPart ! Take the average
+    end if
+    if (nrElec /= 0) then ! Check that we don't divide by zero
+      avg_elec_vel(:) = avg_elec_vel(:) / nrElec ! Take the average
+    end if
+    if (nrIon /= 0) then ! Check that we don't divide by zero
+      avg_ion_vel(:) = avg_ion_vel(:) / nrIon ! Take the average
+    end if
+
+    if (E_z /= 0.0d0) then ! Check that we don't divide by zero
+      avg_mob = sqrt(avg_elec_vel(1)**2 + avg_elec_vel(2)**2 + avg_elec_vel(3)**2) / (-1.0d0*E_z)
+    else
+      avg_mob = 0.0d0
+    end if
+
+  end subroutine Average_Velocities
 
   subroutine Update_ElecIon_Velocity(step)
     ! Update the velocity in the verlet integration
@@ -461,22 +493,8 @@ contains
     end do
     !$OMP END PARALLEL DO
 
-    ! Divide velocity sum by the number of particles to get the average
-    if (nrPart /= 0) then ! Check that we don't divide by zero
-      avg_part_vel(:) = avg_part_vel(:) / nrPart ! Take the average
-    end if
-    if (nrElec /= 0) then ! Check that we don't divide by zero
-      avg_elec_vel(:) = avg_elec_vel(:) / nrElec ! Take the average
-    end if
-    if (nrIon /= 0) then ! Check that we don't divide by zero
-      avg_ion_vel(:) = avg_ion_vel(:) / nrIon ! Take the average
-    end if
-
-    if (E_z /= 0.0d0) then ! Check that we don't divide by zero
-      avg_mob = sqrt(avg_elec_vel(1)**2 + avg_elec_vel(2)**2 + avg_elec_vel(3)**2) / (-1.0d0*E_z)
-    else
-      avg_mob = 0.0d0
-    end if
+    ! The velocity sums are turned into averages by Average_Velocities, which the
+    ! caller runs once after every species has been updated.
   end subroutine Update_ElecIon_Velocity
 
   subroutine Update_Species_Velocity(step,species)
@@ -554,18 +572,10 @@ contains
     end do
     !$OMP END PARALLEL DO
 
-    ! Divide velocity sum by the number of particles to get the average
-    if (nrPart /= 0) then ! Check that we don't divide by zero
-      avg_part_vel(:) = avg_part_vel(:) / nrPart ! Take the average
-    end if
-    if (nrElec /= 0) then ! Check that we don't divide by zero
-      avg_elec_vel(:) = avg_elec_vel(:) / nrElec ! Take the average
-    end if
-    if (nrIon /= 0) then ! Check that we don't divide by zero
-      avg_ion_vel(:) = avg_ion_vel(:) / nrIon ! Take the average
-    end if
-    
-    avg_mob = sqrt(avg_elec_vel(1)**2 + avg_elec_vel(2)**2 + avg_elec_vel(3)**2) / (-1.0d0*E_z)
+    ! The velocity sums are turned into averages by Average_Velocities, which the
+    ! caller runs once after every species has been updated. Normalizing here
+    ! would divide the electron sums again when this routine is called a second
+    ! time for the ions in the same time step.
   end subroutine Update_Species_Velocity
 
   ! ----------------------------------------------------------------------------

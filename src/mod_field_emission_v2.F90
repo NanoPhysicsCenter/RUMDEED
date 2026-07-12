@@ -179,8 +179,12 @@ contains
           case (EMIT_RING)
             ! print *, 'Doing Ring'
             call Do_Field_Emission_Planar_ring(step, i)
-          case (EMIT_RECTANGLE)
+          case (EMIT_CIRCLE, EMIT_RECTANGLE)
             ! print *, 'Doing Rectangle'
+            ! The circle emitter is sampled over its bounding box, the same way
+            ! it was before the ring emitter added this dispatch. Without this
+            ! case a circle emitter would fall through to the default below and
+            ! silently stop emitting.
             call Do_Field_Emission_Planar_rectangle(step, i)
             ! call Do_Field_Emission_Planar_simple(step, i)
           case default
@@ -656,7 +660,9 @@ end function Escape_Prob_log
     ! It gives us coordinates between 0 and 1.
     do k = 1, nvec
       select case (emitters_Type(userdata))
-        case (EMIT_RECTANGLE)
+        case (EMIT_CIRCLE, EMIT_RECTANGLE)
+          ! The circle emitter integrates over its bounding box, like the
+          ! rectangle. Leaving it out would hit the default below and stop the run.
           par_pos(1:2, k) = emitters_pos(1:2, userdata) + xx(1:2, k)*emitters_dim(1:2, userdata) ! x and y position on the surface
           par_pos(3, k) = 0.0d0 ! Height, i.e. on the surface
           A(k) = emitters_dim(1, userdata)*emitters_dim(2, userdata)
@@ -1954,7 +1960,7 @@ end function Escape_Prob_log
       ! the current position.
       !df_new = Get_Kevin_Jgtf(field(3), T_temp, new_w)
       ! print *, 'Metropolis: Escape_Prob_log 2'
-      df_new = Escape_Prob_log(field(3), cur_pos, emit)
+      df_new = Escape_Prob_log(field(3), new_pos, emit)
 
       ! if (abs(cur_w - new_w) > 0.25) then
       !   print *, df_new / df_cur

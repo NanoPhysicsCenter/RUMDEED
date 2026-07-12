@@ -98,7 +98,7 @@ subroutine Do_Discrete_Recombination_ots(step,nrRecombinations)
   complex(8)                        ::  root1, root2, root3, root4
   integer                           ::  code
   ! Logicals
-  logical                           ::  coll_happens
+  logical                           ::  coll_happens, recombined
   ! Misc
   integer                           ::  i, j
 
@@ -109,7 +109,7 @@ subroutine Do_Discrete_Recombination_ots(step,nrRecombinations)
   !$OMP& PRIVATE(ion_cur_pos, atom_cur_pos, atom_cur_vel) &
   !$OMP& PRIVATE(elec_cur_speed, dist, recom_rad2, recom_rad) &
   !$OMP& PRIVATE(a, b, cc, dd, e, t, t1_r, t1_i, t2_r, t2_i, t3_r, t3_i, t4_r, t4_i, code, root1, root2, root3, root4) &
-  !$OMP& PRIVATE(coll_happens) &
+  !$OMP& PRIVATE(coll_happens, recombined) &
   !$OMP& SHARED(nrPart,nrIon,nrElec,particles_ion_pointer,particles_elec_pointer, particles_species, particles_life) &
   !$OMP& SHARED(particles_cur_pos, particles_mask, particles_step, particles_cur_vel, particles_cur_accel) &
   !$OMP& SHARED(step, time_step, particles_emitter, n_d) &
@@ -200,26 +200,44 @@ subroutine Do_Discrete_Recombination_ots(step,nrRecombinations)
       if (coll_happens .eqv. .true.) then
         elec_next_pos = elec_cur_pos + elec_cur_vel*t+0.5d0*elec_cur_acc*t**2
         dist = norm2(elec_next_pos - ion_cur_pos)
-        nrRecombinations = nrRecombinations + 1
 
-        ! Remove ion always
-        call Mark_Particles_Remove(i, remove_recom)
+        ! Claim the ion and the electron together. Two ions handled by different
+        ! threads can reach this point with the same electron; without re-checking
+        ! both masks inside the critical section both would recombine with it,
+        ! removing two ions against a single electron. The data file is written
+        ! here as well, so records from different threads cannot interleave.
+        recombined = .false.
+        !$OMP CRITICAL(RECOMBINATION)
+        if ((particles_mask(i) .eqv. .true.) .and. (particles_mask(j) .eqv. .true.)) then
+          ! Remove ion always
+          call Mark_Particles_Remove(i, remove_recom)
 
-        ! Remove electron always
-        call Mark_Particles_Remove(j, remove_recom)
+          ! Remove electron always
+          call Mark_Particles_Remove(j, remove_recom)
 
-        ! Add atom only if ionization is discrete 
-        if (collision_mode == 4) then
-          atom_cur_pos = ion_cur_pos
-          atom_cur_vel = (/0.0d0,0.0d0,0.0d0/)
-          !$OMP CRITICAL
-          call Add_Particle(atom_cur_pos,atom_cur_vel,species_atom,step,recom_emitter,-1)
-          !$OMP END CRITICAL
+          ! Add atom only if ionization is discrete
+          if (collision_mode == 4) then
+            atom_cur_pos = ion_cur_pos
+            atom_cur_vel = (/0.0d0,0.0d0,0.0d0/)
+            call Add_Particle(atom_cur_pos,atom_cur_vel,species_atom,step,recom_emitter,-1)
+          end if
+
+          ! Write recombination data
+          call Write_Recombination_Data(step, ion_cur_pos, elec_cur_speed, dist, recom_rad, j, i, particles_emitter(j))
+
+          recombined = .true.
+        end if
+        !$OMP END CRITICAL(RECOMBINATION)
+
+        if (recombined .eqv. .true.) then
+          nrRecombinations = nrRecombinations + 1
+          cycle ion ! This ion is gone, move on to the next one
         end if
 
-        ! Write recombination data
-        call Write_Recombination_Data(step, ion_cur_pos, elec_cur_speed, dist, recom_rad, j, i, particles_emitter(j))
-        cycle ion       
+        ! Another thread got there first. If it took our ion we are done with it,
+        ! otherwise keep looking for another electron.
+        if (particles_mask(i) .eqv. .false.) cycle ion
+        cycle elec
       end if
     end do elec
   end do ion
@@ -241,7 +259,7 @@ subroutine Do_Discrete_Recombination_tts(step,nrRecombinations)
   complex(8)                        ::  root1, root2, root3, root4
   integer                           ::  code
   ! Logicals
-  logical                           ::  coll_happens
+  logical                           ::  coll_happens, recombined
   ! Misc
   integer                           ::  i, j, k, l
 
@@ -252,7 +270,7 @@ subroutine Do_Discrete_Recombination_tts(step,nrRecombinations)
   !$OMP& PRIVATE(ion_cur_pos, atom_cur_pos, atom_cur_vel) &
   !$OMP& PRIVATE(elec_cur_speed, dist, recom_rad2, recom_rad) &
   !$OMP& PRIVATE(a, b, cc, dd, e, t, t1_r, t1_i, t2_r, t2_i, t3_r, t3_i, t4_r, t4_i, code, root1, root2, root3, root4) &
-  !$OMP& PRIVATE(coll_happens) &
+  !$OMP& PRIVATE(coll_happens, recombined) &
   !$OMP& SHARED(nrPart,nrIon,nrElec,particles_ion_pointer,particles_elec_pointer, particles_species, particles_life) &
   !$OMP& SHARED(particles_cur_pos, particles_mask, particles_step, particles_cur_vel, particles_cur_accel) &
   !$OMP& SHARED(step, time_step, particles_emitter, n_d) &
@@ -346,26 +364,45 @@ subroutine Do_Discrete_Recombination_tts(step,nrRecombinations)
       if (coll_happens .eqv. .true.) then
         elec_next_pos = elec_cur_pos + elec_cur_vel*t+0.5d0*elec_cur_acc*t**2
         dist = norm2(elec_next_pos - ion_cur_pos)
-        nrRecombinations = nrRecombinations + 1
 
-        ! Remove ion always
-        call Mark_Particles_Remove(i, remove_recom)
+        ! Claim the ion and the electron together. Two ions handled by different
+        ! threads can reach this point with the same electron; without re-checking
+        ! both masks inside the critical section both would recombine with it,
+        ! removing two ions against a single electron. The data file is written
+        ! here as well, so records from different threads cannot interleave.
+        recombined = .false.
+        !$OMP CRITICAL(RECOMBINATION)
+        if ((particles_mask(i) .eqv. .true.) .and. (particles_mask(j) .eqv. .true.)) then
+          ! Remove ion always
+          call Mark_Particles_Remove(i, remove_recom)
 
-        ! Remove electron always
-        call Mark_Particles_Remove(j, remove_recom)
+          ! Remove electron always
+          call Mark_Particles_Remove(j, remove_recom)
 
-        ! Add atom only if ionization is discrete 
-        if (collision_mode == 4) then
-          atom_cur_pos = ion_cur_pos
-          atom_cur_vel = (/0.0d0,0.0d0,0.0d0/)
-          !$OMP CRITICAL
-          call Add_Particle(atom_cur_pos,atom_cur_vel,species_atom,step,recom_emitter,-1)
-          !$OMP END CRITICAL
+          ! Add atom only if ionization is discrete
+          if (collision_mode == 4) then
+            atom_cur_pos = ion_cur_pos
+            atom_cur_vel = (/0.0d0,0.0d0,0.0d0/)
+            call Add_Particle(atom_cur_pos,atom_cur_vel,species_atom,step,recom_emitter,-1)
+          end if
+
+          ! Write recombination data. j is the electron, i is the ion (k is the
+          ! ion loop counter, not a particle index).
+          call Write_Recombination_Data(step, ion_cur_pos, elec_cur_speed, dist, recom_rad, j, i, particles_emitter(j))
+
+          recombined = .true.
+        end if
+        !$OMP END CRITICAL(RECOMBINATION)
+
+        if (recombined .eqv. .true.) then
+          nrRecombinations = nrRecombinations + 1
+          cycle ion ! This ion is gone, move on to the next one
         end if
 
-        ! Write recombination data
-        call Write_Recombination_Data(step, ion_cur_pos, elec_cur_speed, dist, recom_rad, k, i, particles_emitter(j))
-        cycle ion       
+        ! Another thread got there first. If it took our ion we are done with it,
+        ! otherwise keep looking for another electron.
+        if (particles_mask(i) .eqv. .false.) cycle ion
+        cycle elec
       end if
     end do elec
   end do ion
@@ -386,7 +423,7 @@ subroutine Do_Continuous_Ionization_ots_old(step, nrIonizations, nrCollisions)
     double precision, dimension(1:3)  ::  ejec_elec_pos, ejec_elec_vel
     double precision, dimension(1:3)  ::  ion_pos, ion_vel
     double precision                  ::  elec_energy, elec_cur_path, elec_cur_speed
-    integer                           ::  newID, ionID
+    integer                           ::  newID, ionID, newSlot
     ! Ionization
     double precision                  ::  E1, E2, collE, ejecE, inSpeed, outSpeed, newSpeed
     integer                           ::  count_n
@@ -403,7 +440,7 @@ subroutine Do_Continuous_Ionization_ots_old(step, nrIonizations, nrCollisions)
     if (nrElec == 0) return
     !$OMP PARALLEL DO DEFAULT(NONE) &
     !$OMP& PRIVATE(elec_cur_pos,elec_prev_pos,elec_cur_vel,direct_vec,ejec_elec_pos,ejec_elec_vel,ion_pos,ion_vel) &
-    !$OMP& PRIVATE(elec_energy,elec_cur_path,elec_cur_speed,newID,ionID,E1,E2,collE,ejecE,inSpeed,outSpeed,newSpeed) &
+    !$OMP& PRIVATE(elec_energy,elec_cur_path,elec_cur_speed,newID,ionID,newSlot,E1,E2,collE,ejecE,inSpeed,outSpeed,newSpeed) &
     !$OMP& PRIVATE(cross_tot,cross_ion,mean_path,mean_path_avg,i,rnd,alpha) &
     !$OMP& SHARED(particles_species,particles_mask,particles_cur_pos,particles_prev_pos,particles_cur_vel) &
     !$OMP& SHARED(particles_cur_energy,particles_ion_cross_sec,particles_tot_cross_sec,nrID,step) &
@@ -488,7 +525,13 @@ subroutine Do_Continuous_Ionization_ots_old(step, nrIonizations, nrCollisions)
                 !$OMP CRITICAL
                 newID = nrID
                 call Add_Particle(ejec_elec_pos, ejec_elec_vel, species_elec, step, ion_emitter, -1) ! Electron
-                call Update_Collision_Data(newID)
+                ! Add_Particle appends the electron and increments nrPart, so nrPart is the
+                ! array slot it landed in. Update_Collision_Data indexes the particle arrays
+                ! by slot, while newID is the global particle-ID counter used for the output
+                ! files. Both must stay inside this critical section so that no other thread
+                ! can add a particle in between.
+                newSlot = nrPart
+                call Update_Collision_Data(newSlot)
                 !$OMP END CRITICAL
 
                 ! Add the new positively charged ion to the system
@@ -522,7 +565,7 @@ subroutine Do_Continuous_Ionization_ots(step,nrCollisions,nrIonizations)
   double precision, dimension(1:3)  ::  ejec_elec_pos, ejec_elec_vel
   double precision, dimension(1:3)  ::  ion_pos, ion_vel
   double precision                  ::  elec_energy, elec_cur_path, elec_cur_speed
-  integer                           ::  newID, ionID
+  integer                           ::  newID, ionID, newSlot
   ! Ionization
   double precision                  ::  E1, E2, collE, ejecE, inSpeed, outSpeed, newSpeed
   integer                           ::  count_n
@@ -538,7 +581,7 @@ subroutine Do_Continuous_Ionization_ots(step,nrCollisions,nrIonizations)
   if (nrElec == 0) return
   !$OMP PARALLEL DO DEFAULT(NONE) &
   !$OMP& PRIVATE(i,elec_cur_pos,elec_prev_pos,elec_cur_vel,direct_vec,ejec_elec_pos,ejec_elec_vel,ion_pos,ion_vel) &
-  !$OMP& PRIVATE(elec_energy,elec_cur_path,elec_cur_speed,newID,ionID,E1,E2,collE,ejecE,inSpeed,outSpeed,newSpeed) &
+  !$OMP& PRIVATE(elec_energy,elec_cur_path,elec_cur_speed,newID,ionID,newSlot,E1,E2,collE,ejecE,inSpeed,outSpeed,newSpeed) &
   !$OMP& PRIVATE(cross_tot,cross_ion,mean_path,mean_path_avg,rnd,alpha) &
   !$OMP& SHARED(nrPart,particles_elec_pointer,particles_species,particles_mask) &	
   !$OMP& SHARED(particles_cur_pos,particles_prev_pos,particles_cur_vel) &
@@ -628,9 +671,13 @@ subroutine Do_Continuous_Ionization_ots(step,nrCollisions,nrIonizations)
             !$OMP CRITICAL
             newID = nrID
             call Add_Particle(ejec_elec_pos, ejec_elec_vel, species_elec, step, ion_emitter, -1) ! Electron
-            !$OMP END CRITICAL
-            !$OMP CRITICAL
-            call Update_Collision_Data(newID)
+            ! Add_Particle appends the electron and increments nrPart, so nrPart is the
+            ! array slot it landed in. Update_Collision_Data indexes the particle arrays
+            ! by slot, while newID is the global particle-ID counter used for the output
+            ! files. Both must stay inside this critical section so that no other thread
+            ! can add a particle in between.
+            newSlot = nrPart
+            call Update_Collision_Data(newSlot)
             !$OMP END CRITICAL
 
             ! Add the new positively charged ion to the system
@@ -667,7 +714,7 @@ subroutine Do_Continuous_Ionization_tts(step,nrCollisions,nrIonizations)
   double precision, dimension(1:3)  ::  ejec_elec_pos, ejec_elec_vel
   double precision, dimension(1:3)  ::  ion_pos, ion_vel
   double precision                  ::  elec_energy, elec_cur_path, elec_cur_speed
-  integer                           ::  newID, ionID
+  integer                           ::  newID, ionID, newSlot
   ! Ionization
   double precision                  ::  E1, E2, collE, ejecE, inSpeed, outSpeed, newSpeed
   integer                           ::  count_n
@@ -683,7 +730,7 @@ subroutine Do_Continuous_Ionization_tts(step,nrCollisions,nrIonizations)
   if (nrElec == 0) return
   !$OMP PARALLEL DO DEFAULT(NONE) &
   !$OMP& PRIVATE(k,i,elec_cur_pos,elec_prev_pos,elec_cur_vel,direct_vec,ejec_elec_pos,ejec_elec_vel,ion_pos,ion_vel) &
-  !$OMP& PRIVATE(elec_energy,elec_cur_path,elec_cur_speed,newID,ionID,E1,E2,collE,ejecE,inSpeed,outSpeed,newSpeed) &
+  !$OMP& PRIVATE(elec_energy,elec_cur_path,elec_cur_speed,newID,ionID,newSlot,E1,E2,collE,ejecE,inSpeed,outSpeed,newSpeed) &
   !$OMP& PRIVATE(cross_tot,cross_ion,mean_path,mean_path_avg,rnd,alpha) &
   !$OMP& SHARED(nrPart,nrElec,particles_elec_pointer,particles_species,particles_mask) &	
   !$OMP& SHARED(particles_cur_pos,particles_prev_pos,particles_cur_vel) &
@@ -775,9 +822,13 @@ subroutine Do_Continuous_Ionization_tts(step,nrCollisions,nrIonizations)
             !$OMP CRITICAL
             newID = nrID
             call Add_Particle(ejec_elec_pos, ejec_elec_vel, species_elec, step, ion_emitter, -1) ! Electron
-            !$OMP END CRITICAL
-            !$OMP CRITICAL
-            call Update_Collision_Data(newID)
+            ! Add_Particle appends the electron and increments nrPart, so nrPart is the
+            ! array slot it landed in. Update_Collision_Data indexes the particle arrays
+            ! by slot, while newID is the global particle-ID counter used for the output
+            ! files. Both must stay inside this critical section so that no other thread
+            ! can add a particle in between.
+            newSlot = nrPart
+            call Update_Collision_Data(newSlot)
             !$OMP END CRITICAL
 
             ! Add the new positively charged ion to the system
@@ -816,7 +867,7 @@ subroutine Do_Discrete_Ionization_ots(step,nrIonizations)
   ! Ionization
   logical                           ::  ionization
   double precision                  ::  ion_rad2, ion_rad, E1, E2, collE, ejecE, inSpeed, outSpeed, newSpeed
-  integer                           ::  newID, ionID
+  integer                           ::  newID, ionID, newSlot
   ! Polynomial solver
   double precision                  ::  a,b,cc,dd,e,t,t1_r,t1_i,t2_r,t2_i,t3_r,t3_i,t4_r,t4_i
   complex(8)                        ::  root1,root2,root3,root4
@@ -832,7 +883,7 @@ subroutine Do_Discrete_Ionization_ots(step,nrIonizations)
   !$OMP& PRIVATE(i,j,atom_cur_pos,elec_cur_pos,elec_next_pos,elec_cur_vel,elec_cur_acc) &
   !$OMP& PRIVATE(ejec_elec_pos,ejec_elec_vel,ion_pos,ion_vel,relative_pos,direct_vec) &
   !$OMP& PRIVATE(elec_cur_speed,elec_energy,cur_dist2,ionization_dist,ionization,ion_rad2,ion_rad) &
-  !$OMP& PRIVATE(E1,E2,collE,ejecE,inSpeed,outSpeed,newSpeed,newID,ionID) &
+  !$OMP& PRIVATE(E1,E2,collE,ejecE,inSpeed,outSpeed,newSpeed,newID,ionID,newSlot) &
   !$OMP& PRIVATE (a,b,cc,dd,e,t,t1_r,t1_i,t2_r,t2_i,t3_r,t3_i,t4_r,t4_i,root1,root2,root3,root4,code,rnd) &
   !$OMP& SHARED(nrPart,step,time_step,nrID,ion_life_time,particles_emitter,particles_step) &
   !$OMP& SHARED(particles_species,particles_mask,particles_cur_pos,particles_cur_vel,particles_cur_accel) &
@@ -961,9 +1012,13 @@ subroutine Do_Discrete_Ionization_ots(step,nrIonizations)
           ! Add the new electron to the system
           newID = nrID
           call Add_Particle(ejec_elec_pos, ejec_elec_vel, species_elec, step, ion_emitter, -1) ! Electron
-          !$OMP END CRITICAL
-          !$OMP CRITICAL
-          call Update_Collision_Data(newID)
+          ! Add_Particle appends the electron and increments nrPart, so nrPart is the
+          ! array slot it landed in. Update_Collision_Data indexes the particle arrays
+          ! by slot, while newID is the global particle-ID counter used for the output
+          ! files. Both must stay inside this critical section so that no other thread
+          ! can add a particle in between.
+          newSlot = nrPart
+          call Update_Collision_Data(newSlot)
           !$OMP END CRITICAL
 
           !$OMP CRITICAL
@@ -1006,7 +1061,7 @@ subroutine Do_Discrete_Ionization_tts(step,nrIonizations)
   ! Ionization
   logical                           ::  ionization
   double precision                  ::  ion_rad2, ion_rad, E1, E2, collE, ejecE, inSpeed, outSpeed, newSpeed
-  integer                           ::  newID, ionID
+  integer                           ::  newID, ionID, newSlot
   ! Polynomial solver
   double precision                  ::  a,b,cc,dd,e,t,t1_r,t1_i,t2_r,t2_i,t3_r,t3_i,t4_r,t4_i
   complex(8)                        ::  root1,root2,root3,root4
@@ -1022,10 +1077,10 @@ subroutine Do_Discrete_Ionization_tts(step,nrIonizations)
   !$OMP& PRIVATE(i,j,k,l,atom_cur_pos,elec_cur_pos,elec_next_pos,elec_cur_vel,elec_cur_acc) &
   !$OMP& PRIVATE(ejec_elec_pos,ejec_elec_vel,ion_pos,ion_vel,relative_pos,direct_vec) &
   !$OMP& PRIVATE(elec_cur_speed,elec_energy,cur_dist2,ionization_dist,ionization,ion_rad2,ion_rad) &
-  !$OMP& PRIVATE(E1,E2,collE,ejecE,inSpeed,outSpeed,newSpeed,newID,ionID) &
+  !$OMP& PRIVATE(E1,E2,collE,ejecE,inSpeed,outSpeed,newSpeed,newID,ionID,newSlot) &
   !$OMP& PRIVATE (a,b,cc,dd,e,t,t1_r,t1_i,t2_r,t2_i,t3_r,t3_i,t4_r,t4_i,root1,root2,root3,root4,code,rnd) &
   !$OMP& SHARED(nrAtom,nrElec,particles_atom_pointer,particles_elec_pointer) &
-  !$OMP& SHARED(step,time_step,nrID,ion_life_time,particles_emitter,particles_step) &
+  !$OMP& SHARED(nrPart,step,time_step,nrID,ion_life_time,particles_emitter,particles_step) &
   !$OMP& SHARED(particles_species,particles_mask,particles_cur_pos,particles_cur_vel,particles_cur_accel) &
   !$OMP& SHARED(particles_cur_energy, particles_ion_cross_rad) &
   !$OMP& REDUCTION(+:nrIonizations)
@@ -1058,8 +1113,9 @@ subroutine Do_Discrete_Ionization_tts(step,nrIonizations)
       ! Check ionization only if electron has enough energy to ionize
       if (elec_energy >= N_bind) then
         ! print *, 'Ionization energy reached'
-        ion_rad2 = particles_ion_cross_rad(j)
-        ! print *, 'Ionization radius = ', ion_rad2 
+        ion_rad = particles_ion_cross_rad(j)
+        ion_rad2 = ion_rad**2
+        ! print *, 'Ionization radius = ', ion_rad
 
         ionization = .false.
 
@@ -1157,9 +1213,13 @@ subroutine Do_Discrete_Ionization_tts(step,nrIonizations)
           ! Add the new electron to the system
           newID = nrID
           call Add_Particle(ejec_elec_pos, ejec_elec_vel, species_elec, step, ion_emitter, -1) ! Electron
-          !$OMP END CRITICAL
-          !$OMP CRITICAL
-          call Update_Collision_Data(newID)
+          ! Add_Particle appends the electron and increments nrPart, so nrPart is the
+          ! array slot it landed in. Update_Collision_Data indexes the particle arrays
+          ! by slot, while newID is the global particle-ID counter used for the output
+          ! files. Both must stay inside this critical section so that no other thread
+          ! can add a particle in between.
+          newSlot = nrPart
+          call Update_Collision_Data(newSlot)
           !$OMP END CRITICAL
 
           ! Remove the atom from the system
@@ -1197,7 +1257,7 @@ subroutine Do_Discrete_Ionization_old(step,nrIonizations)
   ! Ionization
   logical                           ::  ionization
   double precision                  ::  ion_rad2, ion_rad, E1, E2, collE, ejecE, inSpeed, outSpeed, newSpeed
-  integer                           ::  newID, ionID
+  integer                           ::  newID, ionID, newSlot
   ! Polynomial solver
   double precision                  ::  a,b,cc,dd,e,t,t1_r,t1_i,t2_r,t2_i,t3_r,t3_i,t4_r,t4_i
   complex(8)                        ::  root1,root2,root3,root4
@@ -1213,7 +1273,7 @@ subroutine Do_Discrete_Ionization_old(step,nrIonizations)
   !$OMP& PRIVATE(atom_cur_pos,elec_cur_pos,elec_next_pos,elec_cur_vel,elec_cur_acc) &
   !$OMP& PRIVATE(ejec_elec_pos,ejec_elec_vel,ion_pos,ion_vel,relative_pos,direct_vec) &
   !$OMP& PRIVATE(elec_cur_speed,elec_energy,cur_dist2,ionization_dist,ionization,ion_rad2,ion_rad) &
-  !$OMP& PRIVATE(E1,E2,collE,ejecE,inSpeed,outSpeed,newSpeed,newID,ionID) &
+  !$OMP& PRIVATE(E1,E2,collE,ejecE,inSpeed,outSpeed,newSpeed,newID,ionID,newSlot) &
   !$OMP& PRIVATE (a,b,cc,dd,e,t,t1_r,t1_i,t2_r,t2_i,t3_r,t3_i,t4_r,t4_i,root1,root2,root3,root4,code,i,k,rnd) &
   !$OMP& SHARED(step,nrPart,time_step,nrID,ion_life_time,particles_emitter,particles_step) &
   !$OMP& SHARED(particles_species,particles_mask,particles_cur_pos,particles_cur_vel,particles_cur_accel) &
@@ -1344,7 +1404,13 @@ subroutine Do_Discrete_Ionization_old(step,nrIonizations)
               ! Add the new electron to the system
               newID = nrID
               call Add_Particle(ejec_elec_pos, ejec_elec_vel, species_elec, step, ion_emitter, -1) ! Electron
-              call Update_Collision_Data(newID)
+              ! Add_Particle appends the electron and increments nrPart, so nrPart is the
+              ! array slot it landed in. Update_Collision_Data indexes the particle arrays
+              ! by slot, while newID is the global particle-ID counter used for the output
+              ! files. Both must stay inside this critical section so that no other thread
+              ! can add a particle in between.
+              newSlot = nrPart
+              call Update_Collision_Data(newSlot)
               !$OMP END CRITICAL
 
               ! Remove the atom from the system
@@ -2049,7 +2115,10 @@ subroutine Update_Collision_Data(i)
     elec_energy = 0.5d0*m_0*elec_cur_speed2/q_0
   end if
   ion_cross_sec = Find_Cross_ion_data(elec_energy)
-  ion_cross_rad = ion_cross_sec/pi
+  ! Radius of the cross section, sigma = pi*r^2. The sqrt must not be dropped:
+  ! the consumers below square this value again to compare it with a squared
+  ! distance (the same convention as recom_cross_rad).
+  ion_cross_rad = sqrt(ion_cross_sec/pi)
   tot_cross_sec = Find_Cross_tot_data(elec_energy)
 
   elec_energy = 0.5d0*m_0*elec_cur_speed2/q_0
