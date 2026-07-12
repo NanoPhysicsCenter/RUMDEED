@@ -4,6 +4,14 @@
 ! ----- Date: 2025 -------------------------------------------------------------
 ! ------------------------------------------------------------------------------
 
+! The POLARSO Laplace solver is a compile-time option because it needs the
+! Intel MKL library (PARDISO). Build with 'make POLARSO=yes' to enable it.
+! Without it this file provides a stub module with the same interface (see
+! the #else branch at the bottom), so the callers compile unchanged; the
+! stubs can never be reached because use_polarso can only be set to .true.
+! by Read_Polarso_Variables, which in the stub refuses to enable it.
+#if defined(_POLARSO_)
+
 module mod_polarso
     
     ! Dependencies
@@ -1440,3 +1448,80 @@ contains
         ! print *, 'Polarso: sparse_dot end'
     end function sparse_dot
 end module mod_polarso
+
+#else
+
+! ------------------------------------------------------------------------------
+! Stub version of mod_polarso, used when RUMDEED is built without the POLARSO
+! Laplace solver (the default). It has the same public interface as the real
+! module but no MKL dependency. Read_Polarso_Variables stops the program if a
+! 'polarso' input file is present, so a run that expects the solver cannot
+! silently proceed without it; the other stubs are unreachable because
+! use_polarso stays .false. (they stop the program if called anyway).
+! ------------------------------------------------------------------------------
+module mod_polarso
+
+    use mod_global, only: use_polarso
+
+    implicit none
+
+    private
+    public :: PL_Init_Solver, PL_Calculate_Field, PL_Update_Field, PL_Calculate_Field_At, &
+                PL_Clean_Up, Place_Electron, Write_Polarso_Data, Read_Polarso_Variables
+
+contains
+
+    subroutine Read_Polarso_Variables()
+        logical :: polarso_file_exists
+
+        inquire(file='polarso', exist=polarso_file_exists)
+        if (polarso_file_exists .eqv. .true.) then
+            print '(a)', 'RUMDEED: ERROR a polarso input file is present, but this binary was'
+            print '(a)', 'RUMDEED: built without the POLARSO solver. Rebuild with make POLARSO=yes.'
+            stop
+        end if
+    end subroutine Read_Polarso_Variables
+
+    subroutine Polarso_Not_Available()
+        print '(a)', 'RUMDEED: ERROR POLARSO was called but this binary was built without it.'
+        print '(a)', 'RUMDEED: Rebuild with make POLARSO=yes.'
+        stop
+    end subroutine Polarso_Not_Available
+
+    subroutine PL_Init_Solver()
+        call Polarso_Not_Available()
+    end subroutine PL_Init_Solver
+
+    subroutine PL_Calculate_Field()
+        call Polarso_Not_Available()
+    end subroutine PL_Calculate_Field
+
+    subroutine PL_Update_Field(index)
+        integer, intent(in) :: index
+
+        call Polarso_Not_Available()
+    end subroutine PL_Update_Field
+
+    function PL_Calculate_Field_At(point_pos)
+        real(kind=8), dimension(3), intent(in) :: point_pos
+        real(kind=8), dimension(3) :: PL_Calculate_Field_At
+
+        PL_Calculate_Field_At = 0.0d0
+        call Polarso_Not_Available()
+    end function PL_Calculate_Field_At
+
+    subroutine PL_Clean_Up()
+        ! Nothing to clean up, the solver was never initialized
+    end subroutine PL_Clean_Up
+
+    subroutine Place_Electron()
+        call Polarso_Not_Available()
+    end subroutine Place_Electron
+
+    subroutine Write_Polarso_Data()
+        call Polarso_Not_Available()
+    end subroutine Write_Polarso_Data
+
+end module mod_polarso
+
+#endif

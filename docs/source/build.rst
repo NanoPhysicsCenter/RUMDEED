@@ -67,12 +67,34 @@ mode 3. Runs using the cylindrical tip or torus geometries automatically fall ba
 OpenMP code path at runtime: those geometries interpolate their fields from a mesh with
 kd-tree searches, which cannot run inside a GPU kernel.
 
+For planar field emission (mode 10), also set **MH_BATCH = .TRUE.** in the input file so
+that the emission-side field evaluations run in batches on the GPU as well (see the
+:ref:`Input files and running the code <run>` section); without it the emission remains
+on the CPU and dominates the run time.
+
 For testing the OpenACC code path on a machine without a GPU, the kernels can be compiled
 to run on the CPU cores instead:
 
 .. code-block:: console
 
    make CC=gcc FC=nvfortran ACC=multicore OPENMP=no
+
+POLARSO Laplace solver (optional)
+---------------------------------
+The POLARSO Laplace solver solves the Poisson equation on a grid with Intel MKL's
+PARDISO. Because of the MKL dependency it is a compile-time option that is disabled by
+default; without it a stub module is compiled and MKL is not needed at all. To enable it:
+
+.. code-block:: console
+
+   make POLARSO=yes
+
+The MKL installation is found through the **MKLROOT** variable (default
+``/opt/intel/oneapi/mkl/latest``), which can be overridden on the make command line or
+from the environment. Builds with **POLARSO=yes** use MKL's ILP64 interface and therefore
+8-byte default integers. At runtime the solver is activated by placing a ``polarso``
+namelist file with ``use_polarso = .true.`` in the run directory; a binary built without
+POLARSO stops with an error message if such a file is present.
 
 Cuba library
 ------------
