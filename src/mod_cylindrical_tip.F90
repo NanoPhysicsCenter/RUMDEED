@@ -831,8 +831,14 @@ subroutine Metropolis_Hastings_cyl_tip(ndim_in, F_out, F_norm_out, pos_xyz_out, 
     integer                          :: sec_cur, sec_new
     double precision                 :: alpha, rnd
     !double precision                 :: ratio
-    integer                          :: i, accepted = 0, rejected = 0
+    integer                          :: i, accepted, rejected
     integer                          :: sec_b
+
+    ! Initialize the counters here and NOT in their declarations: an
+    ! initializer on a local variable implies the SAVE attribute, so the
+    ! counts would accumulate over all calls.
+    accepted = 0
+    rejected = 0
 
     k = 0
     ! Get a random initial position on the surface

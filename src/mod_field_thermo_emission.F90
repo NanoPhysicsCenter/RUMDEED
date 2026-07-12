@@ -212,22 +212,9 @@ subroutine Init_Field_Thermo_Emission()
     !ndim = ndim_in
     ndim_in = 0
 
-    ! Try to keep the acceptance ratio around 50% by
-    ! changing the standard deviation.
-    CALL RANDOM_NUMBER(rnd) ! Change be a random number
-    if (a_rate < 0.525d0) then
-      MH_std = MH_std * (1.0d0 - rnd*0.00025d0)
-    else
-      MH_std = MH_std * (1.0d0 + rnd*0.00025d0)
-    end if
-    ! Limits on how big or low the standard deviation can be.
-    if (MH_std > 0.1250d0) then
-      MH_std = 0.1250d0
-    else if (MH_std < 0.005d0) then
-      MH_std = 0.005d0
-    end if
-
-    std(1:2) = emitters_dim(1:2, emit)*MH_std ! Standard deviation for the normal distribution is 0.075% of the emitter length.
+    ! The proposal step MH_std is fixed during the chain and updated once at
+    ! the end from the acceptance rate of this chain (see below).
+    std(1:2) = emitters_dim(1:2, emit)*MH_std ! Standard deviation for the normal distribution is MH_std of the emitter length.
     ! This means that 68% of jumps are less than this value.
     ! The expected value of the absolute value of the normal distribution is std*sqrt(2/pi).
 
@@ -252,19 +239,21 @@ subroutine Init_Field_Thermo_Emission()
         count = count + 1
         if (count > 10000) then ! The loop is infnite, must stop it at some point.
         ! In field emission it is rare the we reach the CL limit.
+          ! Mark the chain as failed and return a defined position, the
+          ! caller skips the emission when ndim_in < 0.
           ndim_in = -1
+          pos_out(1:2) = emitters_pos(1:2, emit)
+          pos_out(3) = 0.0d0
           print *, 'Failed to find spot for emission'
           return ! Exit the function
         end if
       end if
     end do
 
-    ! Calculate the escape probability at this location
-    if (field(3) < 0.0d0) then
-      df_cur = max(Get_Kevin_Jgtf(field(3), T_temp, cur_w), 1.0d-12) ! Floor to avoid div-by-zero in alpha
-    else
-      df_cur = 1.0d-12 ! Zero escape probabilty if field is not favourable
-    end if
+    ! The chain target is the current density at this location. We work with
+    ! its log because J spans a huge dynamic range, the tiny() guard only
+    ! catches a J that underflows to zero.
+    df_cur = log(max(Get_Kevin_Jgtf(field(3), T_temp, cur_w), tiny(1.0d0)))
 
     !---------------------------------------------------------------------------
     ! We now pick a random distance and direction to jump to from our
@@ -286,13 +275,17 @@ subroutine Init_Field_Thermo_Emission()
       new_w = w_theta_xy(new_pos, emit)
 
       ! Check if the field is favourable for emission at the new position.
-      ! If it is not then cycle, i.e. we reject this location and
-      ! pick another one.
-      if (field(3) > 0.0d0) cycle ! Do the next loop iteration, i.e. find a new position.
+      ! If it is not the current density there is zero, i.e. we reject this
+      ! location and pick another one. It counts as a rejected jump so the
+      ! acceptance rate that drives MH_std sees it.
+      if (field(3) > 0.0d0) then
+        jump_r = jump_r + 1
+        cycle ! Do the next loop iteration, i.e. find a new position.
+      end if
 
-      ! Calculate the escape probability at the new position, to compair with
+      ! Calculate the current density at the new position, to compare with
       ! the current position.
-      df_new = max(Get_Kevin_Jgtf(field(3), T_temp, new_w), 1.0d-12) ! Floor to avoid div-by-zero in alpha
+      df_new = log(max(Get_Kevin_Jgtf(field(3), T_temp, new_w), tiny(1.0d0)))
 
       ! if (abs(cur_w - new_w) > 0.25) then
       !   print *, df_new / df_cur
@@ -304,16 +297,16 @@ subroutine Init_Field_Thermo_Emission()
       !   pause
       ! end if
 
-      alpha = df_new / df_cur
+      alpha = df_new - df_cur ! Log of the Metropolis ratio
 
-      if (alpha >= 1.0d0) then
+      if (df_new >= df_cur) then
         cur_pos = new_pos
         df_cur = df_new
         cur_w = new_w
         jump_a = jump_a + 1
       else
         CALL RANDOM_NUMBER(rnd)
-        if (rnd < alpha) then
+        if (log(rnd) <= alpha) then
           cur_pos = new_pos
           df_cur = df_new
           cur_w = new_w
@@ -344,9 +337,18 @@ subroutine Init_Field_Thermo_Emission()
       ! end if
     end do
 
-    ! Acceptance rate (only update when at least one jump was attempted, to avoid 0/0)
+    ! The acceptance rate of this chain drives one multiplicative update of
+    ! the proposal step size, towards an acceptance ratio of about 50%.
+    ! (Only update when at least one jump was attempted, to avoid 0/0.)
     if ((jump_a + jump_r) > 0) then
       a_rate = DBLE(jump_a) / DBLE(jump_r + jump_a)
+      MH_std = MH_std * exp(0.025d0*(a_rate - 0.525d0))
+      ! Limits on how big or low the standard deviation can be.
+      if (MH_std > 0.1250d0) then
+        MH_std = 0.1250d0
+      else if (MH_std < 0.005d0) then
+        MH_std = 0.005d0
+      end if
     end if
     !print *, jump_a
     !print *, jump_r

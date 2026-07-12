@@ -1010,7 +1010,7 @@ subroutine Metropolis_Hastings_Torus(ndim_in, F_out, F_norm_out, pos_xyz_out, n_
     double precision, dimension(1:3), intent(out) :: n_vec
 
     ! Parameters for tuning the standard deviation
-    integer :: total_iter = 0 ! Total number of iterations
+    integer :: total_iter ! Total number of iterations
     double precision, dimension(1:2) :: std_xy
 
     ! Local variables
@@ -1022,7 +1022,16 @@ subroutine Metropolis_Hastings_Torus(ndim_in, F_out, F_norm_out, pos_xyz_out, n_
     double precision :: alpha, rnd
 
     integer :: IFAIL, k
-    integer :: accepted = 0, rejected = 0
+    integer :: accepted, rejected
+
+    ! Initialize the counters here and NOT in their declarations: an
+    ! initializer on a local variable implies the SAVE attribute, so the
+    ! values would persist between calls. That made every chain after the
+    ! first one exit the jump loop below after a single jump, because
+    ! total_iter already held the value from the previous call.
+    total_iter = 0
+    accepted = 0
+    rejected = 0
 
     ! Initialize the output variables
     F_out = 0.0d0

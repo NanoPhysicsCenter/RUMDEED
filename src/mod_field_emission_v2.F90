@@ -59,14 +59,18 @@ Module mod_field_emission_v2
   integer          :: jump_a = 0, jump_r = 0 ! Number of jumps accepted and rejected
 
   ! Tuning constants of the Metropolis-Hastings sampling, shared by the serial
-  ! (Metropolis_Hastings_rectangle_J) and the batched
-  ! (Metropolis_Hastings_rectangle_J_batch) version, so the two always use the
-  ! same schedule and stay statistically equivalent.
+  ! (Metropolis_Hastings_rectangle_J / Metropolis_Hastings_ring_J) and the
+  ! batched (Metropolis_Hastings_rectangle_J_batch) version, so all variants
+  ! use the same schedule.
+  ! The proposal step MH_std is adapted towards MH_target_rate with one
+  ! multiplicative update per acceptance-rate window (one chain in the serial
+  ! samplers, one jump iteration in the batched sampler), see MH_std_update.
+  ! Within a chain the proposal kernel is fixed.
   integer,          parameter :: MH_ndim        = 25*8      ! Number of jumps per chain
   double precision, parameter :: MH_warmup_frac = 0.25d0    ! Fraction of the jumps done with the fixed initial std
   double precision, parameter :: MH_init_std    = 0.10d0    ! Initial std as a fraction of the emitter size
   double precision, parameter :: MH_target_rate = 0.2525d0  ! Acceptance rate the MH_std adaptation aims for
-  double precision, parameter :: MH_std_nudge   = 0.00025d0 ! Maximum relative per-jump nudge of MH_std
+  double precision, parameter :: MH_std_gain    = 0.025d0   ! Gain of the multiplicative MH_std update per window
   double precision, parameter :: MH_std_max     = 0.1250d0  ! Upper limit on MH_std
   double precision, parameter :: MH_std_min     = 0.00005d0 ! Lower limit on MH_std
 
@@ -568,6 +572,43 @@ contains
   Escape_Prob_log = b_FN * (sqrt(w_theta_xy(pos, emit)))**3 * v_y(F, pos, emit) / (-1.0d0*F)
 
 end function Escape_Prob_log
+
+  !-----------------------------------------------------------------------------
+  ! Log of the position dependent part of the electron supply,
+  ! log( F^2 / (t_y^2 * w_theta) ).
+  ! This is the target distribution of the Metropolis-Hastings chains below:
+  ! the number of electrons to try comes from the surface integral of the
+  ! supply, the chains place them proportional to the supply, and the caller
+  ! then emits each one with the escape probability, so the positions of the
+  ! emitted electrons follow the current density J = supply * D.
+  ! (Sampling proportional to D instead would count D twice, once in the
+  ! placement and once in the emission test.)
+  ! The constant prefactor a_FN * time_step / q_0 of the supply cancels in
+  ! the Metropolis ratio and is left out. F must be < 0.
+  double precision function Elec_Supply_log(F, pos, emit)
+    double precision, intent(in)                 :: F
+    double precision, dimension(1:3), intent(in) :: pos
+    integer, intent(in)                          :: emit
+
+    Elec_Supply_log = 2.0d0*log(-1.0d0*F) - 2.0d0*log(t_y(F, pos, emit)) - log(w_theta_xy(pos, emit))
+  end function Elec_Supply_log
+
+  !-----------------------------------------------------------------------------
+  ! One multiplicative update of the shared proposal step MH_std, driven by
+  ! the acceptance rate measured over the last window (one chain in the
+  ! serial samplers, one jump iteration in the batched sampler).
+  ! Low acceptance shrinks the step, high acceptance grows it. The
+  ! exponential form keeps MH_std positive and the clamps bound the excursion.
+  subroutine MH_std_update(rate)
+    double precision, intent(in) :: rate
+
+    MH_std = MH_std * exp(MH_std_gain*(rate - MH_target_rate))
+    if (MH_std > MH_std_max) then
+      MH_std = MH_std_max
+    else if (MH_std < MH_std_min) then
+      MH_std = MH_std_min
+    end if
+  end subroutine MH_std_update
 
   !-----------------------------------------------------------------------------
   ! A simple function that calculates
@@ -1355,23 +1396,18 @@ end function Escape_Prob_log
     double precision                              :: rnd, alpha
     double precision, dimension(1:2)              :: std
     double precision, dimension(1:3)              :: cur_pos, new_pos, field
-    double precision                              :: df_cur, df_new
-    double precision                              :: cur_w, new_w
-    !integer                                       :: jump_a, jump_r ! Number of jumps accepted and rejected
-    double precision                              :: ratio_change
+    double precision                              :: sup_cur, sup_new ! Log of the electron supply (the chain target)
 
     ! Reset the accepted/rejected jump counters so the acceptance rate
-    ! (and the adaptive MH_std it drives) is computed per call rather than
+    ! (and the adaptive MH_std it drives) is computed per chain rather than
     ! accumulating over the whole simulation.
     jump_a = 0
     jump_r = 0
-    !ndim = ndim_in
     ndim_in = 0
 
-    !ndim = nint( 2.0d0/(MH_std*sqrt(2.0d0/pi)) )
     ndim = MH_ndim
-    ratio_change = 0.5d0*100.0d0/maxval(emitters_dim(:, emit))
-    std(1:2) = emitters_dim(1:2, emit)*MH_init_std ! 10% of emitter size
+    ndim_first = nint(ndim*MH_warmup_frac)
+    std(1:2) = emitters_dim(1:2, emit)*MH_init_std ! Warmup std, 10% of the emitter size
 
     ! Get a random initial position on the surface.
     ! We pick this location from a uniform distribution.
@@ -1387,7 +1423,6 @@ end function Escape_Prob_log
       else
         field = Calc_Field_at(cur_pos)
       end if
-      cur_w = w_theta_xy(cur_pos, emit)
 
       if (field(3) < 0.0d0) then
         exit ! We found a nice spot so we exit the loop
@@ -1395,7 +1430,13 @@ end function Escape_Prob_log
         count = count + 1
         if (count > 10000) then ! The loop is infnite, must stop it at some point.
         ! In field emission it is rare the we reach the CL limit.
+          ! Mark the chain as failed: unfavorable field and zero escape
+          ! probability, so the caller does not emit an electron from it.
           ndim_in = -1
+          F_out = 1.0d0
+          df_out = -huge(1.0d0)
+          pos_out(1:2) = emitters_pos(1:2, emit)
+          pos_out(3) = 0.0d0
           print *, 'Failed to find spot for emission'
           return ! Exit the function
         end if
@@ -1404,51 +1445,25 @@ end function Escape_Prob_log
 
     F_out = field(3)
 
-    ! Calculate the escape probability at this location
-    if (field(3) < 0.0d0) then
-      !df_cur = Get_Kevin_Jgtf(field(3), T_temp, cur_w)
-      df_cur = Escape_Prob_log(field(3), cur_pos, emit)
-    else
-      df_cur = -huge(1.0d0)! Zero escape probabilty if field is not favorable
-    end if
-
-    !write(unit=ud_mh) ndim
-    !print *, ndim
-    !write(unit=ud_mh) cur_pos(1), cur_pos(2), std(1), std(2)
-    !print *, 0, cur_pos(1)/1.0d-9, cur_pos(2)/1.0d-9, std(1)/1.0d-9, std(2)/1.0d-9
-
-    ndim_first = nint(ndim*MH_warmup_frac)
+    ! The chain samples positions proportional to the electron supply,
+    ! see Elec_Supply_log.
+    sup_cur = Elec_Supply_log(field(3), cur_pos, emit)
 
     !---------------------------------------------------------------------------
     ! We now pick a random distance and direction to jump to from our
     ! current location. We do this ndim times.
     do i = 1, ndim
 
-      ! Make first 25% of jumps with std as 5% of emitter length.
+      ! The first MH_warmup_frac of the jumps use the fixed initial std,
+      ! after that the adapted step size. MH_std is only updated between
+      ! chains (see below), so the proposal kernel is fixed within a chain.
       if (i > ndim_first) then
-
-        ! Try to keep the acceptance ratio around 25% by
-        ! changing the standard deviation.
-        CALL RANDOM_NUMBER(rnd) ! Change be a random number
-        if (a_rate < MH_target_rate) then
-          MH_std = MH_std * (1.0d0 - rnd*MH_std_nudge)
-        else
-          MH_std = MH_std * (1.0d0 + rnd*MH_std_nudge)
-        end if
-        ! Limits on how big or low the standard deviation can be.
-        if (MH_std > MH_std_max) then
-          MH_std = MH_std_max
-        else if (MH_std < MH_std_min) then
-          MH_std = MH_std_min
-        end if
-
         std(1:2) = emitters_dim(1:2, emit)*MH_std ! Standard deviation for the normal distribution is MH_std of the emitter length.
         ! This means that 68% of jumps are less than this value.
         ! The expected value of the absolute value of the normal distribution is std*sqrt(2/pi).
       end if
 
       ! Find a new position using a normal distribution.
-      !new_pos(1:2) = box_muller(cur_pos(1:2)/length_scale, std)*length_scale
       new_pos(1:2) = box_muller(cur_pos(1:2), std)
       new_pos(3) = 0.0d0 ! At the surface
 
@@ -1461,47 +1476,26 @@ end function Escape_Prob_log
       else
         field = Calc_Field_at(new_pos)
       end if
-      new_w = w_theta_xy(new_pos, emit)
 
       ! Check if the field is favorable for emission at the new position.
-      ! If it is not then cycle, i.e. we reject this location and
-      ! pick another one.
+      ! If it is not the supply there is zero, i.e. we reject this location
+      ! and pick another one.
       if (field(3) >= 0.0d0) then
-        !write(unit=ud_mh) cur_pos(1), cur_pos(2), std(1), std(2)
-        !print *, i, cur_pos(1)/1.0d-9, cur_pos(2)/1.0d-9, std(1)/1.0d-9, std(2)/1.0d-9
-        !print *, 'WARNING UNFAVORABLE FIELD'
-        !print *, field
-        !print *, new_pos/1.0E-9
-        !print *, nrPart
-        !print *, i
-        !pause
         if (i > ndim_first) then
           jump_r = jump_r + 1
         end if
         cycle ! Do the next loop iteration, i.e. find a new position.
       end if
 
-      ! Calculate the escape probability at the new position, to compair with
+      ! Calculate the electron supply at the new position, to compare with
       ! the current position.
-      !df_new = Get_Kevin_Jgtf(field(3), T_temp, new_w)
-      df_new = Escape_Prob_log(field(3), new_pos, emit)
+      sup_new = Elec_Supply_log(field(3), new_pos, emit)
 
-      ! if (abs(cur_w - new_w) > 0.25) then
-      !   print *, df_new / df_cur
-      !   print *, cur_w
-      !   print *, df_cur
-      !   print *, new_w
-      !   print *, df_new
-      !   print *, ''
-      !   pause
-      ! end if
+      alpha = sup_new - sup_cur
 
-      alpha = df_new - df_cur
-
-      if (df_new >= df_cur ) then
+      if (sup_new >= sup_cur) then
         cur_pos = new_pos
-        df_cur = df_new
-        cur_w = new_w
+        sup_cur = sup_new
         F_out = field(3)
         if (i > ndim_first) then
           jump_a = jump_a + 1
@@ -1510,8 +1504,7 @@ end function Escape_Prob_log
         CALL RANDOM_NUMBER(rnd)
         if (log(rnd) <= alpha) then
           cur_pos = new_pos
-          df_cur = df_new
-          cur_w = new_w
+          sup_cur = sup_new
           F_out = field(3)
           if (i > ndim_first) then
             jump_a = jump_a + 1
@@ -1522,26 +1515,20 @@ end function Escape_Prob_log
           end if
         end if
       end if
-
-      !write(unit=ud_mh) cur_pos(1), cur_pos(2), std(1), std(2)
-      !print *, i, cur_pos(1)/1.0d-9, cur_pos(2)/1.0d-9, std(1)/1.0d-9, std(2)/1.0d-9
     end do
 
-    ! Acceptance rate
-    a_rate = DBLE(jump_a) / DBLE(jump_r + jump_a)
-    !print *, jump_a
-    !print *, jump_r
-    !print *, a_rate
-    !print *, MH_std
-    !print *, std(1:2)/length_scale
-    !print *, ''
+    ! The acceptance rate of this chain drives one update of the shared
+    ! proposal step size.
+    if (jump_a + jump_r > 0) then
+      a_rate = DBLE(jump_a) / DBLE(jump_r + jump_a)
+      call MH_std_update(a_rate)
+    end if
 
-    ! Return the current position
+    ! Return the current position.
+    ! The caller decides the emission with the escape probability at this
+    ! position; the chain target above deliberately does not include it.
     pos_out = cur_pos
-    df_out = df_cur
-
-    !close(unit=ud_mh)
-    !stop
+    df_out = Escape_Prob_log(F_out, cur_pos, emit)
   end subroutine Metropolis_Hastings_rectangle_J
 
   ! ----------------------------------------------------------------------------
@@ -1556,11 +1543,9 @@ end function Escape_Prob_log
   !  * All chains sample the particle configuration from the start of the
   !    time step. In the serial version each chain sees the electrons that
   !    earlier chains emitted within the same step.
-  !  * The adaptive step size MH_std is nudged once per active chain per
-  !    iteration (same magnitude and count as the serial per-jump updates),
-  !    but the acceptance rate a_rate that drives it is updated from the
-  !    aggregate accept/reject counts of the running batch instead of at the
-  !    end of each chain.
+  !  * The adaptive step size MH_std gets one update per jump iteration,
+  !    driven by the acceptance rate of that iteration across the whole
+  !    batch, instead of one update per chain as in the serial version.
   !  * The random number stream is consumed in a different order, so
   !    individual positions differ; the sampled distribution is the same.
   subroutine Metropolis_Hastings_rectangle_J_batch(M, emit, df_out, F_out, pos_out)
@@ -1571,22 +1556,19 @@ end function Escape_Prob_log
 
     integer                                       :: ndim, ndim_first
     integer                                       :: i, k, mc, count, n_act
-    double precision                              :: rnd, alpha, df_new
+    integer                                       :: it_a, it_r ! Accepted/rejected jumps of the current iteration
+    double precision                              :: rnd, alpha, sup_new
     double precision, dimension(1:2)              :: std
     integer,          dimension(:),    allocatable :: act ! Chains active in the current batch
     double precision, dimension(:, :), allocatable :: cur_pos, w_pos
     double precision, dimension(:, :), allocatable :: w_field
-    double precision, dimension(:),    allocatable :: df_cur
+    double precision, dimension(:),    allocatable :: sup_cur ! Log of the electron supply (the chain target)
     logical,          dimension(:),    allocatable :: ok ! Chain has a favorable position
 
     ! The working arrays go on the heap: M is the full electron supply of the
     ! time step, which has no upper bound that would make automatic (stack)
     ! arrays safe. They are deallocated automatically on return.
-    allocate(act(1:M), cur_pos(1:3, 1:M), w_pos(1:3, 1:M), w_field(1:3, 1:M), df_cur(1:M), ok(1:M))
-
-    ! Reset the accepted/rejected jump counters, as in the serial version.
-    jump_a = 0
-    jump_r = 0
+    allocate(act(1:M), cur_pos(1:3, 1:M), w_pos(1:3, 1:M), w_field(1:3, 1:M), sup_cur(1:M), ok(1:M))
 
     ndim = MH_ndim
     ndim_first = nint(ndim*MH_warmup_frac)
@@ -1617,10 +1599,12 @@ end function Escape_Prob_log
       do k = 1, i
         mc = act(k)
         if (w_field(3, k) < 0.0d0) then
-          ! We found a nice spot for this chain
+          ! We found a nice spot for this chain.
+          ! The chain samples positions proportional to the electron
+          ! supply, see Elec_Supply_log.
           cur_pos(:, mc) = w_pos(:, k)
           F_out(mc) = w_field(3, k)
-          df_cur(mc) = Escape_Prob_log(w_field(3, k), w_pos(:, k), emit)
+          sup_cur(mc) = Elec_Supply_log(w_field(3, k), w_pos(:, k), emit)
           ok(mc) = .true.
         else
           n_act = n_act + 1
@@ -1638,7 +1622,7 @@ end function Escape_Prob_log
           ! Mark the chain as failed: unfavorable field and zero
           ! escape probability, so no electron is emitted from it.
           F_out(mc) = 1.0d0
-          df_cur(mc) = -huge(1.0d0)
+          sup_cur(mc) = -huge(1.0d0)
           cur_pos(1:2, mc) = emitters_pos(1:2, emit)
           cur_pos(3, mc) = 0.0d0
         end do
@@ -1652,28 +1636,11 @@ end function Escape_Prob_log
     ! chains together.
     do i = 1, ndim
 
-      ! Make first 25% of jumps with std as 10% of emitter length.
+      ! The first MH_warmup_frac of the jumps use the fixed initial std,
+      ! after that the adapted step size. MH_std is updated once per jump
+      ! iteration (below), so within an iteration all chains share the same
+      ! fixed proposal kernel.
       if (i > ndim_first) then
-
-        ! Try to keep the acceptance ratio around 25% by changing the
-        ! standard deviation. One nudge per active chain, which matches the
-        ! per-jump updates of the serial version.
-        do mc = 1, M
-          if (ok(mc) .eqv. .false.) cycle
-          CALL RANDOM_NUMBER(rnd)
-          if (a_rate < MH_target_rate) then
-            MH_std = MH_std * (1.0d0 - rnd*MH_std_nudge)
-          else
-            MH_std = MH_std * (1.0d0 + rnd*MH_std_nudge)
-          end if
-        end do
-        ! Limits on how big or low the standard deviation can be.
-        if (MH_std > MH_std_max) then
-          MH_std = MH_std_max
-        else if (MH_std < MH_std_min) then
-          MH_std = MH_std_min
-        end if
-
         std(1:2) = emitters_dim(1:2, emit)*MH_std
       end if
 
@@ -1698,58 +1665,63 @@ end function Escape_Prob_log
       call Calc_Field_at_Batch(n_act, w_pos(:, 1:n_act), w_field(:, 1:n_act))
 
       ! Do the Metropolis accept/reject step for each chain.
+      it_a = 0
+      it_r = 0
       do k = 1, n_act
         mc = act(k)
 
         ! Check if the field is favorable for emission at the new position.
-        ! If it is not we reject this location.
+        ! If it is not the supply there is zero, i.e. we reject this location.
         if (w_field(3, k) >= 0.0d0) then
-          if (i > ndim_first) then
-            jump_r = jump_r + 1
-          end if
+          it_r = it_r + 1
           cycle
         end if
 
-        ! Calculate the escape probability at the new position, to compair
+        ! Calculate the electron supply at the new position, to compare
         ! with the current position.
-        df_new = Escape_Prob_log(w_field(3, k), w_pos(:, k), emit)
+        sup_new = Elec_Supply_log(w_field(3, k), w_pos(:, k), emit)
 
-        alpha = df_new - df_cur(mc)
+        alpha = sup_new - sup_cur(mc)
 
-        if (df_new >= df_cur(mc)) then
+        if (sup_new >= sup_cur(mc)) then
           cur_pos(:, mc) = w_pos(:, k)
-          df_cur(mc) = df_new
+          sup_cur(mc) = sup_new
           F_out(mc) = w_field(3, k)
-          if (i > ndim_first) then
-            jump_a = jump_a + 1
-          end if
+          it_a = it_a + 1
         else
           CALL RANDOM_NUMBER(rnd)
           if (log(rnd) <= alpha) then
             cur_pos(:, mc) = w_pos(:, k)
-            df_cur(mc) = df_new
+            sup_cur(mc) = sup_new
             F_out(mc) = w_field(3, k)
-            if (i > ndim_first) then
-              jump_a = jump_a + 1
-            end if
+            it_a = it_a + 1
           else
-            if (i > ndim_first) then
-              jump_r = jump_r + 1
-            end if
+            it_r = it_r + 1
           end if
         end if
       end do
 
-      ! Update the acceptance rate from the aggregate counts so the MH_std
-      ! adaptation above sees a live value.
-      if ((i > ndim_first) .and. (jump_a + jump_r > 0)) then
-        a_rate = DBLE(jump_a) / DBLE(jump_r + jump_a)
+      ! The acceptance rate of this jump iteration across the whole batch
+      ! drives one update of the shared proposal step size, mirroring the
+      ! one update per chain of the serial version.
+      if ((i > ndim_first) .and. (it_a + it_r > 0)) then
+        a_rate = DBLE(it_a) / DBLE(it_a + it_r)
+        call MH_std_update(a_rate)
       end if
     end do
 
-    ! Return the current positions
+    ! Return the current positions.
+    ! The caller decides the emission with the escape probability at the
+    ! final position of each chain; the chain target above deliberately
+    ! does not include it. Failed chains keep their sentinels.
     pos_out = cur_pos
-    df_out = df_cur
+    do mc = 1, M
+      if (ok(mc) .eqv. .true.) then
+        df_out(mc) = Escape_Prob_log(F_out(mc), cur_pos(:, mc), emit)
+      else
+        df_out(mc) = -huge(1.0d0)
+      end if
+    end do
   end subroutine Metropolis_Hastings_rectangle_J_batch
 
   ! Adaptive MH in log space
@@ -1821,40 +1793,47 @@ end function Escape_Prob_log
     double precision, intent(out), dimension(1:3) :: pos_out
     integer                                       :: count, i
     double precision                              :: rnd, alpha
-    double precision, dimension(1:2)              :: std
+    double precision, dimension(1:2)              :: std, prop
     double precision, dimension(1:3)              :: cur_pos, new_pos, field
-    double precision                              :: df_cur, df_new
-    double precision                              :: cur_w, new_w
-    double precision                              :: angle, radius
+    double precision                              :: sup_cur, sup_new ! Log of the electron supply (the chain target)
+    double precision                              :: cur_angle, cur_radius, new_angle, new_radius
+    double precision                              :: r_min, r_max
 
-    !jump_a = 0
-    !jump_r = 0
-    !ndim = ndim_in
+    ! Reset the accepted/rejected jump counters so the acceptance rate
+    ! (and the adaptive MH_std it drives) is computed per chain rather than
+    ! accumulating over the whole simulation.
+    jump_a = 0
+    jump_r = 0
     ndim_in = 0
 
-    !ndim = nint( 2.0d0/(MH_std*sqrt(2.0d0/pi)) )
-    ndim = 25*8
+    ndim = MH_ndim
+    ndim_first = nint(ndim*MH_warmup_frac)
+
+    r_min = emitters_ring(2, emit)                          ! Inner radius of the ring
+    r_max = emitters_ring(2, emit) + emitters_ring(3, emit) ! Outer radius of the ring
+
+    ! The chain moves in the (angle, radius) parametrization of the ring.
+    ! Warmup std: MH_init_std of the full angle range and of the ring width.
+    std(1) = 2.0d0*pi*MH_init_std
+    std(2) = emitters_ring(3, emit)*MH_init_std
 
     ! Get a random initial position on the surface.
-    ! We pick this location from a uniform distribution.
+    ! We pick this location from a uniform distribution in (angle, radius).
     count = 0
     do ! Infinite loop, we try to find a favourable position to start from
-      call random_number(cur_pos(1:2))
-      angle = cur_pos(1)*2.0d0*pi
-      radius = emitters_ring(2,emit) + cur_pos(2)*emitters_ring(3,emit)
-      cur_pos(1) = radius*cos(angle)
-      cur_pos(2) = radius*sin(angle)
+      call random_number(prop)
+      cur_angle = prop(1)*2.0d0*pi
+      cur_radius = r_min + prop(2)*emitters_ring(3, emit)
+      cur_pos(1) = cur_radius*cos(cur_angle)
+      cur_pos(2) = cur_radius*sin(cur_angle)
       cur_pos(3) = 0.0d0 ! On the surface
 
       ! Calculate the electric field at this position
-      ! print *, 'Metropolis: Calc_field_at'
       if (use_polarso .eqv. .true.) then
         field = PL_Calculate_Field_At(cur_pos)
       else
         field = Calc_Field_at(cur_pos)
       end if
-      ! print *, 'Metropolis: w_theta_xy'
-      cur_w = w_theta_xy(cur_pos, emit)
 
       if (field(3) < 0.0d0) then
         exit ! We found a nice spot so we exit the loop
@@ -1862,7 +1841,14 @@ end function Escape_Prob_log
         count = count + 1
         if (count > 10000) then ! The loop is infnite, must stop it at some point.
         ! In field emission it is rare the we reach the CL limit.
+          ! Mark the chain as failed: unfavorable field and zero escape
+          ! probability, so the caller does not emit an electron from it.
           ndim_in = -1
+          F_out = 1.0d0
+          df_out = -huge(1.0d0)
+          pos_out(1) = r_min
+          pos_out(2) = 0.0d0
+          pos_out(3) = 0.0d0
           print *, 'Failed to find spot for emission'
           return ! Exit the function
         end if
@@ -1871,113 +1857,71 @@ end function Escape_Prob_log
 
     F_out = field(3)
 
-    ! Calculate the escape probability at this location
-    if (field(3) < 0.0d0) then
-      !df_cur = Get_Kevin_Jgtf(field(3), T_temp, cur_w)
-      ! print *, 'Metropolis: Escape_Prob_log'
-      df_cur = Escape_Prob_log(field(3), cur_pos, emit)
-    else
-      df_cur = -huge(1.0d0)! Zero escape probabilty if field is not favourable
-    end if
-
-    !write(unit=ud_mh) ndim
-    !print *, ndim
-    !write(unit=ud_mh) cur_pos(1), cur_pos(2), std(1), std(2)
-    !print *, 0, cur_pos(1)/1.0d-9, cur_pos(2)/1.0d-9, std(1)/1.0d-9, std(2)/1.0d-9
-
-    ndim_first = nint(ndim*0.25d0)
+    ! The chain samples positions proportional to the electron supply.
+    ! The log(radius) term is the Jacobian of the (angle, radius)
+    ! parametrization of the ring, so the stationary distribution on the
+    ! ring surface is proportional to the supply per unit area.
+    sup_cur = Elec_Supply_log(field(3), cur_pos, emit) + log(cur_radius)
 
     !---------------------------------------------------------------------------
     ! We now pick a random distance and direction to jump to from our
     ! current location. We do this ndim times.
     do i = 1, ndim
 
-      ! Make first 25% of jumps with std as 5% of emitter length.
+      ! The first MH_warmup_frac of the jumps use the fixed initial std,
+      ! after that the adapted step size. MH_std is only updated between
+      ! chains (see below), so the proposal kernel is fixed within a chain.
       if (i > ndim_first) then
-
-        ! Try to keep the acceptance ratio around 25% by
-        ! changing the standard deviation.
-        CALL RANDOM_NUMBER(rnd) ! Change be a random number
-        if (a_rate < 0.2525d0) then
-          MH_std = MH_std * (1.0d0 - rnd*0.00025d0)
-        else
-          MH_std = MH_std * (1.0d0 + rnd*0.00025d0)
-        end if
-        ! Limits on how big or low the standard deviation can be.
-        if (MH_std > 0.1250d0) then
-          MH_std = 0.1250d0
-        else if (MH_std < 0.00005d0) then
-          MH_std = 0.00005d0
-        end if
-
-        std(1:2) = emitters_ring(3,emit)*MH_std ! Standard deviation for the normal distribution is 0.075% of the emitter length.
-        ! This means that 68% of jumps are less than this value.
-        ! The expected value of the absolute value of the normal distribution is std*sqrt(2/pi).
+        std(1) = 2.0d0*pi*MH_std
+        std(2) = emitters_ring(3, emit)*MH_std
       end if
 
-      ! Find a new position using a normal distribution.
-      !new_pos(1:2) = box_muller(cur_pos(1:2)/length_scale, std)*length_scale
-      ! new_pos(1:2) = box_muller(cur_pos(1:2), std)
-      call random_number(new_pos(1:2))
-      angle = new_pos(1)*2.0d0*pi
-      radius = emitters_ring(2,emit) + new_pos(2)*emitters_ring(3,emit)
-      new_pos(1) = radius*cos(angle)
-      new_pos(2) = radius*sin(angle)
-      new_pos(3) = 0.0d0 ! On the surface
+      ! Find a new position using a normal distribution in (angle, radius).
+      ! The angle wraps around the ring. Proposals outside the radial limits
+      ! of the ring are rejected, the supply is zero off the emitter.
+      prop = box_muller((/cur_angle, cur_radius/), std)
+      new_angle = modulo(prop(1), 2.0d0*pi)
+      new_radius = prop(2)
 
-      ! Make sure that the new position is within the limits of the emitter area.
-      call check_limits_metro_ring(new_pos,emit)
-
-      ! Calculate the field at the new position
-      ! print *, 'Metropolis: Calc_Field_at 2'
-      if (use_polarso .eqv. .true.) then
-        field = PL_Calculate_Field_At(new_pos)
-      else
-        field = Calc_Field_at(new_pos)
-      end if
-      ! print *, 'Metropolis: w_theta_xy 2'
-      new_w = w_theta_xy(new_pos, emit)
-
-      ! Check if the field is favourable for emission at the new position.
-      ! If it is not then cycle, i.e. we reject this location and
-      ! pick another one.
-      if (field(3) >= 0.0d0) then
-        !write(unit=ud_mh) cur_pos(1), cur_pos(2), std(1), std(2)
-        !print *, i, cur_pos(1)/1.0d-9, cur_pos(2)/1.0d-9, std(1)/1.0d-9, std(2)/1.0d-9
-        !print *, 'WARNING UNFAVOURABLE FIELD'
-        !print *, field
-        !print *, new_pos/1.0E-9
-        !print *, nrPart
-        !print *, i
-        !pause
+      if ((new_radius < r_min) .or. (new_radius > r_max)) then
         if (i > ndim_first) then
           jump_r = jump_r + 1
         end if
         cycle ! Do the next loop iteration, i.e. find a new position.
       end if
 
-      ! Calculate the escape probability at the new position, to compair with
+      new_pos(1) = new_radius*cos(new_angle)
+      new_pos(2) = new_radius*sin(new_angle)
+      new_pos(3) = 0.0d0 ! On the surface
+
+      ! Calculate the field at the new position
+      if (use_polarso .eqv. .true.) then
+        field = PL_Calculate_Field_At(new_pos)
+      else
+        field = Calc_Field_at(new_pos)
+      end if
+
+      ! Check if the field is favourable for emission at the new position.
+      ! If it is not the supply there is zero, i.e. we reject this location
+      ! and pick another one.
+      if (field(3) >= 0.0d0) then
+        if (i > ndim_first) then
+          jump_r = jump_r + 1
+        end if
+        cycle ! Do the next loop iteration, i.e. find a new position.
+      end if
+
+      ! Calculate the electron supply at the new position, to compare with
       ! the current position.
-      !df_new = Get_Kevin_Jgtf(field(3), T_temp, new_w)
-      ! print *, 'Metropolis: Escape_Prob_log 2'
-      df_new = Escape_Prob_log(field(3), new_pos, emit)
+      sup_new = Elec_Supply_log(field(3), new_pos, emit) + log(new_radius)
 
-      ! if (abs(cur_w - new_w) > 0.25) then
-      !   print *, df_new / df_cur
-      !   print *, cur_w
-      !   print *, df_cur
-      !   print *, new_w
-      !   print *, df_new
-      !   print *, ''
-      !   pause
-      ! end if
+      alpha = sup_new - sup_cur
 
-      alpha = df_new - df_cur
-
-      if (df_new >= df_cur ) then
+      if (sup_new >= sup_cur) then
         cur_pos = new_pos
-        df_cur = df_new
-        cur_w = new_w
+        cur_angle = new_angle
+        cur_radius = new_radius
+        sup_cur = sup_new
         F_out = field(3)
         if (i > ndim_first) then
           jump_a = jump_a + 1
@@ -1986,8 +1930,9 @@ end function Escape_Prob_log
         CALL RANDOM_NUMBER(rnd)
         if (log(rnd) <= alpha) then
           cur_pos = new_pos
-          df_cur = df_new
-          cur_w = new_w
+          cur_angle = new_angle
+          cur_radius = new_radius
+          sup_cur = sup_new
           F_out = field(3)
           if (i > ndim_first) then
             jump_a = jump_a + 1
@@ -1998,27 +1943,20 @@ end function Escape_Prob_log
           end if
         end if
       end if
-
-      !write(unit=ud_mh) cur_pos(1), cur_pos(2), std(1), std(2)
-      !print *, i, cur_pos(1)/1.0d-9, cur_pos(2)/1.0d-9, std(1)/1.0d-9, std(2)/1.0d-9
     end do
 
-    ! Acceptance rate
-    ! print *, 'Metropolis: DBLE'
-    a_rate = DBLE(jump_a) / DBLE(jump_r + jump_a)
-    !print *, jump_a
-    !print *, jump_r
-    !print *, a_rate
-    !print *, MH_std
-    !print *, std(1:2)/length_scale
-    !print *, ''
+    ! The acceptance rate of this chain drives one update of the shared
+    ! proposal step size.
+    if (jump_a + jump_r > 0) then
+      a_rate = DBLE(jump_a) / DBLE(jump_r + jump_a)
+      call MH_std_update(a_rate)
+    end if
 
-    ! Return the current position
+    ! Return the current position.
+    ! The caller decides the emission with the escape probability at this
+    ! position; the chain target above deliberately does not include it.
     pos_out = cur_pos
-    df_out = df_cur
-
-    !close(unit=ud_mh)
-    !stop
+    df_out = Escape_Prob_log(F_out, cur_pos, emit)
   end subroutine Metropolis_Hastings_ring_J
 
   ! ----------------------------------------------------------------------------
