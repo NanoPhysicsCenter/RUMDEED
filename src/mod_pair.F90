@@ -117,6 +117,12 @@ contains
       ! Update the number of particles in the system
       nrElecIon = nrElec + nrIon
       nrPart = nrElecIon + nrAtom
+
+      ! The charge and mass arrays changed (see particles_charge_rev in
+      ! mod_global). This subroutine is called inside a critical section
+      ! (see the comment at the top), so a plain increment is fine.
+      particles_charge_rev = particles_charge_rev + 1
+
       nrID = nrID + 1
 
       ! if (laplace .eqv. .true.) then
@@ -175,6 +181,10 @@ contains
 
     ! Set the charge to zero. That way it no longer has any effects on calculations.
     particles_charge(i) = 0.0d0
+
+    ! The charge array changed (see particles_charge_rev in mod_global)
+    !$OMP ATOMIC UPDATE
+    particles_charge_rev = particles_charge_rev + 1
 
     ! Take care of the book keeping
     !$OMP ATOMIC UPDATE
@@ -474,10 +484,19 @@ contains
       nrElecIon = nrElec + nrIon
       nrPart = nrElecIon + nrAtom
 
-      particles_mask = .true. ! Reset the mask. .true. means all particles are active.
-      particles_elec_mask = .true. ! Reset the mask. .true. means all particles are active.
-      particles_ion_mask = .true. ! Reset the mask. .true. means all particles are active.
-      particles_atom_mask = .true. ! Reset the mask. .true. means all particles are active.
+      ! Compacting shuffled the charge and mass arrays
+      ! (see particles_charge_rev in mod_global)
+      particles_charge_rev = particles_charge_rev + 1
+
+      ! Reset the masks. .true. means all particles are active. The masks are
+      ! initialized to .true. at startup and marking only ever touches live
+      ! indices, so only the old live range (nrPart was already decremented,
+      ! nrPart_remove not yet cleared) needs the reset: the arrays are
+      ! MAX_PARTICLES (5 million) long.
+      particles_mask(1:nrPart+nrPart_remove) = .true.
+      particles_elec_mask(1:nrPart+nrPart_remove) = .true.
+      particles_ion_mask(1:nrPart+nrPart_remove) = .true.
+      particles_atom_mask(1:nrPart+nrPart_remove) = .true.
 
       ! Reset the number of particles to remove
       nrPart_remove = 0
@@ -897,6 +916,13 @@ contains
     character(len=128)  :: filename
     double precision    :: dist
 
+    ! The nearest-neighbour data is only consumed by the sampled output
+    ! below, so skip the O(N^2) pair sweep entirely on steps where no file
+    ! is written. Without this the sweep ran every step and dominated the
+    ! wall time of large runs (~4x on a 1000-step planar FE benchmark).
+    if (sample_elec_file .eqv. .false.) return
+    if (mod(step, sample_elec_rate) /= 0) return
+
     particles_nearest_dist = 1000.0d0
     !$OMP PARALLEL DO DEFAULT(NONE) &
     !$OMP& PRIVATE(i, j, dist) &
@@ -1108,15 +1134,18 @@ contains
   end subroutine compact_array_2D_double_alt
 
   ! This subroutine uses the pack method.
+  ! Only the 1:m (m = nrPart) range holds live particles, so restrict the
+  ! pack to it: the arrays are MAX_PARTICLES (5 million) long and packing
+  ! their full extent every step dominated Remove_Particles.
   subroutine compact_array_2D_double(A, mask, k, m)
     double precision, dimension(:, :), intent(inout) :: A
     logical, dimension(:), intent(in)                :: mask
     !logical, allocatable, dimension(:, :)            :: mask_2d
     integer, intent(in)                              :: m, k ! m = nrPart
 
-    A(1, :) = pack(A(1, :), mask, A(1, :))
-    A(2, :) = pack(A(2, :), mask, A(2, :))
-    A(3, :) = pack(A(3, :), mask, A(3, :))
+    A(1, 1:m) = pack(A(1, 1:m), mask(1:m), A(1, 1:m))
+    A(2, 1:m) = pack(A(2, 1:m), mask(1:m), A(2, 1:m))
+    A(3, 1:m) = pack(A(3, 1:m), mask(1:m), A(3, 1:m))
 
     ! We could also do! Performance?
     ! A = reshape(pack(A, mask), (/ 3, N/))
@@ -1130,7 +1159,8 @@ contains
     logical, dimension(:), intent(in)             :: mask
     integer, intent(in)                           :: m, k
 
-    A = pack(A, mask, A)
+    ! Restricted to the live range, see compact_array_2D_double.
+    A(1:m) = pack(A(1:m), mask(1:m), A(1:m))
   end subroutine compact_array_1D_double
 
   subroutine compact_array_1D_double_alt(A, mask, k, m)
@@ -1158,7 +1188,8 @@ contains
     logical, dimension(:), intent(in)    :: mask
     integer, intent(in)                  :: m, k
 
-    A = pack(A, mask, A)
+    ! Restricted to the live range, see compact_array_2D_double.
+    A(1:m) = pack(A(1:m), mask(1:m), A(1:m))
   end subroutine compact_array_1D_int
 
   subroutine compact_array_1D_int_alt(A, mask, k, m)
