@@ -154,8 +154,6 @@ module mod_global
   integer, dimension(:), pointer :: particles_atom_pointer  ! From nrAtom to nrPart
   integer, dimension(:), pointer :: particles_inverse_pointer ! From nrPart to nrElec, nrIon, or nrAtom (inverse of the above)
 
-
-
   ! Collision data
   double precision, dimension(:), allocatable :: particles_cur_energy         ! Current kinetic energy of each particle
   double precision, dimension(:), allocatable :: particles_recom_cross_rad    ! Recombination cross section for electrons
@@ -163,7 +161,13 @@ module mod_global
   double precision, dimension(:), allocatable :: particles_ion_cross_rad      ! Ionization cross section radius for electrons
   double precision, dimension(:), allocatable :: particles_tot_cross_sec      ! Total collision cross section for electrons
 
-  
+  ! Incremented by mod_pair whenever particles_charge / particles_mass change
+  ! (adding, removing or compacting particles). The OpenACC code in mod_verlet
+  ! compares it against the revision of its device copies, so the charge and
+  ! mass uploads can be skipped on the (majority of) time steps where only the
+  ! positions changed.
+  integer :: particles_charge_rev = 0
+
   ! Cross Sections
   double precision, allocatable, target, dimension(:, :) :: N2_tot_cross ! Total cross section of N2
   double precision, allocatable, target, dimension(:, :) :: N2_ion_cross ! Ioniaztion cross section of N2
@@ -305,12 +309,15 @@ module mod_global
   ! mh_batch: Run the Metropolis-Hastings chains of the field emission
   ! (mod_field_emission_v2) in lockstep, evaluating the surface field for all
   ! chains in one batch per jump (see Calc_Field_at_Batch in mod_verlet).
-  ! This is much faster, especially with OpenACC GPU offload, but all chains
-  ! see the particle configuration from the start of the time step: electrons
-  ! emitted within the current step do not affect the remaining chains, unlike
-  ! the serial algorithm where each chain sees the electrons added before it.
-  ! Set to .false. in the input file to recover the serial behaviour.
-  logical           :: mh_batch = .true.
+  ! This is much faster, especially with OpenACC GPU offload (set it to
+  ! .true. in the input file for GPU runs), but all chains see the particle
+  ! configuration from the start of the time step: electrons emitted within
+  ! the current step do not affect the remaining chains, unlike the serial
+  ! algorithm where each chain sees the electrons added before it. The two
+  ! settings agree statistically, but not run for run, so the default is
+  ! .false.: existing input files keep the serial sampling behaviour (and
+  ! bit-identical results) they had before the batch algorithm was added.
+  logical           :: mh_batch = .false.
 
   ! ----------------------------------------------------------------------------
   ! Define constants

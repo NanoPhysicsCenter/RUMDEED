@@ -39,13 +39,15 @@ NREMIT
 IMAGE_CHARGE
     Boolean (.TRUE. / .FALSE.) if system should include image charge effects.
 MH_BATCH
-    Boolean, defaults to .TRUE.. Only used in planar field emission (mode 10). Advances all
-    Metropolis-Hastings chains of a time step in lockstep and evaluates the surface field for
-    all of them in batches, which is much faster (and required for the emission to benefit
-    from OpenACC GPU offload). All chains then sample the particle configuration from the
-    start of the time step, whereas with .FALSE. each chain runs to completion in turn and
-    sees the electrons emitted before it within the same step. The two settings agree
-    statistically. Set to .FALSE. to recover the exact serial sampling behaviour.
+    Boolean, defaults to .FALSE.. Only used in planar field emission (mode 10). When set to
+    .TRUE. all Metropolis-Hastings chains of a time step advance in lockstep and the surface
+    field is evaluated for all of them in batches, which is much faster (and required for the
+    emission to benefit from OpenACC GPU offload — set it to .TRUE. in GPU runs). All chains
+    then sample the particle configuration from the start of the time step, whereas with the
+    default .FALSE. each chain runs to completion in turn and sees the electrons emitted
+    before it within the same step. The two settings agree statistically, but not run for
+    run; the default .FALSE. keeps the serial sampling behaviour (and its results) of
+    versions that predate this option.
 EMITTERS_DIM(1:3, <EMITTER NUMBER>)
     Dimensions of the emitter given as three numbers in nano-meters [nm].
     If the emitter is a circle, the first number is interpreted as the radius of the emitter,

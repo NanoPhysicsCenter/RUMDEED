@@ -9,6 +9,7 @@ module mod_manual_emission
     use mod_global
     use mod_pair
     use mod_verlet
+    use mod_field_emission_v2, only: E_zunit_planar
     implicit none
 
     PRIVATE
@@ -45,7 +46,8 @@ module mod_manual_emission
     ptr_Image_Charge_effect => Force_Image_charges_v2
 
     ! The unit electric field used for the Ramo current
-    ptr_E_zunit => E_zunit_planar_manual
+    ! (reused from mod_field_emission_v2, the planar geometry is the same)
+    ptr_E_zunit => E_zunit_planar
 
     ! Parameters used in the module
     time_step_div_q0 = time_step / q_0
@@ -58,16 +60,6 @@ module mod_manual_emission
   subroutine Clean_Up_Manual()
     deallocate(nrEmitted_emitters)
   end subroutine Clean_Up_Manual
-
-  function E_zunit_planar_manual(pos)
-    double precision, dimension(1:3), intent(in) :: pos ! Position to calculate the E_z unit vector at
-    double precision, dimension(1:3)             :: E_zunit_planar_manual
-
-    ! The z-component of the electric field is always -1.0d0/d in planar geometry
-    E_zunit_planar_manual(1:2) = 0.0d0
-    E_zunit_planar_manual(3) = -1.0d0/d
-
-  end function E_zunit_planar_manual
 
     !-----------------------------------------------------------------------------
     ! This subroutine gets called from main when the emitters should emit the electrons

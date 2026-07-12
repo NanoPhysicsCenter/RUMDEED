@@ -33,6 +33,25 @@ Module mod_verlet
   logical, private :: acc_par_resident = .false. ! Device copy is current
   integer, private :: acc_par_np = 0             ! Number of particles in the device copy
 
+  ! The particles_charge_rev (mod_global) values that the device copies of
+  ! particles_charge and particles_mass were uploaded at. The charge and mass
+  ! only change when particles are added, removed or compacted, so comparing
+  ! these against particles_charge_rev lets the uploads below skip the two
+  ! arrays on the (majority of) time steps where only the positions moved.
+  integer, private :: acc_charge_rev = -1
+  integer, private :: acc_mass_rev = -1
+
+  ! Persistent staging buffers for Calc_Field_at_Batch (OpenACC builds).
+  ! The batch points and fields pass through these device-resident buffers
+  ! with "update" transfers instead of per-call copyin/copyout data regions:
+  ! the subroutine is called once per Metropolis-Hastings round (about a
+  ! thousand times per emission step) and creating and deleting the device
+  ! copies dominated the cost of the small batches. Allocated on first use,
+  ! grown if a larger batch ever shows up, never freed (process lifetime,
+  ! like the particle arrays above).
+  double precision, allocatable, private :: acc_batch_pos(:, :)
+  double precision, allocatable, private :: acc_batch_field(:, :)
+
   ! Geometries implemented by the OpenACC kernels (see ACC_Geometry)
   integer, parameter :: ACC_GEOM_OTHER  = 0 ! Not implemented, use the OpenMP code path
   integer, parameter :: ACC_GEOM_PLANAR = 1 ! field_E_planar + Force_Image_charges_v2
@@ -63,7 +82,11 @@ contains
     if ((ACC_Geometry() /= ACC_GEOM_OTHER) .and. (nrPart > 0)) then
       call Ensure_Device_Particles()
       np = nrPart
-      !$acc update device(particles_cur_pos(1:3, 1:np), particles_charge(1:np))
+      !$acc update device(particles_cur_pos(1:3, 1:np))
+      if (acc_charge_rev /= particles_charge_rev) then
+        !$acc update device(particles_charge(1:np))
+        acc_charge_rev = particles_charge_rev
+      end if
       acc_par_resident = .true.
       acc_par_np = np
     end if
@@ -557,6 +580,7 @@ contains
     double precision                 :: pre_fac_c
     integer                          :: i, j, k_1, k_2
     double precision, allocatable    :: inv_mass(:)
+    double precision, allocatable    :: accel_sum(:, :)
 
 #ifdef _OPENACC
     ! GPU path: the planar and hyperboloid tip geometries are implemented on
@@ -579,13 +603,22 @@ contains
     end do
     !$OMP END PARALLEL DO
 
+    ! The pair loop reduces into accel_sum, an allocatable sized to the current
+    ! nrPart, instead of reducing over particles_cur_accel directly. Reduction
+    ! private copies of a fixed-size array the size of MAX_PARTICLES land on the
+    ! thread stacks (3 x MAX_PARTICLES x 8 bytes per thread), which overflows the
+    ! default process/OMP stack limits with ifx. The allocatable copies are heap
+    ! allocated and only 3 x nrPart.
+    allocate(accel_sum(1:3, 1:nrPart))
+    accel_sum = 0.0d0
+
     ! We do not use GUIDED scheduling in OpenMP here because the inner loop changes size.
     !$OMP PARALLEL DO DEFAULT(NONE) PRIVATE(i, j, k_1, k_2, pos_1, pos_2, diff, r, inv_r3, pos_ic) &
     !$OMP& PRIVATE(force_E, force_c, force_ic, force_ic_N, force_ic_self, im_1, q_1, qd_1, im_2, q_2, pre_fac_c) &
     !$OMP& SHARED(nrPart, particles_cur_pos, particles_mass, inv_mass, particles_species, ptr_field_E, box_dim) &
     !$OMP& SHARED(ptr_Image_Charge_effect, particles_charge, d) &
     !$OMP& SCHEDULE(DYNAMIC, 1) &
-    !$OMP& REDUCTION(+:particles_cur_accel)
+    !$OMP& REDUCTION(+:accel_sum)
     do i = 1, nrPart
       if (particles_species(i) == species_atom) cycle
       ! Information about the particle we are calculating the force/acceleration on
@@ -673,17 +706,16 @@ contains
         ! force_ic = force_ic + (-1.0d0)*pre_fac_c * diff / r**3
 
 
-        !!!$OMP CRITICAL(ACCEL_UPDATE)
-        particles_cur_accel(:, j) = particles_cur_accel(:, j) + im_2*(force_ic_N - force_c)
-        particles_cur_accel(:, i) = particles_cur_accel(:, i) + im_1*(force_c + force_ic)
-        !!!$OMP END CRITICAL(ACCEL_UPDATE)
+        accel_sum(:, j) = accel_sum(:, j) + im_2*(force_ic_N - force_c)
+        accel_sum(:, i) = accel_sum(:, i) + im_1*(force_c + force_ic)
       end do
 
-      !!!$OMP CRITICAL(ACCEL_UPDATE)
-      particles_cur_accel(:, i) = particles_cur_accel(:, i) + force_E * im_1 + force_ic_self * im_1
-      !!!$OMP END CRITICAL(ACCEL_UPDATE)
+      accel_sum(:, i) = accel_sum(:, i) + force_E * im_1 + force_ic_self * im_1
     end do
     !$OMP END PARALLEL DO
+
+    ! Fold the summed pair forces into the acceleration array
+    particles_cur_accel(:, 1:nrPart) = particles_cur_accel(:, 1:nrPart) + accel_sum
 
     !print *, 'Accel'
     !print *, particles_cur_accel(:, 1:nrPart)
@@ -717,13 +749,21 @@ contains
     double precision                  ::  pre_fac_c
     integer                           ::  i, j, k, l, m, n
     integer                           ::  k_1, k_2
+    double precision, allocatable     ::  accel_sum(:, :)
+
+    ! The pair loops reduce into accel_sum, a heap-allocated nrPart-sized array,
+    ! instead of updating particles_cur_accel under OMP CRITICAL (which
+    ! serializes the accumulation). See Calculate_Acceleration_Particles.
+    allocate(accel_sum(1:3, 1:nrPart))
+    accel_sum = 0.0d0
 
     ! We do not use GUIDED scheduling in OpenMP here because the inner loop changes size.
     !$OMP PARALLEL DO DEFAULT(NONE) &
     !$OMP& PRIVATE(i, j, k, l, m, n, k_1, k_2, pos_1, pos_2, diff, r, pos_ic) &
     !$OMP& PRIVATE(force_E, force_c, force_ic, force_ic_N, force_ic_self, im_1, q_1, im_2, q_2, pre_fac_c) &
     !$OMP& SHARED(nrElec, nrIon, particles_elec_pointer, particles_ion_pointer, particles_cur_pos, particles_mass, particles_species, ptr_field_E, box_dim) &
-    !$OMP& SHARED(ptr_Image_Charge_effect, particles_charge, particles_cur_accel, d)
+    !$OMP& SHARED(ptr_Image_Charge_effect, particles_charge, d) &
+    !$OMP& REDUCTION(+:accel_sum)
 
     do k = 1, nrElec
       i = particles_elec_pointer(k)
@@ -808,13 +848,8 @@ contains
         ! r = sqrt( sum(diff**2) ) + length_scale**3
         ! force_ic = force_ic + (-1.0d0)*pre_fac_c * diff / r**3
 
-        !$OMP CRITICAL
-        particles_cur_accel(:, j) = particles_cur_accel(:, j) - force_c * im_2 + force_ic_N * im_2
-        !$OMP END CRITICAL
-
-        !$OMP CRITICAL
-        particles_cur_accel(:, i) = particles_cur_accel(:, i) + force_c * im_1 + force_ic   * im_1
-        !$OMP END CRITICAL
+        accel_sum(:, j) = accel_sum(:, j) - force_c * im_2 + force_ic_N * im_2
+        accel_sum(:, i) = accel_sum(:, i) + force_c * im_1 + force_ic   * im_1
       end do
 
       do m = 1, nrIon
@@ -844,20 +879,16 @@ contains
         force_ic_N(1:2) = -1.0d0*force_ic(1:2)
         force_ic_N(3)   = +1.0d0*force_ic(3)
 
-        !$OMP CRITICAL
-        particles_cur_accel(:, n) = particles_cur_accel(:, n) - force_c * im_2 + force_ic_N * im_2
-        !$OMP END CRITICAL
-
-        !$OMP CRITICAL
-        particles_cur_accel(:, i) = particles_cur_accel(:, i) + force_c * im_1 + force_ic   * im_1
-        !$OMP END CRITICAL
+        accel_sum(:, n) = accel_sum(:, n) - force_c * im_2 + force_ic_N * im_2
+        accel_sum(:, i) = accel_sum(:, i) + force_c * im_1 + force_ic   * im_1
       end do
 
-      !$OMP CRITICAL
-      particles_cur_accel(:, i) = particles_cur_accel(:, i) + force_E * im_1 + force_ic_self * im_1
-      !$OMP END CRITICAL
+      accel_sum(:, i) = accel_sum(:, i) + force_E * im_1 + force_ic_self * im_1
     end do
     !$OMP END PARALLEL DO
+
+    ! Fold the summed pair forces into the acceleration array
+    particles_cur_accel(:, 1:nrPart) = particles_cur_accel(:, 1:nrPart) + accel_sum
 
     !print *, 'Accel'
     !print *, particles_cur_accel(:, 1:nrPart)
@@ -878,13 +909,21 @@ contains
     double precision                  ::  pre_fac_c
     integer                           ::  i, j, k, l
     integer                           ::  k_1, k_2
+    double precision, allocatable     ::  accel_sum(:, :)
+
+    ! The pair loop reduces into accel_sum, a heap-allocated nrPart-sized array,
+    ! instead of updating particles_cur_accel under OMP CRITICAL (which
+    ! serializes the accumulation). See Calculate_Acceleration_Particles.
+    allocate(accel_sum(1:3, 1:nrPart))
+    accel_sum = 0.0d0
 
     ! We do not use GUIDED scheduling in OpenMP here because the inner loop changes size.
     !$OMP PARALLEL DO DEFAULT(NONE) &
     !$OMP& PRIVATE(i, j, k, l, k_1, k_2, pos_1, pos_2, diff, r, pos_ic) &
     !$OMP& PRIVATE(force_E, force_c, force_ic, force_ic_N, force_ic_self, im_1, q_1, im_2, q_2, pre_fac_c) &
     !$OMP& SHARED(nrIon, particles_ion_pointer, particles_cur_pos, particles_mass, particles_species, ptr_field_E, box_dim) &
-    !$OMP& SHARED(ptr_Image_Charge_effect, particles_charge, particles_cur_accel, d)
+    !$OMP& SHARED(ptr_Image_Charge_effect, particles_charge, d) &
+    !$OMP& REDUCTION(+:accel_sum)
 
     do k = 1, nrIon
       i = particles_ion_pointer(k)
@@ -933,20 +972,16 @@ contains
         force_ic_N(1:2) = -1.0d0*force_ic(1:2)
         force_ic_N(3)   = +1.0d0*force_ic(3)
 
-        !$OMP CRITICAL
-        particles_cur_accel(:, j) = particles_cur_accel(:, j) - force_c * im_2 + force_ic_N * im_2
-        !$OMP END CRITICAL
-
-        !$OMP CRITICAL
-        particles_cur_accel(:, i) = particles_cur_accel(:, i) + force_c * im_1 + force_ic   * im_1
-        !$OMP END CRITICAL
+        accel_sum(:, j) = accel_sum(:, j) - force_c * im_2 + force_ic_N * im_2
+        accel_sum(:, i) = accel_sum(:, i) + force_c * im_1 + force_ic   * im_1
       end do
 
-      !$OMP CRITICAL
-      particles_cur_accel(:, i) = particles_cur_accel(:, i) + force_E * im_1 + force_ic_self * im_1
-      !$OMP END CRITICAL
+      accel_sum(:, i) = accel_sum(:, i) + force_E * im_1 + force_ic_self * im_1
     end do
     !$OMP END PARALLEL DO
+
+    ! Fold the summed pair forces into the acceleration array
+    particles_cur_accel(:, 1:nrPart) = particles_cur_accel(:, 1:nrPart) + accel_sum
 
     !print *, 'Accel'
     !print *, particles_cur_accel(:, 1:nrPart)
@@ -1015,8 +1050,9 @@ contains
   ! and passing local scalars to them from inside a parallel region
   ! miscompiles with nvfortran 26.5 in multicore mode; and a single unified
   ! loop with per-pair geometry branches costs about 3x on an A100 through
-  ! register pressure, so the loops are specialized per geometry even though
-  ! that duplicates some code.
+  ! register pressure, so the loops are specialized per geometry. The inlined
+  ! geometry formulas live in the acc_*.inc include files, which this kernel
+  ! shares with Calc_Field_at_Batch, so each formula is written out once.
   !
   ! When compiled without OpenACC the !$acc directives are comments and this
   ! subroutine simply runs serially, it is only called from the _OPENACC
@@ -1030,7 +1066,7 @@ contains
     double precision :: af, sz, pre_E_tip, z_0_tip, Rsp_tip ! Tip geometry parameters
     double precision :: x_1, y_1, z_1, q_1, qd_1, im_1
     double precision :: x_2, y_2, z_2, q_2, pre_fac_c
-    double precision :: a_x, a_y, a_z, f_x, f_y, f_z, sgn_xy
+    double precision :: a_x, a_y, a_z, ic_x, ic_y, ic_z, sgn_xy
     double precision :: x_a, y_a, z_a, x_b, y_b, z_b ! Image charge pair roles
     double precision :: fE_x, fE_y, fE_z
     double precision :: diff_x, diff_y, diff_z, dxy2, z_ic
@@ -1055,11 +1091,20 @@ contains
     Rsp_tip   = r_tip
 
     ! The particles have just been moved by the Verlet step, so the device
-    ! copy is always refreshed here, and any residency window that is still
-    ! open is stale by definition.
+    ! copy of the positions is always refreshed here, and any residency
+    ! window that is still open is stale by definition. The charge and mass
+    ! are only re-uploaded when they actually changed (see acc_charge_rev).
     call Ensure_Device_Particles()
     call Release_Device_Particles()
-    !$acc update device(particles_cur_pos(1:3, 1:Np), particles_charge(1:Np), particles_mass(1:Np))
+    !$acc update device(particles_cur_pos(1:3, 1:Np))
+    if (acc_charge_rev /= particles_charge_rev) then
+      !$acc update device(particles_charge(1:Np))
+      acc_charge_rev = particles_charge_rev
+    end if
+    if (acc_mass_rev /= particles_charge_rev) then
+      !$acc update device(particles_mass(1:Np))
+      acc_mass_rev = particles_charge_rev
+    end if
 
     if (geom == ACC_GEOM_PLANAR) then
 
@@ -1120,56 +1165,11 @@ contains
             z_b = z_1
           end if
 
-          ! (Force_Image_charges_v2 inlined, see that function for details)
-          ! n = 0: Opposite charge partner below the bottom plane
-          z_ic = -1.0d0*z_b
-          diff_z = z_a - z_ic
-          r = sqrt( dxy2 + diff_z**2 ) + length_scale**2
-          inv_r3 = 1.0d0 / (r*r*r)
-          f_x = -diff_x*inv_r3
-          f_y = -diff_y*inv_r3
-          f_z = -diff_z*inv_r3
+#include "acc_ic_planar_series.inc"
 
-          !$acc loop seq
-          do n = 1, Nic
-            ! Opposite charge partners, plus and minus n
-            z_ic = 2.0d0*n*d_loc - z_b
-            diff_z = z_a - z_ic
-            r = sqrt( dxy2 + diff_z**2 ) + length_scale**2
-            inv_r3 = 1.0d0 / (r*r*r)
-            f_x = f_x - diff_x*inv_r3
-            f_y = f_y - diff_y*inv_r3
-            f_z = f_z - diff_z*inv_r3
-
-            z_ic = -2.0d0*n*d_loc - z_b
-            diff_z = z_a - z_ic
-            r = sqrt( dxy2 + diff_z**2 ) + length_scale**2
-            inv_r3 = 1.0d0 / (r*r*r)
-            f_x = f_x - diff_x*inv_r3
-            f_y = f_y - diff_y*inv_r3
-            f_z = f_z - diff_z*inv_r3
-
-            ! Same charge partners, plus and minus n
-            z_ic = 2.0d0*n*d_loc + z_b
-            diff_z = z_a - z_ic
-            r = sqrt( dxy2 + diff_z**2 ) + length_scale**2
-            inv_r3 = 1.0d0 / (r*r*r)
-            f_x = f_x + diff_x*inv_r3
-            f_y = f_y + diff_y*inv_r3
-            f_z = f_z + diff_z*inv_r3
-
-            z_ic = -2.0d0*n*d_loc + z_b
-            diff_z = z_a - z_ic
-            r = sqrt( dxy2 + diff_z**2 ) + length_scale**2
-            inv_r3 = 1.0d0 / (r*r*r)
-            f_x = f_x + diff_x*inv_r3
-            f_y = f_y + diff_y*inv_r3
-            f_z = f_z + diff_z*inv_r3
-          end do
-
-          a_x = a_x + pre_fac_c*f_x
-          a_y = a_y + pre_fac_c*f_y
-          a_z = a_z + pre_fac_c*f_z
+          a_x = a_x + pre_fac_c*ic_x
+          a_y = a_y + pre_fac_c*ic_y
+          a_z = a_z + pre_fac_c*ic_z
         end if
       end do
 
@@ -1245,54 +1245,21 @@ contains
           end if
 
           ! Image charge effects of the sphere at the top of the tip
-          ! (Sphere_IC_field inlined, see mod_hyperboloid_tip). Note that
-          ! unlike the planar case this includes the q_0/(4*pi*epsilon_0)
-          ! factor, exactly like the original function does.
-          dis_a = sqrt(x_a**2 + y_a**2 + (z_a - z_0_tip)**2)
+          ! (Sphere_IC_field inlined, see the include files for details).
 
-          z_im = z_0_tip + Rsp_tip**2 / ( sqrt(1 + x_a**2/(z_a - z_0_tip)**2 + y_a**2/(z_a - z_0_tip)**2) * dis_a )
-          x_im = (z_im - z_0_tip) * x_a / (z_a - z_0_tip)
-          y_im = (z_im - z_0_tip) * y_a / (z_a - z_0_tip)
+#include "acc_tip_image_point.inc"
+#include "acc_tip_ic_force.inc"
 
-          tmp_dis_a = ( (x_b - x_a)**2 + (y_b - y_a)**2 + (z_b - z_a)**2 )**(3.0d0/2.0d0)
-          tmp_dis_b = ( (x_b - x_im)**2 + (y_b - y_im)**2 + (z_b - z_im)**2 )**(3.0d0/2.0d0)
-
-          f_x = 1.0d0*q_0/(4.0d0*pi*epsilon_0) * ( (x_a - x_b)/tmp_dis_a - (Rsp_tip*(x_im - x_b))/(dis_a*tmp_dis_b) )
-          f_y = 1.0d0*q_0/(4.0d0*pi*epsilon_0) * ( (y_a - y_b)/tmp_dis_a - (Rsp_tip*(y_im - y_b))/(dis_a*tmp_dis_b) )
-          f_z = 1.0d0*q_0/(4.0d0*pi*epsilon_0) * ( (z_a - z_b)/tmp_dis_a - (Rsp_tip*(z_im - z_b))/(dis_a*tmp_dis_b) )
-
-          a_x = a_x + pre_fac_c*sgn_xy*f_x
-          a_y = a_y + pre_fac_c*sgn_xy*f_y
-          a_z = a_z + pre_fac_c*f_z
+          a_x = a_x + pre_fac_c*sgn_xy*ic_x
+          a_y = a_y + pre_fac_c*sgn_xy*ic_y
+          a_z = a_z + pre_fac_c*ic_z
         end if
       end do
 
       ! Add the vacuum electric field, F = q*field_E(pos), and convert the
-      ! total force to acceleration.
-      ! field_E_Hyperboloid inlined (see mod_hyperboloid_tip), with the
-      ! prolate spheroidal coordinates xi_coor / eta_coor / phi_coor.
-      r_p = sqrt(x_1**2 + y_1**2 + (z_1 + af - sz)**2)
-      r_m = sqrt(x_1**2 + y_1**2 + (z_1 - af - sz)**2)
-      xi  = (r_p + r_m) / (2.0d0*af)
-      eta = (r_p - r_m) / (2.0d0*af)
-      if ((abs(x_1) < 1.0d-18) .and. (abs(y_1) < 1.0d-18)) then
-        phi = 0.0d0
-      else
-        phi = atan2(y_1, x_1)
-      end if
+      ! total force to acceleration (field_E_Hyperboloid inlined).
 
-      pre_fac_xyz = pre_E_tip * 1.0d0/(xi**2 - eta**2)
-
-      ! If we are near the tip then the x and y components should be zero
-      if (abs(xi - 1.0d0) < 1.0d-6) then
-        fac_xy = 0.0d0
-      else
-        fac_xy = eta * sqrt( (xi**2 - 1.0d0)/(1.0d0 - eta**2) )
-      end if
-
-      fE_x = -1.0d0*pre_fac_xyz * fac_xy * cos(phi)
-      fE_y = -1.0d0*pre_fac_xyz * fac_xy * sin(phi)
-      fE_z = pre_fac_xyz * xi
+#include "acc_tip_field_E.inc"
 
       im_1 = 1.0d0 / particles_mass(i)
       particles_cur_accel(1, i) = (a_x + q_1*fE_x) * im_1
@@ -1516,12 +1483,14 @@ contains
     integer          :: m_i
 #ifdef _OPENACC
     integer          :: j, n, Np, Nic, geom
+    integer          :: t, nt, tile, j0, j1 ! Particle-sum tiling, see below
     logical          :: do_ic
     double precision :: Ez_loc, d_loc
     double precision :: af, sz, pre_E_tip, z_0_tip, Rsp_tip ! Tip geometry parameters
     double precision :: x_1, y_1, z_1
     double precision :: x_2, y_2, z_2, pre_fac_c
     double precision :: f_x, f_y, f_z, ic_x, ic_y, ic_z
+    double precision :: x_a, y_a, z_a, x_b, y_b, z_b ! Image charge pair roles
     double precision :: fE_x, fE_y, fE_z
     double precision :: diff_x, diff_y, diff_z, dxy2, z_ic
     double precision :: r, inv_r3
@@ -1561,11 +1530,45 @@ contains
       end if
 
       ! Upload the particle data unless a residency window
-      ! (Particles_To_Device) has already put the current copy there.
+      ! (Particles_To_Device) has already put the current copy there. The
+      ! charge is only re-uploaded when it actually changed (see
+      ! acc_charge_rev).
       call Ensure_Device_Particles()
       if ((acc_par_resident .eqv. .false.) .or. (acc_par_np /= Np)) then
-        !$acc update device(particles_cur_pos(1:3, 1:Np), particles_charge(1:Np))
+        !$acc update device(particles_cur_pos(1:3, 1:Np))
+        if (acc_charge_rev /= particles_charge_rev) then
+          !$acc update device(particles_charge(1:Np))
+          acc_charge_rev = particles_charge_rev
+        end if
       end if
+
+      ! Make sure the staging buffers exist and hold at least M points.
+      if (allocated(acc_batch_pos)) then
+        if (size(acc_batch_pos, 2) < M) then
+          !$acc exit data delete(acc_batch_pos, acc_batch_field)
+          deallocate(acc_batch_pos, acc_batch_field)
+        end if
+      end if
+      if (allocated(acc_batch_pos) .eqv. .false.) then
+        allocate(acc_batch_pos(1:3, 1:max(M, 1024)))
+        allocate(acc_batch_field(1:3, 1:max(M, 1024)))
+        !$acc enter data create(acc_batch_pos, acc_batch_field)
+      end if
+      acc_batch_pos(1:3, 1:M) = pos_in(1:3, 1:M)
+      !$acc update device(acc_batch_pos(1:3, 1:M)) async(1)
+
+      ! One gang per point starves the GPU at the small M of the
+      ! Metropolis-Hastings rounds (median a few tens of points, on an A100
+      ! with 108 SMs), so the particle sum is additionally split over nt
+      ! gang-level tiles that accumulate into the field with atomics, after
+      ! a first small kernel seeds the field with the vacuum contribution.
+      ! nt = 1 recovers the one-gang-per-point shape for large batches, and
+      ! the tile stays at least about a vector width so the inner reduction
+      ! loop stays full. Everything runs on one async queue, so the host
+      ! pays a single synchronization per batch, at the final download.
+      nt = max(432/M, 1) ! ~4 gangs per SM when M is small
+      nt = min(nt, max(Np/128, 1))
+      tile = (Np + nt - 1)/nt
 
       ! The image charge effect is evaluated directly at (point, particle),
       ! exactly like Calc_Field_at does. The geometry functions are inlined
@@ -1573,20 +1576,33 @@ contains
       ! Calculate_Acceleration_Particles_ACC (see the comment there).
       if (geom == ACC_GEOM_PLANAR) then
 
-      !$acc parallel loop gang &
-      !$acc& copyin(pos_in(1:3, 1:M)) copyout(field_out(1:3, 1:M)) &
-      !$acc& present(particles_cur_pos, particles_charge)
+      ! Seed with the vacuum electric field (field_E_planar)
+      !$acc parallel loop gang vector present(acc_batch_field) async(1)
       do m_i = 1, M
-        x_1 = pos_in(1, m_i)
-        y_1 = pos_in(2, m_i)
-        z_1 = pos_in(3, m_i)
+        acc_batch_field(1, m_i) = 0.0d0
+        acc_batch_field(2, m_i) = 0.0d0
+        acc_batch_field(3, m_i) = Ez_loc
+      end do
+      !$acc end parallel loop
+
+      !$acc parallel loop collapse(2) gang &
+      !$acc& present(acc_batch_pos, acc_batch_field, particles_cur_pos, particles_charge) &
+      !$acc& async(1)
+      do m_i = 1, M
+        do t = 1, nt
+        x_1 = acc_batch_pos(1, m_i)
+        y_1 = acc_batch_pos(2, m_i)
+        z_1 = acc_batch_pos(3, m_i)
 
         f_x = 0.0d0
         f_y = 0.0d0
         f_z = 0.0d0
 
+        j0 = (t - 1)*tile + 1
+        j1 = min(t*tile, Np)
+
         !$acc loop vector reduction(+:f_x, f_y, f_z)
-        do j = 1, Np
+        do j = j0, j1
           x_2 = particles_cur_pos(1, j)
           y_2 = particles_cur_pos(2, j)
           z_2 = particles_cur_pos(3, j)
@@ -1606,53 +1622,12 @@ contains
           f_z = f_z + pre_fac_c*inv_r3*diff_z
 
           ! Field from the image charge partners of the particle
-          ! (Force_Image_charges_v2 inlined, see that function for details).
+          ! (Force_Image_charges_v2 inlined, see the include file for details).
           if (do_ic .eqv. .true.) then
-            ! n = 0: Opposite charge partner below the bottom plane
-            z_ic = -1.0d0*z_2
-            diff_z = z_1 - z_ic
-            r = sqrt( dxy2 + diff_z**2 ) + length_scale**2
-            inv_r3 = 1.0d0 / (r*r*r)
-            ic_x = -diff_x*inv_r3
-            ic_y = -diff_y*inv_r3
-            ic_z = -diff_z*inv_r3
+            z_a = z_1 ! Evaluate at the field point
+            z_b = z_2 ! The partners are those of particle j
 
-            !$acc loop seq
-            do n = 1, Nic
-              ! Opposite charge partners, plus and minus n
-              z_ic = 2.0d0*n*d_loc - z_2
-              diff_z = z_1 - z_ic
-              r = sqrt( dxy2 + diff_z**2 ) + length_scale**2
-              inv_r3 = 1.0d0 / (r*r*r)
-              ic_x = ic_x - diff_x*inv_r3
-              ic_y = ic_y - diff_y*inv_r3
-              ic_z = ic_z - diff_z*inv_r3
-
-              z_ic = -2.0d0*n*d_loc - z_2
-              diff_z = z_1 - z_ic
-              r = sqrt( dxy2 + diff_z**2 ) + length_scale**2
-              inv_r3 = 1.0d0 / (r*r*r)
-              ic_x = ic_x - diff_x*inv_r3
-              ic_y = ic_y - diff_y*inv_r3
-              ic_z = ic_z - diff_z*inv_r3
-
-              ! Same charge partners, plus and minus n
-              z_ic = 2.0d0*n*d_loc + z_2
-              diff_z = z_1 - z_ic
-              r = sqrt( dxy2 + diff_z**2 ) + length_scale**2
-              inv_r3 = 1.0d0 / (r*r*r)
-              ic_x = ic_x + diff_x*inv_r3
-              ic_y = ic_y + diff_y*inv_r3
-              ic_z = ic_z + diff_z*inv_r3
-
-              z_ic = -2.0d0*n*d_loc + z_2
-              diff_z = z_1 - z_ic
-              r = sqrt( dxy2 + diff_z**2 ) + length_scale**2
-              inv_r3 = 1.0d0 / (r*r*r)
-              ic_x = ic_x + diff_x*inv_r3
-              ic_y = ic_y + diff_y*inv_r3
-              ic_z = ic_z + diff_z*inv_r3
-            end do
+#include "acc_ic_planar_series.inc"
 
             f_x = f_x + pre_fac_c*ic_x
             f_y = f_y + pre_fac_c*ic_y
@@ -1660,29 +1635,63 @@ contains
           end if
         end do
 
-        ! Add the vacuum electric field (field_E_planar)
-        field_out(1, m_i) = f_x
-        field_out(2, m_i) = f_y
-        field_out(3, m_i) = f_z + Ez_loc
+        !$acc atomic update
+        acc_batch_field(1, m_i) = acc_batch_field(1, m_i) + f_x
+        !$acc atomic update
+        acc_batch_field(2, m_i) = acc_batch_field(2, m_i) + f_y
+        !$acc atomic update
+        acc_batch_field(3, m_i) = acc_batch_field(3, m_i) + f_z
+        end do
       end do
       !$acc end parallel loop
 
       else ! ACC_GEOM_TIP
 
-      !$acc parallel loop gang &
-      !$acc& copyin(pos_in(1:3, 1:M)) copyout(field_out(1:3, 1:M)) &
-      !$acc& present(particles_cur_pos, particles_charge)
+      ! Seed with the vacuum electric field (field_E_Hyperboloid inlined)
+      !$acc parallel loop gang vector present(acc_batch_pos, acc_batch_field) async(1)
       do m_i = 1, M
-        x_1 = pos_in(1, m_i)
-        y_1 = pos_in(2, m_i)
-        z_1 = pos_in(3, m_i)
+        x_1 = acc_batch_pos(1, m_i)
+        y_1 = acc_batch_pos(2, m_i)
+        z_1 = acc_batch_pos(3, m_i)
+
+#include "acc_tip_field_E.inc"
+
+        acc_batch_field(1, m_i) = fE_x
+        acc_batch_field(2, m_i) = fE_y
+        acc_batch_field(3, m_i) = fE_z
+      end do
+      !$acc end parallel loop
+
+      !$acc parallel loop collapse(2) gang &
+      !$acc& present(acc_batch_pos, acc_batch_field, particles_cur_pos, particles_charge) &
+      !$acc& async(1)
+      do m_i = 1, M
+        do t = 1, nt
+        x_1 = acc_batch_pos(1, m_i)
+        y_1 = acc_batch_pos(2, m_i)
+        z_1 = acc_batch_pos(3, m_i)
+
+        ! Unlike Calc_Field_at (and the pair loops), the image charge here is
+        ! that of the field point itself, so its position only depends on the
+        ! point: compute it once per (point, tile) instead of once per
+        ! particle in the loop below.
+        if (do_ic .eqv. .true.) then
+          x_a = x_1
+          y_a = y_1
+          z_a = z_1
+
+#include "acc_tip_image_point.inc"
+        end if
 
         f_x = 0.0d0
         f_y = 0.0d0
         f_z = 0.0d0
 
+        j0 = (t - 1)*tile + 1
+        j1 = min(t*tile, Np)
+
         !$acc loop vector reduction(+:f_x, f_y, f_z)
-        do j = 1, Np
+        do j = j0, j1
           x_2 = particles_cur_pos(1, j)
           y_2 = particles_cur_pos(2, j)
           z_2 = particles_cur_pos(3, j)
@@ -1700,24 +1709,15 @@ contains
           f_y = f_y + pre_fac_c*inv_r3*diff_y
           f_z = f_z + pre_fac_c*inv_r3*diff_z
 
-          ! Field from the image charge of the particle in the sphere at
-          ! the top of the tip (Sphere_IC_field inlined, see
-          ! mod_hyperboloid_tip). Note that unlike the planar case this
-          ! includes the q_0/(4*pi*epsilon_0) factor, exactly like the
-          ! original function does.
+          ! Field from the image charge in the sphere at the top of the tip
+          ! (Sphere_IC_field inlined, see the include files for details),
+          ! evaluated at the particle exactly like Calc_Field_at does.
           if (do_ic .eqv. .true.) then
-            dis_a = sqrt(x_1**2 + y_1**2 + (z_1 - z_0_tip)**2)
+            x_b = x_2
+            y_b = y_2
+            z_b = z_2
 
-            z_im = z_0_tip + Rsp_tip**2 / ( sqrt(1 + x_1**2/(z_1 - z_0_tip)**2 + y_1**2/(z_1 - z_0_tip)**2) * dis_a )
-            x_im = (z_im - z_0_tip) * x_1 / (z_1 - z_0_tip)
-            y_im = (z_im - z_0_tip) * y_1 / (z_1 - z_0_tip)
-
-            tmp_dis_a = ( (x_2 - x_1)**2 + (y_2 - y_1)**2 + (z_2 - z_1)**2 )**(3.0d0/2.0d0)
-            tmp_dis_b = ( (x_2 - x_im)**2 + (y_2 - y_im)**2 + (z_2 - z_im)**2 )**(3.0d0/2.0d0)
-
-            ic_x = 1.0d0*q_0/(4.0d0*pi*epsilon_0) * ( (x_1 - x_2)/tmp_dis_a - (Rsp_tip*(x_im - x_2))/(dis_a*tmp_dis_b) )
-            ic_y = 1.0d0*q_0/(4.0d0*pi*epsilon_0) * ( (y_1 - y_2)/tmp_dis_a - (Rsp_tip*(y_im - y_2))/(dis_a*tmp_dis_b) )
-            ic_z = 1.0d0*q_0/(4.0d0*pi*epsilon_0) * ( (z_1 - z_2)/tmp_dis_a - (Rsp_tip*(z_im - z_2))/(dis_a*tmp_dis_b) )
+#include "acc_tip_ic_force.inc"
 
             f_x = f_x + pre_fac_c*ic_x
             f_y = f_y + pre_fac_c*ic_y
@@ -1725,38 +1725,21 @@ contains
           end if
         end do
 
-        ! Add the vacuum electric field
-        ! field_E_Hyperboloid inlined (see mod_hyperboloid_tip)
-        r_p = sqrt(x_1**2 + y_1**2 + (z_1 + af - sz)**2)
-        r_m = sqrt(x_1**2 + y_1**2 + (z_1 - af - sz)**2)
-        xi  = (r_p + r_m) / (2.0d0*af)
-        eta = (r_p - r_m) / (2.0d0*af)
-        if ((abs(x_1) < 1.0d-18) .and. (abs(y_1) < 1.0d-18)) then
-          phi = 0.0d0
-        else
-          phi = atan2(y_1, x_1)
-        end if
-
-        pre_fac_xyz = pre_E_tip * 1.0d0/(xi**2 - eta**2)
-
-        ! If we are near the tip then the x and y components should be zero
-        if (abs(xi - 1.0d0) < 1.0d-6) then
-          fac_xy = 0.0d0
-        else
-          fac_xy = eta * sqrt( (xi**2 - 1.0d0)/(1.0d0 - eta**2) )
-        end if
-
-        fE_x = -1.0d0*pre_fac_xyz * fac_xy * cos(phi)
-        fE_y = -1.0d0*pre_fac_xyz * fac_xy * sin(phi)
-        fE_z = pre_fac_xyz * xi
-
-        field_out(1, m_i) = f_x + fE_x
-        field_out(2, m_i) = f_y + fE_y
-        field_out(3, m_i) = f_z + fE_z
+        !$acc atomic update
+        acc_batch_field(1, m_i) = acc_batch_field(1, m_i) + f_x
+        !$acc atomic update
+        acc_batch_field(2, m_i) = acc_batch_field(2, m_i) + f_y
+        !$acc atomic update
+        acc_batch_field(3, m_i) = acc_batch_field(3, m_i) + f_z
+        end do
       end do
       !$acc end parallel loop
 
       end if
+
+      ! Wait for the seed and accumulate kernels, then bring the result home
+      !$acc update self(acc_batch_field(1:3, 1:M)) wait(1)
+      field_out(1:3, 1:M) = acc_batch_field(1:3, 1:M)
       return
     end if
 #endif

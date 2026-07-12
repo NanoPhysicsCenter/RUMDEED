@@ -58,6 +58,18 @@ Module mod_field_emission_v2
 
   integer          :: jump_a = 0, jump_r = 0 ! Number of jumps accepted and rejected
 
+  ! Tuning constants of the Metropolis-Hastings sampling, shared by the serial
+  ! (Metropolis_Hastings_rectangle_J) and the batched
+  ! (Metropolis_Hastings_rectangle_J_batch) version, so the two always use the
+  ! same schedule and stay statistically equivalent.
+  integer,          parameter :: MH_ndim        = 25*8      ! Number of jumps per chain
+  double precision, parameter :: MH_warmup_frac = 0.25d0    ! Fraction of the jumps done with the fixed initial std
+  double precision, parameter :: MH_init_std    = 0.10d0    ! Initial std as a fraction of the emitter size
+  double precision, parameter :: MH_target_rate = 0.2525d0  ! Acceptance rate the MH_std adaptation aims for
+  double precision, parameter :: MH_std_nudge   = 0.00025d0 ! Maximum relative per-jump nudge of MH_std
+  double precision, parameter :: MH_std_max     = 0.1250d0  ! Upper limit on MH_std
+  double precision, parameter :: MH_std_min     = 0.00005d0 ! Lower limit on MH_std
+
   ! interface 
   !     ! ! Interface for the work function submodule
   !     ! double precision module function w_theta_xy(pos, sec)
@@ -592,74 +604,38 @@ end function Escape_Prob_log
   end subroutine Do_Surface_Integration_FE
 
   ! ----------------------------------------------------------------------------
-  ! The integration function for the Cuba library
-  !
+  ! The integration function for the Cuba library.
+  ! A thin wrapper that delegates to the vectorized integrand below with a
+  ! block of one point, so the integrand physics (surface position mapping,
+  ! favorable-field test, electron supply, area factor and the F_avg
+  ! accumulation) exists in one place only.
   integer function integrand_cuba_fe(ndim, xx, ncomp, ff, userdata)
     ! Input / output variables
     integer, intent(in) :: ndim ! Number of dimensions (Should be 2)
     integer, intent(in) :: ncomp ! Number of vector-components in the integrand (Always 1 here)
     integer, intent(in) :: userdata ! Additional data passed to the integral function (In our case the number of the emitter)
-    double precision, intent(in), dimension(1:ndim)   :: xx ! Integration points, between 0 and 1
-    double precision, intent(out), dimension(1:ncomp) :: ff ! Results of the integrand function
+    double precision, intent(in), dimension(1:ndim)   :: xx ! Integration point, between 0 and 1
+    double precision, intent(out), dimension(1:ncomp) :: ff ! Result of the integrand function
 
-    ! Variables used for calculations
-    double precision, dimension(1:3) :: par_pos, field
-    double precision                 :: A, angle, radius
+    ! The single point as a block of one for the vectorized integrand
+    double precision, dimension(1:ndim, 1:1)  :: xx_v
+    double precision, dimension(1:ncomp, 1:1) :: ff_v
 
-    select case (emitters_Type(userdata))
-      case (EMIT_RECTANGLE)
-        par_pos(1:2) = emitters_pos(1:2, userdata) + xx(1:2)*emitters_dim(1:2, userdata) ! x and y position on the surface
-        par_pos(3) = 0.0d0 ! Height, i.e. on the surface
-        A = emitters_dim(1, userdata)*emitters_dim(2, userdata)
-      case (EMIT_RING)
-        angle = xx(1)*2.0d0*pi
-        radius = emitters_ring(2,userdata) + xx(2)*emitters_ring(3,userdata)
-        par_pos(1) = radius*cos(angle)
-        par_pos(2) = radius*sin(angle)
-        par_pos(3) = 0.0d0 ! Height, i.e. on the surface
-        A = 2.0d0*pi*emitters_ring(3,userdata)*radius
-      case default
-        print *, 'RUMDEED: ERROR UNKNOWN EMITTER TYPE'
-        stop
-    end select
-
-    ! Calculate the electric field on the surface
-    if (use_polarso .eqv. .true.) then
-      field = PL_Calculate_Field_At(par_pos)
-    else
-      field = Calc_Field_at(par_pos)
-    end if
-    ! Add to the average field
-    F_avg = F_avg + field
-
-    ! Check if the field is favorable for emission
-    if (field(3) < 0.0d0) then
-      ! The field is favorable for emission
-      ! Calculate the electron supply at this point
-      ff(1) = Elec_Supply_V2(field(3), par_pos, userdata)
-    else
-      ! The field is NOT favorable for emission
-      ! This point does not contribute
-      ff(1) = 0.0d0
-    end if
-
-    ! We multiply with the area of the emitter because Cuba does the 
-    ! integration over the hybercube, i.e. from 0 to 1.
-    ff(1) = A*ff(1)
-    
-    integrand_cuba_fe = 0 ! Return value to Cuba, 0 = success
+    xx_v(:, 1) = xx
+    integrand_cuba_fe = integrand_cuba_fe_v(ndim, xx_v, ncomp, ff_v, userdata, 1)
+    ff = ff_v(:, 1)
   end function integrand_cuba_fe
 
   ! ----------------------------------------------------------------------------
-  ! Vectorized version of integrand_cuba_fe.
+  ! Vectorized integrand for the Cuba library.
   ! When Cuba is called with nvec > 1 it passes blocks of up to nvec
   ! integration points to the integrand in one call, with the actual number of
   ! points in the block as an extra argument (Cuba also appends further
   ! arguments, core and phase, which we do not need and therefore do not
-  ! declare, exactly like the scalar integrand above ignores nvec).
-  ! The integration points and results are the same as with the scalar
-  ! integrand, but the electric field for the whole block is computed in one
-  ! batch, which runs as a single kernel on the GPU in OpenACC builds.
+  ! declare, exactly like the scalar wrapper above ignores nvec).
+  ! The integration points and results do not depend on the block size, but
+  ! the electric field for the whole block is computed in one batch, which
+  ! runs as a single kernel on the GPU in OpenACC builds.
   integer function integrand_cuba_fe_v(ndim, xx, ncomp, ff, userdata, nvec)
     ! Input / output variables
     integer, intent(in) :: ndim ! Number of dimensions (Should be 2)
@@ -671,22 +647,41 @@ end function Escape_Prob_log
 
     ! Variables used for calculations
     double precision, dimension(1:3, 1:nvec) :: par_pos, field
-    double precision                         :: A ! Emitter area
+    double precision, dimension(1:nvec)      :: A ! Area factor, per point (the ring area depends on the radius)
+    double precision                         :: angle, radius
     integer                                  :: k
-
-    ! Emitter area
-    A = emitters_dim(1, userdata)*emitters_dim(2, userdata)
 
     ! Surface positions
     ! Cuba does the intergration over the hybercube.
     ! It gives us coordinates between 0 and 1.
     do k = 1, nvec
-      par_pos(1:2, k) = emitters_pos(1:2, userdata) + xx(1:2, k)*emitters_dim(1:2, userdata) ! x and y position on the surface
-      par_pos(3, k) = 0.0d0 ! Height, i.e. on the surface
+      select case (emitters_Type(userdata))
+        case (EMIT_RECTANGLE)
+          par_pos(1:2, k) = emitters_pos(1:2, userdata) + xx(1:2, k)*emitters_dim(1:2, userdata) ! x and y position on the surface
+          par_pos(3, k) = 0.0d0 ! Height, i.e. on the surface
+          A(k) = emitters_dim(1, userdata)*emitters_dim(2, userdata)
+        case (EMIT_RING)
+          angle = xx(1, k)*2.0d0*pi
+          radius = emitters_ring(2, userdata) + xx(2, k)*emitters_ring(3, userdata)
+          par_pos(1, k) = radius*cos(angle)
+          par_pos(2, k) = radius*sin(angle)
+          par_pos(3, k) = 0.0d0 ! Height, i.e. on the surface
+          A(k) = 2.0d0*pi*emitters_ring(3, userdata)*radius
+        case default
+          print *, 'RUMDEED: ERROR UNKNOWN EMITTER TYPE'
+          stop
+      end select
     end do
 
     ! Calculate the electric field on the surface for the whole block
-    call Calc_Field_at_Batch(nvec, par_pos, field)
+    if (use_polarso .eqv. .true.) then
+      ! The POLARSO solver evaluates the field per point from its grid
+      do k = 1, nvec
+        field(:, k) = PL_Calculate_Field_At(par_pos(:, k))
+      end do
+    else
+      call Calc_Field_at_Batch(nvec, par_pos, field)
+    end if
 
     do k = 1, nvec
       ! Add to the average field
@@ -705,7 +700,7 @@ end function Escape_Prob_log
 
       ! We multiply with the area of the emitter because Cuba does the
       ! integration over the hybercube, i.e. from 0 to 1.
-      ff(1, k) = A*ff(1, k)
+      ff(1, k) = A(k)*ff(1, k)
     end do
 
     integrand_cuba_fe_v = 0 ! Return value to Cuba, 0 = success
@@ -1368,9 +1363,9 @@ end function Escape_Prob_log
     ndim_in = 0
 
     !ndim = nint( 2.0d0/(MH_std*sqrt(2.0d0/pi)) )
-    ndim = 25*8
+    ndim = MH_ndim
     ratio_change = 0.5d0*100.0d0/maxval(emitters_dim(:, emit))
-    std(1:2) = emitters_dim(1:2, emit)*0.10d0 ! 10% of emitter size
+    std(1:2) = emitters_dim(1:2, emit)*MH_init_std ! 10% of emitter size
 
     ! Get a random initial position on the surface.
     ! We pick this location from a uniform distribution.
@@ -1416,7 +1411,7 @@ end function Escape_Prob_log
     !write(unit=ud_mh) cur_pos(1), cur_pos(2), std(1), std(2)
     !print *, 0, cur_pos(1)/1.0d-9, cur_pos(2)/1.0d-9, std(1)/1.0d-9, std(2)/1.0d-9
 
-    ndim_first = nint(ndim*0.25d0)
+    ndim_first = nint(ndim*MH_warmup_frac)
 
     !---------------------------------------------------------------------------
     ! We now pick a random distance and direction to jump to from our
@@ -1429,16 +1424,16 @@ end function Escape_Prob_log
         ! Try to keep the acceptance ratio around 25% by
         ! changing the standard deviation.
         CALL RANDOM_NUMBER(rnd) ! Change be a random number
-        if (a_rate < 0.2525d0) then
-          MH_std = MH_std * (1.0d0 - rnd*0.00025d0)
+        if (a_rate < MH_target_rate) then
+          MH_std = MH_std * (1.0d0 - rnd*MH_std_nudge)
         else
-          MH_std = MH_std * (1.0d0 + rnd*0.00025d0)
+          MH_std = MH_std * (1.0d0 + rnd*MH_std_nudge)
         end if
         ! Limits on how big or low the standard deviation can be.
-        if (MH_std > 0.1250d0) then
-          MH_std = 0.1250d0
-        else if (MH_std < 0.00005d0) then
-          MH_std = 0.00005d0
+        if (MH_std > MH_std_max) then
+          MH_std = MH_std_max
+        else if (MH_std < MH_std_min) then
+          MH_std = MH_std_min
         end if
 
         std(1:2) = emitters_dim(1:2, emit)*MH_std ! Standard deviation for the normal distribution is MH_std of the emitter length.
@@ -1551,7 +1546,7 @@ end function Escape_Prob_log
   ! builds), instead of one O(N) field sum per chain per jump.
   !
   ! Differences from running Metropolis_Hastings_rectangle_J M times
-  ! (enabled with mh_batch = .true. in the input file, the default):
+  ! (enabled with mh_batch = .true. in the input file, off by default):
   !  * All chains sample the particle configuration from the start of the
   !    time step. In the serial version each chain sees the electrons that
   !    earlier chains emitted within the same step.
@@ -1572,19 +1567,24 @@ end function Escape_Prob_log
     integer                                       :: i, k, mc, count, n_act
     double precision                              :: rnd, alpha, df_new
     double precision, dimension(1:2)              :: std
-    integer,          dimension(1:M)              :: act ! Chains active in the current batch
-    double precision, dimension(1:3, 1:M)         :: cur_pos, w_pos
-    double precision, dimension(1:3, 1:M)         :: w_field
-    double precision, dimension(1:M)              :: df_cur
-    logical,          dimension(1:M)              :: ok ! Chain has a favorable position
+    integer,          dimension(:),    allocatable :: act ! Chains active in the current batch
+    double precision, dimension(:, :), allocatable :: cur_pos, w_pos
+    double precision, dimension(:, :), allocatable :: w_field
+    double precision, dimension(:),    allocatable :: df_cur
+    logical,          dimension(:),    allocatable :: ok ! Chain has a favorable position
+
+    ! The working arrays go on the heap: M is the full electron supply of the
+    ! time step, which has no upper bound that would make automatic (stack)
+    ! arrays safe. They are deallocated automatically on return.
+    allocate(act(1:M), cur_pos(1:3, 1:M), w_pos(1:3, 1:M), w_field(1:3, 1:M), df_cur(1:M), ok(1:M))
 
     ! Reset the accepted/rejected jump counters, as in the serial version.
     jump_a = 0
     jump_r = 0
 
-    ndim = 25*8
-    ndim_first = nint(ndim*0.25d0)
-    std(1:2) = emitters_dim(1:2, emit)*0.10d0 ! 10% of emitter size
+    ndim = MH_ndim
+    ndim_first = nint(ndim*MH_warmup_frac)
+    std(1:2) = emitters_dim(1:2, emit)*MH_init_std ! 10% of emitter size
 
     !---------------------------------------------------------------------------
     ! Get random initial positions on the surface for all chains.
@@ -1655,17 +1655,17 @@ end function Escape_Prob_log
         do mc = 1, M
           if (ok(mc) .eqv. .false.) cycle
           CALL RANDOM_NUMBER(rnd)
-          if (a_rate < 0.2525d0) then
-            MH_std = MH_std * (1.0d0 - rnd*0.00025d0)
+          if (a_rate < MH_target_rate) then
+            MH_std = MH_std * (1.0d0 - rnd*MH_std_nudge)
           else
-            MH_std = MH_std * (1.0d0 + rnd*0.00025d0)
+            MH_std = MH_std * (1.0d0 + rnd*MH_std_nudge)
           end if
         end do
         ! Limits on how big or low the standard deviation can be.
-        if (MH_std > 0.1250d0) then
-          MH_std = 0.1250d0
-        else if (MH_std < 0.00005d0) then
-          MH_std = 0.00005d0
+        if (MH_std > MH_std_max) then
+          MH_std = MH_std_max
+        else if (MH_std < MH_std_min) then
+          MH_std = MH_std_min
         end if
 
         std(1:2) = emitters_dim(1:2, emit)*MH_std
