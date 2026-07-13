@@ -198,4 +198,116 @@ Thermal-field emission
 ----------------------
 The code for planar thermal-field emission can be found in **mod_field_thermo_emission.F90** :cite:p:`PhysRevApplied.15.014040`.
 
-.. index:: Verlet, Beeman, code, Fowler-Nordheim
+.. _metropolis-hastings:
+
+Metropolis-Hastings sampling of the emission positions
+------------------------------------------------------
+In every time step the emission happens in two stages :cite:p:`doi:10.1063/1.4914855`.
+First the number of electrons to try to emit, :math:`N`, is found by integrating over the surface of the emitter.
+Then each of the :math:`N` candidate electrons is given a position on the surface, drawn with the Metropolis-Hastings algorithm.
+
+For field emission the current density is split into the product
+
+.. math::
+    J = S \cdot D\, , \quad
+    S = \frac{a_{FN}}{\phi\, t^2(\ell)}F^2\, , \quad
+    D = \exp(-\nu(\ell)\, b_{FN}\, \phi^{3/2}/F)\, ,
+
+where :math:`S` is the electron supply and :math:`D` the escape probability (see :ref:`field`).
+For the emitted positions to follow the current density, the number :math:`N`, the distribution the chains sample from, and the emission test applied to each candidate must fit together.
+The code uses one of two consistent pairings:
+
+* **Supply pairing**: :math:`N = \frac{\Delta t}{e}\int S\, \mathrm{d}A`, the chains sample positions with density proportional to :math:`S`, and each candidate is then emitted with the probability :math:`D` evaluated at its position.
+  The emitted positions follow :math:`S \cdot D = J` and the expected number of emitted electrons is :math:`\frac{\Delta t}{e}\int J\, \mathrm{d}A`.
+  Used by the planar field emission and by the field emission from the tip.
+
+* **Current-density pairing**: :math:`N` is drawn from a Poisson distribution with mean :math:`\frac{\Delta t}{e}\int J\, \mathrm{d}A`, the chains sample positions proportional to :math:`J`, and every candidate is emitted.
+  Used by the planar thermal-field emission, the thermal-field (GTF) emission from the tip, and the field emission from the torus.
+
+Note that the chains must never sample proportional to :math:`D` (or :math:`J`) when the caller also applies the emission test :math:`D`: the escape probability would then be counted twice and the emitted positions would follow :math:`D^2` instead of :math:`J`.
+The samplers therefore always target the expression whose integral sets :math:`N`, divided by whatever probability the caller applies afterwards.
+
+**The chains.**
+Each candidate electron gets its own chain.
+The chain starts at a random position, uniform in the surface parameters, redrawn until the field there is favorable for emission.
+A jump proposes a new position by adding a Gaussian step to the surface parameters.
+Steps that leave the emitter are reflected at its edges, and angles wrap around, both of which keep the proposal symmetric so the plain Metropolis acceptance rule applies.
+The acceptance is evaluated in log space because the current density spans many orders of magnitude,
+
+.. math::
+    \alpha = \ln \pi_\mathrm{new} - \ln \pi_\mathrm{cur}\, , \quad
+    \text{accept if}\ \ln r \le \alpha\, , \quad r \sim U(0,1)\, ,
+
+where :math:`\pi` is the target density.
+A proposal where the field is not favorable for emission has zero target and is always rejected.
+When the chain moves in surface parameters :math:`(u, v)` instead of directly on the surface, the target includes the area element of the parametrization, :math:`\pi \propto J\, h_u h_v` with :math:`\mathrm{d}A = h_u h_v\, \mathrm{d}u\, \mathrm{d}v`, so that the stationary distribution is proportional to the current density per unit area.
+Constant factors cancel in the Metropolis ratio and are left out of the targets in the code.
+
+**Self-tuning.**
+The first quarter of the jumps of a chain (the warmup) use a large fixed step, 10% of the parameter ranges, so that the chain finds the high-current region from any starting point.
+The remaining jumps use the adapted step size :math:`\sigma`, which is shared between the chains, held fixed within a chain, and updated once at the end of each chain from that chain's acceptance rate :math:`a`,
+
+.. math::
+    \sigma \leftarrow \sigma\, e^{\gamma (a - a^*)}\, ,
+
+clamped between a lower and an upper limit.
+A high acceptance rate means the steps are too small, so the step grows, and the other way around.
+The target rate :math:`a^*` is set per module: 25% for the planar field emission chains, 50% for the planar thermal-field chains, and 35% (the optimum for a two-dimensional random walk) for the tip and torus chains.
+
+Planar emitters
+~~~~~~~~~~~~~~~
+Found in **mod_field_emission_v2.F90**.
+Field emission uses the supply pairing: ``Do_Field_Emission_Planar_rectangle`` gets :math:`N` from the surface integral of :math:`S` and emits each candidate with the probability :math:`D` (``Escape_Prob_log``) at the sampled position.
+The chains (``Metropolis_Hastings_rectangle_J``, 200 jumps) move directly in :math:`(x, y)` on the emitter, where the area element is trivial, and target
+
+.. math::
+    \ln S = 2\ln|F| - 2\ln t(\ell) - \ln \phi
+
+(``Elec_Supply_log``).
+A batched version, ``Metropolis_Hastings_rectangle_J_batch``, advances all chains of the time step in lockstep, so the surface field of every chain is evaluated in one batch per jump — a single GPU kernel per jump iteration in OpenACC builds.
+It is enabled with the ``MH_BATCH`` flag in the input file and its step-size update is applied once per jump iteration, from the acceptance rate of that iteration across all chains.
+The ring emitter (``Metropolis_Hastings_ring_J``) moves in the ring parameters, angle and radius: the angle wraps around the ring, proposals outside the radial limits are rejected, and the target carries the :math:`\ln r` Jacobian of the parametrization.
+
+Planar thermal-field emission (**mod_field_thermo_emission.F90**) uses the current-density pairing: :math:`N` is Poisson distributed with the surface integral of the general thermal-field (GTF) current density as its mean (``Get_Kevin_Jgtf_v2``), the chains (25 jumps, no warmup) target :math:`\ln J_{GTF}`, and every candidate is emitted.
+
+Hyperboloid tip
+~~~~~~~~~~~~~~~
+Found in **mod_emission_tip.f90**.
+The chains move in the :math:`(\xi, \phi)` parametrization of the tip surface (see :ref:`field-tip`), where the area element is
+
+.. math::
+    h_\xi h_\phi = a^2 \sqrt{(\xi^2 - \eta_1^2)(1 - \eta_1^2)}\, ,
+
+so the targets carry an extra :math:`\frac{1}{2}\ln(\xi^2 - \eta_1^2)` term.
+Steps in :math:`\xi` are reflected at the apex :math:`\xi = 1` and at :math:`\xi_{max}`, and :math:`\phi` wraps around the tip.
+The chains are 80 jumps long.
+
+* Field emission (``EMITTERS_TYPE = 1``) uses the supply pairing: ``Do_Field_Emission_Tip_OLDCODE`` integrates :math:`S` over the surface with a midpoint rule, the chains (``Metro_algo_tip_v3``) target :math:`\ln(S\, h_\xi h_\phi)` (``Tip_fe_target_log``), and each candidate is emitted with the escape probability at the sampled position.
+
+* Thermal-field (GTF) emission (``EMITTERS_TYPE = 4``) uses the current-density pairing: ``Do_GTF_Emission_Tip`` integrates :math:`J_{GTF}\, h_\xi h_\phi` with Cuba, the chains (``Metro_algo_tip_gtf_v3``) target the same expression (``Tip_gtf_target_log``), and every candidate is emitted.
+
+The older samplers ``Metro_algo_tip_v2``, ``Metro_algo_tip_gtf`` and ``Metro_algo_tip_gtf_v2`` are kept in the file for reference but are superseded: they target the escape probability instead of the quantity that is integrated for :math:`N`, and their step sizes were effectively frozen (see the comments in the code).
+
+Torus
+~~~~~
+Found in **mod_torus.F90**.
+The torus (a looped carbon nanotube) is parametrized by the angle :math:`\phi` along the loop, with radii :math:`R_y` and :math:`R_z`, and the poloidal angle :math:`\theta` around the tube cross-section of radius :math:`\rho`,
+
+.. math::
+    \begin{split}
+    x &= \rho \sin\theta\, ,\\
+    y &= (R_y + \rho\cos\theta) \cos\phi\, ,\\
+    z &= (R_z + \rho\cos\theta) \sin\phi\, .
+    \end{split}
+
+The area element is :math:`h_\phi h_\theta` with :math:`h_\theta = \rho` and
+
+.. math::
+    h_\phi = \sqrt{ (R_y + \rho\cos\theta)^2 \sin^2\phi + (R_z + \rho\cos\theta)^2 \cos^2\phi }\, .
+
+The vacuum field is interpolated from a finite-element mesh with a kd-tree.
+Emission uses the current-density pairing: :math:`N` is Poisson distributed with the Cuba integral of :math:`J\, h_\phi h_\theta` over the loop as its mean, and every candidate is emitted.
+The chains (``Metropolis_Hastings_Torus_v2``, 500 jumps) are restricted to a :math:`\pm 10^\circ` patch around the top of the loop (:math:`\phi = \pi/2`, :math:`\theta = 0`), where the field is highest and outside of which the current density is negligible, and target :math:`\ln(J\, h_\phi)` (``Torus_target_log``, :math:`h_\theta` is constant).
+The original sampler ``Metropolis_Hastings_Torus``, which targets :math:`|F|` without the area element, is kept for reference.
+
+.. index:: Verlet, Beeman, code, Fowler-Nordheim, Metropolis-Hastings
