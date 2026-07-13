@@ -50,6 +50,18 @@ Module mod_emission_tip
   double precision :: a_rate = 0.5d0, MH_std = 1.0d0 ! Acceptance rate and standard deviation for the MH algorithm
   integer          :: jump_a = 0, jump_r = 0 ! Number of jumps accepted and rejected
 
+  ! Tuning constants of the v3 GTF Metropolis-Hastings sampler
+  ! (Metro_algo_tip_gtf_v3). The shared step MH_std is fixed within a chain
+  ! and gets one clamped multiplicative update per chain, towards the
+  ! acceptance rate MH_target_tip. Same scheme as the planar samplers in
+  ! mod_field_emission_v2.
+  double precision, parameter :: MH_warmup_tip  = 0.25d0   ! Fraction of the jumps done with the fixed initial step
+  double precision, parameter :: MH_init_tip    = 0.10d0   ! Initial step as a fraction of the (xi, phi) ranges
+  double precision, parameter :: MH_target_tip  = 0.35d0   ! Acceptance rate the MH_std update aims for (optimum for a 2D random walk)
+  double precision, parameter :: MH_gain_tip    = 0.025d0  ! Gain of the per-chain MH_std update
+  double precision, parameter :: MH_std_max_tip = 0.125d0  ! Upper limit on MH_std
+  double precision, parameter :: MH_std_min_tip = 0.0005d0 ! Lower limit on MH_std
+
   double precision, dimension(1:3)   :: F_avg = 0.0d0
 
   ! Use image Charge or not
@@ -179,9 +191,9 @@ subroutine Do_GTF_Emission_Tip(step)
   !res_s = N_sup - N_round
 
   do i = 1, N_round
-    ndim = 80 ! Number of iterations for the Metropolish Hastings algorithm
+    ndim = 80 ! Number of jumps in the Metropolis-Hastings chain
 
-    call Metro_algo_tip_gtf(ndim, xi, phi, F, D_f, par_pos)
+    call Metro_algo_tip_gtf_v3(ndim, xi, phi, F, D_f, par_pos)
 
     if (F < 0.0d0) then
       surf_norm = surface_normal(par_pos)
@@ -491,32 +503,13 @@ end subroutine Do_Photo_Emission_Tip
     !print *, 'Emission loop'
     do s = 1, n_r
 
-      !!!$OMP FLUSH (particles, nrElec)
-      ndim = 25
-      !print *, 'Metro algo 1'
-      !par_pos = Metro_algo_tip(ndim, xi_1, phi_1)
-      call Metro_algo_tip_v2(ndim, xi_1, phi_1, F, D_f, par_pos)
-      !F = Field_normal(par_pos, Calc_Field_at(par_pos))
+      ndim = 80 ! Number of jumps in the Metropolis-Hastings chain
+      call Metro_algo_tip_v3(ndim, xi_1, phi_1, F, D_f, par_pos)
+      ! A failed chain comes back with F = 1.0 and D_f = 0, so no electron
+      ! is emitted from it.
 
-      if (F >= 0.0d0) then
-        !Try again
-        !print *, 'Metro algo 2'
-        !par_pos = Metro_algo_tip(ndim, xi_1, phi_1)
-        call Metro_algo_tip_v2(ndim, xi_1, phi_1, F, D_f, par_pos)
-        F = Field_normal(par_pos, Calc_Field_at(par_pos))
-
-        if (F >= 0.0d0) then
-          D_f = 0.0d0
-          print *, 'Warning: F > 0.0d0'
-        end if
-      !else
-      !  print *, 'Escape prob'
-      !  print *, 'F = ', F
-      !  print *, 'par_pos = ', par_pos
-      !  D_f = Escape_Prob_Tip(F, par_pos)
-      end if
-
-      if (rnd(s) <= D_f) then
+      ! Emit the electron with the escape probability at the sampled position
+      if ((F < 0.0d0) .and. (rnd(s) <= D_f)) then
         !par_pos(3) = par_pos(3) + 1.0d0*length
         surf_norm = surface_normal(par_pos)
         par_pos = par_pos + surf_norm*length_scale
@@ -1013,6 +1006,388 @@ end subroutine Do_Photo_Emission_Tip
     ! Acceptance rate
     a_rate = DBLE(jump_a) / DBLE(jump_r + jump_a)
   end subroutine Metro_algo_tip_gtf
+
+  !--------------------------------------------------------------------------------
+  ! Log of the target distribution of the v3 GTF Metropolis-Hastings sampler:
+  ! the GTF current density times the h_xi*h_phi area element of the
+  ! (xi, phi) parametrization of the tip surface, i.e. the same expression
+  ! that integrand_cuba_gtf_tip integrates for the number of electrons to
+  ! emit. h_xi*h_phi = a_foci**2 * sqrt((xi**2 - eta_1**2)*(1 - eta_1**2));
+  ! the constant factors cancel in the Metropolis ratio and are left out,
+  ! as is the time_step/q_0 factor of the integrand. The tiny() guard
+  ! catches a current density that underflows to zero (Get_Kevin_Jgtf_v2
+  ! also returns exactly zero for a negligible field). eta_f must be < 0.
+  double precision function Tip_gtf_target_log(eta_f, xi)
+    double precision, intent(in) :: eta_f, xi
+
+    Tip_gtf_target_log = log(max(Get_Kevin_Jgtf_v2(eta_f, T_temp, w_theta), tiny(1.0d0))) &
+                     & + 0.5d0*log(xi**2 - eta_1**2)
+  end function Tip_gtf_target_log
+
+  !--------------------------------------------------------------------------------
+  ! Metropolis-Hastings sampling of the emission position for the GTF
+  ! emission from the tip (third version, used by Do_GTF_Emission_Tip).
+  !
+  ! The chain moves in the (xi, phi) parametrization of the tip surface and
+  ! samples positions proportional to J_gtf * h_xi * h_phi, the integrand
+  ! that Do_Cuba_Suave_GTF_Tip integrates for the number of electrons to
+  ! emit. Do_GTF_Emission_Tip emits every candidate, so the emitted
+  ! positions follow the current density over the tip surface and the total
+  ! matches the surface integral.
+  ! (Metro_algo_tip_gtf above targets the Fowler-Nordheim escape
+  ! probability instead of the GTF current density, and the sign of its
+  ! step size feedback is inverted: a high acceptance rate shrinks the
+  ! step, which raises the acceptance rate further, until the chain is
+  ! frozen at its starting position. That is why its starting point had to
+  ! be skewed towards the apex. It is kept for reference, like the
+  ! Robbins-Monro attempt Metro_algo_tip_gtf_v2.)
+  !
+  ! The proposal is a Gaussian step in (xi, phi), reflected at the xi
+  ! limits, with phi wrapping around the tip. The first MH_warmup_tip of
+  ! the jumps use the large fixed step MH_init_tip so the chain finds the
+  ! high current region from a uniform start (no skew needed). After that
+  ! the adapted step MH_std is used, fixed within the chain and updated
+  ! once at the end from the acceptance rate of this chain.
+  subroutine Metro_algo_tip_gtf_v3(ndim, xi, phi, eta_f, df_cur, par_pos)
+    integer, intent(in)                           :: ndim
+    double precision, intent(out)                 :: xi, phi, eta_f, df_cur
+    double precision, dimension(1:3), intent(out) :: par_pos
+
+    double precision                 :: new_xi, new_phi, new_eta_f
+    double precision                 :: sup_cur, sup_new ! Log of the chain target
+    double precision                 :: rnd, alpha
+    double precision, dimension(1:2) :: std, step
+    double precision, dimension(1:3) :: cur_pos, new_pos, field
+    integer                          :: i, count, ndim_first
+    integer                          :: acc, rej ! Accepted/rejected jumps after the warmup
+
+    ! Bring the shared step size into the limits before use. It starts at
+    ! 1.0 and the older samplers above use other limits.
+    if (MH_std > MH_std_max_tip) then
+      MH_std = MH_std_max_tip
+    else if (MH_std < MH_std_min_tip) then
+      MH_std = MH_std_min_tip
+    end if
+
+    acc = 0
+    rej = 0
+    ndim_first = nint(ndim*MH_warmup_tip)
+
+    ! Warmup step size, MH_init_tip of the (xi, phi) ranges
+    std(1) = (max_xi - 1.0d0)*MH_init_tip
+    std(2) = 2.0d0*pi*MH_init_tip
+
+    ! Get a random initial position on the tip surface, uniform in (xi, phi)
+    count = 0
+    do ! Infinite loop, we try to find a favourable position to start from
+      CALL RANDOM_NUMBER(step)
+      xi = 1.0d0 + (max_xi - 1.0d0)*step(1)
+      phi = 2.0d0*pi*step(2)
+
+      cur_pos = xyz_corr(xi, eta_1, phi)
+
+      ! Calculate the electric field at this position
+      field = Calc_Field_at(cur_pos)
+      eta_f = Field_normal(cur_pos, field) ! Component normal to the surface
+
+      if (eta_f < 0.0d0) then
+        exit ! We found a nice spot so we exit the loop
+      else
+        count = count + 1
+        if (count > 10000) then ! The loop is infinite, must stop it at some point.
+          ! Mark the chain as failed with defined outputs. The caller
+          ! checks the sign of eta_f and emits no electron from this chain.
+          xi = 1.0d0
+          phi = 0.0d0
+          par_pos = xyz_corr(xi, eta_1, phi)
+          eta_f = 1.0d0
+          df_cur = 0.0d0
+          print *, 'Failed to find spot for emission on the tip'
+          return
+        end if
+      end if
+    end do
+
+    sup_cur = Tip_gtf_target_log(eta_f, xi)
+
+    !---------------------------------------------------------------------------
+    ! We now pick a random distance and direction to jump to from our
+    ! current location. We do this ndim times.
+    do i = 1, ndim
+
+      ! After the warmup the jumps use the adapted step size. MH_std is
+      ! only updated between chains, so the kernel is fixed within a chain.
+      if (i > ndim_first) then
+        std(1) = (max_xi - 1.0d0)*MH_std
+        std(2) = 2.0d0*pi*MH_std
+      end if
+
+      ! Find a new position using a normal distribution
+      step = box_muller((/0.0d0, 0.0d0/), std)
+      new_xi = xi + step(1)
+      new_phi = modulo(phi + step(2), 2.0d0*pi) ! phi wraps around the tip
+
+      ! Reflect xi at the limits of the surface. With the step limited to
+      ! MH_std_max_tip a jump needs at most one reflection; a longer one
+      ! (only possible in the far tail of the warmup step) is rejected.
+      if (new_xi > max_xi) new_xi = 2.0d0*max_xi - new_xi
+      if (new_xi < 1.0d0) new_xi = 2.0d0 - new_xi
+      if ((new_xi < 1.0d0) .or. (new_xi > max_xi)) then
+        if (i > ndim_first) rej = rej + 1
+        cycle ! Do the next loop iteration, i.e. find a new position.
+      end if
+
+      new_pos = xyz_corr(new_xi, eta_1, new_phi)
+
+      ! Calculate the field at the new position
+      field = Calc_Field_at(new_pos)
+      new_eta_f = Field_normal(new_pos, field)
+
+      ! Check if the field is favourable for emission at the new position.
+      ! If it is not the current density there is zero, i.e. we reject this
+      ! location and pick another one.
+      if (new_eta_f >= 0.0d0) then
+        if (i > ndim_first) rej = rej + 1
+        cycle ! Do the next loop iteration, i.e. find a new position.
+      end if
+
+      ! Calculate the target at the new position, to compare with the
+      ! current position
+      sup_new = Tip_gtf_target_log(new_eta_f, new_xi)
+
+      alpha = sup_new - sup_cur ! Log of the Metropolis ratio
+
+      if (sup_new >= sup_cur) then
+        cur_pos = new_pos
+        xi = new_xi
+        phi = new_phi
+        eta_f = new_eta_f
+        sup_cur = sup_new
+        if (i > ndim_first) acc = acc + 1
+      else
+        CALL RANDOM_NUMBER(rnd)
+        if (log(rnd) <= alpha) then
+          cur_pos = new_pos
+          xi = new_xi
+          phi = new_phi
+          eta_f = new_eta_f
+          sup_cur = sup_new
+          if (i > ndim_first) acc = acc + 1
+        else
+          if (i > ndim_first) rej = rej + 1
+        end if
+      end if
+    end do
+
+    ! The acceptance rate of this chain drives one update of the shared
+    ! step size. Note the sign: a high acceptance rate means the steps are
+    ! too small, so the step grows.
+    if (acc + rej > 0) then
+      a_rate = DBLE(acc) / DBLE(acc + rej)
+      MH_std = MH_std * exp(MH_gain_tip*(a_rate - MH_target_tip))
+      ! Limits on how big or low the standard deviation can be
+      if (MH_std > MH_std_max_tip) then
+        MH_std = MH_std_max_tip
+      else if (MH_std < MH_std_min_tip) then
+        MH_std = MH_std_min_tip
+      end if
+    end if
+
+    ! Return the current position. The escape probability is returned for
+    ! diagnostics only, the caller emits every candidate.
+    par_pos = cur_pos
+    df_cur = Escape_Prob_Tip(eta_f, cur_pos)
+  end subroutine Metro_algo_tip_gtf_v3
+
+  !--------------------------------------------------------------------------------
+  ! Log of the target distribution of the v3 field emission sampler: the
+  ! Fowler-Nordheim electron supply times the h_xi*h_phi area element of the
+  ! (xi, phi) parametrization, i.e. the same supply that
+  ! Do_Field_Emission_Tip_OLDCODE integrates over the tip surface for the
+  ! number of candidate electrons. The escape probability is NOT part of
+  ! the target: the caller applies it as the emission test, so the emitted
+  ! positions follow the current density supply * D (see the corresponding
+  ! pairing in mod_field_emission_v2). Constant factors cancel in the
+  ! Metropolis ratio. The tiny() guard catches a supply that underflows to
+  ! zero. eta_f must be < 0.
+  double precision function Tip_fe_target_log(eta_f, xi, pos)
+    double precision, intent(in)                 :: eta_f, xi
+    double precision, dimension(1:3), intent(in) :: pos
+
+    Tip_fe_target_log = log(max(Elec_Supply_tip(eta_f, pos), tiny(1.0d0))) &
+                    & + 0.5d0*log(xi**2 - eta_1**2)
+  end function Tip_fe_target_log
+
+  !--------------------------------------------------------------------------------
+  ! Metropolis-Hastings sampling of the emission position for the field
+  ! emission from the tip (third version, used by
+  ! Do_Field_Emission_Tip_OLDCODE).
+  !
+  ! The chain moves in the (xi, phi) parametrization of the tip surface and
+  ! samples positions proportional to the electron supply times the area
+  ! element (Tip_fe_target_log above). The caller then emits each candidate
+  ! with the escape probability D returned in df_cur, so the emitted
+  ! positions follow the current density supply * D over the tip surface
+  ! and the expected total matches the surface integral of the current.
+  ! (Metro_algo_tip_v2 above targets the escape probability with a step of
+  ! 0.075% of the surface, so its chains stay at their uniform starting
+  ! point: the emitted positions followed D alone, without the supply
+  ! weight and the area element. It is kept for reference.)
+  !
+  ! The mechanics are identical to Metro_algo_tip_gtf_v3: Gaussian steps in
+  ! (xi, phi) reflected at the xi limits with phi wrapping, a warmup with
+  ! the large fixed step MH_init_tip, then the adapted step MH_std, fixed
+  ! within a chain and updated once per chain from its acceptance rate.
+  subroutine Metro_algo_tip_v3(ndim, xi, phi, eta_f, df_cur, par_pos)
+    integer, intent(in)                           :: ndim
+    double precision, intent(out)                 :: xi, phi, eta_f, df_cur
+    double precision, dimension(1:3), intent(out) :: par_pos
+
+    double precision                 :: new_xi, new_phi, new_eta_f
+    double precision                 :: sup_cur, sup_new ! Log of the chain target
+    double precision                 :: rnd, alpha
+    double precision, dimension(1:2) :: std, step
+    double precision, dimension(1:3) :: cur_pos, new_pos, field
+    integer                          :: i, count, ndim_first
+    integer                          :: acc, rej ! Accepted/rejected jumps after the warmup
+
+    ! Bring the shared step size into the limits before use. It starts at
+    ! 1.0 and the older samplers above use other limits.
+    if (MH_std > MH_std_max_tip) then
+      MH_std = MH_std_max_tip
+    else if (MH_std < MH_std_min_tip) then
+      MH_std = MH_std_min_tip
+    end if
+
+    acc = 0
+    rej = 0
+    ndim_first = nint(ndim*MH_warmup_tip)
+
+    ! Warmup step size, MH_init_tip of the (xi, phi) ranges
+    std(1) = (max_xi - 1.0d0)*MH_init_tip
+    std(2) = 2.0d0*pi*MH_init_tip
+
+    ! Get a random initial position on the tip surface, uniform in (xi, phi)
+    count = 0
+    do ! Infinite loop, we try to find a favourable position to start from
+      CALL RANDOM_NUMBER(step)
+      xi = 1.0d0 + (max_xi - 1.0d0)*step(1)
+      phi = 2.0d0*pi*step(2)
+
+      cur_pos = xyz_corr(xi, eta_1, phi)
+
+      ! Calculate the electric field at this position
+      field = Calc_Field_at(cur_pos)
+      eta_f = Field_normal(cur_pos, field) ! Component normal to the surface
+
+      if (eta_f < 0.0d0) then
+        exit ! We found a nice spot so we exit the loop
+      else
+        count = count + 1
+        if (count > 10000) then ! The loop is infinite, must stop it at some point.
+          ! Mark the chain as failed with defined outputs. Zero escape
+          ! probability means the caller emits no electron from this chain.
+          xi = 1.0d0
+          phi = 0.0d0
+          par_pos = xyz_corr(xi, eta_1, phi)
+          eta_f = 1.0d0
+          df_cur = 0.0d0
+          print *, 'Failed to find spot for emission on the tip'
+          return
+        end if
+      end if
+    end do
+
+    sup_cur = Tip_fe_target_log(eta_f, xi, cur_pos)
+
+    !---------------------------------------------------------------------------
+    ! We now pick a random distance and direction to jump to from our
+    ! current location. We do this ndim times.
+    do i = 1, ndim
+
+      ! After the warmup the jumps use the adapted step size. MH_std is
+      ! only updated between chains, so the kernel is fixed within a chain.
+      if (i > ndim_first) then
+        std(1) = (max_xi - 1.0d0)*MH_std
+        std(2) = 2.0d0*pi*MH_std
+      end if
+
+      ! Find a new position using a normal distribution
+      step = box_muller((/0.0d0, 0.0d0/), std)
+      new_xi = xi + step(1)
+      new_phi = modulo(phi + step(2), 2.0d0*pi) ! phi wraps around the tip
+
+      ! Reflect xi at the limits of the surface. With the step limited to
+      ! MH_std_max_tip a jump needs at most one reflection; a longer one
+      ! (only possible in the far tail of the warmup step) is rejected.
+      if (new_xi > max_xi) new_xi = 2.0d0*max_xi - new_xi
+      if (new_xi < 1.0d0) new_xi = 2.0d0 - new_xi
+      if ((new_xi < 1.0d0) .or. (new_xi > max_xi)) then
+        if (i > ndim_first) rej = rej + 1
+        cycle ! Do the next loop iteration, i.e. find a new position.
+      end if
+
+      new_pos = xyz_corr(new_xi, eta_1, new_phi)
+
+      ! Calculate the field at the new position
+      field = Calc_Field_at(new_pos)
+      new_eta_f = Field_normal(new_pos, field)
+
+      ! Check if the field is favourable for emission at the new position.
+      ! If it is not the supply there is zero, i.e. we reject this location
+      ! and pick another one.
+      if (new_eta_f >= 0.0d0) then
+        if (i > ndim_first) rej = rej + 1
+        cycle ! Do the next loop iteration, i.e. find a new position.
+      end if
+
+      ! Calculate the target at the new position, to compare with the
+      ! current position
+      sup_new = Tip_fe_target_log(new_eta_f, new_xi, new_pos)
+
+      alpha = sup_new - sup_cur ! Log of the Metropolis ratio
+
+      if (sup_new >= sup_cur) then
+        cur_pos = new_pos
+        xi = new_xi
+        phi = new_phi
+        eta_f = new_eta_f
+        sup_cur = sup_new
+        if (i > ndim_first) acc = acc + 1
+      else
+        CALL RANDOM_NUMBER(rnd)
+        if (log(rnd) <= alpha) then
+          cur_pos = new_pos
+          xi = new_xi
+          phi = new_phi
+          eta_f = new_eta_f
+          sup_cur = sup_new
+          if (i > ndim_first) acc = acc + 1
+        else
+          if (i > ndim_first) rej = rej + 1
+        end if
+      end if
+    end do
+
+    ! The acceptance rate of this chain drives one update of the shared
+    ! step size. Note the sign: a high acceptance rate means the steps are
+    ! too small, so the step grows.
+    if (acc + rej > 0) then
+      a_rate = DBLE(acc) / DBLE(acc + rej)
+      MH_std = MH_std * exp(MH_gain_tip*(a_rate - MH_target_tip))
+      ! Limits on how big or low the standard deviation can be
+      if (MH_std > MH_std_max_tip) then
+        MH_std = MH_std_max_tip
+      else if (MH_std < MH_std_min_tip) then
+        MH_std = MH_std_min_tip
+      end if
+    end if
+
+    ! Return the current position and the escape probability there, which
+    ! the caller uses for the emission test.
+    par_pos = cur_pos
+    df_cur = Escape_Prob_Tip(eta_f, cur_pos)
+  end subroutine Metro_algo_tip_v3
 
   ! Sphere_IC_field has moved to mod_hyperboloid_tip, so that mod_verlet can
   ! reference it for the OpenACC geometry dispatch (this module uses

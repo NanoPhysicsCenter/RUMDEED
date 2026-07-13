@@ -62,6 +62,26 @@ Module mod_torus
     ! Variables for the Metropolis-Hastings algorithm
     integer, parameter                 :: N_MH_step = 500 ! Number of steps to do in the MH algorithm
 
+    ! Tuning of the v2 sampler (Metropolis_Hastings_Torus_v2). The step
+    ! MH_std_torus is a fraction of the emission patch size, fixed within a
+    ! chain and updated once per chain towards the acceptance rate
+    ! MH_target_torus. Same scheme as the samplers in mod_field_emission_v2
+    ! and mod_emission_tip.
+    double precision, parameter :: MH_warmup_torus  = 0.25d0   ! Fraction of the jumps done with the fixed initial step
+    double precision, parameter :: MH_init_torus    = 0.10d0   ! Initial step as a fraction of the patch size
+    double precision, parameter :: MH_target_torus  = 0.35d0   ! Acceptance rate the update aims for (2D random walk optimum)
+    double precision, parameter :: MH_gain_torus    = 0.025d0  ! Gain of the per-chain step update
+    double precision, parameter :: MH_std_max_torus = 0.125d0  ! Upper limit on MH_std_torus
+    double precision, parameter :: MH_std_min_torus = 0.0005d0 ! Lower limit on MH_std_torus
+    double precision            :: MH_std_torus     = 0.0125d0 ! Adapted step size, fraction of the patch size
+    double precision            :: a_rate_torus     = 0.5d0    ! Acceptance rate of the last chain
+
+    ! Half-width of the emission patch at the top of the torus. The sampler
+    ! and its random starting positions are restricted to
+    ! phi in [pi/2 - rad_patch, pi/2 + rad_patch] and theta in +-rad_patch,
+    ! the same patch as the original sampler below uses.
+    double precision, parameter :: rad_patch = 10.0d0*pi/180.0d0
+
 
     ! ----------------------------------------------------------------------------
     ! Constants for field emission
@@ -730,18 +750,13 @@ subroutine Do_Field_Emission_Torus_simple(step)
     ! Loop over the electrons to be emitted.
     do s = 1, N_round
         ! Get the position of the particle
-        ! ndim_in, F_out, F_norm_out, pos_xyz_out, sec_out
-        call Metropolis_Hastings_Torus(N_MH_step, F, F_norm, par_pos, n_vec)
-  
-        ! Check if the field is favorable for emission or not
+        call Metropolis_Hastings_Torus_v2(N_MH_step, F, F_norm, par_pos, n_vec)
+
+        ! Check if the field is favorable for emission or not.
+        ! A failed chain comes back with F_norm = 1.0, skip it.
         if (F_norm >= 0.0d0) then
           D_f = -huge(1.0d0)
-          print *, 'Warning: F > 0.0d0 (Do_Field_Emission_Torus)'
-          print *, 'F_norm = ', F_norm
-          print *, 'F = ', F
-          print *, 'par_pos = ', par_pos
-          !print *, 'sec = ', sec
-          stop
+          print *, 'Warning: F > 0.0d0, skipping the candidate (Do_Field_Emission_Torus)'
         else
   
           par_pos = par_pos + n_vec*length_scale_torus ! Move the particle a bit away from the surface
@@ -1102,6 +1117,199 @@ subroutine Metropolis_Hastings_Torus(ndim_in, F_out, F_norm_out, pos_xyz_out, n_
     F_out = F_cur
     F_norm_out = F_norm_cur
 end subroutine Metropolis_Hastings_Torus
+
+!-------------------------------------------!
+! Log of the target distribution of the v2 torus sampler: the current
+! density J = Elec_Supply_V2 * Escape_Prob times the h_phi part of the
+! surface area element of the (phi, theta) parametrization -- the same
+! expression that integrand_cuba_torus_simple integrates for the number of
+! electrons to emit. Do_Field_Emission_Torus_simple emits every candidate,
+! so with this target the emitted positions follow the current density
+! over the emission patch. h_theta = rho is constant and cancels in the
+! Metropolis ratio, as does the time step factor inside Elec_Supply_V2.
+! The tiny() guard catches a J that underflows to zero (Escape_Prob also
+! returns exactly zero in its guarded cases). F_norm must be < 0.
+double precision function Torus_target_log(F_norm, pos, phi, theta)
+    double precision, intent(in)                 :: F_norm
+    double precision, dimension(1:3), intent(in) :: pos
+    double precision, intent(in)                 :: phi, theta
+
+    double precision :: h_phi
+
+    h_phi = sqrt((R_y + rho*cos(theta))**2*sin(phi)**2 &
+        &      + (R_z + rho*cos(theta))**2*cos(phi)**2)
+
+    Torus_target_log = log(max(Elec_Supply_V2(F_norm, pos)*Escape_Prob(F_norm, pos), tiny(1.0d0))) &
+                   & + log(h_phi)
+end function Torus_target_log
+
+!-------------------------------------------!
+! Metropolis-Hastings algorithm for the torus (second version, used by
+! Do_Field_Emission_Torus_simple).
+!
+! The chain moves in the (phi, theta) angles over the emission patch at
+! the top of the torus and samples positions proportional to the current
+! density times the surface area element (Torus_target_log above), i.e.
+! the integrand of the electron supply integral. The caller emits every
+! candidate, so the emitted positions follow the current density.
+! (The original Metropolis_Hastings_Torus above targets |F_normal| in the
+! (phi, theta) coordinate measure. That is much flatter than the current
+! density, which is exponential in the field, and it misses the area
+! element. It is kept for reference.)
+!
+! The proposal is a Gaussian step in (phi, theta), reflected at the patch
+! edges. The first MH_warmup_torus of the jumps use the large fixed step
+! MH_init_torus, after that the adapted step MH_std_torus, fixed within a
+! chain and updated once per chain from its acceptance rate.
+subroutine Metropolis_Hastings_Torus_v2(ndim_in, F_out, F_norm_out, pos_xyz_out, n_vec)
+    integer, intent(in)                           :: ndim_in
+    double precision, dimension(1:3), intent(out) :: F_out
+    double precision, intent(out)                 :: F_norm_out
+    double precision, dimension(1:3), intent(out) :: pos_xyz_out
+    double precision, dimension(1:3), intent(out) :: n_vec
+
+    double precision, dimension(1:3) :: F_cur, F_new
+    double precision, dimension(1:3) :: pos_cur, pos_new
+    double precision, dimension(1:3) :: pos_cur_torus, pos_new_torus
+    double precision                 :: F_norm_cur, F_norm_new
+    double precision                 :: sup_cur, sup_new ! Log of the chain target
+    double precision                 :: alpha, rnd
+    double precision, dimension(1:2) :: std, rnd2
+    integer                          :: i, k, ndim_first
+    integer                          :: acc, rej ! Accepted/rejected jumps after the warmup
+
+    acc = 0
+    rej = 0
+    ndim_first = nint(ndim_in*MH_warmup_torus)
+
+    ! Warmup step size, MH_init_torus of the patch size
+    std(1:2) = 2.0d0*rad_patch*MH_init_torus
+
+    ! Get a random initial position, uniform in (phi, theta) over the patch
+    k = 0
+    do ! Infinite loop, we try to find a favourable position to start from
+        call random_number(rnd2)
+        pos_cur_torus(1) = rho
+        pos_cur_torus(2) = (pi/2.0d0 - rad_patch) + 2.0d0*rad_patch*rnd2(1)
+        pos_cur_torus(3) = -rad_patch + 2.0d0*rad_patch*rnd2(2)
+        pos_cur = Convert_to_xyz(pos_cur_torus)
+
+        F_cur = Calc_Field_at(pos_cur, pos_cur_torus, .True.)
+        F_norm_cur = Field_Normal(pos_cur, pos_cur_torus, F_cur)
+
+        if (F_norm_cur < 0.0d0) then
+            exit ! The field is favorable for emission
+        end if
+
+        k = k + 1
+        if (k > 10000) then
+            ! Mark the chain as failed with defined outputs. The caller
+            ! checks the sign of F_norm_out and skips the emission.
+            pos_cur_torus(1) = rho
+            pos_cur_torus(2) = pi/2.0d0
+            pos_cur_torus(3) = 0.0d0
+            pos_xyz_out = Convert_to_xyz(pos_cur_torus)
+            n_vec = Get_Unit_Vector(pos_cur_torus)
+            F_out = 0.0d0
+            F_norm_out = 1.0d0
+            print *, 'RUMDEED: WARNING: Unable to find a position for the particle (Metropolis_Hastings_Torus_v2)'
+            return
+        end if
+    end do
+
+    sup_cur = Torus_target_log(F_norm_cur, pos_cur, pos_cur_torus(2), pos_cur_torus(3))
+
+    ! Do the Metropolis-Hastings jumps
+    do i = 1, ndim_in
+
+        ! After the warmup the jumps use the adapted step size. It is only
+        ! updated between chains, so the kernel is fixed within a chain.
+        if (i > ndim_first) then
+            std(1:2) = 2.0d0*rad_patch*MH_std_torus
+        end if
+
+        ! Gaussian step in (phi, theta)
+        pos_new_torus(2:3) = box_muller(pos_cur_torus(2:3), std)
+        pos_new_torus(1) = rho ! rho is fixed
+
+        ! Reflect phi and theta at the edges of the emission patch. With
+        ! the step limits above a jump needs at most one reflection; a
+        ! longer one (only possible far out in the tail of the warmup
+        ! step) is rejected below.
+        if (pos_new_torus(2) < (pi/2.0d0 - rad_patch)) then
+            pos_new_torus(2) = (pi - 2.0d0*rad_patch) - pos_new_torus(2)
+        else if (pos_new_torus(2) > (pi/2.0d0 + rad_patch)) then
+            pos_new_torus(2) = (pi + 2.0d0*rad_patch) - pos_new_torus(2)
+        end if
+        if (pos_new_torus(3) < -rad_patch) then
+            pos_new_torus(3) = -2.0d0*rad_patch - pos_new_torus(3)
+        else if (pos_new_torus(3) > rad_patch) then
+            pos_new_torus(3) = 2.0d0*rad_patch - pos_new_torus(3)
+        end if
+
+        if ((abs(pos_new_torus(2) - pi/2.0d0) > rad_patch) .or. &
+          & (abs(pos_new_torus(3)) > rad_patch)) then
+            if (i > ndim_first) rej = rej + 1
+            cycle ! Still outside the patch after one reflection, reject the jump
+        end if
+
+        pos_new = Convert_to_xyz(pos_new_torus)
+
+        F_new = Calc_Field_at(pos_new, pos_new_torus, .True.)
+        F_norm_new = Field_Normal(pos_new, pos_new_torus, F_new)
+
+        ! An unfavorable field means zero current, i.e. the jump is rejected
+        if (F_norm_new >= 0.0d0) then
+            if (i > ndim_first) rej = rej + 1
+            cycle
+        end if
+
+        sup_new = Torus_target_log(F_norm_new, pos_new, pos_new_torus(2), pos_new_torus(3))
+
+        alpha = sup_new - sup_cur ! Log of the Metropolis ratio
+
+        if (sup_new >= sup_cur) then
+            pos_cur = pos_new
+            pos_cur_torus = pos_new_torus
+            F_cur = F_new
+            F_norm_cur = F_norm_new
+            sup_cur = sup_new
+            if (i > ndim_first) acc = acc + 1
+        else
+            call random_number(rnd)
+            if (log(rnd) <= alpha) then
+                pos_cur = pos_new
+                pos_cur_torus = pos_new_torus
+                F_cur = F_new
+                F_norm_cur = F_norm_new
+                sup_cur = sup_new
+                if (i > ndim_first) acc = acc + 1
+            else
+                if (i > ndim_first) rej = rej + 1
+            end if
+        end if
+    end do
+
+    ! The acceptance rate of this chain drives one update of the shared
+    ! step size. A high acceptance rate means the steps are too small, so
+    ! the step grows.
+    if (acc + rej > 0) then
+        a_rate_torus = DBLE(acc) / DBLE(acc + rej)
+        MH_std_torus = MH_std_torus * exp(MH_gain_torus*(a_rate_torus - MH_target_torus))
+        ! Limits on how big or low the step can be
+        if (MH_std_torus > MH_std_max_torus) then
+            MH_std_torus = MH_std_max_torus
+        else if (MH_std_torus < MH_std_min_torus) then
+            MH_std_torus = MH_std_min_torus
+        end if
+    end if
+
+    ! Set the output variables
+    pos_xyz_out = pos_cur
+    n_vec = Get_Unit_Vector(pos_cur_torus)
+    F_out = F_cur
+    F_norm_out = F_norm_cur
+end subroutine Metropolis_Hastings_Torus_v2
 
 function Get_Jump_Probability(F_norm_cur, F_norm_new) result(alpha)
     double precision, intent(in) :: F_norm_cur ! Normal field at current position
