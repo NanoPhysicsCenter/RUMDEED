@@ -35,10 +35,14 @@ Module mod_cuba_integration
   integer, parameter          :: nmin = 2    ! Minimum number of samples a former pass must contribute
                                              ! to a subregion to be considered in the region's compound
                                              ! integral value.
-  double precision, parameter :: flatness = 5.0d0 ! Determines how prominently outliers, i.e. samples
+  double precision, parameter :: flatness = 25.0d0 ! Determines how prominently outliers, i.e. samples
                                              ! with a large fluctuation, figure in the total fluctuation,
                                              ! which in turn determines how a region is split up.
                                              ! Choose large for flat integrands, small for volatile ones.
+                                             ! NOTE: flatness = 5 combined with a small nmin makes Suave
+                                             ! converge to a biased result (~10% low even on smooth
+                                             ! integrands, verified against known integrals); 25 is the
+                                             ! Cuba demo value and passes the unit tests in mod_tests.
 
   ! Divonne specific
   integer, parameter :: key1 = 47 ! Sampling in the partitioning phase:

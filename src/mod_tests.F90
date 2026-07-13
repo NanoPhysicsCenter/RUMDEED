@@ -12,6 +12,7 @@ module mod_tests
   use mod_work_function
   use mod_collisions, only: normal_dist, folded_normal_dist, folded_normal_max, &
                           & Calculate_Kramers_Cross_Section
+  use mod_cuba_integration
   implicit none
 
   PRIVATE
@@ -29,6 +30,11 @@ module mod_tests
 
   ! Constant used in MC integration
   double precision :: time_step_div_q0
+
+  ! Parameters of the Gaussian peak integrand in the Cuba integration test
+  double precision, parameter :: cuba_test_sig = 0.1d0
+  double precision, parameter :: cuba_test_mu1 = 0.3d0
+  double precision, parameter :: cuba_test_mu2 = 0.7d0
 
   ! Passed / failed color strings
   character(len=16), parameter :: passed_str = achar(27)//'[32m PASSED'//achar(27)//'[0m'
@@ -234,6 +240,9 @@ contains
 
     print *, ''
     call Test_Collision_Math()
+
+    print *, ''
+    call Test_Cuba_Integration()
 
     print *, ''
     call Test_Work_Function_Checkerboard()
@@ -1669,6 +1678,126 @@ contains
     print *, 'Collision math test finished'
     print *, ''
   end subroutine Test_Collision_Math
+
+  !-----------------------------------------------------------------------------
+  ! Unit tests for Cuba_Integrate in mod_cuba_integration.
+  ! Integrates functions with known analytic values over the unit square with
+  ! all three methods (Suave, Divonne, Cuhre) and checks convergence, the
+  ! result, the error estimate, the userdata passing and that the vectorized
+  ! (nvec > 1) block delivery reproduces the scalar result. The last check
+  ! guards the production setup, where Cuba hands the planar supply integrand
+  ! blocks of 256 points for the batched (GPU) field evaluation.
+  subroutine Test_Cuba_Integration()
+    integer, parameter :: poly_ud = 7 ! Arbitrary userdata; the polynomial integrand scales with it
+    character(len=7), dimension(1:3), parameter :: mname = (/ 'Suave  ', 'Divonne', 'Cuhre  ' /)
+
+    double precision, dimension(1:1) :: integral, error_out, prob
+    double precision                 :: ref_scalar, exact_gauss
+    integer                          :: nregions, neval, fail, m
+
+    ! Saved global integration settings
+    integer          :: method_save, mineval_save, maxeval_save
+    double precision :: epsabs_save, epsrel_save
+
+    print *, 'Starting Cuba integration test'
+
+    method_save  = cuba_method
+    epsabs_save  = cuba_epsabs
+    epsrel_save  = cuba_epsrel
+    mineval_save = cuba_mineval
+    maxeval_save = cuba_maxeval
+
+    ! The test integrals are O(0.1) to O(10), so the production tolerances
+    ! (half an electron) are meaningless here. Ask for 0.01% relative error.
+    cuba_epsabs  = 1.0d-6
+    cuba_epsrel  = 1.0d-4
+    cuba_mineval = 1000
+    cuba_maxeval = 5000000
+
+    ! Analytic value of the Gaussian peak integrand: the product of two 1D
+    ! integrals expressed with the error function.
+    exact_gauss = Gauss_Column_Integral(cuba_test_mu1) * Gauss_Column_Integral(cuba_test_mu2)
+
+    do m = cuba_method_suave, cuba_method_cuhre
+      cuba_method = m
+
+      ! Smooth polynomial with exact integral 3*userdata: checks convergence,
+      ! the result and that userdata reaches the integrand.
+      call Cuba_Integrate(test_integrand_poly, 1, poly_ud, integral, error_out, prob, &
+                        & nregions, neval, fail)
+      call Assert_True(fail == 0, 'Cuba '//trim(mname(m))//': polynomial converged')
+      call Assert_Close(integral(1), 3.0d0*poly_ud, 'Cuba '//trim(mname(m))//': polynomial integral')
+      ref_scalar = integral(1)
+
+      ! The same integrand delivered in blocks of 64 points: the integration
+      ! points do not depend on nvec, so the result must match the scalar one.
+      call Cuba_Integrate(test_integrand_poly_v, 64, poly_ud, integral, error_out, prob, &
+                        & nregions, neval, fail)
+      call Assert_True(abs(integral(1) - ref_scalar) <= 1.0d-8*abs(ref_scalar), &
+                     & 'Cuba '//trim(mname(m))//': vectorized matches scalar')
+
+      ! Gaussian peak with a known value: adaptive refinement and an honest
+      ! error estimate.
+      call Cuba_Integrate(test_integrand_gauss, 1, 0, integral, error_out, prob, &
+                        & nregions, neval, fail)
+      call Assert_True(fail == 0, 'Cuba '//trim(mname(m))//': Gaussian peak converged')
+      call Assert_Close(integral(1), exact_gauss, 'Cuba '//trim(mname(m))//': Gaussian peak integral')
+      call Assert_True(abs(integral(1) - exact_gauss) <= 10.0d0*error_out(1) + 1.0d-8, &
+                     & 'Cuba '//trim(mname(m))//': true error within 10x the estimate')
+    end do
+
+    cuba_method  = method_save
+    cuba_epsabs  = epsabs_save
+    cuba_epsrel  = epsrel_save
+    cuba_mineval = mineval_save
+    cuba_maxeval = maxeval_save
+
+    print *, 'Cuba integration test finished'
+    print *, ''
+  end subroutine Test_Cuba_Integration
+
+  ! One column of the Gaussian test integrand integrated over [0, 1]
+  double precision function Gauss_Column_Integral(mu)
+    double precision, intent(in) :: mu
+
+    Gauss_Column_Integral = cuba_test_sig*sqrt(0.5d0*pi) &
+      & * (erf((1.0d0 - mu)/(cuba_test_sig*sqrt(2.0d0))) + erf(mu/(cuba_test_sig*sqrt(2.0d0))))
+  end function Gauss_Column_Integral
+
+  ! Cuba test integrand: smooth polynomial scaled by userdata.
+  ! The integral over the unit square is 3*userdata.
+  integer function test_integrand_poly(ndim, xx, ncomp, ff, userdata)
+    integer, intent(in) :: ndim, ncomp, userdata
+    double precision, intent(in), dimension(1:ndim)   :: xx
+    double precision, intent(out), dimension(1:ncomp) :: ff
+
+    ff(1) = dble(userdata) * (1.0d0 + 8.0d0*xx(1)*xx(2))
+    test_integrand_poly = 0
+  end function test_integrand_poly
+
+  ! Vectorized form of test_integrand_poly (blocks of up to nvec points)
+  integer function test_integrand_poly_v(ndim, xx, ncomp, ff, userdata, nvec)
+    integer, intent(in) :: ndim, ncomp, userdata, nvec
+    double precision, intent(in), dimension(1:ndim, 1:nvec)   :: xx
+    double precision, intent(out), dimension(1:ncomp, 1:nvec) :: ff
+    integer :: k
+
+    do k = 1, nvec
+      ff(1, k) = dble(userdata) * (1.0d0 + 8.0d0*xx(1, k)*xx(2, k))
+    end do
+    test_integrand_poly_v = 0
+  end function test_integrand_poly_v
+
+  ! Cuba test integrand: Gaussian peak at (mu1, mu2). The analytic value is
+  ! computed in Test_Cuba_Integration with Gauss_Column_Integral.
+  integer function test_integrand_gauss(ndim, xx, ncomp, ff, userdata)
+    integer, intent(in) :: ndim, ncomp, userdata
+    double precision, intent(in), dimension(1:ndim)   :: xx
+    double precision, intent(out), dimension(1:ncomp) :: ff
+
+    ff(1) = exp(-((xx(1) - cuba_test_mu1)**2 + (xx(2) - cuba_test_mu2)**2)/(2.0d0*cuba_test_sig**2))
+    test_integrand_gauss = 0
+  end function test_integrand_gauss
 
   !-----------------------------------------------------------------------------
   ! Test the checkerboard work function model in mod_work_function with a

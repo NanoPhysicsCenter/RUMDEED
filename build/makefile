@@ -234,7 +234,7 @@ mod_pair.mod: mod_pair.o
 	@true
 
 mod_tests.o: ../src/mod_tests.F90 mod_global.mod mod_verlet.mod mod_pair.mod mod_field_emission_v2.mod mod_emission_tip.mod \
-             mod_work_function.mod mod_collisions.mod
+             mod_work_function.mod mod_collisions.mod mod_cuba_integration.mod
 		$(FC) -c $(FFLAGS) ../src/mod_tests.F90
 
 mod_tests.mod: mod_tests.o
