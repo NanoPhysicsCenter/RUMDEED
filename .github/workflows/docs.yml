@@ -38,6 +38,25 @@ jobs:
       - name: Build HTML
         run: make -C docs html
 
+      # master_doc is 'manual', so Sphinx produces no index.html;
+      # redirect the site root to manual.html
+      - name: Create index.html redirect
+        run: |
+          cat > docs/build/html/index.html <<'EOF'
+          <!DOCTYPE html>
+          <html lang="en">
+            <head>
+              <meta charset="utf-8">
+              <meta http-equiv="refresh" content="0; url=manual.html">
+              <link rel="canonical" href="manual.html">
+              <title>RUMDEED Documentation</title>
+            </head>
+            <body>
+              <p>Redirecting to <a href="manual.html">the manual</a>&hellip;</p>
+            </body>
+          </html>
+          EOF
+
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
