@@ -12,8 +12,11 @@ Features
 --------
 
 - Photo emission
-- Field emission
+- Field emission (planar surfaces, hyperboloid and cylindrical tips, torus and 2D-material emitters)
 - Thermal-field emission
+- Inhomogeneous work function (checkerboard, Gaussian spots and Voronoi patterns)
+- Electron collisions with a neutral background gas, including ionization and recombination
+- Parallelization with OpenMP, with optional OpenACC offload of the force calculation to NVIDIA GPUs
 
 Acknowledgments
 ---------------

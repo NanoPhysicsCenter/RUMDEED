@@ -71,7 +71,7 @@ Read input parameters
         nremit = 1
         image_charge = .true.
         n_ic_max = 1
-        collisions = .false.
+        collision_mode = 0
         t_temp = 293.15
         p_abs = 1.0
         emitters_dim(1:3,1) = 500.0, 500.0, 0.0
@@ -139,9 +139,10 @@ Read ramo current and plot
     filename_ramo = path.join(filepath, 'out/ramo_current.dt')
     
     # Read the data into a pandas dataframe
-    #cur_time, step, ramo_cur, V_d, nrPart, nrElec, nrHole
+    #cur_time, step, ramo_cur, V_d, nrPart, nrElec, nrIon
     df_cur = pd.read_csv(filepath_or_buffer=filename_ramo, index_col=1, delim_whitespace=True, \
-                         header=None, names=['time', 'step', 'current', 'volt', 'nrPart', 'nrElec', 'nrHole', 'avg_mob', 'avg_speed', 'ramo_1', 'ramo_2'])
+                         header=None, names=['time', 'step', 'current', 'volt', 'nrPart', 'nrElec', 'nrIon', 'avg_mob', 'avg_speed', \
+                                             'avg_elec_speed', 'avg_ion_speed', 'ramo_elec', 'ramo_ion', 'ramo_atom'])
     
     # Plot current in mA as a function of time in ps
     plt.plot(df_cur['time'].to_numpy(), df_cur['current'].to_numpy()/1.0E-3)
@@ -162,12 +163,12 @@ Plot emission density
 
 .. code:: ipython3
 
-    filename_emit_den = path.join(filepath, 'out/density_emit.bin')
-    
+    filename_emit_den = path.join(filepath, 'out/density_emit_elec.bin')
+
     # Binary file layout
     # float64 (double precision numbers)
     # int32 (32bit integers)
-    dt_emit_type = np.dtype([('x', np.float64), ('y', np.float64), ('emit', np.int32), ('sec', np.int32), ('id', np.int32)])
+    dt_emit_type = np.dtype([('x', np.float64), ('y', np.float64), ('z', np.float64), ('emit', np.int32), ('id', np.int32)])
     
     # Memory map the file
     # mode=r (Read only)

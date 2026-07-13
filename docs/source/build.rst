@@ -32,6 +32,7 @@ After installing the necessary build utilities, navigate to the "RUMDEED" direct
 
 This command will compile the code and generate an executable file named *RUMDEED.out* within the build directory.
 Once the compilation is complete, you can proceed to run the code as explained in the documentation.
+The unit and integration tests can be run with the command **make test**.
 
 If you prefer to use a different compiler, you can specify the **CC** and **FC** variables when executing the make command.
 For instance, if you want to compile using the Intel compilers, utilize the following command:
@@ -53,6 +54,8 @@ This requires the **nvfortran** compiler from the
 
    make CC=gcc FC=nvfortran ACC=gpu
 
+The GPU compute capability can optionally be given with the **GPU_CC** variable, for
+example ``make ACC=gpu GPU_CC=cc80`` for an A100.
 This can be combined with OpenMP (which is enabled by default): the offloaded kernel runs
 on the GPU while the remaining parallel loops (emission, position and velocity updates)
 keep running on the CPU cores. The regular CPU-only builds are unaffected, when compiling
@@ -94,7 +97,9 @@ The MKL installation is found through the **MKLROOT** variable (default
 from the environment. Builds with **POLARSO=yes** use MKL's ILP64 interface and therefore
 8-byte default integers. At runtime the solver is activated by placing a ``polarso``
 namelist file with ``use_polarso = .true.`` in the run directory; a binary built without
-POLARSO stops with an error message if such a file is present.
+POLARSO stops with an error message if such a file is present. The ``polarso`` namelist
+also accepts the grid parameters ``polarso_dim``, ``polarso_pos``, ``polarso_step`` and
+``polarso_padding``, and the flag ``write_field_files`` (see mod_polarso.F90).
 
 Cuba library
 ------------
