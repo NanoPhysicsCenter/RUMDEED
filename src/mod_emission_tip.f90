@@ -10,7 +10,7 @@ Module mod_emission_tip
   use mod_verlet
   use mod_pair
   use mod_ic
-  use mod_kevin_rjgtf
+  use mod_kevin_rjgtf_v2
   use mod_cuba_integration
   !use ieee_arithmetic
   implicit none
@@ -1497,7 +1497,7 @@ end function Elec_supply_tip
       ! Calculate the current density at this point and convert it to
       ! electrons supplied per time step
       !w_theta = w_theta_xy(par_pos, userdata)
-      ff(1) = Get_Kevin_Jgtf(eta_f, T_temp, w_theta) * h_xi * h_phi * time_step_div_q0
+      ff(1) = Get_Kevin_Jgtf_v2(eta_f, T_temp, w_theta) * h_xi * h_phi * time_step_div_q0
     else
       ! The field is NOT favourable for emission
       ! This point does not contribute

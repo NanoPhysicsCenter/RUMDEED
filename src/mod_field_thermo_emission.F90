@@ -11,7 +11,7 @@ Module mod_field_thermo_emission
   use mod_velocity
   use mod_pair
   use mod_work_function
-  use mod_kevin_rjgtf
+  use mod_kevin_rjgtf_v2
   use mod_cuba_integration
   implicit none
 
@@ -254,7 +254,7 @@ subroutine Init_Field_Thermo_Emission()
     ! The chain target is the current density at this location. We work with
     ! its log because J spans a huge dynamic range, the tiny() guard only
     ! catches a J that underflows to zero.
-    df_cur = log(max(Get_Kevin_Jgtf(field(3), T_temp, cur_w), tiny(1.0d0)))
+    df_cur = log(max(Get_Kevin_Jgtf_v2(field(3), T_temp, cur_w), tiny(1.0d0)))
 
     !---------------------------------------------------------------------------
     ! We now pick a random distance and direction to jump to from our
@@ -286,7 +286,7 @@ subroutine Init_Field_Thermo_Emission()
 
       ! Calculate the current density at the new position, to compare with
       ! the current position.
-      df_new = log(max(Get_Kevin_Jgtf(field(3), T_temp, new_w), tiny(1.0d0)))
+      df_new = log(max(Get_Kevin_Jgtf_v2(field(3), T_temp, new_w), tiny(1.0d0)))
 
       ! if (abs(cur_w - new_w) > 0.25) then
       !   print *, df_new / df_cur
@@ -423,7 +423,7 @@ subroutine Init_Field_Thermo_Emission()
       ! Calculate the current density at this point and convert it to
       ! electrons supplied per time step
       w_theta = w_theta_xy(par_pos, userdata)
-      ff(1) = Get_Kevin_Jgtf(field(3), T_temp, w_theta) * time_step_div_q0
+      ff(1) = Get_Kevin_Jgtf_v2(field(3), T_temp, w_theta) * time_step_div_q0
       !ff(1) = Elec_Supply_V2(field(3), par_pos, userdata)*Escape_Prob(field(3), par_pos, userdata)
     else
       ! The field is NOT favourable for emission
