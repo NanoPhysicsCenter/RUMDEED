@@ -24,12 +24,25 @@ Text files ending in .dt have data organized as columns. Files ending in .bin ar
 
   * - Data
     - type
+    - Units
   * - epsilon_r, m_eeff, m_heff
     - 3 × float64
-  * - length_scale, time_scale, vel_scale, cur_scale
-    - 4 × float64
+    - #
+  * - length_scale
+    - float64
+    - m
+  * - time_scale
+    - float64
+    - s
+  * - vel_scale
+    - float64
+    - m/s
+  * - cur_scale
+    - float64
+    - A
   * - MAX_PARTICLES, MAX_EMITTERS, MAX_SECTIONS, MAX_LIFE_TIME
     - 4 × int32
+    - #
 
 ----------
 
@@ -46,7 +59,7 @@ Text files ending in .dt have data organized as columns. Files ending in .bin ar
      - Time
      - Time step
      - Number of emitted particles
-     - Total number of electron in the system
+     - Total number of electrons in the system
      - Number of emitted particles from emitter number 1
      - Number of emitted particles from emitter number 2
      - ...
@@ -73,7 +86,7 @@ Text files ending in .dt have data organized as columns. Files ending in .bin ar
 ----------
 
 | **absorbed.dt**, **absorbed_bot.dt**, **absorbed_top.dt** and **absorbed_recom.dt**
-| The file absorbed.dt contains information about the number of particles absorbed by the cathode or anode. While absorbed_bot.dt contains data only for the cathode and absorbed_top.dt for the anode. The file absorbed_recom.dt contains the number of particles removed through recombination.
+| The file absorbed.dt contains information about the number of particles absorbed by the cathode or anode, while absorbed_bot.dt contains data only for the cathode and absorbed_top.dt only for the anode. The file absorbed_recom.dt contains the number of particles removed through recombination.
 | The data in the columns is
 
 .. list-table:: absorbed.dt, absorbed_bot.dt, absorbed_top.dt, absorbed_recom.dt
@@ -141,7 +154,7 @@ Text files ending in .dt have data organized as columns. Files ending in .bin ar
     - float
     - float
 
----------
+----------
 
 | **integration.dt**
 | The file integration.dt contains information about the numerical integration performed by the Cuba library :cite:p:`HAHN200578`. The default integration method is Divonne; it can be changed with the **cuba_method** parameter in the input file. Please refer to the Cuba library manual for more information. It can be found in the Cuba directory.
@@ -179,7 +192,7 @@ Text files ending in .dt have data organized as columns. Files ending in .bin ar
 
 | Note that the cylindrical tip and torus emission modes omit the first column (the number of the emitter).
 
----------
+----------
 
 | **ramo_current.dt**
 | The file ramo_current.dt contains information about the Ramo current.
@@ -236,10 +249,10 @@ Text files ending in .dt have data organized as columns. Files ending in .bin ar
     - float
     - float
 
----------
+----------
 
 | **volt.dt**
-| The file volt.dt contains information about the voltage over the gap. In future releases it will be possible to have voltage that depends on time or other factors.
+| The file volt.dt contains information about the voltage over the gap. The voltage is currently constant during the simulation and the time dependent column is always zero.
 | The data in the columns is
 
 .. list-table:: volt.dt
@@ -263,10 +276,10 @@ Text files ending in .dt have data organized as columns. Files ending in .bin ar
     - float
     - float
 
----------
+----------
 
 | **gauss.dt**
-| The file gauss.dt contains information about the Gaussian distribution used in the photoemission model. The Gaussian emission can be turned on and off in the mod_photo_emission.f90 file by setting the variable **EmitGauss** to true or false. Parameters for the Gaussian emission can be set in the :ref:`laser file <run>`.
+| The file gauss.dt contains information about the Gaussian distribution used in the photoemission model. The Gaussian emission is turned on and off with the first number in the :ref:`laser file <run>`, where its parameters are also set.
 | The data in the columns is
 
 .. list-table:: gauss.dt
@@ -276,7 +289,7 @@ Text files ending in .dt have data organized as columns. Files ending in .bin ar
 
   * -
     - Time step
-    - Number of electrons allowed by the gaussian distribution
+    - Number of electrons allowed by the Gaussian distribution
   * - Units
     - #
     - #
@@ -284,7 +297,7 @@ Text files ending in .dt have data organized as columns. Files ending in .bin ar
     - integer
     - integer
 
----------
+----------
 
 | **collisions.dt**
 | The file collisions.dt is written every time step when collisions are enabled (**collision_mode** > 0 in the input file).
@@ -311,7 +324,7 @@ Text files ending in .dt have data organized as columns. Files ending in .bin ar
     - integer
     - integer
 
----------
+----------
 
 | **density_emit_elec.bin**, **density_emit_ion.bin** and **density_emit_atom.bin**
 | These files contain the positions where particles were added to the system, split by species: electrons in density_emit_elec.bin, ions in density_emit_ion.bin and neutral atoms in density_emit_atom.bin. The files are written in binary format and the record below is repeated for each particle.
@@ -342,7 +355,7 @@ Text files ending in .dt have data organized as columns. Files ending in .bin ar
     - int32
     - #
 
----------
+----------
 
 | **density_absorb_top.bin** and **density_absorb_bot.bin**
 | The files density_absorb_top.bin and density_absorb_bot.bin contains information about the density of the absorbed particles. The files are written in binary format and contain the x and y coordinates of the absorbed particles, along with absorbed id, section and the ID number of the particle. This data is repeated for each absorbed particle. The top file also contains the velocity of the absorbed particles.
@@ -405,7 +418,7 @@ Text files ending in .dt have data organized as columns. Files ending in .bin ar
     - int32
     - #
 
----------
+----------
 
 | **ionization_data.bin**
 | The file ionization_data.bin contains one binary record for each ionization event.
@@ -440,7 +453,7 @@ Text files ending in .dt have data organized as columns. Files ending in .bin ar
   * - Emitter of the incoming electron
     - int32
 
----------
+----------
 
 | **recombination_data.bin**
 | The file recombination_data.bin contains one binary record for each recombination event.
@@ -471,32 +484,32 @@ Text files ending in .dt have data organized as columns. Files ending in .bin ar
   * - Lifetime of the ion in time steps
     - int32
 
----------
+----------
 
 | **position.bin**
-| The file position.bin is only written when **write_position_file** is set to .TRUE. in the input file. It starts with a header of two int32 numbers: the total number of time steps and the sampling interval. Then for every time step a block follows consisting of the time step number and the number of particles (2 × int32), followed by one record per particle with the position x, y, z (3 × float64, in meters), the emitter number, the emitter section and the particle ID (3 × int32).
+| The file position.bin is only written when **write_position_file** is set to ``.TRUE.`` in the input file. It starts with a header of two int32 numbers: the total number of time steps and the sampling interval. Then for every time step a block follows consisting of the time step number and the number of particles (2 × int32), followed by one record per particle with the position x, y, z (3 × float64, in meters), the emitter number, the emitter section and the particle ID (3 × int32).
 
----------
+----------
 
 | **ramo_current.bin**
-| The file ramo_current.bin is only written when **write_ramo_sec** is set to .TRUE. in the input file. Every time step the full array of Ramo currents per emitter section is written as MAX_SECTIONS × MAX_EMITTERS float64 numbers in Ampere (column-major order, sections varying fastest).
+| The file ramo_current.bin is only written when **write_ramo_sec** is set to ``.TRUE.`` in the input file. Every time step the full array of Ramo currents per emitter section is written as MAX_SECTIONS × MAX_EMITTERS float64 numbers in amperes (column-major order, sections varying fastest).
 
----------
+----------
 
 | **particles-<step>.dt**, **electrons-<step>.dt** and **ions-<step>.dt**
-| These text files are written every time step when **write_particle_data_file**, **write_electron_data_file** or **write_ion_data_file** is set to .TRUE. in the input file. The first line contains the number of particles. Each following line describes one particle: ID, position x, y, z, emitter number and the time step the particle was created. In particles-<step>.dt the positions are in nm, in the other two files they are in meters.
+| These text files are written every time step when **write_particle_data_file**, **write_electron_data_file** or **write_ion_data_file** is set to ``.TRUE.`` in the input file. The first line contains the number of particles. Each following line describes one particle: ID, position x, y, z, emitter number and the time step the particle was created. In particles-<step>.dt the positions are in nm, in the other two files they are in meters.
 
----------
+----------
 
 | **atom-<step>.bin** and **elec-<step>.bin**
-| Snapshot files of atom and electron positions written every **sample_atom_rate** / **sample_elec_rate** time steps when **sample_atom_file** / **sample_elec_file** is set to .TRUE. in the input file.
+| Snapshot files of atom and electron positions written every **sample_atom_rate** / **sample_elec_rate** time steps when **sample_atom_file** / **sample_elec_file** is set to ``.TRUE.`` in the input file.
 
----------
+----------
 
 | **density_emit.bin**, **density_ion.bin**, **mh.bin**, **laplace_average_field.dt** and **laplace_grid.dt**
 | These files are created in the out folder but the current version of the code does not write any data to them.
 
----------
+----------
 
 | **density_absorb_recom.bin**
 | The file density_absorb_recom.bin contains information about particles removed through recombination. The file is written in binary format and the record below is repeated for each removed particle. Note that unlike the other density files, the positions in this file are given in meters.
@@ -534,7 +547,7 @@ Text files ending in .dt have data organized as columns. Files ending in .bin ar
     - float64
     - #
 
----------
+----------
 
 | **planes-?.bin**
 | The files planes-?.bin contain information about particles when they pass through imaginary planes in the system. The number of planes-?.bin files is set using the **planes_N** variable in the input file. The positions of the imaginary planes are specified using the **planes_z** variable. Up to 10 planes can be specified. The files are numbered from 1 to planes_N, and only planes with a position larger than zero produce a file. If the input file does not set these variables, the default is 10 planes at z = 5, 10, 25, 50, 75, 100, 125, 250, 500 and 750 nm. The planes are specified in the input file as

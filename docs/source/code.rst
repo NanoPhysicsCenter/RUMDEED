@@ -48,7 +48,7 @@ Photoemission Branch
     * Velocity has Newtonian calculations
 
 .. math::
-    v_z = \sqrt{ \frac{ 2( \hbar \omega - \phi ) * q_{0} }{ m_{0} }}
+    v_z = \sqrt{ \frac{ 2( \hbar \omega - \phi ) q_{0} }{ m_{0} }}
 
 * Output pulse can be Gaussian
     * Quantum efficiency is controlled by amplitude modulation
@@ -58,7 +58,7 @@ Photoemission Branch
     b = \frac{1}{ 2 \pi \sigma^2}
 
 .. math::
-    f(step) = A exp{ - b  ( step - \mu )^2 }
+    f(step) = A \exp\left( - b ( step - \mu )^2 \right)
 
 .. math::
     QE \equiv \frac{\hbar \omega}{ q_0 } \frac{ J }{ I_{\omega } } \propto ( \hbar \omega - \Phi)^2
@@ -80,7 +80,7 @@ The code for this can be found in **mod_field_emission_v2.F90**.
 The Fowler-Nordheim equation :cite:p:`Forbes08112007` is
 
 .. math::
-    J = \frac{a_{FN}}{\phi t^2(\ell)}F^2 exp(-\nu(\ell)b_{FN}\phi^{3/2}/F)
+    J = \frac{a_{FN}}{\phi t^2(\ell)}F^2 \exp(-\nu(\ell)b_{FN}\phi^{3/2}/F)
 
 where :math:`a_{FN}` and :math:`b_{FN}` are the first and second Fowler-Nordheim constants respectively.
 The functions :math:`\nu(\ell)` and :math:`t(\ell)` arise due to image charge effects and are given by
@@ -101,13 +101,15 @@ If :math:`\phi` is in eV and :math:`F` in V/m then
 
 .. _field-tip:
 
-Tip stuff
-
+Field emission from a hyperboloid tip
+-------------------------------------
+The code for field emission from a hyperboloid tip can be found in **mod_emission_tip.f90**.
+The work function of the tip is set with the ``w_theta`` variable in that file.
 
 .. _thermal-field:
 
 Thermal-field emission
 ----------------------
-Thermo-Field
+The code for planar thermal-field emission can be found in **mod_field_thermo_emission.F90** :cite:p:`PhysRevApplied.15.014040`.
 
 .. index:: Verlet, Beeman, code, Fowler-Nordheim

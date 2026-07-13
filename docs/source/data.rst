@@ -4,9 +4,6 @@ Data analysis examples
 The example directory contains a number of examples with Python Jupyter notebooks that show data analysis.
 The output of the example notebook for the thermal-field emission example is shown below.
 
-Checkerboard
-------------
-
 Thermal-field emission
 ----------------------
 
@@ -29,7 +26,7 @@ Thermal-field emission
     filepath = './'
 
 Read input parameters
----------------------
+~~~~~~~~~~~~~~~~~~~~~
 
 .. code:: ipython3
 
@@ -96,7 +93,7 @@ Read input parameters
 
 
 Emission information
-~~~~~~~~~~~~~~~~~~~~
+^^^^^^^^^^^^^^^^^^^^
 
 .. code:: ipython3
 
@@ -104,7 +101,7 @@ Emission information
     filename_emit = path.join(filepath, 'out/emitted.dt')
     
     # Read data into a pandas dataframe
-    df_emit = pd.read_csv(filepath_or_buffer=filename_emit, index_col=1, delim_whitespace=True, \
+    df_emit = pd.read_csv(filepath_or_buffer=filename_emit, index_col=1, sep=r'\s+', \
                           header=None, names=['time', 'step', 'nrEmit', 'nrElec', 'nrEmit1'])
     
     # Plot number of particles emitted per time step
@@ -129,7 +126,7 @@ Emission information
 
 
 Current
--------
+~~~~~~~
 
 Read ramo current and plot
 
@@ -140,7 +137,7 @@ Read ramo current and plot
     
     # Read the data into a pandas dataframe
     #cur_time, step, ramo_cur, V_d, nrPart, nrElec, nrIon
-    df_cur = pd.read_csv(filepath_or_buffer=filename_ramo, index_col=1, delim_whitespace=True, \
+    df_cur = pd.read_csv(filepath_or_buffer=filename_ramo, index_col=1, sep=r'\s+', \
                          header=None, names=['time', 'step', 'current', 'volt', 'nrPart', 'nrElec', 'nrIon', 'avg_mob', 'avg_speed', \
                                              'avg_elec_speed', 'avg_ion_speed', 'ramo_elec', 'ramo_ion', 'ramo_atom'])
     
@@ -156,10 +153,10 @@ Read ramo current and plot
 
 
 Density
--------
+~~~~~~~
 
 Plot emission density
-~~~~~~~~~~~~~~~~~~~~~
+^^^^^^^^^^^^^^^^^^^^^
 
 .. code:: ipython3
 
@@ -183,19 +180,11 @@ Plot emission density
 
 
 
-
-.. parsed-literal::
-
-    <seaborn.axisgrid.JointGrid at 0x7fdd49645760>
-
-
-
-
 .. image:: files/data_tf/output_10_1.png
 
 
 Plot absorption density
-~~~~~~~~~~~~~~~~~~~~~~~
+^^^^^^^^^^^^^^^^^^^^^^^
 
 .. code:: ipython3
 
@@ -219,22 +208,14 @@ Plot absorption density
 
 
 
-
-.. parsed-literal::
-
-    <seaborn.axisgrid.JointGrid at 0x7fdd496452e0>
-
-
-
-
 .. image:: files/data_tf/output_12_1.png
 
 
 Emittance data
---------------
+~~~~~~~~~~~~~~
 
 Calculates the emittance
-~~~~~~~~~~~~~~~~~~~~~~~~
+^^^^^^^^^^^^^^^^^^^^^^^^
 
 Input is a pandas dataframe that has columns called x and x’.
 
@@ -291,7 +272,7 @@ It returns the following values:
     theta_ell = th
     
     # Plot x and x'
-    ell_0 = Ellipse([0.0, 0.0], 2.0*sigma_w, 2.0*sigma_wp, theta_ell, zorder=1)
+    ell_0 = Ellipse([0.0, 0.0], 2.0*sigma_w, 2.0*sigma_wp, angle=theta_ell, zorder=1)
     ax = plt.subplot(111)
     ax.plot(df_abs['x'].to_numpy(), df_abs["x'"].to_numpy(), 'o', zorder=0)
     plt.xlabel('x [nm]')

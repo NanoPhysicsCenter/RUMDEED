@@ -30,9 +30,9 @@ After installing the necessary build utilities, navigate to the "RUMDEED" direct
    
    make
 
-This command will compile the code and generate an executable file named *RUMDEED.out* within the build directory.
+This command will compile the code and generate an executable file named **RUMDEED.out** within the build directory.
 Once the compilation is complete, you can proceed to run the code as explained in the documentation.
-The unit and integration tests can be run with the command **make test**.
+The unit and integration tests can be run with the command ``make test``.
 
 If you prefer to use a different compiler, you can specify the **CC** and **FC** variables when executing the make command.
 For instance, if you want to compile using the Intel compilers, utilize the following command:
@@ -58,7 +58,7 @@ The GPU compute capability can optionally be given with the **GPU_CC** variable,
 example ``make ACC=gpu GPU_CC=cc80`` for an A100.
 This can be combined with OpenMP (which is enabled by default): the offloaded kernel runs
 on the GPU while the remaining parallel loops (emission, position and velocity updates)
-keep running on the CPU cores. The regular CPU-only builds are unaffected, when compiling
+keep running on the CPU cores. The regular CPU-only builds are unaffected: when compiling
 with gfortran or without the **ACC** variable the OpenACC directives are ignored and the
 OpenMP code path is used as before.
 
@@ -104,21 +104,21 @@ also accepts the grid parameters ``polarso_dim``, ``polarso_pos``, ``polarso_ste
 Cuba library
 ------------
 The code uses the `Cuba library <https://feynarts.de/cuba/>`_ for numerical integration :cite:p:`HAHN200578`.
-When executing the make file, you will be prompted to download and build the Cuba library.
-It is necessary to have **wget** installed on your system to have the make file automatically download and build the library.
+When executing the makefile, you will be prompted to download and build the Cuba library.
+It is necessary to have **wget** installed on your system to have the makefile automatically download and build the library.
 In case the download encounters any issues or if you prefer to manually download the library,
-you can obtain the file 'Cuba-4.2.2.tar.gz' directly from the Cuba website.
-After acquiring the file, please place it into the cuba folder. To build the library, simply execute the 'install-cuba.sh' script.
+you can obtain the file **Cuba-4.2.2.tar.gz** directly from the Cuba website.
+After acquiring the file, please place it into the cuba folder. To build the library, simply execute the **install-cuba.sh** script.
 
 Documentation
 -------------
-This documentation can also be generated using the make file with the command:
+This documentation can also be generated using the makefile with the command:
 
 .. code-block:: console
 
    make docs
 
-This will produce html and pdf files in the docs/build directory. You must have **Python** and **venv** installed to generate the HTML documentation.
+This will produce HTML and PDF files in the docs/build directory. You must have **Python** and **venv** installed to generate the HTML documentation.
 To make the PDF file, **xelatex** and **xindy** must be installed.
 
 .. index:: build, make, git, compiler, gfortran, github, Intel, ifort, ifx, Cuba library, Windows Subsystem for Linux (WSL), Python, venv, xelatex, xindy, GPU, OpenACC, nvfortran, NVIDIA HPC SDK

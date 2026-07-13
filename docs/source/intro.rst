@@ -3,8 +3,8 @@ Introduction
 
 The Reykjavík University Molecular Dynamics code for Electron Emission and Dynamics (RUMDEED) program was first written by Andreas Pedersen in Python
 to simulate space charge limited photo emission :cite:p:`PhysRevLett.104.175002`. It was later rewritten in Fortran by Kristinn Torfason with parallelization using OpenMP. 
-He also extended the code to include Field emission :cite:p:`doi:10.1063/1.4914855,doi:10.1063/1.4972821` and
-Thermal-field emission :cite:p:`PhysRevApplied.15.014040`. Laser pulse functionality was added by Hákon Örn.
+He also extended the code to include field emission :cite:p:`doi:10.1063/1.4914855,doi:10.1063/1.4972821` and
+thermal-field emission :cite:p:`PhysRevApplied.15.014040`. Laser pulse functionality was added by Hákon Örn.
 
 .. index:: Python, Fortran, Photo emission, Field emission, Thermal-field emission
 
@@ -29,5 +29,6 @@ necessarily reflect the views of the United States Air Force.
 Other software
 ---------------
 The RUMDEED code uses the following open source software:
+
 - Cuba, a library for multidimensional numerical integration :cite:p:`HAHN200578`
 - KDTree2, a library for nearest neighbor search :cite:p:`kennel2004kdtree`
