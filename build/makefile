@@ -7,7 +7,7 @@
 # Compiler to use
 # Override default values if nothing else is set
 ifeq ($(origin FC),default)
-FC = ifx
+FC = gfortran
 endif
 ifeq ($(origin CC),default)
 CC = gcc
