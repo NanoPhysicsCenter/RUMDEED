@@ -76,15 +76,18 @@ module mod_global
 
 
   ! ----------------------------------------------------------------------------
-  ! Parameters for the surface integration using CUBA
+  ! Parameters for the surface integration using CUBA (see mod_cuba_integration).
+  ! All of these can be overridden in the input file.
   integer, parameter :: cuba_method_suave = 1
   integer, parameter :: cuba_method_divonne = 2
+  integer, parameter :: cuba_method_cuhre = 3
   integer            :: cuba_method = cuba_method_divonne ! Method to use
 
-  double precision   :: cuba_epsabs = 0.5d0 ! Requested absolute error
-  double precision   :: cuba_epsrel = 0.0d0 ! Requested relative error
-  !double precision   :: cuba_epsabs = 1.0d-8 ! Requested absolute error
-  !double precision   :: cuba_epsrel = 1.0d-14 ! Requested relative error
+  ! The supply integrals are in units of electrons per time step, so the
+  ! integration stops at an error of half an electron or 0.1% of the supply,
+  ! whichever is larger.
+  double precision   :: cuba_epsabs = 0.5d0  ! Requested absolute error
+  double precision   :: cuba_epsrel = 1.0d-3 ! Requested relative error
   integer            :: cuba_maxeval = 5000000 ! Maximum number of integrand evaluations
   integer            :: cuba_mineval = 1000    ! Minimum number of integrand evaluations
 
@@ -426,7 +429,9 @@ module mod_global
                    sample_atom_file, sample_atom_rate, &
                    sample_elec_file, sample_elec_rate, &
                    R_s, R_p, L_p, C_p, ion_life_time, &
-                   planes_N, planes_z, mh_batch
+                   planes_N, planes_z, mh_batch, &
+                   cuba_method, cuba_epsabs, cuba_epsrel, &
+                   cuba_mineval, cuba_maxeval
 
   ! ----------------------------------------------------------------------------
   ! Procedure interfaces and pointers

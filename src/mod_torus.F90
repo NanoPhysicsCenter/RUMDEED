@@ -11,6 +11,7 @@ Module mod_torus
 #endif
     use mod_verlet
     use mod_pair
+    use mod_cuba_integration
     !use mod_work_function
     use kdtree2_precision_module
     use kdtree2_module
@@ -1308,142 +1309,15 @@ end function w_theta_pos_tip
 subroutine Do_Surface_Integration_simple(N_sup)
     double precision, intent(out) :: N_sup ! Number of electrons
 
-    SELECT CASE (cuba_method)
-    case(cuba_method_suave)
-      !call Do_Cuba_Suave(N_sup)
-      print '(a)', 'RUMDEED: ERROR SIMPLE METHOD NOT IMPLEMENTED FOR SUAVE'
-      stop
-    case(cuba_method_divonne)
-      call Do_Cuba_Divonne_simple(N_sup)
-    case default
-      print '(a)', 'RUMDEED: ERROR UNKNOWN INTEGRATION METHOD'
-      print *, cuba_method
-      stop
-    end select
-end subroutine Do_Surface_Integration_simple
+    integer                          :: nregions, neval, fail, IFAIL
+    double precision, dimension(1:1) :: integral, error, prob
 
-  subroutine Do_Cuba_Divonne_simple(N_sup)
-    implicit none
-    double precision, intent(out) :: N_sup
-    integer                       :: i
-    integer                       :: IFAIL
-  
-    
-    ! Cuba integration variables (common)
-    integer, parameter :: ndim = 2 ! Number of dimensions
-    integer, parameter :: ncomp = 1 ! Number of components in the integrand
-    integer            :: userdata = 0 ! User data passed to the integrand
-    integer, parameter :: nvec = 1 ! Number of points given to the integrand function
-    !double precision   :: epsrel = 1.0d-4 ! Requested relative error
-    !double precision   :: epsabs = 0.25d0 ! Requested absolute error
-    integer            :: flags = 0+4 ! Flags
-    ! Set seed to non-zero value based on the current time
-    integer            :: seed = 0 ! Seed for the rng. Zero will use Sobol.
-    !integer            :: mineval = 75000 ! Minimum number of integrand evaluations
-    !integer            :: maxeval = 10000000 ! Maximum number of integrand evaluations
-  
-    ! Divonne specific
-    integer :: key1 = 47 ! 〈in〉, determines sampling in the partitioning phase:
-                    ! key1 = 7,9,11,13 selects the cubature rule of degree key1.
-                    ! Note that the degree-11 rule is available only in 3 dimensions, the degree-13 rule only in 2 dimensions.
-                    ! For other values of key1, a quasi-random sample of n_1=|key1| points is used,
-                    ! where the sign of key1 determines the type of sample,
-                    ! – key1 > 0, use a Korobov quasi-random sample,
-                    ! – key1 < 0, use a “standard” sample (a Sobol quasi-random sample if seed= 0, otherwise a pseudo-random sample).
-    integer :: key2 = -1 !<in>, determines sampling in the final integration phase:
-                    ! key2 = 7, 9, 11, 13 selects the cubature rule of degree key2. Note that the degree-11
-                    ! rule is available only in 3 dimensions, the degree-13 rule only in 2 dimensions.
-                    ! For other values of key2, a quasi-random sample is used, where the sign of key2
-                    ! determines the type of sample,
-                    ! - key2 > 0, use a Korobov quasi-random sample,
-                    ! - key2 < 0, use a "standard" sample (see description of key1 above),
-                    ! and n_2 = |key2| determines the number of points,
-                    ! - n_2 > 40, sample n2 points,
-                    ! - n_2 < 40, sample n2 nneed points, where nneed is the number of points needed to
-                    ! reach the prescribed accuracy, as estimated by Divonne from the results of the
-                    ! partitioning phase.
-    integer :: key3 = -1 ! <in>, sets the strategy for the refinement phase:
-                    ! key3 = 0, do not treat the subregion any further.
-                    ! key3 = 1, split the subregion up once more.
-                    ! Otherwise, the subregion is sampled a third time with key3 specifying the sampling
-                    ! parameters exactly as key2 above.
-    integer :: maxpass = 3 ! <in>, controls the thoroughness of the partitioning phase: The
-  ! partitioning phase terminates when the estimated total number of integrand evaluations
-  ! (partitioning plus final integration) does not decrease for maxpass successive iterations.
-  ! A decrease in points generally indicates that Divonne discovered new structures of
-  ! the integrand and was able to find a more effective partitioning. maxpass can be
-  ! understood as the number of `safety' iterations that are performed before the partition
-  ! is accepted as final and counting consequently restarts at zero whenever new structures are found.
-    double precision :: border = 0.0d0 ! <in>, the width of the border of the integration region.
-  ! Points falling into this border region will not be sampled directly, but will be extrapolated
-  ! from two samples from the interior. Use a non-zero border if the integrand
-  ! subroutine cannot produce values directly on the integration boundary.
-    double precision :: maxchisq = 5.0d0 !<in>, the maximum \chi^2 value a single subregion is allowed
-  ! to have in the final integration phase. Regions which fail this \chi^2 test and whose
-  ! sample averages differ by more than mindeviation move on to the refinement phase.
-    double precision :: mindeviation = 0.20d0 !<in>, a bound, given as the fraction of the requested
-  ! error of the entire integral, which determines whether it is worthwhile further
-  ! examining a region that failed the \chi^2 test. Only if the two sampling averages
-  ! obtained for the region differ by more than this bound is the region further treated.
-    integer :: ngiven = 0 ! <in>, the number of points in the xgiven array.
-    integer :: ldxgiven = ndim ! <in>, the leading dimension of xgiven, i.e. the offset between one point and the next in memory.
-    !double precision, allocatable :: xgiven(:,:) ! xgiven(ldxgiven,ngiven) <in>, a list of points where the integrand
-  ! might have peaks. Divonne will consider these points when partitioning the
-  ! integration region. The idea here is to help the integrator find the extrema of the integrand
-  ! in the presence of very narrow peaks. Even if only the approximate location
-  ! of such peaks is known, this can considerably speed up convergence.
-    integer :: nextra = 0 ! <in>, the maximum number of extra points the peak-finder subroutine
-  ! will return. If nextra is zero, peakfinder is not called and an arbitrary object
-  ! may be passed in its place, e.g. just 0.
-  
-  
-    ! Output
-    character          :: statefile = "" ! File to save the state in. Empty string means don't do it.
-    integer            :: spin = -1 ! Spinning cores
-    integer            :: nregions ! <out> The actual number of subregions needed
-    integer            :: neval ! <out> The actual number of integrand evaluations needed
-    integer            :: fail ! <out> Error flag (0 = Success, -1 = Dimension out of range, >0 = Accuracy goal was not met)
-    double precision, dimension(1:ncomp) :: integral ! <out> The integral of the integrand over the unit hybercube
-    double precision, dimension(1:ncomp) :: error ! <out> The presumed absolute error
-    double precision, dimension(1:ncomp) :: prob ! <out> The chi-square probability
-  
     ! Initialize the average field to zero
     F_avg = 0.0d0
 
-    ! Set seed
-    !seed = my_seed(1)
+    call Cuba_Integrate(integrand_cuba_torus_simple, 1, 0, integral, error, prob, nregions, neval, fail)
 
-    !-----------------------------------------------------------------------------
-    ! Integrate over the surface
-   
-    call divonne(ndim, ncomp, integrand_cuba_torus_simple, userdata, nvec,&
-                cuba_epsrel, cuba_epsabs, flags, seed, cuba_mineval, cuba_maxeval,&
-                key1, key2, key3, maxpass,&
-                border, maxchisq, mindeviation,&
-                ngiven, ldxgiven, 0, nextra, 0,&
-                statefile, spin,&
-                nregions, neval, fail, integral, error, prob)
-  
-    if (fail /= 0) then
-      if (abs(error(1) - cuba_epsabs) > 1.0d-2) then
-        print '(a)', 'RUMDEED: WARNING Cuba did not return 0'
-        print *, 'Top integration'
-        print *, 'time_step = ', time_step
-        print *, 'Fail = ', fail
-        print *, 'nregions = ', nregions
-        print *, 'neval = ', neval, ' max is ', cuba_maxeval
-        print *, 'error(1) = ', error(1)
-        print *, 'integral(1)*epsrel = ', integral(1)*cuba_epsrel
-        print *, 'epsabs = ', cuba_epsabs
-        print *, 'prob(1) = ', prob(1)
-        print *, 'integral(1) = ', integral(1)
-        call Flush_Data()
-      end if
-    end if
-  
-    ! Store the results
     N_sup = integral(1)
-    !print *, 'N_sup = ', N_sup
 
     ! Write the output variables of the integration to a file
     write(ud_integrand, '(i8, tr2, i8, tr2, i4, tr2, ES12.4, tr2, ES12.4, tr2, ES12.4)', iostat=IFAIL) &
@@ -1451,8 +1325,8 @@ end subroutine Do_Surface_Integration_simple
 
     ! Finish calculating the average field
     F_avg = F_avg / neval
+end subroutine Do_Surface_Integration_simple
 
-  end subroutine Do_Cuba_Divonne_simple
 
   ! ----------------------------------------------------------------------------
   ! The integration function for the Cuba library

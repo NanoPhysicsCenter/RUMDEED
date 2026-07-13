@@ -11,6 +11,7 @@ Module mod_emission_tip
   use mod_pair
   use mod_ic
   use mod_kevin_rjgtf
+  use mod_cuba_integration
   !use ieee_arithmetic
   implicit none
 
@@ -172,7 +173,7 @@ subroutine Do_GTF_Emission_Tip(step)
 
   nrElecEmit = 0
 
-  call Do_Cuba_Suave_GTF_Tip(1, N_sup)
+  call Do_Surface_Integration_GTF_Tip(1, N_sup)
 
   N_round = Rand_Poisson(N_sup)
   !res_s = N_sup - N_round
@@ -271,7 +272,7 @@ subroutine Do_Field_Emission_Tip(step)
 
   nrElecEmit = 0
 
-  call Do_Cuba_Suave_FE_Tip(1, N_sup)
+  call Do_Surface_Integration_FE_Tip(1, N_sup)
 
   N_round = nint(N_sup + res_s)
   res_s = N_sup - N_round
@@ -400,95 +401,6 @@ end subroutine Do_Photo_Emission_Tip
 
 !----------------------------------------------------------------------------------------
 
-  subroutine Do_Field_Emission_Tip_1(step)
-    integer, intent(in)              :: step
-    double precision                 :: F
-    double precision, dimension(1:3) :: par_pos, surf_norm, par_vel
-    !double precision, dimension(1)   :: rnd
-    double precision                 :: rnd, N_sup
-    integer                          :: i, j, s, IFAIL, nrElecEmit, n_r
-    double precision                 :: A_f, D_f, n_s, F_avg, n_add
-    double precision                 :: len_phi, len_xi
-    integer                          :: nr_phi, nr_xi, ndim, emit
-    double precision                 :: xi_1, phi_1, xi_2, phi_2, xi_c, phi_c
-    double precision, dimension(1:3) :: field
-
-    !!!$OMP SINGLE
-    emit = 1
-
-
-    !print *, len_x, len_x / length
-    !print *, len_y, len_y / length
-
-    nrElecEmit = 0
-
-
-    !!$OMP SINGLE
-    !print *, 'F_avg = ', F_avg
-    !F_avg = 0.0d0
-    !write (ud_debug, "(i8, tr2, E16.8)", iostat=IFAIL) step, F_avg
-
-    call Do_Cuba_Suave_FE_Tip_old(emit, N_sup)
-
-    n_r = nint(N_sup + res_s)
-    res_s = N_sup - N_r
-
-    !print *, 'n_r = ', n_r
-    if (n_r < 0) then
-      print *, 'n_r < 0'
-      print *, 'n_s = ', n_s
-      print *, 'n_r = ', n_r
-      stop
-    end if
-
-    !!!$OMP END SINGLE
-
-    !print *, 'Doing emission'
-    !print *, n_r
-
-    !!$OMP PARALLEL DO DEFAULT(NONE) PRIVATE(s, ndim, par_pos, field, F, D_f, surf_norm, xi_1, phi_1, rnd, par_vel) SCHEDULE(GUIDED, 2500)
-    do s = 1, n_r
-
-      !!!$OMP FLUSH (particles, nrElec)
-      ndim = 25
-      call Metro_algo_tip_v2(ndim, xi_1, phi_1, F, D_f, par_pos)
-
-      if (F >= 0.0d0) then
-        D_f = 0.0d0
-      end if
-
-      CALL RANDOM_NUMBER(rnd)
-      !print *, 'rnd ', rnd
-      !print *, 'D_f ', D_f
-      !print *, ''
-      if (rnd <= D_f) then
-        surf_norm = surface_normal(par_pos)
-        par_pos = par_pos + surf_norm*length_scale
-        !$OMP CRITICAL
-
-        ! Add a particle to the system
-        par_vel = 0.0d0
-        call Add_Particle(par_pos, par_vel, species_elec, step, emit, -1, 1)
-
-        !nrElec = nrElec + 1
-        nrElecEmit = nrElecEmit + 1
-        !print *, 'Particle emitted'
-        !$OMP END CRITICAL
-      end if
-    end do
-    !!$OMP END PARALLEL DO
-
-    !!!$OMP MASTER
-
-    posInit = posInit + nrElecEmit
-    nrEmitted = nrEmitted + nrElecEmit
-    !print *, 'Emission done'
-    !print *, posInit
-    !print *, ''
-    !!!$OMP END MASTER
-
-    !!!$OMP END PARALLEL
-  end subroutine Do_Field_Emission_Tip_1
 
   subroutine Do_Field_Emission_Tip_OLDCODE(step)
     integer, intent(in)              :: step
@@ -1478,66 +1390,6 @@ end function Elec_supply_tip
 
 
   ! ----------------------------------------------------------------------------
-  ! The integration function for the Cuba library
-  !
-  integer function integrand_cuba_fe_tip(ndim, xx, ncomp, ff, userdata)
-    ! Input / output variables
-  integer, intent(in) :: ndim ! Number of dimensions (Should be 2)
-  integer, intent(in) :: ncomp ! Number of vector-components in the integrand (Always 1 here)
-  integer, intent(in) :: userdata ! Additional data passed to the integral function (In our case the number of the emitter)
-  double precision, intent(in), dimension(1:ndim)   :: xx ! Integration points, between 0 and 1
-  double precision, intent(out), dimension(1:ncomp) :: ff ! Results of the integrand function
-
-  ! Variables used for calculations
-  double precision, dimension(1:3) :: par_pos, field
-  double precision                 :: A ! Emitter area
-  double precision                 :: eta_f ! Component normal to the surface
-  double precision                 :: xi, phi ! Prolate coordinates
-  double precision                 :: h_xi, h_phi ! Scale factors
-
-  !! Emitter area
-  !A = Tip_Area(1.0d0, max_xi, 0.0d0, 2.0d0*pi)
-
-  ! Surface position
-  ! Cuba does the integration over the hybercube.
-  ! It gives us coordinates between 0 and 1.
-  xi = (max_xi - 1.0d0)*xx(1) + 1.0d0
-  phi = 2.0d0*pi*xx(2)
-
-  !par_pos(1) = x_coor(xi, eta_1, phi)
-  !par_pos(2) = y_coor(xi, eta_1, phi)
-  !par_pos(3) = z_coor(xi, eta_1, phi)
-  par_pos = xyz_corr(xi, eta_1, phi)
-
-  ! Calculate the electric field on the surface
-  field = Calc_Field_at(par_pos)
-  eta_f = Field_normal(par_pos, field)
-
-  ! Add to the average field
-  !F_avg = F_avg + field
-
-  ! Check if the field is favorable for emission
-  if (eta_f < 0.0d0) then
-    ! The field is favorable for emission
-
-    ! Calculate the scale factors
-    h_xi = a_foci*sqrt((xi**2 - eta_1**2)/(xi**2 - 1.0d0))
-    h_phi = a_foci*sqrt((xi**2 - 1.0d0)*(1 - eta_1**2))
-
-    ! Calculate the current density at this point
-    ff(1) = Elec_Supply_tip(eta_f, par_pos) * h_xi * h_phi
-  else
-    ! The field is NOT favorable for emission
-    ! This point does not contribute
-    ff(1) = 0.0d0
-  end if
-
-  ! We multiply with 2.0*pi (max_xi - 1.0) because Cuba does the 
-  ! integration over the hybercube, i.e. from 0 to 1.
-  ff(1) = 2.0d0*pi*(max_xi - 1.0d0)*ff(1)
-  
-  integrand_cuba_fe_tip = 0 ! Return value to Cuba, 0 = success
-  end function integrand_cuba_fe_tip
 
   ! ----------------------------------------------------------------------------
   ! The integration function for the Cuba library
@@ -1576,7 +1428,7 @@ end function Elec_supply_tip
     eta_f = Field_normal(par_pos, field)
 
     ! Add to the average field
-    !F_avg = F_avg + field
+    F_avg = F_avg + field
 
     ! Check if the field is favorable for emission
     if (eta_f < 0.0d0) then
@@ -1642,9 +1494,10 @@ end function Elec_supply_tip
       h_xi = a_foci*sqrt((xi**2 - eta_1**2)/(xi**2 - 1.0d0))
       h_phi = a_foci*sqrt((xi**2 - 1.0d0)*(1 - eta_1**2))
 
-      ! Calculate the current density at this point
+      ! Calculate the current density at this point and convert it to
+      ! electrons supplied per time step
       !w_theta = w_theta_xy(par_pos, userdata)
-      ff(1) = Get_Kevin_Jgtf(eta_f, T_temp, w_theta) * h_xi * h_phi
+      ff(1) = Get_Kevin_Jgtf(eta_f, T_temp, w_theta) * h_xi * h_phi * time_step_div_q0
     else
       ! The field is NOT favourable for emission
       ! This point does not contribute
@@ -1659,220 +1512,49 @@ end function Elec_supply_tip
     integrand_cuba_gtf_tip = 0 ! Return value to Cuba, 0 = success
   end function integrand_cuba_gtf_tip
 
-  subroutine Do_Cuba_Suave_FE_Tip_old(emit, N_sup)
-    ! Input / output variables
-    integer, intent(in)           :: emit
-    double precision, intent(out) :: N_sup
-
-    ! Cuba integration variables
-    integer, parameter :: ndim = 2 ! Number of dimensions
-    integer, parameter :: ncomp = 1 ! Number of components in the integrand
-    integer            :: userdata = 0 ! User data passed to the integrand
-    integer, parameter :: nvec = 1 ! Number of points given to the integrand function
-    double precision   :: epsrel = 1.0d-2 ! Requested relative error
-    double precision   :: epsabs = 1.0d-4 ! Requested absolute error
-    integer            :: flags = 0+4 ! Flags
-    integer            :: seed = 0 ! Seed for the rng. Zero will use Sobol.
-    integer            :: mineval = 10000 ! Minimum number of integrand evaluations
-    integer            :: maxeval = 5000000 ! Maximum number of integrand evaluations
-    integer            :: nnew = 2500 ! Number of integrand evaluations in each subdivision
-    integer            :: nmin = 1000 ! Minimum number of samples a former pass must contribute to a subregion to be considered in the region's compound integral value.
-    double precision   :: flatness = 5.0d0 ! Determine how prominently out-liers, i.e. samples with a large fluctuation, 
-                                           ! figure in the total fluctuation, which in turn determines how a region is split up.
-                                           ! As suggested by its name, flatness should be chosen large for 'flat" integrand and small for 'volatile' integrands
-                                           ! with high peaks.
-    character          :: statefile = "" ! File to save the state in. Empty string means don't do it.
-    integer            :: spin = -1 ! Spinning cores
-    integer            :: nregions ! <out> The actual number of subregions needed
-    integer            :: neval ! <out> The actual number of integrand evaluations needed
-    integer            :: fail ! <out> Error flag (0 = Success, -1 = Dimension out of range, >0 = Accuracy goal was not met)
-    double precision, dimension(1:ncomp) :: integral ! <out> The integral of the integrand over the unit hybercube
-    double precision, dimension(1:ncomp) :: error ! <out> The presumed absolute error
-    double precision, dimension(1:ncomp) :: prob ! <out> The chi-square probability
-
-
-    ! Initialize the average field to zero
-    !F_avg = 0.0d0
-
-    ! Pass the number of the emitter being integrated over to the integrand as userdata
-    userdata = emit
-
-    call suave(ndim, ncomp, integrand_cuba_fe_tip, userdata, nvec, &
-     & epsrel, epsabs, flags, seed, &
-     & mineval, maxeval, nnew, nmin, flatness, &
-     & statefile, spin, &
-     & nregions, neval, fail, integral, error, prob)
-
-     if (fail /= 0) then
-      print '(a)', 'RUMDEED: WARNING Cuba did not return 0'
-      print *, fail
-      print *, error
-      print *, prob
-      print *, integral(1)
-     end if
-
-     ! Round the results to the nearest integer
-     !N_sup = nint( integral(1) )
-     N_sup = integral(1)
-
-    !  print *, 'Integral results'
-    !  print *, integral(1)
-    !  print *, N_sup
-    !  print *, Tip_Area(1.0d0, max_xi, 0.0d0, 2.0d0*pi)
-    !  print *, ''
-    !  print *, a_foci
-    !  pause
-
-     ! Finish calculating the average field
-     !F_avg = F_avg / neval
-  end subroutine Do_Cuba_Suave_FE_Tip_old
 
   ! ----------------------------------------------------------------------------
   ! This subroutine does the Cuba integration for the GTF emission tip.
-  subroutine Do_Cuba_Suave_GTF_Tip(emit, N_sup)
+  subroutine Do_Surface_Integration_GTF_Tip(emit, N_sup)
     ! Input / output variables
     integer, intent(in)           :: emit
     double precision, intent(out) :: N_sup
 
-    ! Cuba integration variables
-    integer, parameter :: ndim = 2 ! Number of dimensions
-    integer, parameter :: ncomp = 1 ! Number of components in the integrand
-    integer            :: userdata = 0 ! User data passed to the integrand
-    integer, parameter :: nvec = 1 ! Number of points given to the integrand function
-    double precision   :: epsrel = 1.0d-2 ! Requested relative error
-    double precision   :: epsabs = 1.0d-4 ! Requested absolute error
-    integer            :: flags = 0+4 ! Flags
-    integer            :: seed = 0 ! Seed for the rng. Zero will use Sobol.
-    integer            :: mineval = 25000 ! Minimum number of integrand evaluations
-    integer            :: maxeval = 50000000 ! Maximum number of integrand evaluations
-    integer            :: nnew = 5000 ! Number of integrand evaluations in each subdivision
-    integer            :: nmin = 1000 ! Minimum number of samples a former pass must contribute to a subregion to be considered in the region's compound integral value.
-    double precision   :: flatness = 5.0d0 ! Determine how prominently out-liers, i.e. samples with a large fluctuation, 
-                                           ! figure in the total fluctuation, which in turn determines how a region is split up.
-                                           ! As suggested by its name, flatness should be chosen large for 'flat" integrand and small for 'volatile' integrands
-                                           ! with high peaks.
-    character          :: statefile = "" ! File to save the state in. Empty string means don't do it.
-    integer            :: spin = -1 ! Spinning cores
-    integer            :: nregions ! <out> The actual number of subregions nedded
-    integer            :: neval ! <out> The actual number of integrand evaluations needed
-    integer            :: fail ! <out> Error flag (0 = Success, -1 = Dimension out of range, >0 = Accuracy goal was not met)
-    double precision, dimension(1:ncomp) :: integral ! <out> The integral of the integrand over the unit hybercube
-    double precision, dimension(1:ncomp) :: error ! <out> The presumed absolute error
-    double precision, dimension(1:ncomp) :: prob ! <out> The chi-square probability
+    integer                          :: nregions, neval, fail
+    double precision, dimension(1:1) :: integral, error, prob
 
-    !integer            :: verbose = 0
-    !integer, parameter :: last = 4
-    integer, parameter :: key = 0
+    ! Initialize the average field to zero
+    F_avg = 0.0d0
 
-    userdata = emit
+    call Cuba_Integrate(integrand_cuba_gtf_tip, 1, emit, integral, error, prob, nregions, neval, fail)
 
-    !call cuhre(ndim, ncomp, integrand_cuba_gtf_tip, userdata, nvec, &
-    ! & epsrel, epsabs, flags, &
-    ! & mineval, maxeval, key, &
-    ! & statefile, spin, &
-    ! & nregions, neval, fail, integral, error, prob)
+    ! The integrand is in electrons supplied per time step
+    N_sup = integral(1)
 
-    call suave(ndim, ncomp, integrand_cuba_gtf_tip, userdata, nvec, &
-     & epsrel, epsabs, flags, seed, &
-     & mineval, maxeval, nnew, nmin, flatness, &
-     & statefile, spin, &
-     & nregions, neval, fail, integral, error, prob)
-
-
-     if (fail /= 0) then
-      print '(a)', 'RUMDEED: WARNING Cuba did not return 0 (GTF)'
-      print *, 'fail = ', fail
-      print *, 'error = ', error
-      print *, 'prob = ', prob
-      print *, 'integral = ', integral(1)
-     end if
-
-     ! Round the results to the nearest integer
-     !N_sup = nint( integral(1) )
-     N_sup = integral(1) * time_step_div_q0
-
-  end subroutine Do_Cuba_Suave_GTF_Tip
+    ! Finish calculating the average field
+    F_avg = F_avg / neval
+  end subroutine Do_Surface_Integration_GTF_Tip
 
   ! ----------------------------------------------------------------------------
   ! This subroutine does the Cuba integration for the field emission tip.
-  subroutine Do_Cuba_Suave_FE_Tip(emit, N_sup)
+  subroutine Do_Surface_Integration_FE_Tip(emit, N_sup)
     ! Input / output variables
     integer, intent(in)           :: emit
     double precision, intent(out) :: N_sup
 
-    ! Cuba integration variables
-    integer, parameter :: ndim = 2 ! Number of dimensions
-    integer, parameter :: ncomp = 1 ! Number of components in the integrand
-    integer            :: userdata = 0 ! User data passed to the integrand
-    integer, parameter :: nvec = 1 ! Number of points given to the integrand function
-    double precision   :: epsrel = 1.0d-2 ! Requested relative error
-    double precision   :: epsabs = 1.0d-4 ! Requested absolute error
-    integer            :: flags = 0+4 ! Flags
-    integer            :: seed = 0 ! Seed for the rng. Zero will use Sobol.
-    integer            :: mineval = 1000 ! Minimum number of integrand evaluations
-    integer            :: maxeval = 50000000 ! Maximum number of integrand evaluations
-    integer            :: nnew = 250 ! Number of integrand evaluations in each subdivision
-    integer            :: nmin = 100 ! Minimum number of samples a former pass must contribute to a subregion to be considered in the region's compound integral value.
-    double precision   :: flatness = 5.0d0 ! Determine how prominently out-liers, i.e. samples with a large fluctuation, 
-                                           ! figure in the total fluctuation, which in turn determines how a region is split up.
-                                           ! As suggested by its name, flatness should be chosen large for 'flat" integrand and small for 'volatile' integrands
-                                           ! with high peaks.
-    character          :: statefile = "" ! File to save the state in. Empty string means don't do it.
-    integer            :: spin = -1 ! Spinning cores
-    integer            :: nregions ! <out> The actual number of subregions nedded
-    integer            :: neval ! <out> The actual number of integrand evaluations needed
-    integer            :: fail ! <out> Error flag (0 = Success, -1 = Dimension out of range, >0 = Accuracy goal was not met)
-    double precision, dimension(1:ncomp) :: integral ! <out> The integral of the integrand over the unit hybercube
-    double precision, dimension(1:ncomp) :: error ! <out> The presumed absolute error
-    double precision, dimension(1:ncomp) :: prob ! <out> The chi-square probability
-
-    !integer            :: verbose = 0
-    !integer, parameter :: last = 4
-    integer, parameter :: key = 0
-
+    integer                          :: nregions, neval, fail
+    double precision, dimension(1:1) :: integral, error, prob
 
     ! Initialize the average field to zero
-    !F_avg = 0.0d0
+    F_avg = 0.0d0
 
-    ! Pass the number of the emitter being integraded over to the integrand as userdata
-    userdata = emit
+    call Cuba_Integrate(integrand_cuba_fe_tip_test, 1, emit, integral, error, prob, nregions, neval, fail)
 
-    !call suave(ndim, ncomp, integrand_cuba_fe_tip_test, userdata, nvec, &
-    ! & epsrel, epsabs, flags, seed, &
-    ! & mineval, maxeval, nnew, nmin, flatness, &
-    ! & statefile, spin, &
-    ! & nregions, neval, fail, integral, error, prob)
+    N_sup = integral(1)
 
-     call cuhre(ndim, ncomp, integrand_cuba_fe_tip_test, userdata, nvec, &
-     & epsrel, epsabs, flags, &
-     & mineval, maxeval, key, &
-     & statefile, spin, &
-     & nregions, neval, fail, integral, error, prob)
-
-
-     if (fail /= 0) then
-      print '(a)', 'RUMDEED: WARNING Cuba did not return 0'
-      print *, fail
-      print *, error
-      print *, prob
-      print *, integral(1)
-     end if
-
-     ! Round the results to the nearest integer
-     !N_sup = nint( integral(1) )
-     N_sup = integral(1)
-
-    !  print *, 'Integral results'
-    !  print *, integral(1)
-    !  print *, N_sup
-    !  print *, Tip_Area(1.0d0, max_xi, 0.0d0, 2.0d0*pi)
-    !  print *, ''
-    !  print *, a_foci
-    !  pause
-
-     ! Finish calculating the average field
-     F_avg = F_avg / neval
-  end subroutine Do_Cuba_Suave_FE_Tip
+    ! Finish calculating the average field
+    F_avg = F_avg / neval
+  end subroutine Do_Surface_Integration_FE_Tip
 
   ! Gives a gaussian emission curve
   ! where step is the current time step

@@ -11,6 +11,7 @@ Module mod_field_emission_v2
   use mod_pair
   use mod_work_function
   use mod_polarso
+  use mod_cuba_integration
   implicit none
 
   PRIVATE
@@ -217,7 +218,7 @@ contains
 
 
     ! Do integration
-    call Do_Cuba_Suave_Simple(emit, N_sup)
+    call Do_Surface_Integration_Simple(emit, N_sup)
 
     N_round = nint(N_sup + residual(emit)) ! Round to whole number
     residual(emit) = N_sup - N_round
@@ -626,50 +627,33 @@ end function Escape_Prob_log
 
   ! ----------------------------------------------------------------------------
   ! This function is called to do the surface integration.
-  ! Here we select the method to do it.
+  ! The method and tolerances are selected with the cuba_* input variables
+  ! (see mod_global and mod_cuba_integration). All methods use the vectorized
+  ! integrand: Cuba hands it blocks of up to 256 points, which the batched
+  ! field evaluation turns into one GPU kernel per block in OpenACC builds.
   !
   subroutine Do_Surface_Integration_FE(emit, N_sup)
     integer, intent(in)           :: emit ! The emitter to do the integration on
     double precision, intent(out) :: N_sup ! Number of electrons
 
-    !!call Do_2D_MC_plain(emit, N_sup)
-    !call Do_Cuba_Suave_FE(emit, N_sup)
-    !!call Do_Cuba_Divonne_FE(emit, N_sup)
+    integer, parameter               :: nvec = 256 ! Number of points given to the integrand per call
+    integer                          :: nregions, neval, fail, IFAIL
+    double precision, dimension(1:1) :: integral, error, prob
 
-    SELECT CASE (cuba_method)
-    case(cuba_method_suave)
-      call Do_Cuba_Suave_FE(emit, N_sup)
-    case(cuba_method_divonne)
-      call Do_Cuba_Divonne_FE(emit, N_sup)
-    case default
-      print '(a)', 'RUMDEED: ERROR UNKNOWN INTEGRATION METHOD'
-      print *, cuba_method
-      stop
-    end select
+    ! Initialize the average field to zero
+    F_avg = 0.0d0
+
+    call Cuba_Integrate(integrand_cuba_fe_v, nvec, emit, integral, error, prob, nregions, neval, fail)
+
+    N_sup = integral(1)
+
+    ! Finish calculating the average field
+    F_avg = F_avg / neval
+
+    ! Write the output variables of the integration to a file
+    write(ud_integrand, '(i3, tr2, i8, tr2, i8, tr2, i4, tr2, ES12.4, tr2, ES12.4, tr2, ES12.4)', iostat=IFAIL) &
+                         & emit, nregions, neval, fail, integral(1), error(1), prob(1)
   end subroutine Do_Surface_Integration_FE
-
-  ! ----------------------------------------------------------------------------
-  ! The integration function for the Cuba library.
-  ! A thin wrapper that delegates to the vectorized integrand below with a
-  ! block of one point, so the integrand physics (surface position mapping,
-  ! favorable-field test, electron supply, area factor and the F_avg
-  ! accumulation) exists in one place only.
-  integer function integrand_cuba_fe(ndim, xx, ncomp, ff, userdata)
-    ! Input / output variables
-    integer, intent(in) :: ndim ! Number of dimensions (Should be 2)
-    integer, intent(in) :: ncomp ! Number of vector-components in the integrand (Always 1 here)
-    integer, intent(in) :: userdata ! Additional data passed to the integral function (In our case the number of the emitter)
-    double precision, intent(in), dimension(1:ndim)   :: xx ! Integration point, between 0 and 1
-    double precision, intent(out), dimension(1:ncomp) :: ff ! Result of the integrand function
-
-    ! The single point as a block of one for the vectorized integrand
-    double precision, dimension(1:ndim, 1:1)  :: xx_v
-    double precision, dimension(1:ncomp, 1:1) :: ff_v
-
-    xx_v(:, 1) = xx
-    integrand_cuba_fe = integrand_cuba_fe_v(ndim, xx_v, ncomp, ff_v, userdata, 1)
-    ff = ff_v(:, 1)
-  end function integrand_cuba_fe
 
   ! ----------------------------------------------------------------------------
   ! Vectorized integrand for the Cuba library.
@@ -677,7 +661,7 @@ end function Escape_Prob_log
   ! integration points to the integrand in one call, with the actual number of
   ! points in the block as an extra argument (Cuba also appends further
   ! arguments, core and phase, which we do not need and therefore do not
-  ! declare, exactly like the scalar wrapper above ignores nvec).
+  ! declare).
   ! The integration points and results do not depend on the block size, but
   ! the electric field for the whole block is computed in one batch, which
   ! runs as a single kernel on the GPU in OpenACC builds.
@@ -753,231 +737,7 @@ end function Escape_Prob_log
     integrand_cuba_fe_v = 0 ! Return value to Cuba, 0 = success
   end function integrand_cuba_fe_v
 
-  subroutine Do_Cuba_Divonne_FE(emit,  N_sup)
-  implicit none
-  integer, intent(in)           :: emit
-  double precision, intent(out) :: N_sup
-  integer                       :: i
-  integer                       :: IFAIL
 
-  
-  ! Cuba integration variables (common)
-  integer, parameter :: ndim = 2 ! Number of dimensions
-  integer, parameter :: ncomp = 1 ! Number of components in the integrand
-  integer            :: userdata = 0 ! User data passed to the integrand
-  integer, parameter :: nvec = 256 ! Number of points given to the integrand function per call.
-                                   ! The integration points and result do not depend on this,
-                                   ! Cuba just delivers the points in blocks, which the
-                                   ! vectorized integrand evaluates as one batch (one GPU
-                                   ! kernel per block in OpenACC builds).
-  !double precision   :: epsrel = 1.0d-4 ! Requested relative error
-  !double precision   :: epsabs = 0.25d0 ! Requested absolute error
-  integer            :: flags = 0+4 ! Flags
-  integer            :: seed = 0 ! Seed for the rng. Zero will use Sobol.
-  !integer            :: mineval = 75000 ! Minimum number of integrand evaluations
-  !integer            :: maxeval = 10000000 ! Maximum number of integrand evaluations
-
-  ! Divonne specific
-  integer :: key1 = 47 ! 〈in〉, determines sampling in the partitioning phase:
-                  ! key1 = 7,9,11,13 selects the cubature rule of degree key1.
-                  ! Note that the degree-11 rule is available only in 3 dimensions, the degree-13 rule only in 2 dimensions.
-                  ! For other values of key1, a quasi-random sample of n_1=|key1| points is used,
-                  ! where the sign of key1 determines the type of sample,
-                  ! – key1 > 0, use a Korobov quasi-random sample,
-                  ! – key1 < 0, use a “standard” sample (a Sobol quasi-random sample if seed= 0, otherwise a pseudo-random sample).
-  integer :: key2 = 1 !<in>, determines sampling in the final integration phase:
-                  ! key2 = 7, 9, 11, 13 selects the cubature rule of degree key2. Note that the degree-11
-                  ! rule is available only in 3 dimensions, the degree-13 rule only in 2 dimensions.
-                  ! For other values of key2, a quasi-random sample is used, where the sign of key2
-                  ! determines the type of sample,
-                  ! - key2 > 0, use a Korobov quasi-random sample,
-                  ! - key2 < 0, use a "standard" sample (see description of key1 above),
-                  ! and n_2 = |key2| determines the number of points,
-                  ! - n_2 > 40, sample n2 points,
-                  ! - n_2 < 40, sample n2 nneed points, where nneed is the number of points needed to
-                  ! reach the prescribed accuracy, as estimated by Divonne from the results of the
-                  ! partitioning phase.
-  integer :: key3 = -1 ! <in>, sets the strategy for the refinement phase:
-                  ! key3 = 0, do not treat the subregion any further.
-                  ! key3 = 1, split the subregion up once more.
-                  ! Otherwise, the subregion is sampled a third time with key3 specifying the sampling
-                  ! parameters exactly as key2 above.
-  integer :: maxpass = 2! <in>, controls the thoroughness of the partitioning phase: The
-! partitioning phase terminates when the estimated total number of integrand evaluations
-! (partitioning plus final integration) does not decrease for maxpass successive iterations.
-! A decrease in points generally indicates that Divonne discovered new structures of
-! the integrand and was able to find a more effective partitioning. maxpass can be
-! understood as the number of `safety' iterations that are performed before the partition
-! is accepted as final and counting consequently restarts at zero whenever new structures are found.
-  double precision :: border = 0.0d0 ! <in>, the width of the border of the integration region.
-! Points falling into this border region will not be sampled directly, but will be extrapolated
-! from two samples from the interior. Use a non-zero border if the integrand
-! subroutine cannot produce values directly on the integration boundary.
-  double precision :: maxchisq = 10.0d0 !<in>, the maximum \chi^2 value a single subregion is allowed
-! to have in the final integration phase. Regions which fail this \chi^2 test and whose
-! sample averages differ by more than mindeviation move on to the refinement phase.
-  double precision :: mindeviation = 0.25d0 !<in>, a bound, given as the fraction of the requested
-! error of the entire integral, which determines whether it is worthwhile further
-! examining a region that failed the \chi^2 test. Only if the two sampling averages
-! obtained for the region differ by more than this bound is the region further treated.
-  integer :: ngiven = 0 ! <in>, the number of points in the xgiven array.
-  integer :: ldxgiven = ndim ! <in>, the leading dimension of xgiven, i.e. the offset between one point and the next in memory.
-  !double precision, allocatable :: xgiven(:,:) ! xgiven(ldxgiven,ngiven) <in>, a list of points where the integrand
-! might have peaks. Divonne will consider these points when partitioning the
-! integration region. The idea here is to help the integrator find the extrema of the integrand
-! in the presence of very narrow peaks. Even if only the approximate location
-! of such peaks is known, this can considerably speed up convergence.
-  integer :: nextra = 0 ! <in>, the maximum number of extra points the peak-finder subroutine
-! will return. If nextra is zero, peakfinder is not called and an arbitrary object
-! may be passed in its place, e.g. just 0.
-
-
-  ! Output
-  character          :: statefile = "" ! File to save the state in. Empty string means don't do it.
-  integer            :: spin = -1 ! Spinning cores
-  integer            :: nregions ! <out> The actual number of subregions needed
-  integer            :: neval ! <out> The actual number of integrand evaluations needed
-  integer            :: fail ! <out> Error flag (0 = Success, -1 = Dimension out of range, >0 = Accuracy goal was not met)
-  double precision, dimension(1:ncomp) :: integral ! <out> The integral of the integrand over the unit hybercube
-  double precision, dimension(1:ncomp) :: error ! <out> The presumed absolute error
-  double precision, dimension(1:ncomp) :: prob ! <out> The chi-square probability
-
-    ! Initialize the average field to zero
-    F_avg = 0.0d0
-
-    ! Pass the number of the emitter being integrated over to the integrand as userdata
-    userdata = emit
-
-    !seed = sum(my_seed(:))
-
-    !allocated(xgiven(1:ndim, 1:MAX_PARTICLES))
-
-    ! Find possible peaks, i.e. all electrons with z < 5 nm.
-    !!$OMP PARALLEL DO DEFAULT(NONE) PRIVATE(i) shared(ngiven, xgiven, particles_cur_pos, nrPart)
-    !do i = 1, nrPart
-    !  if (particles_cur_pos(3, i) < 5.0d-9) then
-    !    !$OMP CRITICAL
-    !    ngiven = ngiven + 1
-    !    xgiven(1, ngiven) = particles_cur_pos(1, i)
-    !    xgiven(2, ngiven) = particles_cur_pos(2, i)
-    !    !$OMP END CRITICAL
-    !  end if
-    !end do
-    !!$OMP END PARALLEL DO
-    !ngiven = nrPart
-
-    call divonne(ndim, ncomp, integrand_cuba_fe_v, userdata, nvec,&
-              cuba_epsrel, cuba_epsabs, flags, seed, cuba_mineval, cuba_maxeval,&
-              key1, key2, key3, maxpass,&
-              border, maxchisq, mindeviation,&
-              ngiven, ldxgiven, particles_cur_pos(1:2, 1:nrPart), nextra, 0,&
-              statefile, spin,&
-              nregions, neval, fail, integral, error, prob)
-
-    !deallocate(xgiven)
-
-    if (fail /= 0) then
-      if (abs(error(1) - cuba_epsabs) > 1.0d-2) then
-        print '(a)', 'RUMDEED: WARNING Cuba did not return 0'
-        print *, 'Fail = ', fail
-        print *, 'nregions = ', nregions
-        print *, 'neval = ', neval, ' max is ', cuba_maxeval
-        print *, 'error(1) = ', error(1)
-        print *, 'integral(1)*epsrel = ', integral(1)*cuba_epsrel
-        print *, 'epsabs = ', cuba_epsabs
-        print *, 'prob(1) = ', prob(1)
-        print *, 'integral(1) = ', integral(1)
-        call Flush_Data()
-      end if
-     end if
-
-
-     !! Round the results to the nearest integer
-     !N_sup = nint( integral(1) )
-     N_sup = integral(1)
-
-     ! Finish calculating the average field
-     F_avg = F_avg / neval
-
-     ! Write the output variables of the integration to a file
-     write(ud_integrand, '(i3, tr2, i8, tr2, i8, tr2, i4, tr2, ES12.4, tr2, ES12.4, tr2, ES12.4)', iostat=IFAIL) &
-                          & emit, nregions, neval, fail, integral(1), error(1), prob(1)
-  end subroutine Do_Cuba_Divonne_FE
-
-  ! ----------------------------------------------------------------------------
-  ! Use the Cuba library to do the surface integration
-  ! http://www.feynarts.de/cuba/
-  !
-  subroutine Do_Cuba_Suave_FE(emit, N_sup)
-    ! Input / output variables
-    integer, intent(in)           :: emit
-    double precision, intent(out) :: N_sup
-    integer                       :: IFAIL
-
-    ! Cuba integration variables
-    integer, parameter :: ndim = 2 ! Number of dimensions
-    integer, parameter :: ncomp = 1 ! Number of components in the integrand
-    integer            :: userdata = 0 ! User data passed to the integrand
-    integer, parameter :: nvec = 1 ! Number of points given to the integrand function
-    !double precision   :: epsrel = 1.0d-2 ! Requested relative error
-    !double precision   :: epsabs = 1.0d-4 ! Requested absolute error
-    integer            :: flags = 0+4 ! Flags
-    integer            :: seed = 0 ! Seed for the rng. Zero will use Sobol.
-    !integer            :: mineval = 1000 ! Minimum number of integrand evaluations
-    !integer            :: maxeval = 10000000 ! Maximum number of integrand evaluations
-    integer            :: nnew = 100 ! Number of integrand evaluations in each subdivision
-    integer            :: nmin = 20   ! Minimum number of samples a former pass must contribute to a subregion to be considered in the region's compound integral value.
-    double precision   :: flatness = 5.0d0 ! Determine how prominently out-liers, i.e. samples with a large fluctuation, 
-                                           ! figure in the total fluctuation, which in turn determines how a region is split up.
-                                           ! As suggested by its name, flatness should be chosen large for 'flat" integrand and small for 'volatile' integrands
-                                           ! with high peaks.
-    character          :: statefile = "" ! File to save the state in. Empty string means don't do it.
-    integer            :: spin = -1 ! Spinning cores
-    integer            :: nregions ! <out> The actual number of subregions nedded
-    integer            :: neval ! <out> The actual number of integrand evaluations needed
-    integer            :: fail ! <out> Error flag (0 = Success, -1 = Dimension out of range, >0 = Accuracy goal was not met)
-    double precision, dimension(1:ncomp) :: integral ! <out> The integral of the integrand over the unit hybercube
-    double precision, dimension(1:ncomp) :: error ! <out> The presumed absolute error
-    double precision, dimension(1:ncomp) :: prob ! <out> The chi-square probability
-
-
-    ! Initialize the average field to zero
-    F_avg = 0.0d0
-
-    ! Pass the number of the emitter being integrated over to the integrand as userdata
-    userdata = emit
-
-    call suave(ndim, ncomp, integrand_cuba_fe, userdata, nvec, &
-     & cuba_epsrel, cuba_epsabs, flags, seed, &
-     & cuba_mineval, cuba_maxeval, nnew, nmin, flatness, &
-     & statefile, spin, &
-     & nregions, neval, fail, integral, error, prob)
-
-     if (fail /= 0) then
-      print '(a)', 'RUMDEED: WARNING Cuba did not return 0'
-      print *, fail
-      print *, error
-      print *, integral(1)*cuba_epsrel
-      print *, cuba_epsabs
-      print *, prob
-      print *, integral(1)
-      call Flush_Data()
-     end if
-
-
-     !! Round the results to the nearest integer
-     !N_sup = nint( integral(1) )
-     N_sup = integral(1)
-
-     ! Finish calculating the average field
-     F_avg = F_avg / neval
-
-     ! Write the output variables of the integration to a file
-     write(ud_integrand, '(i3, tr2, i8, tr2, i8, tr2, i4, tr2, ES12.4, tr2, ES12.4, tr2, ES12.4)', iostat=IFAIL) &
-                          & emit, nregions, neval, fail, integral(1), error(1), prob(1)
-
-      ! write (ud_field, "(E16.8)", iostat=IFAIL) F_avg(3)
-  end subroutine Do_Cuba_Suave_FE
 
   ! ----------------------------------------------------------------------------
   ! The integration function for the Cuba library
@@ -1031,64 +791,24 @@ end function Escape_Prob_log
     integrand_cuba_simple = 0 ! Return value to Cuba, 0 = success
   end function integrand_cuba_simple
 
-  subroutine Do_Cuba_Suave_Simple(emit, N_sup)
+  subroutine Do_Surface_Integration_Simple(emit, N_sup)
     ! Input / output variables
     integer, intent(in)           :: emit
     double precision, intent(out) :: N_sup
 
-    ! Cuba integration variables
-    integer, parameter :: ndim = 2 ! Number of dimensions
-    integer, parameter :: ncomp = 1 ! Number of components in the integrand
-    integer            :: userdata = 0 ! User data passed to the integrand
-    integer, parameter :: nvec = 1 ! Number of points given to the integrand function
-    double precision   :: epsrel = 1.0d-2 ! Requested relative error
-    double precision   :: epsabs = 1.0d-4 ! Requested absolute error
-    integer            :: flags = 0+4 ! Flags
-    integer            :: seed = 0 ! Seed for the rng. Zero will use Sobol.
-    integer            :: mineval = 10000 ! Minimum number of integrand evaluations
-    integer            :: maxeval = 5000000 ! Maximum number of integrand evaluations
-    integer            :: nnew = 2500 ! Number of integrand evaluations in each subdivision
-    integer            :: nmin = 1000 ! Minimum number of samples a former pass must contribute to a subregion to be considered in the region's compound integral value.
-    double precision   :: flatness = 5.0d0 ! Determine how prominently out-liers, i.e. samples with a large fluctuation, 
-                                           ! figure in the total fluctuation, which in turn determines how a region is split up.
-                                           ! As suggested by its name, flatness should be chosen large for 'flat" integrand and small for 'volatile' integrands
-                                           ! with high peaks.
-    character          :: statefile = "" ! File to save the state in. Empty string means don't do it.
-    integer            :: spin = -1 ! Spinning cores
-    integer            :: nregions ! <out> The actual number of subregions nedded
-    integer            :: neval ! <out> The actual number of integrand evaluations needed
-    integer            :: fail ! <out> Error flag (0 = Success, -1 = Dimension out of range, >0 = Accuracy goal was not met)
-    double precision, dimension(1:ncomp) :: integral ! <out> The integral of the integrand over the unit hybercube
-    double precision, dimension(1:ncomp) :: error ! <out> The presumed absolute error
-    double precision, dimension(1:ncomp) :: prob ! <out> The chi-square probability
-
+    integer                          :: nregions, neval, fail
+    double precision, dimension(1:1) :: integral, error, prob
 
     ! Initialize the average field to zero
     F_avg = 0.0d0
 
-    ! Pass the number of the emitter being integrated over to the integrand as userdata
-    userdata = emit
+    call Cuba_Integrate(integrand_cuba_simple, 1, emit, integral, error, prob, nregions, neval, fail)
 
-    call suave(ndim, ncomp, integrand_cuba_simple, userdata, nvec, &
-     & epsrel, epsabs, flags, seed, &
-     & mineval, maxeval, nnew, nmin, flatness, &
-     & statefile, spin, &
-     & nregions, neval, fail, integral, error, prob)
+    N_sup = integral(1)
 
-     if (fail /= 0) then
-      print '(a)', 'RUMDEED: WARNING Cuba did not return 0'
-      print *, fail
-      print *, error
-      print *, prob
-     end if
-
-     !! Round the results to the nearest integer
-     !N_sup = nint( integral(1) )
-     N_sup = integral(1)
-
-     ! Finish calculating the average field
-     F_avg = F_avg / neval
-  end subroutine
+    ! Finish calculating the average field
+    F_avg = F_avg / neval
+  end subroutine Do_Surface_Integration_Simple
 
   ! ----------------------------------------------------------------------------
   ! Plain 2D Monte Carlo integration

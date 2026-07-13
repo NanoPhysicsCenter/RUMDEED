@@ -12,6 +12,7 @@ Module mod_field_thermo_emission
   use mod_pair
   use mod_work_function
   use mod_kevin_rjgtf
+  use mod_cuba_integration
   implicit none
 
   PRIVATE
@@ -151,7 +152,7 @@ subroutine Init_Field_Thermo_Emission()
 
 
     ! Do integration
-    call Do_Cuba_Suave_Simple(emit, N_sup)
+    call Do_Surface_Integration_Simple(emit, N_sup)
 
     ! Use the number of electrons as an average for a Poission distribution to get the number of electrons to emit.
     N_round = Rand_Poisson(N_sup)
@@ -419,9 +420,10 @@ subroutine Init_Field_Thermo_Emission()
     ! Check if the field is favourable for emission
     if (field(3) < 0.0d0) then
       ! The field is favourable for emission
-      ! Calculate the current density at this point
+      ! Calculate the current density at this point and convert it to
+      ! electrons supplied per time step
       w_theta = w_theta_xy(par_pos, userdata)
-      ff(1) = Get_Kevin_Jgtf(field(3), T_temp, w_theta)
+      ff(1) = Get_Kevin_Jgtf(field(3), T_temp, w_theta) * time_step_div_q0
       !ff(1) = Elec_Supply_V2(field(3), par_pos, userdata)*Escape_Prob(field(3), par_pos, userdata)
     else
       ! The field is NOT favourable for emission
@@ -436,64 +438,25 @@ subroutine Init_Field_Thermo_Emission()
     integrand_cuba_simple = 0 ! Return value to Cuba, 0 = success
   end function integrand_cuba_simple
 
-  subroutine Do_Cuba_Suave_Simple(emit, N_sup)
+  subroutine Do_Surface_Integration_Simple(emit, N_sup)
     ! Input / output variables
     integer, intent(in)           :: emit
     double precision, intent(out) :: N_sup
 
-    ! Cuba integration variables
-    integer, parameter :: ndim = 2 ! Number of dimensions
-    integer, parameter :: ncomp = 1 ! Number of components in the integrand
-    integer            :: userdata = 0 ! User data passed to the integrand
-    integer, parameter :: nvec = 1 ! Number of points given to the integrand function
-    double precision   :: epsrel = 1.0d-2 ! Requested relative error
-    double precision   :: epsabs = 1.0d-4 ! Requested absolute error
-    integer            :: flags = 0+4 ! Flags
-    integer            :: seed = 0 ! Seed for the rng. Zero will use Sobol.
-    integer            :: mineval = 10000 ! Minimum number of integrand evaluations
-    integer            :: maxeval = 5000000 ! Maximum number of integrand evaluations
-    integer            :: nnew = 2500 ! Number of integrand evaluations in each subdivision
-    integer            :: nmin = 1000 ! Minimum number of samples a former pass must contribute to a subregion to be considered in the region's compound integral value.
-    double precision   :: flatness = 5.0d0 ! Determine how prominently out-liers, i.e. samples with a large fluctuation, 
-                                           ! figure in the total fluctuation, which in turn determines how a region is split up.
-                                           ! As suggested by its name, flatness should be chosen large for 'flat" integrand and small for 'volatile' integrands
-                                           ! with high peaks.
-    character          :: statefile = "" ! File to save the state in. Empty string means don't do it.
-    integer            :: spin = -1 ! Spinning cores
-    integer            :: nregions ! <out> The actual number of subregions nedded
-    integer            :: neval ! <out> The actual number of integrand evaluations needed
-    integer            :: fail ! <out> Error flag (0 = Success, -1 = Dimension out of range, >0 = Accuracy goal was not met)
-    double precision, dimension(1:ncomp) :: integral ! <out> The integral of the integrand over the unit hybercube
-    double precision, dimension(1:ncomp) :: error ! <out> The presumed absolute error
-    double precision, dimension(1:ncomp) :: prob ! <out> The chi-square probability
-
+    integer                          :: nregions, neval, fail
+    double precision, dimension(1:1) :: integral, error, prob
 
     ! Initialize the average field to zero
     F_avg = 0.0d0
 
-    ! Pass the number of the emitter being integraded over to the integrand as userdata
-    userdata = emit
+    call Cuba_Integrate(integrand_cuba_simple, 1, emit, integral, error, prob, nregions, neval, fail)
 
-    call suave(ndim, ncomp, integrand_cuba_simple, userdata, nvec, &
-     & epsrel, epsabs, flags, seed, &
-     & mineval, maxeval, nnew, nmin, flatness, &
-     & statefile, spin, &
-     & nregions, neval, fail, integral, error, prob)
+    ! The integrand is in electrons supplied per time step
+    N_sup = integral(1)
 
-     if (fail /= 0) then
-      print '(a)', 'RUMDEED: WARNING Cuba did not return 0'
-      print *, fail
-      print *, error
-      print *, prob
-     end if
-
-     !! Round the results to the nearest integer
-     !N_sup = nint( integral(1) )
-     N_sup = integral(1) * time_step_div_q0
-
-     ! Finish calculating the average field
-     F_avg = F_avg / neval
-  end subroutine Do_Cuba_Suave_Simple
+    ! Finish calculating the average field
+    F_avg = F_avg / neval
+  end subroutine Do_Surface_Integration_Simple
 
   ! !----------------------------------------------------------------------------------------
   ! ! A function that calculates

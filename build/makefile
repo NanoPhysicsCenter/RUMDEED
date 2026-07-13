@@ -157,6 +157,7 @@ all: $(PROJECT_NAME).out
 
 $(PROJECT_NAME).out: ../src/main.F90 ../cuba/lib/libcuba.a \
 			mod_global.mod mod_global.o \
+			mod_cuba_integration.mod mod_cuba_integration.o \
 			mod_verlet.mod mod_verlet.o \
 			mod_pair.mod mod_pair.o	\
 			mod_tests.mod mod_tests.o \
@@ -180,7 +181,7 @@ $(PROJECT_NAME).out: ../src/main.F90 ../cuba/lib/libcuba.a \
 			mod_polarso.mod mod_polarso.o \
 			$(MKL_DEPS)
 		$(FC) $(FFLAGS) -D_GIT_VERSION_=\"${GIT_VERSION}\" -D_TESTING_MODE_=${TESTING_MODE} \
-		    ../src/main.F90 mod_global.o mod_verlet.o mod_pair.o \
+		    ../src/main.F90 mod_global.o mod_cuba_integration.o mod_verlet.o mod_pair.o \
 			mod_tests.o mod_photo_emission.o mod_field_emission.o mod_field_emission_v2.o \
 			mod_field_thermo_emission.o mod_kevin_rjgtf.o \
 			mod_emission_tip.o mod_hyperboloid_tip.o mod_ic.o mod_field_emission_2D.o \
@@ -205,6 +206,12 @@ mod_global.o: ../src/mod_global.F90
 		$(FC) -c $(FFLAGS) ../src/mod_global.F90
 
 mod_global.mod: mod_global.o
+	@true
+
+mod_cuba_integration.o: ../src/mod_cuba_integration.F90 mod_global.mod
+		$(FC) -c $(FFLAGS) ../src/mod_cuba_integration.F90
+
+mod_cuba_integration.mod: mod_cuba_integration.o
 	@true
 
 mod_ic.o: ../src/mod_ic.f90 mod_global.o mod_hyperboloid_tip.o mod_verlet.o
@@ -245,13 +252,13 @@ mod_field_emission.o: ../src/mod_field_emission.f90 mod_global.mod mod_verlet.mo
 mod_field_emission.mod: mod_field_emission.o
 	@true
 
-mod_field_emission_v2.o: ../src/mod_field_emission_v2.F90 mod_global.mod mod_verlet.mod mod_pair.mod mod_work_function.mod mod_velocity.mod mod_polarso.mod
+mod_field_emission_v2.o: ../src/mod_field_emission_v2.F90 mod_global.mod mod_cuba_integration.mod mod_verlet.mod mod_pair.mod mod_work_function.mod mod_velocity.mod mod_polarso.mod
 		$(FC) -c $(FFLAGS) $(MKL_LIBS) ../src/mod_field_emission_v2.F90
 
 mod_field_emission_v2.mod: mod_field_emission_v2.o
 	@true
 
-mod_field_thermo_emission.o: ../src/mod_field_thermo_emission.F90 mod_global.mod mod_verlet.mod mod_pair.mod mod_work_function.mod mod_kevin_rjgtf.mod mod_velocity.mod
+mod_field_thermo_emission.o: ../src/mod_field_thermo_emission.F90 mod_global.mod mod_cuba_integration.mod mod_verlet.mod mod_pair.mod mod_work_function.mod mod_kevin_rjgtf.mod mod_velocity.mod
 		$(FC) -c $(FFLAGS) ../src/mod_field_thermo_emission.F90
 
 mod_field_thermo_emission.mod: mod_field_thermo_emission.o
@@ -269,7 +276,7 @@ mod_field_emission_2D.o: ../src/mod_field_emission_2D.f90 mod_global.mod mod_ver
 mod_field_emission_2D.mod: mod_field_emission_2D.o
 	@true
 
-mod_emission_tip.o: ../src/mod_emission_tip.f90 mod_global.mod mod_verlet.mod mod_pair.mod mod_hyperboloid_tip.mod mod_ic.mod mod_velocity.mod mod_kevin_rjgtf.mod
+mod_emission_tip.o: ../src/mod_emission_tip.f90 mod_global.mod mod_cuba_integration.mod mod_verlet.mod mod_pair.mod mod_hyperboloid_tip.mod mod_ic.mod mod_velocity.mod mod_kevin_rjgtf.mod
 		$(FC) -c $(FFLAGS) ../src/mod_emission_tip.f90
 
 mod_emission_tip.mod: mod_emission_tip.o
@@ -281,13 +288,13 @@ mod_hyperboloid_tip.o: ../src/mod_hyperboloid_tip.f90 mod_global.mod
 mod_hyperboloid_tip.mod: mod_hyperboloid_tip.o
 	@true
 
-mod_cylindrical_tip.o: ../src/mod_cylindrical_tip.F90 mod_global.mod mod_verlet.mod mod_pair.mod mod_velocity.mod kdtree2_module.mod
+mod_cylindrical_tip.o: ../src/mod_cylindrical_tip.F90 mod_global.mod mod_cuba_integration.mod mod_verlet.mod mod_pair.mod mod_velocity.mod kdtree2_module.mod
 		$(FC) -c $(FFLAGS) ../src/mod_cylindrical_tip.F90
 
 mod_cylindrical_tip.mod: mod_cylindrical_tip.o
 	@true
 
-mod_torus.o: ../src/mod_torus.F90 mod_global.mod mod_verlet.mod mod_pair.mod mod_velocity.mod
+mod_torus.o: ../src/mod_torus.F90 mod_global.mod mod_cuba_integration.mod mod_verlet.mod mod_pair.mod mod_velocity.mod
 		$(FC) -c $(FFLAGS) ../src/mod_torus.F90
 
 mod_torus.mod: mod_torus.o
