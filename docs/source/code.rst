@@ -106,6 +106,92 @@ Field emission from a hyperboloid tip
 The code for field emission from a hyperboloid tip can be found in **mod_emission_tip.f90**.
 The work function of the tip is set with the ``w_theta`` variable in that file.
 
+The tip is modeled as a hyperboloid of revolution, which is described using prolate spheroidal coordinates.
+With :math:`\xi = \cosh{\mu}` and :math:`\eta = \cos{\nu}` the coordinates are defined as
+
+.. math::
+    \begin{split}
+    x &= a \sqrt{\xi^2-1}\sqrt{1-\eta^2} \cos{\phi}\, ,\\
+    y &= a \sqrt{\xi^2-1}\sqrt{1-\eta^2} \sin{\phi}\, ,\\
+    z &= a \xi \eta\, ,
+    \end{split}
+
+where :math:`a` is the focal distance of the hyperboloid. The reverse relations are
+
+.. math::
+    \begin{split}
+    \xi &= \frac{1}{2a} \left( \sqrt{x^2 + y^2 + (z+a)^2} + \sqrt{x^2 + y^2 + (z-a)^2} \right)\, ,\\
+    \eta &= \frac{1}{2a} \left( \sqrt{x^2 + y^2 + (z+a)^2} - \sqrt{x^2 + y^2 + (z-a)^2} \right)\, ,\\
+    \phi &= \arctan{\frac{y}{x}}\, .
+    \end{split}
+
+The surface of the tip is the hyperboloid :math:`\eta = \eta_1`, which is held at :math:`V = 0`,
+and the anode is the plane :math:`\eta_2 = 0` at :math:`V = V_0`.
+The potential between them is :cite:p:`pan:2151`
+
+.. math::
+    V(\eta) = V_0 \frac{\ln{\left[ \frac{1 + \eta_1}{1-\eta_1}\frac{1-\eta}{1+\eta} \right]}}{\ln{\left[ \frac{1+\eta_1}{1-\eta_1}\frac{1-\eta_2}{1+\eta_2} \right]}}\, .
+
+Note that the boundary conditions have been swapped compared to the reference.
+The vacuum electric field is then
+
+.. math::
+    \vec{E} = - \nabla V(\eta) = \frac{2V_0}{a} \frac{1}{\xi^2-\eta^2} \frac{1}{\ln \left[ \frac{1+\eta_1}{1-\eta_1} \frac{1-\eta_2}{1+\eta_2} \right]}
+    \begin{pmatrix}
+    -\eta \sqrt{\frac{\xi^2-1}{1-\eta^2}} \cos{\phi}\\
+    -\eta \sqrt{\frac{\xi^2-1}{1-\eta^2}} \sin{\phi}\\
+    \xi
+    \end{pmatrix}\, ,
+
+with the magnitude
+
+.. math::
+    |\vec{E}| = \frac{2V_0}{a} \frac{1}{\sqrt{\xi^2-\eta^2}\sqrt{1-\eta^2}} \frac{1}{\ln \left[ \frac{1+\eta_1}{1-\eta_1} \frac{1-\eta_2}{1+\eta_2} \right]}\, .
+
+At the apex of the tip, where :math:`\eta = \eta_1` and :math:`\xi = 1`, the field points in the z direction,
+
+.. math::
+    E_z = \frac{2V_0}{a} \frac{1}{1 - \eta_1^2} \frac{1}{\ln \left[ \frac{1+\eta_1}{1-\eta_1} \right]}\, .
+
+The shape of the tip is set in the input file with the parameter :ref:`EMITTERS_DIM <run>`,
+which gives the distance :math:`d` from the apex of the tip to the anode, the base radius :math:`R` and the height :math:`h` of the tip.
+These determine the coordinate parameters through
+
+.. math::
+    R = a \sqrt{\xi_{max}^2-1}\sqrt{1-\eta_1^2}\, , \quad
+    \eta_1 = -\frac{d}{a}\, , \quad
+    \xi_{max} = \frac{h}{d} + 1\, , \quad
+    a = \sqrt{\frac{d^2R^2}{h^2 + 2dh} + d^2}\, ,
+
+which keep the shape of the tip constant for all values of :math:`d`.
+The radius of curvature of the surface is
+
+.. math::
+    R_c = \left| \frac{a}{\eta_1} \frac{(\xi^2 - \eta_1^2)^{\frac{3}{2}}}{\sqrt{1-\eta_1^2}} \right| \, ,
+
+which at the apex, where :math:`\xi = 1` and :math:`\eta_1 = -\frac{d}{a}`, reduces to
+
+.. math::
+    R_c = \frac{a^2}{d} - d\, .
+
+The surface area of the tip between :math:`\xi_1` and :math:`\xi_2`, used when integrating the emission current over the surface, is
+
+.. math::
+    A = \frac{a^2}{2} \sqrt{1-\eta_1^2}\, (\phi_2 - \phi_1) \left[ \xi \sqrt{\xi^2 - \eta_1^2} - \eta_1^2 \ln\left(\xi + \sqrt{\xi^2 - \eta_1^2}\right) \right]_{\xi_1}^{\xi_2}\, .
+
+For the image charge interaction the tip is approximated by a sphere.
+A charged particle at a distance :math:`y` from the center of a sphere with radius :math:`r` has an image charge partner at a distance
+
+.. math::
+    y^\prime = \frac{r^2}{y}
+
+from the center of the sphere, with the charge
+
+.. math::
+    q^\prime = -\frac{r}{y}q\, ,
+
+where :math:`q` is the charge of the particle at :math:`y`.
+
 .. _thermal-field:
 
 Thermal-field emission
