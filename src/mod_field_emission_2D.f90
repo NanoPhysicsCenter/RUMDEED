@@ -9,6 +9,7 @@ Module mod_field_emission_2D
   use mod_global
   use mod_verlet
   use mod_pair
+  use mod_field_emission_v2, only: E_zunit_planar
   implicit none
 
   PRIVATE
@@ -74,6 +75,9 @@ contains
 
     ! The function to do image charge effects
     ptr_Image_Charge_effect => Force_Image_charges_v2
+
+    ! Ramo E_z, the emitter is planar
+    ptr_E_zunit => E_zunit_planar
 
     SELECT CASE (EMISSION_MODE)
     case(EMISSION_FIELD_2D_2DEG_C)
@@ -178,11 +182,7 @@ contains
     !$OMP PARALLEL DO PRIVATE(s, par_pos, field, F, D_f, rnd, par_vel) REDUCTION(+:df_avg, F_avg)
     do s = 1, N_sup
 
-      par_pos = Metropolis_Hastings_rectangle_v2(30, emit, D_f, F)
-      !print *, 'D_f = ', D_f
-      !print *, 'F = ', F
-      !print *, ''
-      !pause
+      par_pos = Uniform_Pos_rectangle(emit, D_f, F)
 
       ! Check if the field is favourable for emission or not
       if (F >= 0.0d0) then
@@ -369,6 +369,49 @@ contains
     end if
   end function Escape_Prob_DIRAC_NC
 
+
+  !-----------------------------------------------------------------------------
+  ! Draw the position of an emission candidate, uniform over the emitter.
+  !
+  ! For the 2D material emission models in this module the electron supply
+  ! (Elec_Supply_*) is a material constant times the emitter area: the
+  ! supply density over the surface is exactly uniform, so the consistent
+  ! candidate distribution is the uniform one and no Metropolis-Hastings
+  ! chain is needed at all (a chain with a constant target accepts every
+  ! jump and just performs a random walk). The caller emits each candidate
+  ! with the escape probability D(F) returned in df_out, so the emitted
+  ! positions follow the current density supply * D and the expected number
+  ! of emitted electrons is the surface integral of the current density.
+  ! (The old Metropolis_Hastings_rectangle_v2 below is kept for reference:
+  ! its chain targets D and the caller then thins with D again, which
+  ! weights the emitted positions with D^2 instead of D whenever the field
+  ! is not uniform.)
+  !
+  ! A candidate that lands where the field is not favorable is returned
+  ! with df_out = 0 and NOT redrawn: N_sup counts the supply of the whole
+  ! area, so the supply of a blocked spot must be lost rather than
+  ! redistributed to the favorable spots. This also keeps the routine free
+  ! of shared state, so the OpenMP loop in the caller stays safe.
+  function Uniform_Pos_rectangle(emit, df_out, F_out) result(pos_out)
+    integer, intent(in)              :: emit
+    double precision, intent(out)    :: df_out, F_out
+    double precision, dimension(1:3) :: pos_out
+    double precision, dimension(1:3) :: field
+
+    ! Uniform position on the emitter
+    CALL RANDOM_NUMBER(pos_out(1:2))
+    pos_out(1:2) = pos_out(1:2)*emitters_dim(1:2, emit) + emitters_pos(1:2, emit)
+    pos_out(3) = 0.0d0 ! On the surface
+
+    ! The escape probability at this position
+    field = Calc_Field_at(pos_out)
+    F_out = field(3)
+    if (field(3) < 0.0d0) then
+      df_out = ptr_Escape_Prob(field(3))
+    else
+      df_out = 0.0d0 ! The field is not favorable, no emission from this spot
+    end if
+  end function Uniform_Pos_rectangle
 
   !-----------------------------------------------------------------------------
   ! Metropolis-Hastings algorithm

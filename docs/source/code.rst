@@ -270,6 +270,10 @@ The ring emitter (``Metropolis_Hastings_ring_J``) moves in the ring parameters, 
 
 Planar thermal-field emission (**mod_field_thermo_emission.F90**) uses the current-density pairing: :math:`N` is Poisson distributed with the surface integral of the general thermal-field (GTF) current density as its mean (``Get_Kevin_Jgtf_v2``), the chains (25 jumps, no warmup) target :math:`\ln J_{GTF}`, and every candidate is emitted.
 
+Field emission from 2D materials (**mod_field_emission_2D.f90**, the 2DEG and Dirac models) is a special case of the supply pairing where no chain is needed at all: the electron supply of these models is a material constant times the emitter area, so the supply density over the surface is exactly uniform and the consistent candidate distribution is the uniform one (a Metropolis chain with a constant target accepts every jump and is just a wasted random walk).
+``Uniform_Pos_rectangle`` draws each candidate uniformly over the emitter and the caller emits it with the escape probability :math:`D(F)` at that spot, so the emitted positions follow the current density.
+A candidate that lands where the field is not favorable is discarded rather than redrawn, because :math:`N` counts the supply of the whole area, so the supply of a blocked spot must be lost instead of redistributed.
+
 Hyperboloid tip
 ~~~~~~~~~~~~~~~
 Found in **mod_emission_tip.f90**.

@@ -270,7 +270,7 @@ mod_kevin_rjgtf_v2.o: ../src/mod_kevin_rjgtf_v2.f90
 mod_kevin_rjgtf_v2.mod: mod_kevin_rjgtf_v2.o
 	@true
 
-mod_field_emission_2D.o: ../src/mod_field_emission_2D.f90 mod_global.mod mod_verlet.mod mod_pair.mod mod_velocity.mod
+mod_field_emission_2D.o: ../src/mod_field_emission_2D.f90 mod_global.mod mod_verlet.mod mod_pair.mod mod_velocity.mod mod_field_emission_v2.mod
 		$(FC) -c $(FFLAGS) ../src/mod_field_emission_2D.f90
 
 mod_field_emission_2D.mod: mod_field_emission_2D.o
