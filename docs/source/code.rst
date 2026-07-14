@@ -252,7 +252,7 @@ The remaining jumps use the adapted step size :math:`\sigma`, which is shared be
 
 clamped between a lower and an upper limit.
 A high acceptance rate means the steps are too small, so the step grows, and the other way around.
-The target rate :math:`a^*` is set per module: 25% for the planar field emission chains, 50% for the planar thermal-field chains, and 35% (the optimum for a two-dimensional random walk) for the tip and torus chains.
+The target rate :math:`a^*` is set per module: 25% for the planar field emission chains, 50% for the planar thermal-field chains, and 35% (the optimum for a two-dimensional random walk) for the tip, cylindrical tip and torus chains.
 
 Planar emitters
 ~~~~~~~~~~~~~~~
@@ -309,5 +309,29 @@ The vacuum field is interpolated from a finite-element mesh with a kd-tree.
 Emission uses the current-density pairing: :math:`N` is Poisson distributed with the Cuba integral of :math:`J\, h_\phi h_\theta` over the loop as its mean, and every candidate is emitted.
 The chains (``Metropolis_Hastings_Torus_v2``, 500 jumps) are restricted to a :math:`\pm 10^\circ` patch around the top of the loop (:math:`\phi = \pi/2`, :math:`\theta = 0`), where the field is highest and outside of which the current density is negligible, and target :math:`\ln(J\, h_\phi)` (``Torus_target_log``, :math:`h_\theta` is constant).
 The original sampler ``Metropolis_Hastings_Torus``, which targets :math:`|F|` without the area element, is kept for reference.
+
+Cylindrical tip
+~~~~~~~~~~~~~~~
+Found in **mod_cylindrical_tip.F90**.
+The emitter is a cylinder of radius :math:`R` and height :math:`h` whose top edge is rounded with a quarter-torus corner of radius :math:`r_c`.
+Its surface consists of three sections — the top disk, the corner arc and the side — but the chain does not move in the local coordinates of the sections.
+Instead it uses one seamless chart of the whole surface of revolution: the meridian arc length :math:`s`, running from the center of the top (:math:`s = 0`) over the top disk, around the corner arc and down the side, together with the azimuth :math:`\phi`.
+A Gaussian step in :math:`(s, \phi)` is then symmetric everywhere, also across the section boundaries, so no jumps between coordinate patches are needed.
+The area element of this chart is :math:`\mathrm{d}A = r(s)\, \mathrm{d}s\, \mathrm{d}\phi`, where :math:`r(s)` is the distance from the axis (``Cyl_meridian_radius``),
+
+.. math::
+    r(s) =
+    \begin{cases}
+    s & \text{top disk,} \\
+    (R - r_c) + r_c \sin\left( \frac{s - s_1}{r_c} \right) & \text{corner arc,} \\
+    R & \text{side,}
+    \end{cases}
+
+with :math:`s_1 = R - r_c` the edge of the top disk.
+The vacuum field is interpolated from a finite-element mesh with a kd-tree.
+Emission uses the current-density pairing: :math:`N` is Poisson distributed with the Cuba integral of :math:`J` over the three sections as its mean, and every candidate is emitted.
+The chains (``Metropolis_Hastings_cyl_tip_v2``, 55 jumps) target :math:`\ln(J\, r(s))` (``Cyl_target_log``); :math:`s` is reflected at the center of the top and at the bottom of the side, and :math:`\phi` wraps around the axis.
+Because the current density concentrates almost entirely on the corner arc, which is a small fraction of the meridian, the chain starts in a section drawn with the probabilities that the surface integration computes from the per-section current integrals each time step, then uniform along that section's meridian — a starting point only, not a bias, since the chain converges to its target from any start.
+The original sampler ``Metropolis_Hastings_cyl_tip`` is kept for reference: it proposes steps in the local coordinates of each section and projects points that cross a boundary onto the neighboring section; those transition maps are not symmetric, the physical step sizes differ by large factors between the sections, and it targets :math:`|F|` without the area elements.
 
 .. index:: Verlet, Beeman, code, Fowler-Nordheim, Metropolis-Hastings

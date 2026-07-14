@@ -115,6 +115,30 @@ Module mod_cylindrical_tip
     ! Variables for the Metropolis-Hastings algorithm
     integer, parameter                 :: N_MH_step = 55 ! Number of steps to do in the MH algorithm
 
+    ! Tuning of the v2 sampler (Metropolis_Hastings_cyl_tip_v2). The step
+    ! MH_std_cyl is a fraction of the (s, phi) ranges, fixed within a chain
+    ! and updated once per chain towards the acceptance rate MH_target_cyl.
+    ! Same scheme as the samplers in mod_field_emission_v2, mod_emission_tip
+    ! and mod_torus.
+    double precision, parameter :: MH_warmup_cyl  = 0.25d0   ! Fraction of the jumps done with the fixed initial step
+    double precision, parameter :: MH_init_cyl    = 0.10d0   ! Initial step as a fraction of the (s, phi) ranges
+    double precision, parameter :: MH_target_cyl  = 0.35d0   ! Acceptance rate the update aims for (2D random walk optimum)
+    double precision, parameter :: MH_gain_cyl    = 0.025d0  ! Gain of the per-chain step update
+    double precision, parameter :: MH_std_max_cyl = 0.125d0  ! Upper limit on MH_std_cyl
+    double precision, parameter :: MH_std_min_cyl = 0.0005d0 ! Lower limit on MH_std_cyl
+    double precision            :: MH_std_cyl     = 0.0125d0 ! Adapted step size
+    double precision            :: a_rate_cyl     = 0.5d0    ! Acceptance rate of the last chain
+
+    ! Meridian arc length parametrization of the emitter surface, used by
+    ! the v2 sampler: s runs from the center of the top (s = 0) over the top
+    ! disk, around the corner arc and down the side to the bottom
+    ! (s = s_max_cyl). Together with the azimuth phi this is one seamless
+    ! chart of the whole surface of revolution, with the area element
+    ! dA = r(s) ds dphi (see Cyl_meridian_radius).
+    double precision, parameter :: s_top_cyl    = radius_cyl - radius_cor                  ! End of the top disk
+    double precision, parameter :: s_corner_cyl = s_top_cyl + radius_cor*pi/2.0d0          ! End of the corner arc
+    double precision, parameter :: s_max_cyl    = s_corner_cyl + (height_cyl - radius_cor) ! Bottom of the side
+
 contains
 
 !-------------------------------------------!
@@ -779,18 +803,13 @@ subroutine Do_Field_Emission_Cylinder_simple(step)
   ! Loop over the electrons to be emitted.
   do s = 1, N_round
       ! Get the position of the particle
-      ! ndim_in, F_out, F_norm_out, pos_xyz_out, sec_out
-      call Metropolis_Hastings_cyl_tip(N_MH_step, F, F_norm, par_pos, sec, n_vec)
+      call Metropolis_Hastings_cyl_tip_v2(N_MH_step, F, F_norm, par_pos, sec, n_vec)
 
-      ! Check if the field is favorable for emission or not
+      ! Check if the field is favorable for emission or not.
+      ! A failed chain comes back with F_norm = 1.0, skip it.
       if (F_norm >= 0.0d0) then
         D_f = -huge(1.0d0)
-        print *, 'Warning: F > 0.0d0 (Do_Field_Emission_Cylinder)'
-        print *, 'F_norm = ', F_norm
-        print *, 'F = ', F
-        print *, 'par_pos = ', par_pos
-        print *, 'sec = ', sec
-        stop
+        print *, 'Warning: F > 0.0d0, skipping the candidate (Do_Field_Emission_Cylinder)'
       else
 
         par_pos = par_pos + n_vec*length_scale_cyl
@@ -918,6 +937,263 @@ subroutine Metropolis_Hastings_cyl_tip(ndim_in, F_out, F_norm_out, pos_xyz_out, 
 
     !write(ud_cyl_debug, *) pos_xyz_cur, pos_cur, sec_cur, n_vec
 end subroutine Metropolis_Hastings_cyl_tip
+
+!-------------------------------------------!
+! Map the meridian coordinate s and the azimuth phi of the v2 sampler to
+! the section-local coordinates used by the rest of the module
+! (top: cartesian (x, y, z); side: (rho, phi, z); corner: (rho, phi, theta)).
+subroutine Cyl_meridian_to_sec(s, phi, pos_sec, sec)
+    double precision, intent(in)                  :: s, phi
+    double precision, dimension(1:3), intent(out) :: pos_sec
+    integer, intent(out)                          :: sec
+
+    if (s < s_top_cyl) then
+        ! Top disk, s is the distance from the center
+        sec = sec_top
+        pos_sec(1) = s * cos(phi)
+        pos_sec(2) = s * sin(phi)
+        pos_sec(3) = height_cyl
+    else if (s < s_corner_cyl) then
+        ! Corner arc, theta = pi/2 at the top edge and 0 at the side
+        sec = sec_corner
+        pos_sec(1) = radius_cor
+        pos_sec(2) = phi
+        pos_sec(3) = pi/2.0d0 - (s - s_top_cyl)/radius_cor
+    else
+        ! Side of the cylinder, z decreases with s
+        sec = sec_side
+        pos_sec(1) = radius_cyl
+        pos_sec(2) = phi
+        pos_sec(3) = (height_cyl - radius_cor) - (s - s_corner_cyl)
+    end if
+end subroutine Cyl_meridian_to_sec
+
+!-------------------------------------------!
+! Distance from the axis of the cylinder at the meridian coordinate s,
+! i.e. the h_phi factor of the area element dA = r(s) ds dphi of the
+! (s, phi) parametrization.
+double precision function Cyl_meridian_radius(s)
+    double precision, intent(in) :: s
+
+    if (s < s_top_cyl) then
+        Cyl_meridian_radius = s
+    else if (s < s_corner_cyl) then
+        Cyl_meridian_radius = (radius_cyl - radius_cor) + radius_cor*sin((s - s_top_cyl)/radius_cor)
+    else
+        Cyl_meridian_radius = radius_cyl
+    end if
+end function Cyl_meridian_radius
+
+!-------------------------------------------!
+! Log of the target distribution of the v2 sampler: the current density
+! J = Elec_Supply_V2 * Escape_Prob times the r(s) area element of the
+! (s, phi) parametrization -- the same current density that
+! integrand_cuba_cyl_simple integrates over the three sections for the
+! number of electrons to emit. Do_Field_Emission_Cylinder_simple emits
+! every candidate, so with this target the emitted positions follow the
+! current density over the whole surface. The time step factor inside
+! Elec_Supply_V2 is constant and cancels in the Metropolis ratio. The
+! tiny() guards catch a J that underflows to zero and the r(0) = 0 point
+! at the center of the top. F_norm must be < 0.
+double precision function Cyl_target_log(F_norm, pos_xyz, s)
+    double precision, intent(in)                 :: F_norm, s
+    double precision, dimension(1:3), intent(in) :: pos_xyz
+
+    Cyl_target_log = log(max(Elec_Supply_V2(F_norm, pos_xyz)*Escape_Prob(F_norm, pos_xyz), tiny(1.0d0))) &
+                 & + log(max(Cyl_meridian_radius(s), tiny(1.0d0)))
+end function Cyl_target_log
+
+!-------------------------------------------!
+! Metropolis-Hastings algorithm for the cylindrical tip (second version,
+! used by Do_Field_Emission_Cylinder_simple).
+!
+! The chain moves in (s, phi), where s is the meridian arc length from the
+! center of the top and phi the azimuth. This single chart covers the top,
+! the corner and the side seamlessly, so no jumps between coordinate
+! patches are needed: a Gaussian step in (s, phi) is symmetric everywhere,
+! also across the section boundaries.
+! (The original sampler above proposes steps in the local coordinates of
+! each section and projects points that cross a boundary onto the
+! neighboring section. Those transition maps are not symmetric, no
+! Hastings correction is applied, and the physical step sizes differ by
+! large factors between the sections, so a chain that enters the corner
+! nearly freezes. It also targets |F_normal| in the mixed coordinate
+! measures of the sections, without the area elements. It is kept for
+! reference.)
+!
+! The chain samples positions proportional to the current density times
+! the area element (Cyl_target_log above), the same expression that is
+! integrated for the number of electrons to emit; the caller emits every
+! candidate. Steps in s are reflected at s = 0 and s = s_max_cyl, phi
+! wraps around the axis. The first MH_warmup_cyl of the jumps use the
+! large fixed step MH_init_cyl, after that the adapted step MH_std_cyl,
+! fixed within a chain and updated once per chain from its acceptance
+! rate.
+subroutine Metropolis_Hastings_cyl_tip_v2(ndim_in, F_out, F_norm_out, pos_xyz_out, sec_out, n_vec)
+    integer, intent(in)                           :: ndim_in
+    double precision, dimension(1:3), intent(out) :: F_out, n_vec
+    double precision, intent(out)                 :: F_norm_out
+    double precision, dimension(1:3), intent(out) :: pos_xyz_out
+    integer, intent(out)                          :: sec_out
+
+    double precision, dimension(1:3) :: pos_cur, pos_new ! Section-local coordinates
+    double precision, dimension(1:3) :: pos_xyz_cur, pos_xyz_new
+    double precision, dimension(1:3) :: F_cur, F_new
+    double precision                 :: F_norm_cur, F_norm_new
+    double precision                 :: s_cur, phi_cur, s_new, phi_new
+    double precision                 :: sup_cur, sup_new ! Log of the chain target
+    double precision                 :: alpha, rnd
+    double precision, dimension(1:2) :: std, rnd2
+    double precision, dimension(1:3) :: rnd3
+    integer                          :: sec_cur, sec_new
+    integer                          :: i, k, ndim_first
+    integer                          :: acc, rej ! Accepted/rejected jumps after the warmup
+
+    acc = 0
+    rej = 0
+    ndim_first = nint(ndim_in*MH_warmup_cyl)
+
+    ! Warmup step size, MH_init_cyl of the (s, phi) ranges
+    std(1) = s_max_cyl*MH_init_cyl
+    std(2) = 2.0d0*pi*MH_init_cyl
+
+    ! Get a random initial position. The section is drawn with the
+    ! probabilities prob_top/prob_side/prob_corner that the surface
+    ! integration computes from the per-section current integrals every
+    ! time step, then s is uniform along the meridian of that section.
+    ! This is only a good starting point, not a bias: the chain converges
+    ! to its target from any start, but the current is so concentrated on
+    ! the corner (typically > 99.9%) that a start uniform over the whole
+    ! meridian would need far more jumps to find it reliably.
+    k = 0
+    do ! Infinite loop, we try to find a favourable position to start from
+        call random_number(rnd3)
+        if (rnd3(1) < prob_top) then
+            s_cur = s_top_cyl*rnd3(2)
+        else if (rnd3(1) < prob_top + prob_side) then
+            s_cur = s_corner_cyl + (s_max_cyl - s_corner_cyl)*rnd3(2)
+        else
+            s_cur = s_top_cyl + (s_corner_cyl - s_top_cyl)*rnd3(2)
+        end if
+        phi_cur = 2.0d0*pi*rnd3(3)
+
+        call Cyl_meridian_to_sec(s_cur, phi_cur, pos_cur, sec_cur)
+        pos_xyz_cur = Convert_to_xyz(pos_cur, sec_cur)
+        F_cur = Calc_Field_at(pos_xyz_cur)
+        F_norm_cur = Field_normal(pos_xyz_cur, pos_cur, F_cur, sec_cur)
+
+        if (F_norm_cur < 0.0d0) then
+            exit ! The field is favorable for emission
+        end if
+
+        k = k + 1
+        if (k > 10000) then
+            ! Mark the chain as failed with defined outputs. The caller
+            ! checks the sign of F_norm_out and skips the emission.
+            s_cur = s_top_cyl + radius_cor*pi/4.0d0 ! Middle of the corner arc
+            phi_cur = 0.0d0
+            call Cyl_meridian_to_sec(s_cur, phi_cur, pos_cur, sec_cur)
+            pos_xyz_out = Convert_to_xyz(pos_cur, sec_cur)
+            sec_out = sec_cur
+            n_vec = surface_normal(pos_xyz_out, pos_cur, sec_cur)
+            F_out = 0.0d0
+            F_norm_out = 1.0d0
+            print *, 'RUMDEED: WARNING: Unable to find a position for the particle (Metropolis_Hastings_cyl_tip_v2)'
+            return
+        end if
+    end do
+
+    sup_cur = Cyl_target_log(F_norm_cur, pos_xyz_cur, s_cur)
+
+    ! Do the Metropolis-Hastings jumps
+    do i = 1, ndim_in
+
+        ! After the warmup the jumps use the adapted step size. It is only
+        ! updated between chains, so the kernel is fixed within a chain.
+        if (i > ndim_first) then
+            std(1) = s_max_cyl*MH_std_cyl
+            std(2) = 2.0d0*pi*MH_std_cyl
+        end if
+
+        ! Gaussian step in (s, phi); phi wraps around the axis
+        rnd2 = box_muller((/s_cur, phi_cur/), std)
+        s_new = rnd2(1)
+        phi_new = modulo(rnd2(2), 2.0d0*pi)
+
+        ! Reflect s at the center of the top and at the bottom of the side.
+        ! With the step limits above a jump needs at most one reflection; a
+        ! longer one (far tail of the warmup step) is rejected below.
+        if (s_new < 0.0d0) s_new = -s_new
+        if (s_new > s_max_cyl) s_new = 2.0d0*s_max_cyl - s_new
+        if ((s_new < 0.0d0) .or. (s_new > s_max_cyl)) then
+            if (i > ndim_first) rej = rej + 1
+            cycle ! Still outside after one reflection, reject the jump
+        end if
+
+        call Cyl_meridian_to_sec(s_new, phi_new, pos_new, sec_new)
+        pos_xyz_new = Convert_to_xyz(pos_new, sec_new)
+        F_new = Calc_Field_at(pos_xyz_new)
+        F_norm_new = Field_normal(pos_xyz_new, pos_new, F_new, sec_new)
+
+        ! An unfavorable field means zero current, i.e. the jump is rejected
+        if (F_norm_new >= 0.0d0) then
+            if (i > ndim_first) rej = rej + 1
+            cycle
+        end if
+
+        sup_new = Cyl_target_log(F_norm_new, pos_xyz_new, s_new)
+
+        alpha = sup_new - sup_cur ! Log of the Metropolis ratio
+
+        if (sup_new >= sup_cur) then
+            s_cur = s_new
+            phi_cur = phi_new
+            pos_cur = pos_new
+            sec_cur = sec_new
+            pos_xyz_cur = pos_xyz_new
+            F_cur = F_new
+            F_norm_cur = F_norm_new
+            sup_cur = sup_new
+            if (i > ndim_first) acc = acc + 1
+        else
+            call random_number(rnd)
+            if (log(rnd) <= alpha) then
+                s_cur = s_new
+                phi_cur = phi_new
+                pos_cur = pos_new
+                sec_cur = sec_new
+                pos_xyz_cur = pos_xyz_new
+                F_cur = F_new
+                F_norm_cur = F_norm_new
+                sup_cur = sup_new
+                if (i > ndim_first) acc = acc + 1
+            else
+                if (i > ndim_first) rej = rej + 1
+            end if
+        end if
+    end do
+
+    ! The acceptance rate of this chain drives one update of the shared
+    ! step size. A high acceptance rate means the steps are too small, so
+    ! the step grows.
+    if (acc + rej > 0) then
+        a_rate_cyl = DBLE(acc) / DBLE(acc + rej)
+        MH_std_cyl = MH_std_cyl * exp(MH_gain_cyl*(a_rate_cyl - MH_target_cyl))
+        ! Limits on how big or low the step can be
+        if (MH_std_cyl > MH_std_max_cyl) then
+            MH_std_cyl = MH_std_max_cyl
+        else if (MH_std_cyl < MH_std_min_cyl) then
+            MH_std_cyl = MH_std_min_cyl
+        end if
+    end if
+
+    ! Set the output variables
+    pos_xyz_out = pos_xyz_cur
+    sec_out = sec_cur
+    n_vec = surface_normal(pos_xyz_cur, pos_cur, sec_cur)
+    F_out = F_cur
+    F_norm_out = F_norm_cur
+end subroutine Metropolis_Hastings_cyl_tip_v2
 
 subroutine Jump_MH(pos_cur, sec_cur, pos_new, sec_new)
     ! Input variables
