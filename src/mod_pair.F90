@@ -37,6 +37,7 @@ contains
     integer, intent(in)                          :: par_species, step, emit, life
     integer, intent(in), optional                :: opt_sec
     integer                                      :: sec
+    double precision, dimension(1:3)             :: par_accel
 
     ! Check if we have reach the maximum number of paticles allowed
     if (nrPart+1 > MAX_PARTICLES) then
@@ -114,6 +115,22 @@ contains
       else
         print *, 'ERROR UNKNOWN PARTICLE TYPE'
         stop
+      end if
+
+      ! Seed the Beeman acceleration history with the acceleration from the
+      ! vacuum field at the emission point. Beeman is not self-starting: with
+      ! a zeroed history the particle's first position update is field-free
+      ! drift and its first velocity update underweights the force. With
+      ! cur/prev/prev2 all seeded to the same value the first step degenerates
+      ! to velocity Verlet, which is exact for a uniform field. The
+      ! space-charge and image-charge parts of the true acceleration are not
+      ! in the seed; they enter with the first full force evaluation.
+      if (associated(ptr_field_E)) then
+        par_accel = (particles_charge(nrPart+1)/particles_mass(nrPart+1)) &
+                & * ptr_field_E(par_pos)
+        particles_cur_accel(:, nrPart+1)   = par_accel
+        particles_prev_accel(:, nrPart+1)  = par_accel
+        particles_prev2_accel(:, nrPart+1) = par_accel
       end if
 
       ! Update the number of particles in the system

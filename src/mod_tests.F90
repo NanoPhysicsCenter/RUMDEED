@@ -274,6 +274,9 @@ contains
     call Test_Planar_Batch_Field()
 
     print *, ''
+    call Test_Planar_Specialized_Acceleration()
+
+    print *, ''
     call Test_Beeman_Kinematics()
 
     print *, ''
@@ -480,6 +483,14 @@ contains
     call Add_Particle(R_1, par_vel, species_elec, 1, 0, -1)
     call Add_Particle(R_2, par_vel, species_elec, 1, 0, -1)
     call Add_Particle(R_3, par_vel, species_ion, 1, 0, -1)
+
+    ! Add_Particle seeds the Beeman history with the vacuum-field
+    ! acceleration. This test calls the acceleration routine directly, which
+    ! accumulates on top of particles_cur_accel; clear the history first like
+    ! the position update does in a production step.
+    particles_cur_accel(:, 1:nrPart)   = 0.0d0
+    particles_prev_accel(:, 1:nrPart)  = 0.0d0
+    particles_prev2_accel(:, 1:nrPart) = 0.0d0
 
     call Update_Particle_Acceleration(1)
     ! call Calculate_Acceleration_Particles()
@@ -822,6 +833,14 @@ contains
     call Add_Particle(R_2, par_vel, species_elec, 1, 0, -1)
     call Add_Particle(R_3, par_vel, species_ion, 1, 0, -1)
 
+    ! Add_Particle seeds the Beeman history with the vacuum-field
+    ! acceleration. This test calls the acceleration routine directly, which
+    ! accumulates on top of particles_cur_accel; clear the history first like
+    ! the position update does in a production step.
+    particles_cur_accel(:, 1:nrPart)   = 0.0d0
+    particles_prev_accel(:, 1:nrPart)  = 0.0d0
+    particles_prev2_accel(:, 1:nrPart) = 0.0d0
+
     call Update_Particle_Acceleration(1)
     ! call Calculate_Acceleration_Particles()
 
@@ -1029,6 +1048,14 @@ contains
       a_expected(:, i) = a_expected(:, i) &
                      & + particles_charge(i) * ptr_field_E(pos_1) / particles_mass(i)
     end do
+
+    ! Add_Particle seeds the Beeman history with the vacuum-field
+    ! acceleration; the CPU pair loops accumulate on top of
+    ! particles_cur_accel, so clear the history first like the position
+    ! update does in a production step.
+    particles_cur_accel(:, 1:nrPart)   = 0.0d0
+    particles_prev_accel(:, 1:nrPart)  = 0.0d0
+    particles_prev2_accel(:, 1:nrPart) = 0.0d0
 
     ! The acceleration from the kernel (GPU in OpenACC builds)
     call Calculate_Acceleration_Particles()
@@ -1367,9 +1394,10 @@ contains
   ! Test the Beeman integrator and the Ramo current with a single electron in
   ! a uniform field, where every step can be written down exactly.
   ! The electron starts at rest in z with a transverse drift velocity v_x.
-  ! With a constant acceleration a = q V / (m d) and zeroed acceleration
-  ! history the Beeman scheme gives after three steps:
-  !   z3 - z0 = 3 a dt^2,   v_z3 = 5/2 a dt,   x3 - x0 = 3 v_x dt
+  ! Add_Particle seeds the acceleration history with the vacuum-field
+  ! acceleration, which for a uniform field is the exact constant
+  ! a = q V / (m d) — the Beeman scheme is then exact and after three steps:
+  !   z3 - z0 = 9/2 a dt^2,   v_z3 = 3 a dt,   x3 - x0 = 3 v_x dt
   ! and the Ramo current of the last step is I = q_0 v_z3 / d.
   subroutine Test_Beeman_Kinematics()
     double precision, parameter      :: d_test = 1000.0d0*length_scale
@@ -1401,8 +1429,8 @@ contains
 
     ! Expected values, see the header of this subroutine
     a_z      = q_0*V_test/(m_0*d_test)
-    dz_exp   = 3.0d0*a_z*delta_t_test**2
-    v_z_exp  = 2.5d0*a_z*delta_t_test
+    dz_exp   = 4.5d0*a_z*delta_t_test**2
+    v_z_exp  = 3.0d0*a_z*delta_t_test
     dx_exp   = 3.0d0*v_x0*delta_t_test
     ramo_exp = q_0*v_z_exp/d_test
 
@@ -1572,6 +1600,83 @@ contains
     print *, 'Planar batched field test finished'
     print *, ''
   end subroutine Test_Planar_Batch_Field
+
+  !-----------------------------------------------------------------------------
+  ! The planar-specialized pair loop (Calculate_Acceleration_Particles_Planar,
+  ! inlined field and image charge math) must reproduce the generic pair loop
+  ! (Calculate_Acceleration_Particles_Generic, procedure pointers) up to
+  ! floating-point rounding, with the image charge series on and off.
+  subroutine Test_Planar_Specialized_Acceleration()
+    integer, parameter :: N_test = 40
+    double precision, parameter      :: d_test = 1000.0d0*length_scale
+    double precision, parameter      :: V_test = 2.0d3 ! V
+    double precision, parameter      :: delta_t_test = 0.25d-15 ! Time step
+
+    double precision, dimension(1:3, 1:N_test) :: a_gen
+    double precision, dimension(1:3)           :: par_pos, par_vel
+    double precision                           :: max_dev, dev_scale
+    integer                                    :: i, pass, spc
+
+    print *, 'Starting planar specialized pair loop test'
+
+    do pass = 1, 2
+      if (pass == 1) then
+        ! Image charge series on, with two extra partner pairs
+        call Setup_Test_System(d_test, delta_t_test, 10, V_test, .true., 2)
+      else
+        ! Image charge off: Coulomb and vacuum field only
+        call Setup_Test_System(d_test, delta_t_test, 10, V_test, .false., 0)
+      end if
+
+      ! Make sure the planar geometry is active
+      ptr_field_E => field_E_planar
+      ptr_Image_Charge_effect => Force_Image_charges_v2
+      ptr_Check_Boundary => Check_Boundary_Planar
+      ptr_E_zunit => E_zunit_planar
+
+      ! Deterministic quasi-random positions spread over the box, with every
+      ! fifth particle an ion
+      par_vel = 0.0d0
+      do i = 1, N_test
+        par_pos(1) = (0.5d0 + 0.45d0*sin(1.7d0*i)) * box_dim(1)
+        par_pos(2) = (0.5d0 + 0.45d0*cos(2.3d0*i)) * box_dim(2)
+        par_pos(3) = (0.5d0 + 0.45d0*sin(3.1d0*i + 0.5d0)) * box_dim(3)
+        if (mod(i, 5) == 0) then
+          spc = species_ion
+        else
+          spc = species_elec
+        end if
+        call Add_Particle(par_pos, par_vel, spc, 1, 1, -1)
+      end do
+
+      ! Generic pair loop
+      particles_cur_accel(:, 1:nrPart)   = 0.0d0
+      particles_prev_accel(:, 1:nrPart)  = 0.0d0
+      particles_prev2_accel(:, 1:nrPart) = 0.0d0
+      call Calculate_Acceleration_Particles_Generic()
+      a_gen(:, 1:nrPart) = particles_cur_accel(:, 1:nrPart)
+
+      ! Specialized pair loop on the identical system
+      particles_cur_accel(:, 1:nrPart) = 0.0d0
+      call Calculate_Acceleration_Particles_Planar()
+
+      ! Compare the accelerations relative to their magnitude
+      max_dev = 0.0d0
+      do i = 1, nrPart
+        dev_scale = max(norm2(a_gen(:, i)), 1.0d0)
+        max_dev = max(max_dev, norm2(particles_cur_accel(:, i) - a_gen(:, i))/dev_scale)
+      end do
+
+      if (pass == 1) then
+        call Assert_True(max_dev < 1.0d-10, 'Planar specialized pair loop (image charge on)')
+      else
+        call Assert_True(max_dev < 1.0d-10, 'Planar specialized pair loop (image charge off)')
+      end if
+    end do
+
+    print *, 'Planar specialized pair loop test finished'
+    print *, ''
+  end subroutine Test_Planar_Specialized_Acceleration
 
   !-----------------------------------------------------------------------------
   ! Test the Fowler-Nordheim functions v_y, t_y and Escape_Prob in
