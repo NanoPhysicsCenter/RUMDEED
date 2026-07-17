@@ -198,7 +198,7 @@ module mod_global
 
   double precision :: time_step  ! Size of the time_step
   double precision :: time_step2 ! time_step squared
-  integer :: atom_time_interval ! Time interval for atom movement
+  integer :: atom_time_interval = 0 ! Time interval for atom movement; 0 (the default) disables two_time_step mode
   double precision :: atom_time_step ! Size of the time_step for atom movement
   double precision :: atom_interval2 ! atom_time_step squared
 

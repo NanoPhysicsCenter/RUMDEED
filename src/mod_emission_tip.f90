@@ -1782,7 +1782,7 @@ end function Elec_supply_tip
     double precision                 :: A ! Emitter area
     double precision                 :: eta_f ! Component normal to the surface
     double precision                 :: xi, phi ! Prolate coordinates
-    double precision                 :: h_xi, h_phi ! Scale factors
+    double precision                 :: h_area ! Area element of the surface
 
     !! Emitter area
     !A = Tip_Area(1.0d0, max_xi, 0.0d0, 2.0d0*pi)
@@ -1809,12 +1809,15 @@ end function Elec_supply_tip
     if (eta_f < 0.0d0) then
       ! The field is favorable for emission
 
-      ! Calculate the scale factors
-      h_xi = a_foci*sqrt((xi**2 - eta_1**2)/(xi**2 - 1.0d0))
-      h_phi = a_foci*sqrt((xi**2 - 1.0d0)*(1 - eta_1**2))
+      ! Area element of the (xi, phi) parametrization. The scale factors are
+      ! each singular at the apex (xi = 1): h_xi diverges and h_phi vanishes,
+      ! so forming them separately gives Inf*0 = NaN there. Their product is
+      ! finite and has to be formed analytically, because Divonne evaluates
+      ! the boundary of the hypercube (border = 0), i.e. xi = 1 exactly.
+      h_area = a_foci**2 * sqrt((xi**2 - eta_1**2)*(1 - eta_1**2))
 
       ! Calculate the current density at this point
-      ff(1) = Elec_Supply_tip(eta_f, par_pos)*Escape_Prob_Tip(eta_f, par_pos) * h_xi * h_phi
+      ff(1) = Elec_Supply_tip(eta_f, par_pos)*Escape_Prob_Tip(eta_f, par_pos) * h_area
     else
       ! The field is NOT favorable for emission
       ! This point does not contribute
@@ -1842,7 +1845,7 @@ end function Elec_supply_tip
     !double precision                 :: w_theta ! Emitter area
     double precision                 :: eta_f ! Component normal to the surface
     double precision                 :: xi, phi ! Prolate coordinates
-    double precision                 :: h_xi, h_phi ! Scale factors
+    double precision                 :: h_area ! Area element of the surface
 
     ! Surface position
     ! Cuba does the intergration over the hybercube.
@@ -1864,15 +1867,18 @@ end function Elec_supply_tip
     if (eta_f < 0.0d0) then
       ! The field is favourable for emission
 
-      ! Calculate the scale factors
-      ! Scale factors for the prolate coordinates to Cartesian coordinates
-      h_xi = a_foci*sqrt((xi**2 - eta_1**2)/(xi**2 - 1.0d0))
-      h_phi = a_foci*sqrt((xi**2 - 1.0d0)*(1 - eta_1**2))
+      ! Area element of the (xi, phi) parametrization, the same expression
+      ! Tip_gtf_target_log samples. The scale factors are each singular at the
+      ! apex (xi = 1): h_xi diverges and h_phi vanishes, so forming them
+      ! separately gives Inf*0 = NaN there. Their product is finite and has to
+      ! be formed analytically, because Divonne evaluates the boundary of the
+      ! hypercube (border = 0), i.e. xi = 1 exactly.
+      h_area = a_foci**2 * sqrt((xi**2 - eta_1**2)*(1 - eta_1**2))
 
       ! Calculate the current density at this point and convert it to
       ! electrons supplied per time step
       !w_theta = w_theta_xy(par_pos, userdata)
-      ff(1) = Get_Kevin_Jgtf_v2(eta_f, T_temp, w_theta) * h_xi * h_phi * time_step_div_q0
+      ff(1) = Get_Kevin_Jgtf_v2(eta_f, T_temp, w_theta) * h_area * time_step_div_q0
     else
       ! The field is NOT favourable for emission
       ! This point does not contribute
