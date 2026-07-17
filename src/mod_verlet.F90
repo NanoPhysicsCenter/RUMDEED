@@ -2,6 +2,13 @@
 ! Module for Verlet Integration             !
 ! Kristinn Torfason                         !
 ! 21.01.16                                  !
+!                                           !
+! Note: the integrator actually in use is   !
+! Beeman's algorithm (see the position and  !
+! velocity update routines; the plain       !
+! velocity Verlet variant is kept there in  !
+! comments). The module keeps its           !
+! historical name.                          !
 !-------------------------------------------!
 
 Module mod_verlet
@@ -346,10 +353,14 @@ contains
 
         ! If current position is above the plane and previous is below then the particles passed trough the plane in this time step
         if ((z_cur > z) .and. (z_prev < z)) then
-          ! Record information about this particle
+          ! Record information about this particle. Check_Planes runs inside
+          ! the position-update OpenMP loops, so the write to the shared unit
+          ! needs a critical section (like the writes in Mark_Particles_Remove).
+          !$OMP CRITICAL(PLANES_WRITE)
           write(unit=planes_ud(k)) particles_cur_pos(1, i)/length_scale, particles_cur_pos(2, i)/length_scale, &
                                           & particles_cur_vel(1, i), particles_cur_vel(2, i), particles_cur_vel(3, i), &
                                           & particles_emitter(i), particles_section(i), particles_id(i)
+          !$OMP END CRITICAL(PLANES_WRITE)
         end if
       end if
     end do
@@ -438,12 +449,12 @@ contains
   subroutine Update_ElecIon_Velocity(step)
     ! Update the velocity in the verlet integration
     integer, intent(in)              :: step
-    integer                          :: i, j, s, emit, sec
-    double precision                 :: q, EzV, nrStep
+    integer                          :: i, s, emit, sec
+    double precision                 :: q, EzV
     double precision, dimension(1:3) :: E_zu
 
     !$OMP PARALLEL DO DEFAULT(NONE) &
-    !$OMP& PRIVATE(i, j, s, q, emit, sec, E_zu, EzV) &
+    !$OMP& PRIVATE(i, s, q, emit, sec, E_zu, EzV) &
     !$OMP& SHARED(particles_cur_vel, particles_prev_accel, particles_cur_accel, time_step) &
     !$OMP& SHARED(ramo_current, ramo_current_emit, ptr_E_zunit, particles_section, particles_charge, particles_cur_pos) &
     !$OMP& SHARED(nrPart, particles_elec_pointer, particles_ion_pointer, particles_species, particles_emitter, particles_prev2_accel) &
@@ -500,7 +511,7 @@ contains
   subroutine Update_Species_Velocity(step,species)
     ! Update the velocity in the verlet integration
     integer, intent(in)              :: step, species
-    integer                          :: i, j, k, s, nrFor, emit, sec
+    integer                          :: i, k, s, nrFor, emit, sec
     double precision                 :: q, EzV, nrStep
     double precision, dimension(1:3) :: E_zu
 
@@ -514,7 +525,7 @@ contains
     end select
 
     !$OMP PARALLEL DO DEFAULT(NONE) &
-    !$OMP& PRIVATE(i, j, k, s, q, emit, sec, E_zu, EzV) &
+    !$OMP& PRIVATE(i, k, s, q, emit, sec, E_zu, EzV) &
     !$OMP& SHARED(species, nrStep, particles_cur_vel, particles_prev_accel, particles_cur_accel, time_step) &
     !$OMP& SHARED(ramo_current, ramo_current_emit, ptr_E_zunit, particles_section, particles_charge, particles_cur_pos) &
     !$OMP& SHARED(nrFor, particles_elec_pointer, particles_ion_pointer, particles_species, particles_emitter, particles_prev2_accel) &
@@ -580,29 +591,47 @@ contains
 
   ! ----------------------------------------------------------------------------
   ! Acceleration
-  ! Update the acceleration for all the particles
+  ! Update the acceleration for all the particles.
+  ! Dispatches to the fastest implementation of the pair loop that supports
+  ! the active geometry; they all compute the same physics.
   subroutine Calculate_Acceleration_Particles()
-    double precision, dimension(1:3) :: force_E, force_c, force_ic, force_ic_N, force_ic_self
-    double precision, dimension(1:3) :: pos_1, pos_2, diff, pos_ic
-    double precision                 :: r, inv_r3
-    double precision                 :: q_1, q_2, qd_1
-    double precision                 :: im_1, im_2
-    double precision                 :: pre_fac_c
-    integer                          :: i, j, k_1, k_2
-    double precision, allocatable    :: inv_mass(:)
-    double precision, allocatable    :: accel_sum(:, :)
 
 #ifdef _OPENACC
     ! GPU path: the planar and hyperboloid tip geometries are implemented on
     ! the device, because the procedure pointers ptr_field_E /
     ! ptr_Image_Charge_effect cannot be called inside a GPU kernel. The
     ! cylindrical tip and torus geometries interpolate their fields from a
-    ! mesh with kd-tree searches and fall back to the OpenMP loop below.
+    ! mesh with kd-tree searches and fall back to the OpenMP loops below.
     if (ACC_Geometry() /= ACC_GEOM_OTHER) then
       call Calculate_Acceleration_Particles_ACC(ACC_Geometry())
       return
     end if
 #endif
+
+    ! CPU path: the planar geometry has a specialized pair loop with the
+    ! field and image charge math inlined — the procedure pointer calls in
+    ! the generic inner loop block inlining and vectorization. All other
+    ! geometries use the generic loop through the procedure pointers.
+    if (ACC_Geometry() == ACC_GEOM_PLANAR) then
+      call Calculate_Acceleration_Particles_Planar()
+    else
+      call Calculate_Acceleration_Particles_Generic()
+    end if
+  end subroutine Calculate_Acceleration_Particles
+
+  ! ----------------------------------------------------------------------------
+  ! The generic CPU pair loop: works for every geometry through the
+  ! ptr_field_E / ptr_Image_Charge_effect procedure pointers.
+  subroutine Calculate_Acceleration_Particles_Generic()
+    double precision, dimension(1:3) :: force_E, force_c, force_ic, force_ic_N, force_ic_self
+    double precision, dimension(1:3) :: pos_1, pos_2, diff
+    double precision                 :: r, inv_r3
+    double precision                 :: q_1, q_2, qd_1
+    double precision                 :: im_1, im_2
+    double precision                 :: pre_fac_c
+    integer                          :: i, j
+    double precision, allocatable    :: inv_mass(:)
+    double precision, allocatable    :: accel_sum(:, :)
 
     ! Precompute the inverse masses once (O(N)) so the inner O(N^2) loop below
     ! does array loads instead of a division per pair.
@@ -623,7 +652,7 @@ contains
     accel_sum = 0.0d0
 
     ! We do not use GUIDED scheduling in OpenMP here because the inner loop changes size.
-    !$OMP PARALLEL DO DEFAULT(NONE) PRIVATE(i, j, k_1, k_2, pos_1, pos_2, diff, r, inv_r3, pos_ic) &
+    !$OMP PARALLEL DO DEFAULT(NONE) PRIVATE(i, j, pos_1, pos_2, diff, r, inv_r3) &
     !$OMP& PRIVATE(force_E, force_c, force_ic, force_ic_N, force_ic_self, im_1, q_1, qd_1, im_2, q_2, pre_fac_c) &
     !$OMP& SHARED(nrPart, particles_cur_pos, particles_mass, inv_mass, particles_species, ptr_field_E, box_dim) &
     !$OMP& SHARED(ptr_Image_Charge_effect, particles_charge, d) &
@@ -636,7 +665,6 @@ contains
       im_1 = inv_mass(i)
       q_1 = particles_charge(i)
       qd_1 = q_1 * div_fac_c ! Loop-invariant part of the Coulomb prefactor
-      k_1 = particles_species(i)
 
       ! Acceleration due to electric field
       force_E = q_1 * ptr_field_E(pos_1)
@@ -657,12 +685,8 @@ contains
         if (particles_species(j) == species_atom) cycle
         ! Information about the particle that is acting on the particle at pos_1
         pos_2 = particles_cur_pos(:, j)
-        !if (particles_mass(j) == 0.0d0) then
-        !  print *, 'Hi'
-        !end if
         im_2 = inv_mass(j)
         q_2 = particles_charge(j)
-        k_2 = particles_species(j)
 
         ! Prefactor for Coloumb's law
         pre_fac_c = qd_1 * q_2 ! q_1*q_2 / (4*pi*epsilon)
@@ -701,21 +725,6 @@ contains
         force_ic_N(1:2) = -1.0d0*force_ic(1:2)
         force_ic_N(3)   = +1.0d0*force_ic(3)
 
-        ! ! Below plane
-        ! pos_ic(1:2) = pos_2(1:2)
-        ! pos_ic(3) = -1.0d0*pos_2(3)
-        ! diff = pos_1 - pos_ic
-        ! r = sqrt( sum(diff**2) ) + length_scale**3
-        ! force_ic = (-1.0d0)*pre_fac_c * diff / r**3
-
-        ! ! Above plane
-        ! pos_ic(1:2) = pos_2(1:2)
-        ! pos_ic(3) = 2*d - pos_2(3)
-        ! diff = pos_1 - pos_ic
-        ! r = sqrt( sum(diff**2) ) + length_scale**3
-        ! force_ic = force_ic + (-1.0d0)*pre_fac_c * diff / r**3
-
-
         accel_sum(:, j) = accel_sum(:, j) + im_2*(force_ic_N - force_c)
         accel_sum(:, i) = accel_sum(:, i) + im_1*(force_c + force_ic)
       end do
@@ -726,16 +735,140 @@ contains
 
     ! Fold the summed pair forces into the acceleration array
     particles_cur_accel(:, 1:nrPart) = particles_cur_accel(:, 1:nrPart) + accel_sum
+  end subroutine Calculate_Acceleration_Particles_Generic
 
-    !print *, 'Accel'
-    !print *, particles_cur_accel(:, 1:nrPart)
-    !print *, ''
-    !print *, 'Pos'
-    !print *, particles_cur_pos(:, 1:nrPart)/length_scale
-    !print *, 'Done'
-    !print *, nrPart
-    !stop
-  end subroutine Calculate_Acceleration_Particles
+  ! ----------------------------------------------------------------------------
+  ! Specialized version of the generic pair loop for the planar geometry
+  ! (field_E_planar + Force_Image_charges_v2, the ACC_GEOM_PLANAR dispatch
+  ! condition). The generic loop calls the geometry procedure pointers once
+  ! per pair, which blocks inlining and vectorization of the inner loop; here
+  ! the vacuum field is the constant (0, 0, E_z) and the image charge series
+  ! is inlined from acc_ic_planar_series.inc — the same include the OpenACC
+  ! kernels use, so each formula is written out once. The pair bookkeeping
+  ! (Coulomb reaction -F on particle j, image charge force on j mirrored in
+  ! x and y) is identical to the generic loop.
+  subroutine Calculate_Acceleration_Particles_Planar()
+    double precision              :: x_1, y_1, z_1, q_1, qd_1, im_1, im_2
+    double precision              :: x_2, y_2, z_2, q_2, pre_fac_c
+    double precision              :: a_x, a_y, a_z    ! Force sum on particle i
+    double precision              :: fc_x, fc_y, fc_z ! Coulomb force of the pair
+    double precision              :: ic_x, ic_y, ic_z ! Image charge sum of the pair
+    double precision              :: diff_x, diff_y, diff_z, dxy2, z_ic, z_a, z_b
+    double precision              :: r, inv_r3
+    double precision              :: Ez_loc, d_loc
+    logical                       :: do_ic
+    integer                       :: i, j, n, Nic
+    double precision, allocatable :: inv_mass(:)
+    double precision, allocatable :: accel_sum(:, :)
+
+    ! Local copies of the module scalars used by the inlined series
+    Ez_loc = E_z
+    d_loc  = d
+    Nic    = N_ic_max
+    do_ic  = image_charge
+
+    ! Precompute the inverse masses once (see the generic version)
+    allocate(inv_mass(1:nrPart))
+    !$OMP PARALLEL DO PRIVATE(i) SHARED(inv_mass, particles_mass, nrPart)
+    do i = 1, nrPart
+      inv_mass(i) = 1.0d0 / particles_mass(i)
+    end do
+    !$OMP END PARALLEL DO
+
+    ! The pair loop reduces into a heap-allocated nrPart-sized array
+    ! (see the comment in the generic version)
+    allocate(accel_sum(1:3, 1:nrPart))
+    accel_sum = 0.0d0
+
+    ! We do not use GUIDED scheduling in OpenMP here because the inner loop changes size.
+    !$OMP PARALLEL DO DEFAULT(NONE) &
+    !$OMP& PRIVATE(i, j, n, x_1, y_1, z_1, q_1, qd_1, im_1, im_2, x_2, y_2, z_2, q_2, pre_fac_c) &
+    !$OMP& PRIVATE(a_x, a_y, a_z, fc_x, fc_y, fc_z, ic_x, ic_y, ic_z) &
+    !$OMP& PRIVATE(diff_x, diff_y, diff_z, dxy2, z_ic, z_a, z_b, r, inv_r3) &
+    !$OMP& SHARED(nrPart, particles_cur_pos, particles_charge, particles_species, inv_mass) &
+    !$OMP& SHARED(Ez_loc, d_loc, Nic, do_ic) &
+    !$OMP& SCHEDULE(DYNAMIC, 1) &
+    !$OMP& REDUCTION(+:accel_sum)
+    do i = 1, nrPart
+      if (particles_species(i) == species_atom) cycle
+      ! Information about the particle we are calculating the force/acceleration on
+      x_1 = particles_cur_pos(1, i)
+      y_1 = particles_cur_pos(2, i)
+      z_1 = particles_cur_pos(3, i)
+      q_1 = particles_charge(i)
+      qd_1 = q_1 * div_fac_c ! Loop-invariant part of the Coulomb prefactor
+      im_1 = inv_mass(i)
+
+      ! Force sum on particle i from the pairs (i, j > i)
+      a_x = 0.0d0
+      a_y = 0.0d0
+      a_z = 0.0d0
+
+      ! Loop over the pairs (i, j > i); the forces on i and j are equal but
+      ! opposite, so each pair is evaluated once (see the generic version).
+      do j = i+1, nrPart
+        if (particles_species(j) == species_atom) cycle
+        x_2 = particles_cur_pos(1, j)
+        y_2 = particles_cur_pos(2, j)
+        z_2 = particles_cur_pos(3, j)
+        q_2 = particles_charge(j)
+        im_2 = inv_mass(j)
+
+        ! Prefactor for Coloumb's law
+        pre_fac_c = qd_1 * q_2 ! q_1*q_2 / (4*pi*epsilon)
+
+        ! Coulomb force, F = pre_fac_c * (r_1 - r_2) / |r_1 - r_2|^3.
+        ! We add length_scale**2 to r to guard against r = 0 (division by
+        ! zero), exactly like the generic loop.
+        diff_x = x_1 - x_2
+        diff_y = y_1 - y_2
+        diff_z = z_1 - z_2
+        dxy2 = diff_x**2 + diff_y**2 ! The x/y offsets are the same for all image charge partners
+
+        r = sqrt( dxy2 + diff_z**2 ) + length_scale**2
+        inv_r3 = 1.0d0 / (r*r*r)
+        fc_x = (pre_fac_c*inv_r3)*diff_x
+        fc_y = (pre_fac_c*inv_r3)*diff_y
+        fc_z = (pre_fac_c*inv_r3)*diff_z
+
+        ! Image charge force of the pair, evaluated at particle i like
+        ! ptr_Image_Charge_effect(pos_1, pos_2) in the generic loop
+        ! (Force_Image_charges_v2 inlined; clobbers diff_z, r, inv_r3).
+        if (do_ic .eqv. .true.) then
+          z_a = z_1 ! Evaluate at particle i
+          z_b = z_2 ! The partners are those of particle j
+
+#include "acc_ic_planar_series.inc"
+
+        else
+          ic_x = 0.0d0
+          ic_y = 0.0d0
+          ic_z = 0.0d0
+        end if
+
+        ! Force on particle i
+        a_x = a_x + fc_x + pre_fac_c*ic_x
+        a_y = a_y + fc_y + pre_fac_c*ic_y
+        a_z = a_z + fc_z + pre_fac_c*ic_z
+
+        ! Reaction on particle j: -F for the Coulomb part; the image charge
+        ! force is the same in z with the x and y directions reversed
+        accel_sum(1, j) = accel_sum(1, j) + im_2*(-pre_fac_c*ic_x - fc_x)
+        accel_sum(2, j) = accel_sum(2, j) + im_2*(-pre_fac_c*ic_y - fc_y)
+        accel_sum(3, j) = accel_sum(3, j) + im_2*( pre_fac_c*ic_z - fc_z)
+      end do
+
+      ! Add the vacuum electric field (field_E_planar), F = q*(0, 0, E_z),
+      ! and convert the force sum on particle i to an acceleration
+      accel_sum(1, i) = accel_sum(1, i) + a_x*im_1
+      accel_sum(2, i) = accel_sum(2, i) + a_y*im_1
+      accel_sum(3, i) = accel_sum(3, i) + (a_z + q_1*Ez_loc)*im_1
+    end do
+    !$OMP END PARALLEL DO
+
+    ! Fold the summed pair forces into the acceleration array
+    particles_cur_accel(:, 1:nrPart) = particles_cur_accel(:, 1:nrPart) + accel_sum
+  end subroutine Calculate_Acceleration_Particles_Planar
 
   subroutine Update_Particle_Acceleration(step)
     integer, intent(in) :: step
@@ -752,36 +885,47 @@ contains
 
   subroutine Update_Elec_Acceleration()
     double precision, dimension(1:3)  ::  force_E, force_c, force_ic, force_ic_N, force_ic_self
-    double precision, dimension(1:3)  ::  pos_1, pos_2, diff, pos_ic
-    double precision                  ::  r
-    double precision                  ::  q_1, q_2
+    double precision, dimension(1:3)  ::  pos_1, pos_2, diff
+    double precision                  ::  r, inv_r3
+    double precision                  ::  q_1, q_2, qd_1
     double precision                  ::  im_1, im_2
     double precision                  ::  pre_fac_c
     integer                           ::  i, j, k, l, m, n
-    integer                           ::  k_1, k_2
+    double precision, allocatable     ::  inv_mass(:)
     double precision, allocatable     ::  accel_sum(:, :)
+
+    ! Precompute the inverse masses once (O(N)) so the inner O(N^2) loops below
+    ! do array loads instead of a division per pair.
+    allocate(inv_mass(1:nrPart))
+    !$OMP PARALLEL DO PRIVATE(i) SHARED(inv_mass, particles_mass, nrPart)
+    do i = 1, nrPart
+      inv_mass(i) = 1.0d0 / particles_mass(i)
+    end do
+    !$OMP END PARALLEL DO
 
     ! The pair loops reduce into accel_sum, a heap-allocated nrPart-sized array,
     ! instead of updating particles_cur_accel under OMP CRITICAL (which
-    ! serializes the accumulation). See Calculate_Acceleration_Particles.
+    ! serializes the accumulation). See Calculate_Acceleration_Particles_Generic.
     allocate(accel_sum(1:3, 1:nrPart))
     accel_sum = 0.0d0
 
-    ! We do not use GUIDED scheduling in OpenMP here because the inner loop changes size.
+    ! DYNAMIC scheduling because the inner electron loop shrinks with k: the
+    ! default static schedule hands the first thread the longest inner loops.
     !$OMP PARALLEL DO DEFAULT(NONE) &
-    !$OMP& PRIVATE(i, j, k, l, m, n, k_1, k_2, pos_1, pos_2, diff, r, pos_ic) &
-    !$OMP& PRIVATE(force_E, force_c, force_ic, force_ic_N, force_ic_self, im_1, q_1, im_2, q_2, pre_fac_c) &
-    !$OMP& SHARED(nrElec, nrIon, particles_elec_pointer, particles_ion_pointer, particles_cur_pos, particles_mass, particles_species, ptr_field_E, box_dim) &
+    !$OMP& PRIVATE(i, j, k, l, m, n, pos_1, pos_2, diff, r, inv_r3) &
+    !$OMP& PRIVATE(force_E, force_c, force_ic, force_ic_N, force_ic_self, im_1, q_1, qd_1, im_2, q_2, pre_fac_c) &
+    !$OMP& SHARED(nrElec, nrIon, particles_elec_pointer, particles_ion_pointer, particles_cur_pos, inv_mass, particles_species, ptr_field_E, box_dim) &
     !$OMP& SHARED(ptr_Image_Charge_effect, particles_charge, d) &
+    !$OMP& SCHEDULE(DYNAMIC, 1) &
     !$OMP& REDUCTION(+:accel_sum)
 
     do k = 1, nrElec
       i = particles_elec_pointer(k)
       ! Information about the particle we are calculating the force/acceleration on
       pos_1 = particles_cur_pos(:, i)
-      im_1 = 1.0d0 / particles_mass(i)
+      im_1 = inv_mass(i)
       q_1 = particles_charge(i)
-      k_1 = particles_species(i)
+      qd_1 = q_1 * div_fac_c ! Loop-invariant part of the Coulomb prefactor
 
       ! Acceleration due to electric field
       force_E = q_1 * ptr_field_E(pos_1)
@@ -802,39 +946,25 @@ contains
         j = particles_elec_pointer(l)
         ! Information about the particle that is acting on the particle at pos_1
         pos_2 = particles_cur_pos(:, j)
-        !if (particles_mass(j) == 0.0d0) then
-        !  print *, 'Hi'
-        !end if
-        im_2 = 1.0d0 / particles_mass(j)
+        im_2 = inv_mass(j)
         q_2 = particles_charge(j)
-        k_2 = particles_species(j)
 
         ! Prefactor for Coloumb's law
-        pre_fac_c = q_1*q_2 * div_fac_c ! q_1*q_2 / (4*pi*epsilon)
+        pre_fac_c = qd_1 * q_2 ! q_1*q_2 / (4*pi*epsilon)
 
-        ! Calculate the distance between the two particles
+        ! Calculate the distance between the two particles.
+        ! We add a small number (length_scale**2) to the result to
+        ! guard against r = 0 (division by zero) when calculating 1/r**3.
         diff = pos_1 - pos_2
-        ! There are fours ways to calculate the distance
-        ! Number 1: Use the intrinsic function NORM2(v)
-        ! Number 2: Use the equation for it sqrt( v(1)**2 + v(2)**2 + v(3)**2 )
-        ! Number 3: Or do sqrt( dot_product(v, v) )
-        ! Number 4: Or use sqrt( sum(v**2) )
-        ! It turns you number 1 is the slowest by far. Number 2, 3 and 4 are
-        ! often similar in speed. The difference is small and they fluctuate a lot,
-        ! with no clear winner.
-        !
-        ! We add a small number (length_scale**3) to the results to
-        ! prevent a singularity when calulating 1/r**3
-        !
-        r = sqrt( sum(diff**2) ) + length_scale**3
-        !r = sqrt( dot_product(diff, diff) ) + length_scale**3
-        !r = NORM2(diff) + length_scale**3
+        r = sqrt( sum(diff**2) ) + length_scale**2
 
         ! Calculate the Coulomb force
         ! F = (r_1 - r_2) / |r_1 - r_2|^3
         ! F = (diff / r) * 1/r^2
         ! (diff / r) is a unit vector
-        force_c = pre_fac_c * diff / r**3
+        ! One reciprocal + multiplies instead of three element-wise divisions.
+        inv_r3 = 1.0d0 / (r*r*r)
+        force_c = (pre_fac_c*inv_r3) * diff
 
         ! Do image charge
         force_ic = pre_fac_c * ptr_Image_Charge_effect(pos_1, pos_2)
@@ -844,20 +974,6 @@ contains
         force_ic_N(1:2) = -1.0d0*force_ic(1:2)
         force_ic_N(3)   = +1.0d0*force_ic(3)
 
-        ! ! Below plane
-        ! pos_ic(1:2) = pos_2(1:2)
-        ! pos_ic(3) = -1.0d0*pos_2(3)
-        ! diff = pos_1 - pos_ic
-        ! r = sqrt( sum(diff**2) ) + length_scale**3
-        ! force_ic = (-1.0d0)*pre_fac_c * diff / r**3
-
-        ! ! Above plane
-        ! pos_ic(1:2) = pos_2(1:2)
-        ! pos_ic(3) = 2*d - pos_2(3)
-        ! diff = pos_1 - pos_ic
-        ! r = sqrt( sum(diff**2) ) + length_scale**3
-        ! force_ic = force_ic + (-1.0d0)*pre_fac_c * diff / r**3
-
         accel_sum(:, j) = accel_sum(:, j) - force_c * im_2 + force_ic_N * im_2
         accel_sum(:, i) = accel_sum(:, i) + force_c * im_1 + force_ic   * im_1
       end do
@@ -866,20 +982,19 @@ contains
         n = particles_ion_pointer(m)
         ! Information about the particle that is acting on the particle at pos_1
         pos_2 = particles_cur_pos(:, n)
-        im_2 = 1.0d0 / particles_mass(n)
+        im_2 = inv_mass(n)
         q_2 = particles_charge(n)
-        k_2 = particles_species(n)
 
         ! Prefactor for Coloumb's law
-        pre_fac_c = q_1*q_2 * div_fac_c ! q_1*q_2 / (4*pi*epsilon)
+        pre_fac_c = qd_1 * q_2 ! q_1*q_2 / (4*pi*epsilon)
 
         ! Calculate the distance between the two particles
         diff = pos_1 - pos_2
-        
-        r = sqrt( sum(diff**2) ) + length_scale**3
+        r = sqrt( sum(diff**2) ) + length_scale**2
 
         ! Calculate the Coulomb force
-        force_c = pre_fac_c * diff / r**3
+        inv_r3 = 1.0d0 / (r*r*r)
+        force_c = (pre_fac_c*inv_r3) * diff
 
         ! Do image charge
         force_ic = pre_fac_c * ptr_Image_Charge_effect(pos_1, pos_2)
@@ -899,49 +1014,50 @@ contains
 
     ! Fold the summed pair forces into the acceleration array
     particles_cur_accel(:, 1:nrPart) = particles_cur_accel(:, 1:nrPart) + accel_sum
-
-    !print *, 'Accel'
-    !print *, particles_cur_accel(:, 1:nrPart)
-    !print *, ''
-    !print *, 'Pos'
-    !print *, particles_cur_pos(:, 1:nrPart)/length_scale
-    !print *, 'Done'
-    !print *, nrPart
-    !stop
   end subroutine Update_Elec_Acceleration
 
   subroutine Update_Ion_Acceleration()
     double precision, dimension(1:3)  ::  force_E, force_c, force_ic, force_ic_N, force_ic_self
-    double precision, dimension(1:3)  ::  pos_1, pos_2, diff, pos_ic
-    double precision                  ::  r
-    double precision                  ::  q_1, q_2
+    double precision, dimension(1:3)  ::  pos_1, pos_2, diff
+    double precision                  ::  r, inv_r3
+    double precision                  ::  q_1, q_2, qd_1
     double precision                  ::  im_1, im_2
     double precision                  ::  pre_fac_c
     integer                           ::  i, j, k, l
-    integer                           ::  k_1, k_2
+    double precision, allocatable     ::  inv_mass(:)
     double precision, allocatable     ::  accel_sum(:, :)
+
+    ! Precompute the inverse masses once (see Update_Elec_Acceleration)
+    allocate(inv_mass(1:nrPart))
+    !$OMP PARALLEL DO PRIVATE(i) SHARED(inv_mass, particles_mass, nrPart)
+    do i = 1, nrPart
+      inv_mass(i) = 1.0d0 / particles_mass(i)
+    end do
+    !$OMP END PARALLEL DO
 
     ! The pair loop reduces into accel_sum, a heap-allocated nrPart-sized array,
     ! instead of updating particles_cur_accel under OMP CRITICAL (which
-    ! serializes the accumulation). See Calculate_Acceleration_Particles.
+    ! serializes the accumulation). See Calculate_Acceleration_Particles_Generic.
     allocate(accel_sum(1:3, 1:nrPart))
     accel_sum = 0.0d0
 
-    ! We do not use GUIDED scheduling in OpenMP here because the inner loop changes size.
+    ! DYNAMIC scheduling because the inner loop shrinks with k (see
+    ! Update_Elec_Acceleration).
     !$OMP PARALLEL DO DEFAULT(NONE) &
-    !$OMP& PRIVATE(i, j, k, l, k_1, k_2, pos_1, pos_2, diff, r, pos_ic) &
-    !$OMP& PRIVATE(force_E, force_c, force_ic, force_ic_N, force_ic_self, im_1, q_1, im_2, q_2, pre_fac_c) &
-    !$OMP& SHARED(nrIon, particles_ion_pointer, particles_cur_pos, particles_mass, particles_species, ptr_field_E, box_dim) &
+    !$OMP& PRIVATE(i, j, k, l, pos_1, pos_2, diff, r, inv_r3) &
+    !$OMP& PRIVATE(force_E, force_c, force_ic, force_ic_N, force_ic_self, im_1, q_1, qd_1, im_2, q_2, pre_fac_c) &
+    !$OMP& SHARED(nrIon, particles_ion_pointer, particles_cur_pos, inv_mass, particles_species, ptr_field_E, box_dim) &
     !$OMP& SHARED(ptr_Image_Charge_effect, particles_charge, d) &
+    !$OMP& SCHEDULE(DYNAMIC, 1) &
     !$OMP& REDUCTION(+:accel_sum)
 
     do k = 1, nrIon
       i = particles_ion_pointer(k)
       ! Information about the particle we are calculating the force/acceleration on
       pos_1 = particles_cur_pos(:, i)
-      im_1 = 1.0d0 / particles_mass(i)
+      im_1 = inv_mass(i)
       q_1 = particles_charge(i)
-      k_1 = particles_species(i)
+      qd_1 = q_1 * div_fac_c ! Loop-invariant part of the Coulomb prefactor
 
       ! Acceleration due to electric field
       force_E = q_1 * ptr_field_E(pos_1)
@@ -959,20 +1075,21 @@ contains
         j = particles_ion_pointer(l)
         ! Information about the particle that is acting on the particle at pos_1
         pos_2 = particles_cur_pos(:, j)
-        im_2 = 1.0d0 / particles_mass(j)
+        im_2 = inv_mass(j)
         q_2 = particles_charge(j)
-        k_2 = particles_species(j)
 
         ! Prefactor for Coloumb's law
-        pre_fac_c = q_1*q_2 * div_fac_c ! q_1*q_2 / (4*pi*epsilon)
+        pre_fac_c = qd_1 * q_2 ! q_1*q_2 / (4*pi*epsilon)
 
-        ! Calculate the distance between the two particles
+        ! Calculate the distance between the two particles.
+        ! We add a small number (length_scale**2) to the result to
+        ! guard against r = 0 (division by zero) when calculating 1/r**3.
         diff = pos_1 - pos_2
-        
-        r = sqrt( sum(diff**2) ) + length_scale**3
+        r = sqrt( sum(diff**2) ) + length_scale**2
 
         ! Calculate the Coulomb force
-        force_c = pre_fac_c * diff / r**3
+        inv_r3 = 1.0d0 / (r*r*r)
+        force_c = (pre_fac_c*inv_r3) * diff
 
         ! Do image charge
         force_ic = pre_fac_c * ptr_Image_Charge_effect(pos_1, pos_2)
@@ -992,15 +1109,6 @@ contains
 
     ! Fold the summed pair forces into the acceleration array
     particles_cur_accel(:, 1:nrPart) = particles_cur_accel(:, 1:nrPart) + accel_sum
-
-    !print *, 'Accel'
-    !print *, particles_cur_accel(:, 1:nrPart)
-    !print *, ''
-    !print *, 'Pos'
-    !print *, particles_cur_pos(:, 1:nrPart)/length_scale
-    !print *, 'Done'
-    !print *, nrPart
-    !stop
   end subroutine Update_Ion_Acceleration
 
   ! ----------------------------------------------------------------------------
@@ -1325,7 +1433,7 @@ contains
     double precision, dimension(1:3) :: force_c, force_tot, force_ic
     double precision, dimension(1:3) :: pos_1, pos_2, diff
     double precision                 :: r, inv_r3
-    double precision                 :: q_1, q_2
+    double precision                 :: q_2
     double precision                 :: pre_fac_c
     integer                          :: j
 
@@ -1387,8 +1495,8 @@ contains
 
     double precision, dimension(1:3) :: force_c, force_tot, force_ic
     double precision, dimension(1:3) :: pos_1, pos_2, diff
-    double precision                 :: r
-    double precision                 :: q_1, q_2
+    double precision                 :: r, inv_r3
+    double precision                 :: q_2
     double precision                 :: pre_fac_c
     integer                          :: k, j
 
@@ -1399,7 +1507,7 @@ contains
     force_tot = ptr_field_E(pos_1)
     !print *, force_tot
 
-    !$OMP PARALLEL DO DEFAULT(NONE) PRIVATE(k, j, pos_2, diff, r, force_c, force_ic, q_2, pre_fac_c) &
+    !$OMP PARALLEL DO DEFAULT(NONE) PRIVATE(k, j, pos_2, diff, r, inv_r3, force_c, force_ic, q_2, pre_fac_c) &
     !$OMP& SHARED(nrElec, particles_elec_pointer, particles_cur_pos, ptr_Image_Charge_effect, pos_1, box_dim) &
     !$OMP& SHARED(particles_charge) &
     !$OMP& REDUCTION(+:force_tot)
@@ -1412,28 +1520,28 @@ contains
 
       pre_fac_c = q_2 * div_fac_c ! q_2 / (4*pi*epsilon)
 
-      ! Calculate the distance between the two particles
+      ! Calculate the distance between the two particles.
+      ! We add a small number (length_scale**2) to the result to
+      ! guard against r = 0 (division by zero) when calculating 1/r**3.
       diff = pos_1 - pos_2
-      r = sqrt( sum(diff**2) ) + length_scale**3
-      !r = sqrt( dot_product(diff, diff) ) + length_scale**3
-      !r = NORM2(diff) + length_scale**3 ! distance + Prevent singularity
+      r = sqrt( sum(diff**2) ) + length_scale**2
 
       ! Calculate the Coulomb force
       ! F = (r_1 - r_2) / |r_1 - r_2|^3
       ! F = (diff / r) * 1/r^2
       ! (diff / r) is a unit vector
-      force_c = diff / r**3
-      !force_c = diff / (r*r*r)
+      inv_r3 = 1.0d0 / (r*r*r)
+      force_c = diff * inv_r3
 
       ! Image charge effect
       force_ic = ptr_Image_Charge_effect(pos_1, pos_2)
 
       ! The total force
-      force_tot = force_tot + pre_fac_c * force_c + pre_fac_c * force_ic
+      force_tot = force_tot + pre_fac_c * (force_c + force_ic)
     end do
     !$OMP END PARALLEL DO
 
-    !$OMP PARALLEL DO DEFAULT(NONE) PRIVATE(k, j, pos_2, diff, r, force_c, force_ic, q_2, pre_fac_c) &
+    !$OMP PARALLEL DO DEFAULT(NONE) PRIVATE(k, j, pos_2, diff, r, inv_r3, force_c, force_ic, q_2, pre_fac_c) &
     !$OMP& SHARED(nrIon, particles_ion_pointer, particles_cur_pos, ptr_Image_Charge_effect, pos_1, box_dim) &
     !$OMP& SHARED(particles_charge) &
     !$OMP& REDUCTION(+:force_tot)
@@ -1446,24 +1554,24 @@ contains
 
       pre_fac_c = q_2 * div_fac_c ! q_2 / (4*pi*epsilon)
 
-      ! Calculate the distance between the two particles
+      ! Calculate the distance between the two particles.
+      ! We add a small number (length_scale**2) to the result to
+      ! guard against r = 0 (division by zero) when calculating 1/r**3.
       diff = pos_1 - pos_2
-      r = sqrt( sum(diff**2) ) + length_scale**3
-      !r = sqrt( dot_product(diff, diff) ) + length_scale**3
-      !r = NORM2(diff) + length_scale**3 ! distance + Prevent singularity
+      r = sqrt( sum(diff**2) ) + length_scale**2
 
       ! Calculate the Coulomb force
       ! F = (r_1 - r_2) / |r_1 - r_2|^3
       ! F = (diff / r) * 1/r^2
       ! (diff / r) is a unit vector
-      force_c = diff / r**3
-      !force_c = diff / (r*r*r)
+      inv_r3 = 1.0d0 / (r*r*r)
+      force_c = diff * inv_r3
 
       ! Image charge effect
       force_ic = ptr_Image_Charge_effect(pos_1, pos_2)
 
       ! The total force
-      force_tot = force_tot + pre_fac_c * force_c + pre_fac_c * force_ic
+      force_tot = force_tot + pre_fac_c * (force_c + force_ic)
     end do
     !$OMP END PARALLEL DO
 
