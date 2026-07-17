@@ -9,6 +9,10 @@ module mod_tests
   use mod_pair
   use mod_verlet
   use mod_field_emission_v2
+  use mod_work_function
+  use mod_collisions, only: normal_dist, folded_normal_dist, folded_normal_max, &
+                          & Calculate_Kramers_Cross_Section
+  use mod_cuba_integration
   implicit none
 
   PRIVATE
@@ -26,6 +30,11 @@ module mod_tests
 
   ! Constant used in MC integration
   double precision :: time_step_div_q0
+
+  ! Parameters of the Gaussian peak integrand in the Cuba integration test
+  double precision, parameter :: cuba_test_sig = 0.1d0
+  double precision, parameter :: cuba_test_mu1 = 0.3d0
+  double precision, parameter :: cuba_test_mu2 = 0.7d0
 
   ! Passed / failed color strings
   character(len=16), parameter :: passed_str = achar(27)//'[32m PASSED'//achar(27)//'[0m'
@@ -227,6 +236,18 @@ contains
     call Assert_True(fe_v_y_ok, 'Field emission v_y')
 
     print *, ''
+    call Test_FN_Functions()
+
+    print *, ''
+    call Test_Collision_Math()
+
+    print *, ''
+    call Test_Cuba_Integration()
+
+    print *, ''
+    call Test_Work_Function_Checkerboard()
+
+    print *, ''
     call Test_Acceleration_Without_Image_Charge()
 
     print *, ''
@@ -238,12 +259,42 @@ contains
     call Test_Particle_Bookkeeping()
 
     print *, ''
+    call Test_Particle_Removal()
+
+    print *, ''
+    call Test_Remove_All_Particles()
+
+    print *, ''
+    call Test_Pointer_Arrays()
+
+    print *, ''
     call Test_Planar_Field()
+
+    print *, ''
+    call Test_Planar_Batch_Field()
+
+    print *, ''
+    call Test_Beeman_Kinematics()
+
+    print *, ''
+    call Test_TTS_Equivalence()
 
     print *, ''
     call Test_Transit_Time()
 
     !call Test_Many_Particles()
+
+    print *, ''
+    call Test_Tip_Acceleration()
+
+    ! The two whole-system tests run last: they replace the emission,
+    ! boundary and field pointers with the production ones for their
+    ! geometry (Init_Field_Emission_v2 / Init_Emission_Tip).
+    print *, ''
+    call Test_Planar_System()
+
+    print *, ''
+    call Test_Tip_System()
 
 #if defined(_OPENMP)
     print '(a)', 'Do OpenMP test'
@@ -293,18 +344,32 @@ contains
     nrPart     = 0
     nrElec     = 0
     nrIon      = 0
+    nrAtom     = 0
     nrElecIon  = 0
 
     nrPart_remove = 0
     nrElec_remove = 0
     nrIon_remove  = 0
+    nrAtom_remove = 0
 
     nrPart_remove_top = 0
     nrPart_remove_bot = 0
+    nrPart_remove_recom = 0
+    nrPart_remove_ion = 0
     nrElec_remove_top = 0
     nrElec_remove_bot = 0
+    nrElec_remove_recom = 0
     nrIon_remove_top = 0
     nrIon_remove_bot = 0
+    nrIon_remove_recom = 0
+    nrAtom_remove_ion = 0
+
+    nrElec_remove_top_emit = 0
+
+    ! Tests that exercise the two-time-step path set this themselves and are
+    ! expected to restore it, but reset it here so a failing test cannot leak
+    ! the mode into the tests that follow it.
+    two_time_step = .false.
 
     ! ID starts with 0
     nrID = 0
@@ -416,7 +481,8 @@ contains
     call Add_Particle(R_2, par_vel, species_elec, 1, 0, -1)
     call Add_Particle(R_3, par_vel, species_ion, 1, 0, -1)
 
-    call Calculate_Acceleration_Particles()
+    call Update_Particle_Acceleration(1)
+    ! call Calculate_Acceleration_Particles()
 
     ! Test the field at this location
     par_vel = (/ -4.55, -2.34, 96.44 /) * length_scale
@@ -756,7 +822,8 @@ contains
     call Add_Particle(R_2, par_vel, species_elec, 1, 0, -1)
     call Add_Particle(R_3, par_vel, species_ion, 1, 0, -1)
 
-    call Calculate_Acceleration_Particles()
+    call Update_Particle_Acceleration(1)
+    ! call Calculate_Acceleration_Particles()
 
     ! Test the field at this location
     par_vel = (/ -4.55, -2.34, 96.44 /) * length_scale
@@ -890,6 +957,106 @@ contains
   end subroutine Test_Transit_Time
 
   !-----------------------------------------------------------------------------
+  ! Test the acceleration and the batched field evaluation for the
+  ! hyperboloid tip geometry (field_E_Hyperboloid + Sphere_IC_field).
+  ! The expected values are computed here on the host with the same pair
+  ! loop as the generic OpenMP version of Calculate_Acceleration_Particles,
+  ! using direct calls to the geometry functions. In OpenACC builds
+  ! Calculate_Acceleration_Particles and Calc_Field_at_Batch dispatch to the
+  ! GPU kernels for this geometry, so this test verifies the device code
+  ! against the host functions.
+  subroutine Test_Tip_Acceleration()
+    use mod_emission_tip, only: Init_Emission_Tip
+
+    double precision, dimension(1:3)      :: par_vel
+    double precision, dimension(1:3, 1:3) :: R, a_expected
+    double precision, dimension(1:3)      :: pos_1, pos_2, diff, force_c, force_ic, force_ic_N
+    double precision                      :: r_dis, inv_r3, pre_fac_c
+    double precision, dimension(1:3, 1:4) :: field_pos, field_batch
+    double precision, dimension(1:3)      :: field_single
+    integer                               :: i, j, k
+    character(len=64)                     :: label
+
+    print '(a)', 'Starting hyperboloid tip test'
+
+    ! d = 1000 nm gap with a 100 nm high tip: d_tip = 900 nm to the anode,
+    ! base radius 100 nm.
+    call Setup_Test_System(1000.0d0*length_scale, 0.25d-3*time_scale, 100, 2.0d3, .true., 0)
+    emitters_dim(1:3, 1) = (/ 900.0d0, 100.0d0, 100.0d0 /) * length_scale
+    emitters_pos(1:3, 1) = 0.0d0
+
+    ! Sets the tip geometry pointers and computes the tip parameters
+    ! (a_foci, eta_1, r_tip, shift_z, pre_fac_E_tip, ...).
+    call Init_Emission_Tip()
+
+    ! Three particles just above the tip apex (apex at z = h_tip = 100 nm).
+    ! They are placed close to the tip and to each other on purpose: there
+    ! the sphere image charge force is a large fraction of the total force,
+    ! so the test is sensitive to errors in the image charge parameters
+    ! (sphere center and radius) used by the OpenACC kernels.
+    R(:, 1) = (/   2.0d0,   1.0d0, 103.0d0 /) * length_scale
+    R(:, 2) = (/  -2.0d0,   2.5d0, 106.0d0 /) * length_scale
+    R(:, 3) = (/   1.5d0,  -3.0d0, 110.0d0 /) * length_scale
+
+    par_vel = 0.0d0
+    call Add_Particle(R(:, 1), par_vel, species_elec, 1, 0, -1)
+    call Add_Particle(R(:, 2), par_vel, species_elec, 1, 0, -1)
+    call Add_Particle(R(:, 3), par_vel, species_ion, 1, 0, -1)
+
+    ! Expected accelerations: the same pair loop as the OpenMP version of
+    ! Calculate_Acceleration_Particles, using the geometry pointers directly.
+    a_expected = 0.0d0
+    do i = 1, 3
+      pos_1 = particles_cur_pos(:, i)
+
+      do j = i+1, 3
+        pos_2 = particles_cur_pos(:, j)
+        pre_fac_c = particles_charge(i) * particles_charge(j) * div_fac_c
+
+        diff = pos_1 - pos_2
+        r_dis = sqrt( sum(diff**2) ) + length_scale**2
+        inv_r3 = 1.0d0 / (r_dis*r_dis*r_dis)
+        force_c = (pre_fac_c*inv_r3) * diff
+
+        force_ic = pre_fac_c * ptr_Image_Charge_effect(pos_1, pos_2)
+        force_ic_N(1:2) = -1.0d0*force_ic(1:2)
+        force_ic_N(3)   = force_ic(3)
+
+        a_expected(:, j) = a_expected(:, j) + (force_ic_N - force_c) / particles_mass(j)
+        a_expected(:, i) = a_expected(:, i) + (force_c + force_ic) / particles_mass(i)
+      end do
+
+      a_expected(:, i) = a_expected(:, i) &
+                     & + particles_charge(i) * ptr_field_E(pos_1) / particles_mass(i)
+    end do
+
+    ! The acceleration from the kernel (GPU in OpenACC builds)
+    call Calculate_Acceleration_Particles()
+
+    do i = 1, 3
+      write(label, '(a, i0)') 'Tip acceleration particle ', i
+      call Assert_Close_Vec(particles_cur_accel(:, i), a_expected(:, i), trim(label))
+    end do
+
+    ! Batched field evaluation against the point-by-point Calc_Field_at
+    field_pos(:, 1) = (/   0.0d0,   0.0d0, 102.0d0 /) * length_scale
+    field_pos(:, 2) = (/  30.0d0, -10.0d0, 130.0d0 /) * length_scale
+    field_pos(:, 3) = (/ -50.0d0,  40.0d0, 300.0d0 /) * length_scale
+    field_pos(:, 4) = (/  15.0d0,   8.0d0, 500.0d0 /) * length_scale
+
+    call Calc_Field_at_Batch(4, field_pos, field_batch)
+
+    do k = 1, 4
+      field_single = Calc_Field_at(field_pos(:, k))
+      write(label, '(a, i0)') 'Tip batched field point ', k
+      call Assert_Close_Vec(field_batch(:, k), field_single, trim(label))
+    end do
+
+    print '(a)', 'Hyperboloid tip test finished'
+  end subroutine Test_Tip_Acceleration
+
+
+  !-----------------------------------------------------------------------------
   ! Test the particle bookkeeping in mod_pair.
   ! Add a known mix of electrons and ions to an empty system and check that the
   ! particle counters (nrElec, nrIon, nrElecIon, nrPart) are updated correctly.
@@ -951,6 +1118,994 @@ contains
     print *, 'Planar field test finished'
     print *, ''
   end subroutine Test_Planar_Field
+
+  !-----------------------------------------------------------------------------
+  ! Constant work function used by the tests below. Matches the Work_fun
+  ! abstract interface in mod_work_function.
+  double precision function Const_Work_Fun_Test(pos, emit, sec)
+    double precision, dimension(1:3), intent(in) :: pos
+    integer, intent(in)                          :: emit
+    integer, intent(out), optional               :: sec
+
+    if (present(sec) .eqv. .true.) sec = 1
+    Const_Work_Fun_Test = 4.7d0
+  end function Const_Work_Fun_Test
+
+  !-----------------------------------------------------------------------------
+  ! Count the number of particles whose species pointer arrays are
+  ! inconsistent. For every particle i the inverse pointer k must map back to
+  ! i through the pointer array of its own species (see Check_Pointer_Arrays
+  ! in mod_pair). Returns 0 when the bookkeeping is consistent.
+  integer function Count_Pointer_Mismatches()
+    integer :: i, k, j
+
+    Count_Pointer_Mismatches = 0
+    do i = 1, nrPart
+      k = particles_inverse_pointer(i)
+      j = -1
+      select case (particles_species(i))
+        case (species_elec)
+          if ((k >= 1) .and. (k <= nrElec)) j = particles_elec_pointer(k)
+        case (species_ion)
+          if ((k >= 1) .and. (k <= nrIon)) j = particles_ion_pointer(k)
+        case (species_atom)
+          if ((k >= 1) .and. (k <= nrAtom)) j = particles_atom_pointer(k)
+      end select
+      if (j /= i) Count_Pointer_Mismatches = Count_Pointer_Mismatches + 1
+    end do
+  end function Count_Pointer_Mismatches
+
+  !-----------------------------------------------------------------------------
+  ! Test Mark_Particles_Remove and Remove_Particles in mod_pair.
+  ! A known mix of electrons and ions is added, three particles are marked for
+  ! removal (top, bottom and top) and removed. The test checks the removal
+  ! counters, that the compaction (compact_array_*) keeps the data of the
+  ! survivors intact and in order, that the life time histogram is recorded,
+  ! and that the masks are reset afterwards.
+  subroutine Test_Particle_Removal()
+    double precision, parameter      :: d_test = 100.0d0*length_scale
+    double precision, parameter      :: V_test = 2.0d0 ! V
+    double precision, parameter      :: delta_t_test = 0.25d-15 ! Time step
+
+    integer, parameter                    :: n_add = 7
+    double precision, dimension(1:3, 1:n_add) :: R, R_prev, Vel
+    integer, dimension(1:n_add)           :: spc
+    integer, dimension(1:4)               :: keep, expect_spc, expect_id
+    character(len=64)                     :: label
+    integer                               :: i, k
+
+    print *, 'Starting particle removal test'
+
+    call Setup_Test_System(d_test, delta_t_test, 100, V_test, .false., 0)
+
+    ! Electrons everywhere except ions at 3 and 6
+    spc = species_elec
+    spc(3) = species_ion
+    spc(6) = species_ion
+
+    do i = 1, n_add
+      ! Distinct data for every particle so the compaction can be checked
+      R(:, i)   = (/ 1.0d0*i, -2.0d0*i, 10.0d0*i /) * length_scale
+      Vel(:, i) = (/ 100.0d0*i, -50.0d0*i, 25.0d0*i /)
+      call Add_Particle(R(:, i), Vel(:, i), spc(i), 1, 1, -1)
+
+      ! Overwrite the previous position with a distinct value as well, so a
+      ! second 2D array with different content goes through the compaction.
+      R_prev(:, i) = R(:, i) + 0.5d0*length_scale
+      particles_prev_pos(:, i) = R_prev(:, i)
+    end do
+
+    call Assert_True((nrPart == 7) .and. (nrElec == 5) .and. (nrIon == 2), &
+                   & 'Removal: system before removal')
+
+    ! Mark an electron at the top, an electron at the bottom and an ion at the
+    ! top. Particle 2 is marked twice: the second call must be a no-op.
+    call Mark_Particles_Remove(2, remove_top)
+    call Mark_Particles_Remove(2, remove_top)
+    call Mark_Particles_Remove(4, remove_bot)
+    call Mark_Particles_Remove(6, remove_top)
+
+    call Assert_True((nrPart_remove == 3), 'Removal: marked count (double mark is a no-op)')
+    call Assert_True((nrElec_remove == 2) .and. (nrIon_remove == 1), &
+                   & 'Removal: marked count per species')
+    call Assert_True((nrElec_remove_top == 1) .and. (nrElec_remove_bot == 1) &
+                   & .and. (nrIon_remove_top == 1), 'Removal: marked count per boundary')
+    call Assert_True((particles_charge(2) == 0.0d0), 'Removal: marked particle is neutralized')
+
+    ! Particles were added at step 1 and are removed at step 11:
+    ! life time = 10 steps.
+    call Remove_Particles(11)
+
+    call Assert_True((nrPart == 4), 'Removal: total count after removal')
+    call Assert_True((nrElec == 3) .and. (nrIon == 1) .and. (nrElecIon == 4), &
+                   & 'Removal: species counts after removal')
+
+    ! The survivors are the old particles 1, 3, 5 and 7 in that order
+    keep       = (/ 1, 3, 5, 7 /)
+    expect_spc = (/ species_elec, species_ion, species_elec, species_elec /)
+    expect_id  = (/ 0, 2, 4, 6 /) ! IDs are assigned 0, 1, 2, ... in Add_Particle
+
+    do k = 1, 4
+      i = keep(k)
+      write(label, '(a, i0)') 'Removal: position of survivor ', k
+      call Assert_Close_Vec(particles_cur_pos(:, k)/length_scale, R(:, i)/length_scale, trim(label))
+      write(label, '(a, i0)') 'Removal: prev position of survivor ', k
+      call Assert_Close_Vec(particles_prev_pos(:, k)/length_scale, R_prev(:, i)/length_scale, trim(label))
+      write(label, '(a, i0)') 'Removal: velocity of survivor ', k
+      call Assert_Close_Vec(particles_cur_vel(:, k), Vel(:, i), trim(label))
+    end do
+
+    call Assert_True(all(particles_species(1:4) == expect_spc), 'Removal: species of survivors')
+    call Assert_True(all(particles_id(1:4) == expect_id), 'Removal: IDs of survivors')
+    call Assert_True(all(particles_emitter(1:4) == 1) .and. all(particles_section(1:4) == 1), &
+                   & 'Removal: emitter and section of survivors')
+
+    ! Charge and mass of the survivors (scaled to O(1) numbers so that the
+    ! relative tolerance in Assert_Close applies)
+    call Assert_Close(particles_charge(1)/q_0, -1.0d0, 'Removal: charge of surviving electron')
+    call Assert_Close(particles_charge(2)/q_0, +1.0d0, 'Removal: charge of surviving ion')
+    call Assert_Close(particles_mass(1)/m_0, m_eeff, 'Removal: mass of surviving electron')
+    call Assert_Close(particles_mass(2)/m_N2p, 1.0d0, 'Removal: mass of surviving ion')
+
+    ! Life times: two electrons and one ion lived 10 steps
+    call Assert_True((life_time(10, species_elec) == 2), 'Removal: electron life time recorded')
+    call Assert_True((life_time(10, species_ion) == 1), 'Removal: ion life time recorded')
+
+    ! The masks over the old live range must be reset and the counters cleared
+    call Assert_True(all(particles_mask(1:7)), 'Removal: masks reset after removal')
+    call Assert_True((nrPart_remove == 0) .and. (nrElec_remove == 0) .and. (nrIon_remove == 0), &
+                   & 'Removal: remove counters cleared')
+
+    print *, 'Particle removal test finished'
+    print *, ''
+  end subroutine Test_Particle_Removal
+
+  !-----------------------------------------------------------------------------
+  ! Remove every particle in the system. This takes the branch in
+  ! Remove_Particles that skips the compaction entirely, which the test above
+  ! does not reach. Afterwards the system must be empty and usable again.
+  subroutine Test_Remove_All_Particles()
+    double precision, parameter      :: d_test = 100.0d0*length_scale
+    double precision, parameter      :: V_test = 2.0d0 ! V
+    double precision, parameter      :: delta_t_test = 0.25d-15 ! Time step
+    double precision, dimension(1:3) :: R, par_vel
+
+    print *, 'Starting remove-all-particles test'
+
+    call Setup_Test_System(d_test, delta_t_test, 100, V_test, .false., 0)
+
+    par_vel = 0.0d0
+    R = (/  3.0d0, -10.0d0,  2.0d0 /) * length_scale
+    call Add_Particle(R, par_vel, species_elec, 1, 1, -1)
+    R = (/ -9.0d0,  26.0d0, 80.0d0 /) * length_scale
+    call Add_Particle(R, par_vel, species_elec, 1, 1, -1)
+
+    call Mark_Particles_Remove(1, remove_top)
+    call Mark_Particles_Remove(2, remove_top)
+    call Remove_Particles(21)
+
+    call Assert_True((nrPart == 0) .and. (nrElec == 0), 'Remove all: system is empty')
+    call Assert_True((nrPart_remove == 0), 'Remove all: remove counters cleared')
+    call Assert_True(all(particles_mask(1:2)), 'Remove all: masks reset')
+
+    ! The system must accept new particles again
+    R = (/ 5.0d0, 6.0d0, 50.0d0 /) * length_scale
+    call Add_Particle(R, par_vel, species_elec, 2, 1, -1)
+    call Assert_True((nrPart == 1) .and. (nrElec == 1), 'Remove all: particle added to empty system')
+    call Assert_Close_Vec(particles_cur_pos(:, 1)/length_scale, R/length_scale, &
+                        & 'Remove all: position of new particle')
+
+    print *, 'Remove-all-particles test finished'
+    print *, ''
+  end subroutine Test_Remove_All_Particles
+
+  !-----------------------------------------------------------------------------
+  ! Test the species pointer bookkeeping through a removal in two-time-step
+  ! mode. In that mode Remove_Particles rebuilds the pointer arrays
+  ! (Update_Pointer_Arrays_parallel) before compacting them, and the
+  ! two-time-step integrator and the POLARSO solver rely on the result. The
+  ! test adds electrons, ions and an atom, removes one of each species and
+  ! checks that every pointer round trip (particle -> inverse pointer ->
+  ! species pointer -> particle) is consistent afterwards.
+  subroutine Test_Pointer_Arrays()
+    double precision, parameter      :: d_test = 100.0d0*length_scale
+    double precision, parameter      :: V_test = 2.0d0 ! V
+    double precision, parameter      :: delta_t_test = 0.25d-15 ! Time step
+
+    integer, parameter               :: n_add = 7
+    integer, dimension(1:n_add)      :: spc
+    integer, dimension(1:4)          :: expect_spc, expect_id
+    double precision, dimension(1:3) :: R, par_vel
+    integer                          :: i
+
+    print *, 'Starting pointer array test'
+
+    call Setup_Test_System(d_test, delta_t_test, 100, V_test, .false., 0)
+    two_time_step = .true. ! Take the pointer rebuild path in Remove_Particles
+
+    spc = (/ species_elec, species_ion, species_elec, species_atom, &
+           & species_elec, species_ion, species_atom /)
+
+    par_vel = 0.0d0
+    do i = 1, n_add
+      R = (/ 2.0d0*i, -1.0d0*i, 5.0d0*i /) * length_scale
+      call Add_Particle(R, par_vel, spc(i), 1, 1, -1)
+    end do
+
+    call Assert_True((nrElec == 3) .and. (nrIon == 2) .and. (nrAtom == 2), &
+                   & 'Pointers: counts after adding')
+    call Assert_True((Count_Pointer_Mismatches() == 0), 'Pointers: consistent after adding')
+
+    ! Remove one particle of each species
+    call Mark_Particles_Remove(3, remove_top) ! electron
+    call Mark_Particles_Remove(2, remove_bot) ! ion
+    call Mark_Particles_Remove(7, remove_ion) ! atom
+    call Remove_Particles(31)
+
+    call Assert_True((nrPart == 4) .and. (nrElec == 2) .and. (nrIon == 1) .and. (nrAtom == 1), &
+                   & 'Pointers: counts after removal')
+
+    ! Survivors are the old particles 1 (e), 4 (a), 5 (e) and 6 (i)
+    expect_spc = (/ species_elec, species_atom, species_elec, species_ion /)
+    expect_id  = (/ 0, 3, 4, 5 /)
+    call Assert_True(all(particles_species(1:4) == expect_spc), 'Pointers: species of survivors')
+    call Assert_True(all(particles_id(1:4) == expect_id), 'Pointers: IDs of survivors')
+
+    call Assert_True((Count_Pointer_Mismatches() == 0), 'Pointers: consistent after removal')
+
+    ! With no marked particles the pointer rebuild must be a no-op
+    call Update_Pointer_Arrays_sequential()
+    call Assert_True((Count_Pointer_Mismatches() == 0), 'Pointers: sequential rebuild is a no-op')
+
+    two_time_step = .false.
+
+    print *, 'Pointer array test finished'
+    print *, ''
+  end subroutine Test_Pointer_Arrays
+
+  !-----------------------------------------------------------------------------
+  ! Test the Beeman integrator and the Ramo current with a single electron in
+  ! a uniform field, where every step can be written down exactly.
+  ! The electron starts at rest in z with a transverse drift velocity v_x.
+  ! With a constant acceleration a = q V / (m d) and zeroed acceleration
+  ! history the Beeman scheme gives after three steps:
+  !   z3 - z0 = 3 a dt^2,   v_z3 = 5/2 a dt,   x3 - x0 = 3 v_x dt
+  ! and the Ramo current of the last step is I = q_0 v_z3 / d.
+  subroutine Test_Beeman_Kinematics()
+    double precision, parameter      :: d_test = 1000.0d0*length_scale
+    double precision, parameter      :: V_test = 2.0d3 ! V
+    double precision, parameter      :: delta_t_test = 0.25d-15 ! Time step
+    double precision, parameter      :: v_x0 = 1.0d3 ! Transverse drift velocity (m/s)
+
+    double precision, dimension(1:3) :: R_0, par_vel
+    double precision                 :: a_z, v_z_exp, dz_exp, dx_exp, ramo_exp
+    integer                          :: i
+
+    print *, 'Starting Beeman kinematics test'
+
+    call Setup_Test_System(d_test, delta_t_test, 10, V_test, .false., 0)
+
+    ! Make sure the planar geometry is active
+    ptr_field_E => field_E_planar
+    ptr_Image_Charge_effect => Force_Image_charges_v2
+    ptr_Check_Boundary => Check_Boundary_Planar
+    ptr_E_zunit => E_zunit_planar
+
+    R_0 = (/ 0.0d0, 0.0d0, 500.0d0*length_scale /)
+    par_vel = (/ v_x0, 0.0d0, 0.0d0 /)
+    call Add_Particle(R_0, par_vel, species_elec, 1, 1, -1)
+
+    do i = 1, 3
+      call Update_Position(i)
+    end do
+
+    ! Expected values, see the header of this subroutine
+    a_z      = q_0*V_test/(m_0*d_test)
+    dz_exp   = 3.0d0*a_z*delta_t_test**2
+    v_z_exp  = 2.5d0*a_z*delta_t_test
+    dx_exp   = 3.0d0*v_x0*delta_t_test
+    ramo_exp = q_0*v_z_exp/d_test
+
+    call Assert_Close((particles_cur_pos(3, 1) - R_0(3))/length_scale, dz_exp/length_scale, &
+                    & 'Beeman: z-displacement after 3 steps')
+    call Assert_Close(particles_cur_vel(3, 1), v_z_exp, 'Beeman: z-velocity after 3 steps')
+    call Assert_Close((particles_cur_pos(1, 1) - R_0(1))/length_scale, dx_exp/length_scale, &
+                    & 'Beeman: transverse drift after 3 steps')
+    call Assert_Close(particles_cur_vel(1, 1), v_x0, 'Beeman: transverse velocity is unchanged')
+    call Assert_Close((particles_cur_pos(2, 1) - R_0(2))/length_scale, 0.0d0, &
+                    & 'Beeman: no drift in y')
+    ! Scaled to nA so that the relative tolerance in Assert_Close applies
+    call Assert_Close(ramo_current(species_elec)*1.0d9, ramo_exp*1.0d9, &
+                    & 'Beeman: Ramo current of a single electron')
+
+    print *, 'Beeman kinematics test finished'
+    print *, ''
+  end subroutine Test_Beeman_Kinematics
+
+  !-----------------------------------------------------------------------------
+  ! The two-time-step integrator with atom_time_interval = 1 must reproduce
+  ! the standard integrator: every species is then updated on every step with
+  ! the same Beeman formulas, only through the species pointer lists instead
+  ! of one loop over all particles. The same three-particle system is run for
+  ! three steps in both modes and the trajectories, the Ramo current and
+  ! Calc_Field_at (which dispatches to Calc_Field_at_tts) are compared.
+  subroutine Test_TTS_Equivalence()
+    double precision, parameter      :: d_test = 1000.0d0*length_scale
+    double precision, parameter      :: V_test = 2.0d3 ! V
+    double precision, parameter      :: delta_t_test = 0.25d-15 ! Time step
+
+    double precision, dimension(1:3, 1:3) :: R_0, V_0, pos_ref, vel_ref
+    double precision, dimension(1:3)      :: probe, E_ots, E_tts
+    double precision, dimension(1:2)      :: ramo_ref
+    integer, dimension(1:3)               :: spc
+    character(len=64)                     :: label
+    integer                               :: i, run
+
+    print *, 'Starting two-time-step equivalence test'
+
+    ! Two electrons and one ion a few nm apart: the pair forces are a large
+    ! part of the acceleration, so the test is sensitive to the pair loops of
+    ! the two-time-step routines, not only to the vacuum field.
+    R_0(:, 1) = (/  1.0d0, -2.0d0, 500.0d0 /) * length_scale
+    R_0(:, 2) = (/  3.0d0,  4.0d0, 503.0d0 /) * length_scale
+    R_0(:, 3) = (/ -2.0d0,  1.0d0, 505.0d0 /) * length_scale
+    V_0(:, 1) = (/  1.0d3,  0.0d0, 0.0d0 /)
+    V_0(:, 2) = (/  0.0d0, -1.0d3, 0.0d0 /)
+    V_0(:, 3) = 0.0d0
+    spc = (/ species_elec, species_elec, species_ion /)
+
+    probe = (/ 0.0d0, 1.0d0, 502.0d0 /) * length_scale
+
+    do run = 1, 2
+      call Setup_Test_System(d_test, delta_t_test, 10, V_test, .true., 0)
+
+      ! Make sure the planar geometry is active
+      ptr_field_E => field_E_planar
+      ptr_Image_Charge_effect => Force_Image_charges_v2
+      ptr_Check_Boundary => Check_Boundary_Planar
+      ptr_E_zunit => E_zunit_planar
+
+      if (run == 2) then
+        two_time_step = .true.
+        atom_time_interval = 1 ! Update ions on every step
+      end if
+
+      do i = 1, 3
+        call Add_Particle(R_0(:, i), V_0(:, i), spc(i), 1, 1, -1)
+      end do
+
+      if (run == 1) then
+        ! The field summed over the species pointer lists must equal the
+        ! field summed over all particles.
+        E_ots = Calc_Field_at(probe)
+        two_time_step = .true.
+        E_tts = Calc_Field_at(probe)
+        two_time_step = .false.
+        call Assert_Close_Vec(E_tts, E_ots, 'TTS: field equals the standard field')
+      end if
+
+      do i = 1, 3
+        call Update_Position(i)
+      end do
+
+      if (run == 1) then
+        pos_ref = particles_cur_pos(:, 1:3)
+        vel_ref = particles_cur_vel(:, 1:3)
+        ramo_ref(1) = ramo_current(species_elec)
+        ramo_ref(2) = ramo_current(species_ion)
+      else
+        do i = 1, 3
+          write(label, '(a, i0)') 'TTS: trajectory of particle ', i
+          call Assert_Close_Vec(particles_cur_pos(:, i)/length_scale, &
+                              & pos_ref(:, i)/length_scale, trim(label))
+          write(label, '(a, i0)') 'TTS: velocity of particle ', i
+          call Assert_Close_Vec(particles_cur_vel(:, i), vel_ref(:, i), trim(label))
+        end do
+        ! Scaled to nA so that the relative tolerance in Assert_Close applies
+        call Assert_Close(ramo_current(species_elec)*1.0d9, ramo_ref(1)*1.0d9, &
+                        & 'TTS: electron Ramo current')
+        call Assert_Close(ramo_current(species_ion)*1.0d9, ramo_ref(2)*1.0d9, &
+                        & 'TTS: ion Ramo current')
+      end if
+    end do
+
+    two_time_step = .false.
+
+    print *, 'Two-time-step equivalence test finished'
+    print *, ''
+  end subroutine Test_TTS_Equivalence
+
+  !-----------------------------------------------------------------------------
+  ! Test the batched field evaluation for the planar geometry against the
+  ! point-by-point Calc_Field_at, with image charge partners enabled
+  ! (N_IC_MAX = 1 exercises the image charge series). In OpenACC builds
+  ! Calc_Field_at_Batch dispatches to the planar GPU kernel, so this verifies
+  ! the device code against the host functions; the hyperboloid tip geometry
+  ! has the same check in Test_Tip_Acceleration.
+  subroutine Test_Planar_Batch_Field()
+    double precision, parameter      :: d_test = 100.0d0*length_scale
+    double precision, parameter      :: V_test = 2.0d0 ! V
+    double precision, parameter      :: delta_t_test = 0.25d-15 ! Time step
+
+    double precision, dimension(1:3, 1:4) :: field_pos, field_batch
+    double precision, dimension(1:3)      :: R, par_vel, field_single, E_vac
+    character(len=64)                     :: label
+    integer                               :: k
+
+    print *, 'Starting planar batched field test'
+
+    call Setup_Test_System(d_test, delta_t_test, 100, V_test, .true., 1)
+
+    ! Make sure the planar geometry is active
+    ptr_field_E => field_E_planar
+    ptr_Image_Charge_effect => Force_Image_charges_v2
+
+    field_pos(:, 1) = (/   0.0d0,   0.0d0, 10.0d0 /) * length_scale
+    field_pos(:, 2) = (/  12.0d0,  -4.0d0, 21.0d0 /) * length_scale
+    field_pos(:, 3) = (/ -20.0d0,  30.0d0, 80.0d0 /) * length_scale
+    field_pos(:, 4) = (/  40.0d0,  40.0d0, 95.0d0 /) * length_scale
+
+    ! Empty system: the batch must return the vacuum field at every point
+    E_vac = (/ 0.0d0, 0.0d0, -1.0d0*V_test/d_test /)
+    call Calc_Field_at_Batch(4, field_pos, field_batch)
+    do k = 1, 4
+      write(label, '(a, i0)') 'Planar batched vacuum field point ', k
+      call Assert_Close_Vec(field_batch(:, k), E_vac, trim(label))
+    end do
+
+    ! Add particles, point 2 is close to the first electron on purpose
+    par_vel = 0.0d0
+    R = (/  10.0d0, -5.0d0, 20.0d0 /) * length_scale
+    call Add_Particle(R, par_vel, species_elec, 1, 1, -1)
+    R = (/ -15.0d0,  8.0d0, 60.0d0 /) * length_scale
+    call Add_Particle(R, par_vel, species_elec, 1, 1, -1)
+    R = (/   5.0d0, 25.0d0, 40.0d0 /) * length_scale
+    call Add_Particle(R, par_vel, species_ion, 1, 1, -1)
+
+    call Calc_Field_at_Batch(4, field_pos, field_batch)
+    do k = 1, 4
+      field_single = Calc_Field_at(field_pos(:, k))
+      write(label, '(a, i0)') 'Planar batched field point ', k
+      call Assert_Close_Vec(field_batch(:, k), field_single, trim(label))
+    end do
+
+    print *, 'Planar batched field test finished'
+    print *, ''
+  end subroutine Test_Planar_Batch_Field
+
+  !-----------------------------------------------------------------------------
+  ! Test the Fowler-Nordheim functions v_y, t_y and Escape_Prob in
+  ! mod_field_emission_v2 against reference values computed independently
+  ! (Python) with the same physical constants, for a constant work function
+  ! of 4.7 eV. Also checks the identities v_y = t_y = 1 without image charge
+  ! and the clamping of l = y^2 to 1 for very strong fields.
+  subroutine Test_FN_Functions()
+    double precision, parameter      :: d_test = 1000.0d0*length_scale
+    double precision, parameter      :: V_test = 2.0d3 ! V
+    double precision, parameter      :: delta_t_test = 0.25d-15 ! Time step
+
+    double precision, dimension(1:3) :: pos
+    double precision                 :: F
+
+    print *, 'Starting Fowler-Nordheim function test'
+
+    call Setup_Test_System(d_test, delta_t_test, 100, V_test, .false., 0)
+
+    ! Constant work function of 4.7 eV
+    ptr_Work_fun => Const_Work_Fun_Test
+
+    pos = 0.0d0
+
+    ! Without the image charge effect both correction factors are exactly 1
+    F = -2.0d9 ! V/m
+    call Assert_Close(v_y(F, pos, 1), 1.0d0, 'FN: v_y = 1 without image charge')
+    call Assert_Close(t_y(F, pos, 1), 1.0d0, 'FN: t_y = 1 without image charge')
+
+    ! With the image charge effect, compare against the reference values
+    image_charge = .true.
+
+    F = -2.0d9 ! V/m, l = 0.13037...
+    call Assert_Close(v_y(F, pos, 1), 0.8253581935658024d0, 'FN: v_y at F = -2 GV/m')
+    call Assert_Close(t_y(F, pos, 1), 1.0292422630703880d0, 'FN: t_y at F = -2 GV/m')
+    ! The escape probability itself (3.354e-13) is below the absolute
+    ! tolerance of Assert_Close, so compare its logarithm instead.
+    call Assert_Close(log(Escape_Prob(F, pos, 1)), -28.723444978828507d0, &
+                    & 'FN: log escape probability at F = -2 GV/m')
+
+    F = -4.0d9 ! V/m, l = 0.26074...
+    call Assert_Close(v_y(F, pos, 1), 0.6808388366998485d0, 'FN: v_y at F = -4 GV/m')
+    call Assert_Close(t_y(F, pos, 1), 1.0484437096180323d0, 'FN: t_y at F = -4 GV/m')
+    call Assert_Close(log(Escape_Prob(F, pos, 1)), -11.846999895226958d0, &
+                    & 'FN: log escape probability at F = -4 GV/m')
+
+    ! For fields so strong that l = y^2 > 1 (barrier fully suppressed) v_y
+    ! clamps l to 1, and v_y = 1 - 1 + 1/6 * 1 * log(1) = 0
+    F = -1.0d12 ! V/m
+    call Assert_Close(v_y(F, pos, 1), 0.0d0, 'FN: v_y clamps to 0 above the barrier maximum')
+
+    image_charge = .false.
+
+    print *, 'Fowler-Nordheim function test finished'
+    print *, ''
+  end subroutine Test_FN_Functions
+
+  !-----------------------------------------------------------------------------
+  ! Test the statistical helper functions and the Kramers recombination cross
+  ! section in mod_collisions against reference values computed independently
+  ! (Python) with the same physical constants.
+  subroutine Test_Collision_Math()
+    double precision :: fmax, f, x
+    logical          :: envelope_ok
+    integer          :: k
+
+    print *, 'Starting collision math test'
+
+    ! Normal distribution
+    call Assert_Close(normal_dist(0.0d0, 1.0d0, 0.0d0), 0.3989422804014327d0, &
+                    & 'Collisions: standard normal at 0')
+    call Assert_Close(normal_dist(5.0d0, 25.0d0, 12.5d0), 0.015255512618420964d0, &
+                    & 'Collisions: normal distribution')
+
+    ! Folded normal distribution: reference value and the identity
+    ! f(x; mu, sigma) = N(x; mu, sigma) + N(x; -mu, sigma)
+    call Assert_Close(folded_normal_dist(5.0d0, 25.0d0, 30.0d0), 0.015667927606195526d0, &
+                    & 'Collisions: folded normal distribution')
+    call Assert_Close(folded_normal_dist(12.0d0, 40.0d0, 77.0d0), &
+                    & normal_dist(12.0d0, 40.0d0, 77.0d0) + normal_dist(-12.0d0, 40.0d0, 77.0d0), &
+                    & 'Collisions: folded normal sum identity')
+
+    ! folded_normal_max is used as the envelope constant in the
+    ! acceptance-rejection sampling of the scattering angle: it must bound the
+    ! distribution on the angular domain [0, 180].
+    fmax = folded_normal_max(5.0d0, 25.0d0)
+    envelope_ok = .true.
+    do k = 0, 180
+      x = 1.0d0*k
+      f = folded_normal_dist(5.0d0, 25.0d0, x)
+      if (f > fmax*(1.0d0 + 1.0d-12)) envelope_ok = .false.
+    end do
+    call Assert_True(envelope_ok, 'Collisions: folded normal max bounds the distribution')
+
+    ! Kramers cross section. The values (~1e-26 m^2) are far below the
+    ! absolute tolerance of Assert_Close, so compare them scaled to O(1).
+    call Assert_Close(Calculate_Kramers_Cross_Section(10.0d0)*1.0d26, 3.995353707087291d0, &
+                    & 'Collisions: Kramers cross section at 10 eV')
+    call Assert_Close(Calculate_Kramers_Cross_Section(100.0d0)*1.0d28, 8.842728751351863d0, &
+                    & 'Collisions: Kramers cross section at 100 eV')
+    call Assert_True(Calculate_Kramers_Cross_Section(10.0d0) > Calculate_Kramers_Cross_Section(100.0d0), &
+                   & 'Collisions: Kramers cross section decreases with energy')
+
+    print *, 'Collision math test finished'
+    print *, ''
+  end subroutine Test_Collision_Math
+
+  !-----------------------------------------------------------------------------
+  ! Unit tests for Cuba_Integrate in mod_cuba_integration.
+  ! Integrates functions with known analytic values over the unit square with
+  ! all three methods (Suave, Divonne, Cuhre) and checks convergence, the
+  ! result, the error estimate, the userdata passing and that the vectorized
+  ! (nvec > 1) block delivery reproduces the scalar result. The last check
+  ! guards the production setup, where Cuba hands the planar supply integrand
+  ! blocks of 256 points for the batched (GPU) field evaluation.
+  subroutine Test_Cuba_Integration()
+    integer, parameter :: poly_ud = 7 ! Arbitrary userdata; the polynomial integrand scales with it
+    character(len=7), dimension(1:3), parameter :: mname = (/ 'Suave  ', 'Divonne', 'Cuhre  ' /)
+
+    double precision, dimension(1:1) :: integral, error_out, prob
+    double precision                 :: ref_scalar, exact_gauss
+    integer                          :: nregions, neval, fail, m
+
+    ! Saved global integration settings
+    integer          :: method_save, mineval_save, maxeval_save
+    double precision :: epsabs_save, epsrel_save
+
+    print *, 'Starting Cuba integration test'
+
+    method_save  = cuba_method
+    epsabs_save  = cuba_epsabs
+    epsrel_save  = cuba_epsrel
+    mineval_save = cuba_mineval
+    maxeval_save = cuba_maxeval
+
+    ! The test integrals are O(0.1) to O(10), so the production tolerances
+    ! (half an electron) are meaningless here. Ask for 0.01% relative error.
+    cuba_epsabs  = 1.0d-6
+    cuba_epsrel  = 1.0d-4
+    cuba_mineval = 1000
+    cuba_maxeval = 5000000
+
+    ! Analytic value of the Gaussian peak integrand: the product of two 1D
+    ! integrals expressed with the error function.
+    exact_gauss = Gauss_Column_Integral(cuba_test_mu1) * Gauss_Column_Integral(cuba_test_mu2)
+
+    do m = cuba_method_suave, cuba_method_cuhre
+      cuba_method = m
+
+      ! Smooth polynomial with exact integral 3*userdata: checks convergence,
+      ! the result and that userdata reaches the integrand.
+      call Cuba_Integrate(test_integrand_poly, 1, poly_ud, integral, error_out, prob, &
+                        & nregions, neval, fail)
+      call Assert_True(fail == 0, 'Cuba '//trim(mname(m))//': polynomial converged')
+      call Assert_Close(integral(1), 3.0d0*poly_ud, 'Cuba '//trim(mname(m))//': polynomial integral')
+      ref_scalar = integral(1)
+
+      ! The same integrand delivered in blocks of 64 points: the integration
+      ! points do not depend on nvec, so the result must match the scalar one.
+      call Cuba_Integrate(test_integrand_poly_v, 64, poly_ud, integral, error_out, prob, &
+                        & nregions, neval, fail)
+      call Assert_True(abs(integral(1) - ref_scalar) <= 1.0d-8*abs(ref_scalar), &
+                     & 'Cuba '//trim(mname(m))//': vectorized matches scalar')
+
+      ! Gaussian peak with a known value: adaptive refinement and an honest
+      ! error estimate.
+      call Cuba_Integrate(test_integrand_gauss, 1, 0, integral, error_out, prob, &
+                        & nregions, neval, fail)
+      call Assert_True(fail == 0, 'Cuba '//trim(mname(m))//': Gaussian peak converged')
+      call Assert_Close(integral(1), exact_gauss, 'Cuba '//trim(mname(m))//': Gaussian peak integral')
+      call Assert_True(abs(integral(1) - exact_gauss) <= 10.0d0*error_out(1) + 1.0d-8, &
+                     & 'Cuba '//trim(mname(m))//': true error within 10x the estimate')
+    end do
+
+    cuba_method  = method_save
+    cuba_epsabs  = epsabs_save
+    cuba_epsrel  = epsrel_save
+    cuba_mineval = mineval_save
+    cuba_maxeval = maxeval_save
+
+    print *, 'Cuba integration test finished'
+    print *, ''
+  end subroutine Test_Cuba_Integration
+
+  ! One column of the Gaussian test integrand integrated over [0, 1]
+  double precision function Gauss_Column_Integral(mu)
+    double precision, intent(in) :: mu
+
+    Gauss_Column_Integral = cuba_test_sig*sqrt(0.5d0*pi) &
+      & * (erf((1.0d0 - mu)/(cuba_test_sig*sqrt(2.0d0))) + erf(mu/(cuba_test_sig*sqrt(2.0d0))))
+  end function Gauss_Column_Integral
+
+  ! Cuba test integrand: smooth polynomial scaled by userdata.
+  ! The integral over the unit square is 3*userdata.
+  integer function test_integrand_poly(ndim, xx, ncomp, ff, userdata)
+    integer, intent(in) :: ndim, ncomp, userdata
+    double precision, intent(in), dimension(1:ndim)   :: xx
+    double precision, intent(out), dimension(1:ncomp) :: ff
+
+    ff(1) = dble(userdata) * (1.0d0 + 8.0d0*xx(1)*xx(2))
+    test_integrand_poly = 0
+  end function test_integrand_poly
+
+  ! Vectorized form of test_integrand_poly (blocks of up to nvec points)
+  integer function test_integrand_poly_v(ndim, xx, ncomp, ff, userdata, nvec)
+    integer, intent(in) :: ndim, ncomp, userdata, nvec
+    double precision, intent(in), dimension(1:ndim, 1:nvec)   :: xx
+    double precision, intent(out), dimension(1:ncomp, 1:nvec) :: ff
+    integer :: k
+
+    do k = 1, nvec
+      ff(1, k) = dble(userdata) * (1.0d0 + 8.0d0*xx(1, k)*xx(2, k))
+    end do
+    test_integrand_poly_v = 0
+  end function test_integrand_poly_v
+
+  ! Cuba test integrand: Gaussian peak at (mu1, mu2). The analytic value is
+  ! computed in Test_Cuba_Integration with Gauss_Column_Integral.
+  integer function test_integrand_gauss(ndim, xx, ncomp, ff, userdata)
+    integer, intent(in) :: ndim, ncomp, userdata
+    double precision, intent(in), dimension(1:ndim)   :: xx
+    double precision, intent(out), dimension(1:ncomp) :: ff
+
+    ff(1) = exp(-((xx(1) - cuba_test_mu1)**2 + (xx(2) - cuba_test_mu2)**2)/(2.0d0*cuba_test_sig**2))
+    test_integrand_gauss = 0
+  end function test_integrand_gauss
+
+  !-----------------------------------------------------------------------------
+  ! Test the checkerboard work function model in mod_work_function with a
+  ! 2x2 pattern on a 100x100 nm emitter: the value lookup (with the reversed
+  ! y-direction in the matrix), the section numbering and the clamping of
+  ! positions outside the emitter.
+  subroutine Test_Work_Function_Checkerboard()
+    double precision, dimension(1:3) :: pos
+    integer                          :: sec
+
+    print *, 'Starting checkerboard work function test'
+
+    ! A single 100 x 100 nm rectangular emitter centered at the origin of the
+    ! unit square mapping (emitters_pos is the lower left corner).
+    nrEmit = 1
+    emitters_Type(1) = EMIT_RECTANGLE
+    emitters_pos(1:3, 1) = 0.0d0
+    emitters_dim(1:3, 1) = (/ 100.0d0, 100.0d0, 0.0d0 /) * length_scale
+
+    ! 2x2 checkerboard. Row 1 of the matrix is the TOP row of the pattern
+    ! (the y-direction is reversed in the array).
+    x_num = 2
+    y_num = 2
+    x_len = 1.0d0/x_num
+    y_len = 1.0d0/y_num
+    if (allocated(w_theta_arr)) deallocate(w_theta_arr)
+    allocate(w_theta_arr(1:y_num, 1:x_num))
+    w_theta_arr(1, 1:2) = (/ 4.10d0, 4.20d0 /) ! Top row
+    w_theta_arr(2, 1:2) = (/ 4.30d0, 4.40d0 /) ! Bottom row
+
+    ptr_Work_fun => w_theta_checkerboard
+
+    ! Centers of the four sections. The section numbering starts at the
+    ! bottom left and runs row-wise:  | 3 4 |
+    !                                 | 1 2 |
+    pos = (/ 25.0d0, 25.0d0, 0.0d0 /) * length_scale ! Bottom left
+    call Assert_Close(w_theta_xy(pos, 1, sec), 4.30d0, 'Work function: bottom left value')
+    call Assert_True((sec == 1), 'Work function: bottom left section')
+
+    pos = (/ 75.0d0, 25.0d0, 0.0d0 /) * length_scale ! Bottom right
+    call Assert_Close(w_theta_xy(pos, 1, sec), 4.40d0, 'Work function: bottom right value')
+    call Assert_True((sec == 2), 'Work function: bottom right section')
+
+    pos = (/ 25.0d0, 75.0d0, 0.0d0 /) * length_scale ! Top left
+    call Assert_Close(w_theta_xy(pos, 1, sec), 4.10d0, 'Work function: top left value')
+    call Assert_True((sec == 3), 'Work function: top left section')
+
+    pos = (/ 75.0d0, 75.0d0, 0.0d0 /) * length_scale ! Top right
+    call Assert_Close(w_theta_xy(pos, 1, sec), 4.20d0, 'Work function: top right value')
+    call Assert_True((sec == 4), 'Work function: top right section')
+
+    ! Positions outside the emitter clamp to the nearest section
+    pos = (/ 150.0d0, 25.0d0, 0.0d0 /) * length_scale ! Right of the emitter
+    call Assert_Close(w_theta_xy(pos, 1, sec), 4.40d0, 'Work function: clamped in x')
+    call Assert_True((sec == 2), 'Work function: clamped section in x')
+
+    pos = (/ -10.0d0, 130.0d0, 0.0d0 /) * length_scale ! Left of and above the emitter
+    call Assert_Close(w_theta_xy(pos, 1, sec), 4.10d0, 'Work function: clamped in x and y')
+    call Assert_True((sec == 3), 'Work function: clamped section in x and y')
+
+    ! Leave a valid work function behind for any test that runs after this one
+    deallocate(w_theta_arr)
+    ptr_Work_fun => Const_Work_Fun_Test
+
+    print *, 'Checkerboard work function test finished'
+    print *, ''
+  end subroutine Test_Work_Function_Checkerboard
+
+  !-----------------------------------------------------------------------------
+  ! Seed the random number generator with a fixed seed so that the system
+  ! tests below are reproducible from run to run (they are still not bitwise
+  ! identical across compilers, whose RANDOM_NUMBER generators differ; the
+  ! assertions use invariants and generous bands for that reason).
+  subroutine Seed_RNG_Deterministic()
+    integer                            :: n, i
+    integer, dimension(:), allocatable :: seed
+
+    call random_seed(size=n)
+    allocate(seed(1:n))
+    do i = 1, n
+      seed(i) = 12345 + 37*(i - 1)
+    end do
+    call random_seed(put=seed)
+    deallocate(seed)
+  end subroutine Seed_RNG_Deterministic
+
+  !-----------------------------------------------------------------------------
+  ! Whole system test for the planar diode: run the production field emission
+  ! (Init_Field_Emission_v2 / Do_Field_Emission with the Cuba supply integral
+  ! and Metropolis-Hastings sampling, using the work function read from the
+  ! file 'work') together with the integrator and the absorption for a few
+  ! hundred steps, exactly like the main loop does. The checks are physical
+  ! invariants:
+  !   * charge bookkeeping: emitted = absorbed + still in flight (exact)
+  !   * particles never end up outside the gap and positions stay finite
+  !   * Ramo charge accounting: the time-integrated Ramo current must equal
+  !     q_0/d times the total z-displacement of all electrons (Shockley-Ramo
+  !     theorem), which is known from the absorption counts and the positions
+  !     of the electrons still in flight
+  !   * the steady-state current lies in a band around the value this diode
+  !     (1 kV over 500 nm, 100x100 nm emitter, 2.0 eV) is known to give
+  subroutine Test_Planar_System()
+    double precision, parameter :: d_test = 500.0d0*length_scale
+    double precision, parameter :: V_test = 1.0d3 ! V
+    double precision, parameter :: delta_t_test = 0.25d-15 ! Time step
+    integer, parameter          :: n_steps = 250
+    double precision, parameter :: z_emit = 1.0d0*length_scale ! Emission height used by Do_Field_Emission
+
+    ! Band for the steady-state current (second half of the run). The value
+    ! is stochastic (Metropolis-Hastings) and the RNG differs between
+    ! compilers, so the band is generous.
+    double precision, parameter :: I_low  = 0.5d-3 ! A
+    double precision, parameter :: I_high = 4.0d-3 ! A
+
+    integer          :: i, n_before, n_emit_tot, n_abs_top, n_abs_bot, n_peak
+    double precision :: Q_ramo, Q_ramo_ss, Q_exp, I_avg_ss, sum_z
+    logical          :: bounds_ok, finite_ok
+
+    print *, 'Starting planar field emission system test'
+
+    call Setup_Test_System(d_test, delta_t_test, n_steps, V_test, .true., 0)
+
+    ! One 100 x 100 nm emitter centered in the box
+    nrEmit = 1
+    emitters_pos(1:3, 1) = (/ -50.0d0, -50.0d0, 0.0d0 /) * length_scale
+    emitters_dim(1:3, 1) = (/ 100.0d0, 100.0d0, 0.0d0 /) * length_scale
+    emitters_type(1)     = EMIT_RECTANGLE
+    emitters_delay(1)    = 0
+
+    ! The production init: sets the planar pointers, allocates the emission
+    ! bookkeeping and reads the work function from the file 'work' (2.0 eV).
+    call Init_Field_Emission_v2()
+
+    call Seed_RNG_Deterministic()
+
+    n_emit_tot = 0
+    n_abs_top  = 0
+    n_abs_bot  = 0
+    n_peak     = 0
+    Q_ramo     = 0.0d0
+    Q_ramo_ss  = 0.0d0
+    bounds_ok  = .true.
+    finite_ok  = .true.
+
+    ! The same sequence as the main loop
+    do i = 1, n_steps
+      n_before = nrElec
+      call ptr_Do_Emission(i)
+      n_emit_tot = n_emit_tot + (nrElec - n_before)
+
+      call Update_Position(i)
+
+      ! The Ramo current of this step, and the absorption counts marked
+      ! during the position update (Remove_Particles clears them)
+      Q_ramo = Q_ramo + ramo_current(species_elec)*time_step
+      if (i > n_steps/2) then
+        Q_ramo_ss = Q_ramo_ss + ramo_current(species_elec)*time_step
+      end if
+      n_abs_top = n_abs_top + nrElec_remove_top
+      n_abs_bot = n_abs_bot + nrElec_remove_bot
+
+      call Remove_Particles(i)
+
+      if (nrPart > 0) then
+        if (.not. (all(particles_cur_pos(3, 1:nrPart) >= 0.0d0) .and. &
+                 & all(particles_cur_pos(3, 1:nrPart) <= box_dim(3)))) bounds_ok = .false.
+        ! A NaN also fails this comparison
+        if (.not. all(abs(particles_cur_pos(:, 1:nrPart)) < 1.0d0)) finite_ok = .false.
+      end if
+      n_peak = max(n_peak, nrElec)
+    end do
+
+    ! Expected Ramo charge: every electron contributes q_0 * dz/d, absorbed
+    ! electrons traveled from z_emit to the anode (or back to the cathode),
+    ! electrons still in flight from z_emit to their current position.
+    sum_z = 0.0d0
+    do i = 1, nrPart
+      sum_z = sum_z + (particles_cur_pos(3, i) - z_emit)
+    end do
+    Q_exp = q_0*( n_abs_top*(d_test - z_emit) - n_abs_bot*z_emit + sum_z )/d_test
+
+    I_avg_ss = Q_ramo_ss / (time_step*(n_steps - n_steps/2))
+
+    print '(a, i0, a, i0, a, i0, a, i0)', '  emitted = ', n_emit_tot, ', absorbed top = ', n_abs_top, &
+                                        & ', absorbed bottom = ', n_abs_bot, ', in flight = ', nrElec
+    print '(a, i0)', '  peak number of electrons = ', n_peak
+    print '(a, f8.4, a)', '  steady-state current = ', I_avg_ss*1.0d3, ' mA'
+    print '(a, f8.4, a, f8.4, a)', '  Ramo charge = ', Q_ramo*1.0d15, ' fC, expected = ', Q_exp*1.0d15, ' fC'
+
+    call Assert_True((n_emit_tot > 100), 'Planar system: emission is active')
+    call Assert_True((n_abs_top > 50), 'Planar system: electrons reach the anode')
+    call Assert_True((nrElec == n_emit_tot - n_abs_top - n_abs_bot), &
+                   & 'Planar system: charge bookkeeping is conserved')
+    call Assert_True(bounds_ok, 'Planar system: no particle outside the gap')
+    call Assert_True(finite_ok, 'Planar system: positions stay finite')
+    call Assert_True((abs(Q_ramo - Q_exp) < 0.10d0*abs(Q_exp)), &
+                   & 'Planar system: Ramo charge accounting (within 10%)')
+    call Assert_True((I_avg_ss > I_low) .and. (I_avg_ss < I_high), &
+                   & 'Planar system: steady-state current in the expected band')
+
+    ! Clean up the emission module state allocated by Init_Field_Emission_v2
+    ! and leave a valid work function pointer behind.
+    call Clean_Up_Field_Emission_v2()
+    ptr_Work_fun => Const_Work_Fun_Test
+
+    print *, 'Planar field emission system test finished'
+    print *, ''
+  end subroutine Test_Planar_System
+
+  !-----------------------------------------------------------------------------
+  ! Whole system test for the hyperboloid tip: run the production tip field
+  ! emission (Init_Emission_Tip / Do_Emission_Tip, surface supply integral
+  ! plus Metropolis-Hastings on the tip surface) together with the integrator
+  ! and the absorption, exactly like the main loop does. The checks mirror
+  ! the planar system test. For the Ramo accounting the tip weighting field
+  ! (E_zunit_tip) is not uniform, so instead of an exact identity the
+  ! Shockley-Ramo bounds are used: every electron absorbed at the anode
+  ! contributes q_0, every electron still in flight between 0 and q_0, and
+  ! electrons that returned to the tip contribute nothing.
+  subroutine Test_Tip_System()
+    use mod_emission_tip, only: Init_Emission_Tip
+
+    double precision, parameter :: d_test = 1000.0d0*length_scale ! Total gap (tip + vacuum)
+    ! The apex field of this tip is about 9.8 MV/m per volt (49 nm apex
+    ! radius). 800 V gives about 7.9 GV/m at the apex: strong emission, but
+    ! still below the field where the image charge correction saturates
+    ! (l > 1) and the barrier is fully suppressed.
+    double precision, parameter :: V_test = 800.0d0 ! V
+    double precision, parameter :: delta_t_test = 0.25d-15 ! Time step
+    integer, parameter          :: n_steps = 350
+
+    integer          :: i, n_before, n_emit_tot, n_abs_top, n_abs_bot, n_peak
+    double precision :: Q_ramo, Q_transits
+    logical          :: bounds_ok, finite_ok
+
+    print *, 'Starting tip field emission system test'
+
+    call Setup_Test_System(d_test, delta_t_test, n_steps, V_test, .true., 0)
+
+    ! The same tip as in Test_Tip_Acceleration: 1000 nm gap with a 100 nm
+    ! high tip, 900 nm from apex to anode, 100 nm base radius.
+    nrEmit = 1
+    emitters_dim(1:3, 1) = (/ 900.0d0, 100.0d0, 100.0d0 /) * length_scale
+    emitters_pos(1:3, 1) = 0.0d0
+    ! NOTE: the tip module has its own emitter type convention, 1 means
+    ! field emission (it is not EMIT_CIRCLE).
+    emitters_type(1)     = 1
+    emitters_delay(1)    = 0
+
+    ! The production init: tip geometry parameters and pointers
+    call Init_Emission_Tip()
+
+    call Seed_RNG_Deterministic()
+
+    n_emit_tot = 0
+    n_abs_top  = 0
+    n_abs_bot  = 0
+    n_peak     = 0
+    Q_ramo     = 0.0d0
+    bounds_ok  = .true.
+    finite_ok  = .true.
+
+    ! The same sequence as the main loop
+    do i = 1, n_steps
+      n_before = nrElec
+      call ptr_Do_Emission(i)
+      n_emit_tot = n_emit_tot + (nrElec - n_before)
+
+      call Update_Position(i)
+
+      Q_ramo = Q_ramo + ramo_current(species_elec)*time_step
+      n_abs_top = n_abs_top + nrElec_remove_top
+      n_abs_bot = n_abs_bot + nrElec_remove_bot
+
+      call Remove_Particles(i)
+
+      if (nrPart > 0) then
+        if (.not. (all(particles_cur_pos(3, 1:nrPart) >= 0.0d0) .and. &
+                 & all(particles_cur_pos(3, 1:nrPart) <= box_dim(3)))) bounds_ok = .false.
+        ! A NaN also fails this comparison
+        if (.not. all(abs(particles_cur_pos(:, 1:nrPart)) < 1.0d0)) finite_ok = .false.
+      end if
+      n_peak = max(n_peak, nrElec)
+    end do
+
+    ! Ramo charge in units of full cathode-anode transits
+    Q_transits = Q_ramo/q_0
+
+    print '(a, i0, a, i0, a, i0, a, i0)', '  emitted = ', n_emit_tot, ', absorbed top = ', n_abs_top, &
+                                        & ', absorbed bottom = ', n_abs_bot, ', in flight = ', nrElec
+    print '(a, i0)', '  peak number of electrons = ', n_peak
+    print '(a, f10.3, a, i0, a, i0)', '  Ramo charge = ', Q_transits, &
+                                    & ' transits, bounds: > 0.8 x ', n_abs_top, ', < in flight + ', n_abs_top
+
+    call Assert_True((n_emit_tot > 20), 'Tip system: emission is active')
+    call Assert_True((n_abs_top > 5), 'Tip system: electrons reach the anode')
+    call Assert_True((nrElec == n_emit_tot - n_abs_top - n_abs_bot), &
+                   & 'Tip system: charge bookkeeping is conserved')
+    call Assert_True(bounds_ok, 'Tip system: no particle outside the gap')
+    call Assert_True(finite_ok, 'Tip system: positions stay finite')
+    call Assert_True((Q_transits > 0.8d0*n_abs_top - 2.0d0), &
+                   & 'Tip system: Ramo charge above the Shockley-Ramo lower bound')
+    call Assert_True((Q_transits < 1.0d0*(n_abs_top + nrElec) + 2.0d0), &
+                   & 'Tip system: Ramo charge below the Shockley-Ramo upper bound')
+
+    print *, 'Tip field emission system test finished'
+    print *, ''
+  end subroutine Test_Tip_System
 
   !-----------------------------------------------------------------------------
   ! A test with 1000 particles

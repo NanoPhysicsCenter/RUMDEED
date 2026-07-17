@@ -46,6 +46,8 @@ jobs:
           rm -rf "$rundir"
           mkdir -p "$rundir/pos" "$rundir/accel"
           cp tests/input "$rundir/input"
+          # Work function file used by the planar field emission system test
+          cp tests/work "$rundir/work"
           cp build/RUMDEED.out "$rundir/RUMDEED.out"
           cd "$rundir"
           ./RUMDEED.out

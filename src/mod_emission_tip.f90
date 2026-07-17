@@ -10,7 +10,8 @@ Module mod_emission_tip
   use mod_verlet
   use mod_pair
   use mod_ic
-  use mod_kevin_rjgtf
+  use mod_kevin_rjgtf_v2
+  use mod_cuba_integration
   !use ieee_arithmetic
   implicit none
 
@@ -48,6 +49,18 @@ Module mod_emission_tip
   ! MH algorithm parameters
   double precision :: a_rate = 0.5d0, MH_std = 1.0d0 ! Acceptance rate and standard deviation for the MH algorithm
   integer          :: jump_a = 0, jump_r = 0 ! Number of jumps accepted and rejected
+
+  ! Tuning constants of the v3 GTF Metropolis-Hastings sampler
+  ! (Metro_algo_tip_gtf_v3). The shared step MH_std is fixed within a chain
+  ! and gets one clamped multiplicative update per chain, towards the
+  ! acceptance rate MH_target_tip. Same scheme as the planar samplers in
+  ! mod_field_emission_v2.
+  double precision, parameter :: MH_warmup_tip  = 0.25d0   ! Fraction of the jumps done with the fixed initial step
+  double precision, parameter :: MH_init_tip    = 0.10d0   ! Initial step as a fraction of the (xi, phi) ranges
+  double precision, parameter :: MH_target_tip  = 0.35d0   ! Acceptance rate the MH_std update aims for (optimum for a 2D random walk)
+  double precision, parameter :: MH_gain_tip    = 0.025d0  ! Gain of the per-chain MH_std update
+  double precision, parameter :: MH_std_max_tip = 0.125d0  ! Upper limit on MH_std
+  double precision, parameter :: MH_std_min_tip = 0.0005d0 ! Lower limit on MH_std
 
   double precision, dimension(1:3)   :: F_avg = 0.0d0
 
@@ -172,15 +185,15 @@ subroutine Do_GTF_Emission_Tip(step)
 
   nrElecEmit = 0
 
-  call Do_Cuba_Suave_GTF_Tip(1, N_sup)
+  call Do_Surface_Integration_GTF_Tip(1, N_sup)
 
   N_round = Rand_Poisson(N_sup)
   !res_s = N_sup - N_round
 
   do i = 1, N_round
-    ndim = 80 ! Number of iterations for the Metropolish Hastings algorithm
+    ndim = 80 ! Number of jumps in the Metropolis-Hastings chain
 
-    call Metro_algo_tip_gtf(ndim, xi, phi, F, D_f, par_pos)
+    call Metro_algo_tip_gtf_v3(ndim, xi, phi, F, D_f, par_pos)
 
     if (F < 0.0d0) then
       surf_norm = surface_normal(par_pos)
@@ -271,7 +284,7 @@ subroutine Do_Field_Emission_Tip(step)
 
   nrElecEmit = 0
 
-  call Do_Cuba_Suave_FE_Tip(1, N_sup)
+  call Do_Surface_Integration_FE_Tip(1, N_sup)
 
   N_round = nint(N_sup + res_s)
   res_s = N_sup - N_round
@@ -400,95 +413,6 @@ end subroutine Do_Photo_Emission_Tip
 
 !----------------------------------------------------------------------------------------
 
-  subroutine Do_Field_Emission_Tip_1(step)
-    integer, intent(in)              :: step
-    double precision                 :: F
-    double precision, dimension(1:3) :: par_pos, surf_norm, par_vel
-    !double precision, dimension(1)   :: rnd
-    double precision                 :: rnd, N_sup
-    integer                          :: i, j, s, IFAIL, nrElecEmit, n_r
-    double precision                 :: A_f, D_f, n_s, F_avg, n_add
-    double precision                 :: len_phi, len_xi
-    integer                          :: nr_phi, nr_xi, ndim, emit
-    double precision                 :: xi_1, phi_1, xi_2, phi_2, xi_c, phi_c
-    double precision, dimension(1:3) :: field
-
-    !!!$OMP SINGLE
-    emit = 1
-
-
-    !print *, len_x, len_x / length
-    !print *, len_y, len_y / length
-
-    nrElecEmit = 0
-
-
-    !!$OMP SINGLE
-    !print *, 'F_avg = ', F_avg
-    !F_avg = 0.0d0
-    !write (ud_debug, "(i8, tr2, E16.8)", iostat=IFAIL) step, F_avg
-
-    call Do_Cuba_Suave_FE_Tip_old(emit, N_sup)
-
-    n_r = nint(N_sup + res_s)
-    res_s = N_sup - N_r
-
-    !print *, 'n_r = ', n_r
-    if (n_r < 0) then
-      print *, 'n_r < 0'
-      print *, 'n_s = ', n_s
-      print *, 'n_r = ', n_r
-      stop
-    end if
-
-    !!!$OMP END SINGLE
-
-    !print *, 'Doing emission'
-    !print *, n_r
-
-    !!$OMP PARALLEL DO DEFAULT(NONE) PRIVATE(s, ndim, par_pos, field, F, D_f, surf_norm, xi_1, phi_1, rnd, par_vel) SCHEDULE(GUIDED, 2500)
-    do s = 1, n_r
-
-      !!!$OMP FLUSH (particles, nrElec)
-      ndim = 25
-      call Metro_algo_tip_v2(ndim, xi_1, phi_1, F, D_f, par_pos)
-
-      if (F >= 0.0d0) then
-        D_f = 0.0d0
-      end if
-
-      CALL RANDOM_NUMBER(rnd)
-      !print *, 'rnd ', rnd
-      !print *, 'D_f ', D_f
-      !print *, ''
-      if (rnd <= D_f) then
-        surf_norm = surface_normal(par_pos)
-        par_pos = par_pos + surf_norm*length_scale
-        !$OMP CRITICAL
-
-        ! Add a particle to the system
-        par_vel = 0.0d0
-        call Add_Particle(par_pos, par_vel, species_elec, step, emit, -1, 1)
-
-        !nrElec = nrElec + 1
-        nrElecEmit = nrElecEmit + 1
-        !print *, 'Particle emitted'
-        !$OMP END CRITICAL
-      end if
-    end do
-    !!$OMP END PARALLEL DO
-
-    !!!$OMP MASTER
-
-    posInit = posInit + nrElecEmit
-    nrEmitted = nrEmitted + nrElecEmit
-    !print *, 'Emission done'
-    !print *, posInit
-    !print *, ''
-    !!!$OMP END MASTER
-
-    !!!$OMP END PARALLEL
-  end subroutine Do_Field_Emission_Tip_1
 
   subroutine Do_Field_Emission_Tip_OLDCODE(step)
     integer, intent(in)              :: step
@@ -579,32 +503,13 @@ end subroutine Do_Photo_Emission_Tip
     !print *, 'Emission loop'
     do s = 1, n_r
 
-      !!!$OMP FLUSH (particles, nrElec)
-      ndim = 25
-      !print *, 'Metro algo 1'
-      !par_pos = Metro_algo_tip(ndim, xi_1, phi_1)
-      call Metro_algo_tip_v2(ndim, xi_1, phi_1, F, D_f, par_pos)
-      !F = Field_normal(par_pos, Calc_Field_at(par_pos))
+      ndim = 80 ! Number of jumps in the Metropolis-Hastings chain
+      call Metro_algo_tip_v3(ndim, xi_1, phi_1, F, D_f, par_pos)
+      ! A failed chain comes back with F = 1.0 and D_f = 0, so no electron
+      ! is emitted from it.
 
-      if (F >= 0.0d0) then
-        !Try again
-        !print *, 'Metro algo 2'
-        !par_pos = Metro_algo_tip(ndim, xi_1, phi_1)
-        call Metro_algo_tip_v2(ndim, xi_1, phi_1, F, D_f, par_pos)
-        F = Field_normal(par_pos, Calc_Field_at(par_pos))
-
-        if (F >= 0.0d0) then
-          D_f = 0.0d0
-          print *, 'Warning: F > 0.0d0'
-        end if
-      !else
-      !  print *, 'Escape prob'
-      !  print *, 'F = ', F
-      !  print *, 'par_pos = ', par_pos
-      !  D_f = Escape_Prob_Tip(F, par_pos)
-      end if
-
-      if (rnd(s) <= D_f) then
+      ! Emit the electron with the escape probability at the sampled position
+      if ((F < 0.0d0) .and. (rnd(s) <= D_f)) then
         !par_pos(3) = par_pos(3) + 1.0d0*length
         surf_norm = surface_normal(par_pos)
         par_pos = par_pos + surf_norm*length_scale
@@ -1102,49 +1007,392 @@ end subroutine Do_Photo_Emission_Tip
     a_rate = DBLE(jump_a) / DBLE(jump_r + jump_a)
   end subroutine Metro_algo_tip_gtf
 
-  function Sphere_IC_field(pos_1, pos_2)
-    double precision, dimension(1:3)             :: Sphere_IC_field
-    double precision, dimension(1:3), intent(in) :: pos_1, pos_2
-    double precision                 :: x_a, y_a, z_a
-    double precision                 :: x_b, y_b, z_b
-    double precision                 :: x, y, z
-    double precision                 :: z_0, Sphere_R
-    double precision                 :: dis_a, tmp_dis_a, tmp_dis_b
+  !--------------------------------------------------------------------------------
+  ! Log of the target distribution of the v3 GTF Metropolis-Hastings sampler:
+  ! the GTF current density times the h_xi*h_phi area element of the
+  ! (xi, phi) parametrization of the tip surface, i.e. the same expression
+  ! that integrand_cuba_gtf_tip integrates for the number of electrons to
+  ! emit. h_xi*h_phi = a_foci**2 * sqrt((xi**2 - eta_1**2)*(1 - eta_1**2));
+  ! the constant factors cancel in the Metropolis ratio and are left out,
+  ! as is the time_step/q_0 factor of the integrand. The tiny() guard
+  ! catches a current density that underflows to zero (Get_Kevin_Jgtf_v2
+  ! also returns exactly zero for a negligible field). eta_f must be < 0.
+  double precision function Tip_gtf_target_log(eta_f, xi)
+    double precision, intent(in) :: eta_f, xi
 
-    if (image_charge .eqv. .true.) then
+    Tip_gtf_target_log = log(max(Get_Kevin_Jgtf_v2(eta_f, T_temp, w_theta), tiny(1.0d0))) &
+                     & + 0.5d0*log(xi**2 - eta_1**2)
+  end function Tip_gtf_target_log
 
-      z_0 = h_tip - r_tip
-      Sphere_R = r_tip
+  !--------------------------------------------------------------------------------
+  ! Metropolis-Hastings sampling of the emission position for the GTF
+  ! emission from the tip (third version, used by Do_GTF_Emission_Tip).
+  !
+  ! The chain moves in the (xi, phi) parametrization of the tip surface and
+  ! samples positions proportional to J_gtf * h_xi * h_phi, the integrand
+  ! that Do_Cuba_Suave_GTF_Tip integrates for the number of electrons to
+  ! emit. Do_GTF_Emission_Tip emits every candidate, so the emitted
+  ! positions follow the current density over the tip surface and the total
+  ! matches the surface integral.
+  ! (Metro_algo_tip_gtf above targets the Fowler-Nordheim escape
+  ! probability instead of the GTF current density, and the sign of its
+  ! step size feedback is inverted: a high acceptance rate shrinks the
+  ! step, which raises the acceptance rate further, until the chain is
+  ! frozen at its starting position. That is why its starting point had to
+  ! be skewed towards the apex. It is kept for reference, like the
+  ! Robbins-Monro attempt Metro_algo_tip_gtf_v2.)
+  !
+  ! The proposal is a Gaussian step in (xi, phi), reflected at the xi
+  ! limits, with phi wrapping around the tip. The first MH_warmup_tip of
+  ! the jumps use the large fixed step MH_init_tip so the chain finds the
+  ! high current region from a uniform start (no skew needed). After that
+  ! the adapted step MH_std is used, fixed within the chain and updated
+  ! once at the end from the acceptance rate of this chain.
+  subroutine Metro_algo_tip_gtf_v3(ndim, xi, phi, eta_f, df_cur, par_pos)
+    integer, intent(in)                           :: ndim
+    double precision, intent(out)                 :: xi, phi, eta_f, df_cur
+    double precision, dimension(1:3), intent(out) :: par_pos
 
-      !print *, 'Sphere_R = ', Sphere_R
-      !print *, 'z_0 = ', z_0
+    double precision                 :: new_xi, new_phi, new_eta_f
+    double precision                 :: sup_cur, sup_new ! Log of the chain target
+    double precision                 :: rnd, alpha
+    double precision, dimension(1:2) :: std, step
+    double precision, dimension(1:3) :: cur_pos, new_pos, field
+    integer                          :: i, count, ndim_first
+    integer                          :: acc, rej ! Accepted/rejected jumps after the warmup
 
-      x_a = pos_1(1)
-      y_a = pos_1(2)
-      z_a = pos_1(3)
-
-      x = pos_2(1)
-      y = pos_2(2)
-      z = pos_2(3)
-
-      dis_a = sqrt(x_a**2 + y_a**2 + (z_a - z_0)**2)
-
-      z_b = z_0 + Sphere_R**2 / ( sqrt(1 + x_a**2/(z_a - z_0)**2 + y_a**2/(z_a - z_0)**2) * dis_a )
-      x_b = (z_b - z_0) * x_a / (z_a - z_0)
-      y_b = (z_b - z_0) * y_a / (z_a - z_0)
-
-      tmp_dis_a = ( (x - x_a)**2 + (y - y_a)**2 + (z - z_a)**2 )**(3.0d0/2.0d0)
-      tmp_dis_b = ( (x - x_b)**2 + (y - y_b)**2 + (z - z_b)**2 )**(3.0d0/2.0d0)
-
-      Sphere_IC_field(1) = 1.0d0*q_0/(4.0d0*pi*epsilon_0) * ( (x_a - x)/tmp_dis_a - (Sphere_R*(x_b - x))/(dis_a*tmp_dis_b) )
-      Sphere_IC_field(2) = 1.0d0*q_0/(4.0d0*pi*epsilon_0) * ( (y_a - y)/tmp_dis_a - (Sphere_R*(y_b - y))/(dis_a*tmp_dis_b) )
-      Sphere_IC_field(3) = 1.0d0*q_0/(4.0d0*pi*epsilon_0) * ( (z_a - z)/tmp_dis_a - (Sphere_R*(z_b - z))/(dis_a*tmp_dis_b) )
-
-    else
-      Sphere_IC_field = 0.0d0
+    ! Bring the shared step size into the limits before use. It starts at
+    ! 1.0 and the older samplers above use other limits.
+    if (MH_std > MH_std_max_tip) then
+      MH_std = MH_std_max_tip
+    else if (MH_std < MH_std_min_tip) then
+      MH_std = MH_std_min_tip
     end if
 
-  end function Sphere_IC_field
+    acc = 0
+    rej = 0
+    ndim_first = nint(ndim*MH_warmup_tip)
+
+    ! Warmup step size, MH_init_tip of the (xi, phi) ranges
+    std(1) = (max_xi - 1.0d0)*MH_init_tip
+    std(2) = 2.0d0*pi*MH_init_tip
+
+    ! Get a random initial position on the tip surface, uniform in (xi, phi)
+    count = 0
+    do ! Infinite loop, we try to find a favourable position to start from
+      CALL RANDOM_NUMBER(step)
+      xi = 1.0d0 + (max_xi - 1.0d0)*step(1)
+      phi = 2.0d0*pi*step(2)
+
+      cur_pos = xyz_corr(xi, eta_1, phi)
+
+      ! Calculate the electric field at this position
+      field = Calc_Field_at(cur_pos)
+      eta_f = Field_normal(cur_pos, field) ! Component normal to the surface
+
+      if (eta_f < 0.0d0) then
+        exit ! We found a nice spot so we exit the loop
+      else
+        count = count + 1
+        if (count > 10000) then ! The loop is infinite, must stop it at some point.
+          ! Mark the chain as failed with defined outputs. The caller
+          ! checks the sign of eta_f and emits no electron from this chain.
+          xi = 1.0d0
+          phi = 0.0d0
+          par_pos = xyz_corr(xi, eta_1, phi)
+          eta_f = 1.0d0
+          df_cur = 0.0d0
+          print *, 'Failed to find spot for emission on the tip'
+          return
+        end if
+      end if
+    end do
+
+    sup_cur = Tip_gtf_target_log(eta_f, xi)
+
+    !---------------------------------------------------------------------------
+    ! We now pick a random distance and direction to jump to from our
+    ! current location. We do this ndim times.
+    do i = 1, ndim
+
+      ! After the warmup the jumps use the adapted step size. MH_std is
+      ! only updated between chains, so the kernel is fixed within a chain.
+      if (i > ndim_first) then
+        std(1) = (max_xi - 1.0d0)*MH_std
+        std(2) = 2.0d0*pi*MH_std
+      end if
+
+      ! Find a new position using a normal distribution
+      step = box_muller((/0.0d0, 0.0d0/), std)
+      new_xi = xi + step(1)
+      new_phi = modulo(phi + step(2), 2.0d0*pi) ! phi wraps around the tip
+
+      ! Reflect xi at the limits of the surface. With the step limited to
+      ! MH_std_max_tip a jump needs at most one reflection; a longer one
+      ! (only possible in the far tail of the warmup step) is rejected.
+      if (new_xi > max_xi) new_xi = 2.0d0*max_xi - new_xi
+      if (new_xi < 1.0d0) new_xi = 2.0d0 - new_xi
+      if ((new_xi < 1.0d0) .or. (new_xi > max_xi)) then
+        if (i > ndim_first) rej = rej + 1
+        cycle ! Do the next loop iteration, i.e. find a new position.
+      end if
+
+      new_pos = xyz_corr(new_xi, eta_1, new_phi)
+
+      ! Calculate the field at the new position
+      field = Calc_Field_at(new_pos)
+      new_eta_f = Field_normal(new_pos, field)
+
+      ! Check if the field is favourable for emission at the new position.
+      ! If it is not the current density there is zero, i.e. we reject this
+      ! location and pick another one.
+      if (new_eta_f >= 0.0d0) then
+        if (i > ndim_first) rej = rej + 1
+        cycle ! Do the next loop iteration, i.e. find a new position.
+      end if
+
+      ! Calculate the target at the new position, to compare with the
+      ! current position
+      sup_new = Tip_gtf_target_log(new_eta_f, new_xi)
+
+      alpha = sup_new - sup_cur ! Log of the Metropolis ratio
+
+      if (sup_new >= sup_cur) then
+        cur_pos = new_pos
+        xi = new_xi
+        phi = new_phi
+        eta_f = new_eta_f
+        sup_cur = sup_new
+        if (i > ndim_first) acc = acc + 1
+      else
+        CALL RANDOM_NUMBER(rnd)
+        if (log(rnd) <= alpha) then
+          cur_pos = new_pos
+          xi = new_xi
+          phi = new_phi
+          eta_f = new_eta_f
+          sup_cur = sup_new
+          if (i > ndim_first) acc = acc + 1
+        else
+          if (i > ndim_first) rej = rej + 1
+        end if
+      end if
+    end do
+
+    ! The acceptance rate of this chain drives one update of the shared
+    ! step size. Note the sign: a high acceptance rate means the steps are
+    ! too small, so the step grows.
+    if (acc + rej > 0) then
+      a_rate = DBLE(acc) / DBLE(acc + rej)
+      MH_std = MH_std * exp(MH_gain_tip*(a_rate - MH_target_tip))
+      ! Limits on how big or low the standard deviation can be
+      if (MH_std > MH_std_max_tip) then
+        MH_std = MH_std_max_tip
+      else if (MH_std < MH_std_min_tip) then
+        MH_std = MH_std_min_tip
+      end if
+    end if
+
+    ! Return the current position. The escape probability is returned for
+    ! diagnostics only, the caller emits every candidate.
+    par_pos = cur_pos
+    df_cur = Escape_Prob_Tip(eta_f, cur_pos)
+  end subroutine Metro_algo_tip_gtf_v3
+
+  !--------------------------------------------------------------------------------
+  ! Log of the target distribution of the v3 field emission sampler: the
+  ! Fowler-Nordheim electron supply times the h_xi*h_phi area element of the
+  ! (xi, phi) parametrization, i.e. the same supply that
+  ! Do_Field_Emission_Tip_OLDCODE integrates over the tip surface for the
+  ! number of candidate electrons. The escape probability is NOT part of
+  ! the target: the caller applies it as the emission test, so the emitted
+  ! positions follow the current density supply * D (see the corresponding
+  ! pairing in mod_field_emission_v2). Constant factors cancel in the
+  ! Metropolis ratio. The tiny() guard catches a supply that underflows to
+  ! zero. eta_f must be < 0.
+  double precision function Tip_fe_target_log(eta_f, xi, pos)
+    double precision, intent(in)                 :: eta_f, xi
+    double precision, dimension(1:3), intent(in) :: pos
+
+    Tip_fe_target_log = log(max(Elec_Supply_tip(eta_f, pos), tiny(1.0d0))) &
+                    & + 0.5d0*log(xi**2 - eta_1**2)
+  end function Tip_fe_target_log
+
+  !--------------------------------------------------------------------------------
+  ! Metropolis-Hastings sampling of the emission position for the field
+  ! emission from the tip (third version, used by
+  ! Do_Field_Emission_Tip_OLDCODE).
+  !
+  ! The chain moves in the (xi, phi) parametrization of the tip surface and
+  ! samples positions proportional to the electron supply times the area
+  ! element (Tip_fe_target_log above). The caller then emits each candidate
+  ! with the escape probability D returned in df_cur, so the emitted
+  ! positions follow the current density supply * D over the tip surface
+  ! and the expected total matches the surface integral of the current.
+  ! (Metro_algo_tip_v2 above targets the escape probability with a step of
+  ! 0.075% of the surface, so its chains stay at their uniform starting
+  ! point: the emitted positions followed D alone, without the supply
+  ! weight and the area element. It is kept for reference.)
+  !
+  ! The mechanics are identical to Metro_algo_tip_gtf_v3: Gaussian steps in
+  ! (xi, phi) reflected at the xi limits with phi wrapping, a warmup with
+  ! the large fixed step MH_init_tip, then the adapted step MH_std, fixed
+  ! within a chain and updated once per chain from its acceptance rate.
+  subroutine Metro_algo_tip_v3(ndim, xi, phi, eta_f, df_cur, par_pos)
+    integer, intent(in)                           :: ndim
+    double precision, intent(out)                 :: xi, phi, eta_f, df_cur
+    double precision, dimension(1:3), intent(out) :: par_pos
+
+    double precision                 :: new_xi, new_phi, new_eta_f
+    double precision                 :: sup_cur, sup_new ! Log of the chain target
+    double precision                 :: rnd, alpha
+    double precision, dimension(1:2) :: std, step
+    double precision, dimension(1:3) :: cur_pos, new_pos, field
+    integer                          :: i, count, ndim_first
+    integer                          :: acc, rej ! Accepted/rejected jumps after the warmup
+
+    ! Bring the shared step size into the limits before use. It starts at
+    ! 1.0 and the older samplers above use other limits.
+    if (MH_std > MH_std_max_tip) then
+      MH_std = MH_std_max_tip
+    else if (MH_std < MH_std_min_tip) then
+      MH_std = MH_std_min_tip
+    end if
+
+    acc = 0
+    rej = 0
+    ndim_first = nint(ndim*MH_warmup_tip)
+
+    ! Warmup step size, MH_init_tip of the (xi, phi) ranges
+    std(1) = (max_xi - 1.0d0)*MH_init_tip
+    std(2) = 2.0d0*pi*MH_init_tip
+
+    ! Get a random initial position on the tip surface, uniform in (xi, phi)
+    count = 0
+    do ! Infinite loop, we try to find a favourable position to start from
+      CALL RANDOM_NUMBER(step)
+      xi = 1.0d0 + (max_xi - 1.0d0)*step(1)
+      phi = 2.0d0*pi*step(2)
+
+      cur_pos = xyz_corr(xi, eta_1, phi)
+
+      ! Calculate the electric field at this position
+      field = Calc_Field_at(cur_pos)
+      eta_f = Field_normal(cur_pos, field) ! Component normal to the surface
+
+      if (eta_f < 0.0d0) then
+        exit ! We found a nice spot so we exit the loop
+      else
+        count = count + 1
+        if (count > 10000) then ! The loop is infinite, must stop it at some point.
+          ! Mark the chain as failed with defined outputs. Zero escape
+          ! probability means the caller emits no electron from this chain.
+          xi = 1.0d0
+          phi = 0.0d0
+          par_pos = xyz_corr(xi, eta_1, phi)
+          eta_f = 1.0d0
+          df_cur = 0.0d0
+          print *, 'Failed to find spot for emission on the tip'
+          return
+        end if
+      end if
+    end do
+
+    sup_cur = Tip_fe_target_log(eta_f, xi, cur_pos)
+
+    !---------------------------------------------------------------------------
+    ! We now pick a random distance and direction to jump to from our
+    ! current location. We do this ndim times.
+    do i = 1, ndim
+
+      ! After the warmup the jumps use the adapted step size. MH_std is
+      ! only updated between chains, so the kernel is fixed within a chain.
+      if (i > ndim_first) then
+        std(1) = (max_xi - 1.0d0)*MH_std
+        std(2) = 2.0d0*pi*MH_std
+      end if
+
+      ! Find a new position using a normal distribution
+      step = box_muller((/0.0d0, 0.0d0/), std)
+      new_xi = xi + step(1)
+      new_phi = modulo(phi + step(2), 2.0d0*pi) ! phi wraps around the tip
+
+      ! Reflect xi at the limits of the surface. With the step limited to
+      ! MH_std_max_tip a jump needs at most one reflection; a longer one
+      ! (only possible in the far tail of the warmup step) is rejected.
+      if (new_xi > max_xi) new_xi = 2.0d0*max_xi - new_xi
+      if (new_xi < 1.0d0) new_xi = 2.0d0 - new_xi
+      if ((new_xi < 1.0d0) .or. (new_xi > max_xi)) then
+        if (i > ndim_first) rej = rej + 1
+        cycle ! Do the next loop iteration, i.e. find a new position.
+      end if
+
+      new_pos = xyz_corr(new_xi, eta_1, new_phi)
+
+      ! Calculate the field at the new position
+      field = Calc_Field_at(new_pos)
+      new_eta_f = Field_normal(new_pos, field)
+
+      ! Check if the field is favourable for emission at the new position.
+      ! If it is not the supply there is zero, i.e. we reject this location
+      ! and pick another one.
+      if (new_eta_f >= 0.0d0) then
+        if (i > ndim_first) rej = rej + 1
+        cycle ! Do the next loop iteration, i.e. find a new position.
+      end if
+
+      ! Calculate the target at the new position, to compare with the
+      ! current position
+      sup_new = Tip_fe_target_log(new_eta_f, new_xi, new_pos)
+
+      alpha = sup_new - sup_cur ! Log of the Metropolis ratio
+
+      if (sup_new >= sup_cur) then
+        cur_pos = new_pos
+        xi = new_xi
+        phi = new_phi
+        eta_f = new_eta_f
+        sup_cur = sup_new
+        if (i > ndim_first) acc = acc + 1
+      else
+        CALL RANDOM_NUMBER(rnd)
+        if (log(rnd) <= alpha) then
+          cur_pos = new_pos
+          xi = new_xi
+          phi = new_phi
+          eta_f = new_eta_f
+          sup_cur = sup_new
+          if (i > ndim_first) acc = acc + 1
+        else
+          if (i > ndim_first) rej = rej + 1
+        end if
+      end if
+    end do
+
+    ! The acceptance rate of this chain drives one update of the shared
+    ! step size. Note the sign: a high acceptance rate means the steps are
+    ! too small, so the step grows.
+    if (acc + rej > 0) then
+      a_rate = DBLE(acc) / DBLE(acc + rej)
+      MH_std = MH_std * exp(MH_gain_tip*(a_rate - MH_target_tip))
+      ! Limits on how big or low the standard deviation can be
+      if (MH_std > MH_std_max_tip) then
+        MH_std = MH_std_max_tip
+      else if (MH_std < MH_std_min_tip) then
+        MH_std = MH_std_min_tip
+      end if
+    end if
+
+    ! Return the current position and the escape probability there, which
+    ! the caller uses for the emission test.
+    par_pos = cur_pos
+    df_cur = Escape_Prob_Tip(eta_f, cur_pos)
+  end subroutine Metro_algo_tip_v3
+
+  ! Sphere_IC_field has moved to mod_hyperboloid_tip, so that mod_verlet can
+  ! reference it for the OpenACC geometry dispatch (this module uses
+  ! mod_verlet, so it cannot be referenced the other way). It is still
+  ! available here through use association.
 
   subroutine check_limits_metro_rec_tip(xi, phi)
     double precision, intent(inout) :: xi, phi
@@ -1517,66 +1765,6 @@ end function Elec_supply_tip
 
 
   ! ----------------------------------------------------------------------------
-  ! The integration function for the Cuba library
-  !
-  integer function integrand_cuba_fe_tip(ndim, xx, ncomp, ff, userdata)
-    ! Input / output variables
-  integer, intent(in) :: ndim ! Number of dimensions (Should be 2)
-  integer, intent(in) :: ncomp ! Number of vector-components in the integrand (Always 1 here)
-  integer, intent(in) :: userdata ! Additional data passed to the integral function (In our case the number of the emitter)
-  double precision, intent(in), dimension(1:ndim)   :: xx ! Integration points, between 0 and 1
-  double precision, intent(out), dimension(1:ncomp) :: ff ! Results of the integrand function
-
-  ! Variables used for calculations
-  double precision, dimension(1:3) :: par_pos, field
-  double precision                 :: A ! Emitter area
-  double precision                 :: eta_f ! Component normal to the surface
-  double precision                 :: xi, phi ! Prolate coordinates
-  double precision                 :: h_xi, h_phi ! Scale factors
-
-  !! Emitter area
-  !A = Tip_Area(1.0d0, max_xi, 0.0d0, 2.0d0*pi)
-
-  ! Surface position
-  ! Cuba does the integration over the hybercube.
-  ! It gives us coordinates between 0 and 1.
-  xi = (max_xi - 1.0d0)*xx(1) + 1.0d0
-  phi = 2.0d0*pi*xx(2)
-
-  !par_pos(1) = x_coor(xi, eta_1, phi)
-  !par_pos(2) = y_coor(xi, eta_1, phi)
-  !par_pos(3) = z_coor(xi, eta_1, phi)
-  par_pos = xyz_corr(xi, eta_1, phi)
-
-  ! Calculate the electric field on the surface
-  field = Calc_Field_at(par_pos)
-  eta_f = Field_normal(par_pos, field)
-
-  ! Add to the average field
-  !F_avg = F_avg + field
-
-  ! Check if the field is favorable for emission
-  if (eta_f < 0.0d0) then
-    ! The field is favorable for emission
-
-    ! Calculate the scale factors
-    h_xi = a_foci*sqrt((xi**2 - eta_1**2)/(xi**2 - 1.0d0))
-    h_phi = a_foci*sqrt((xi**2 - 1.0d0)*(1 - eta_1**2))
-
-    ! Calculate the current density at this point
-    ff(1) = Elec_Supply_tip(eta_f, par_pos) * h_xi * h_phi
-  else
-    ! The field is NOT favorable for emission
-    ! This point does not contribute
-    ff(1) = 0.0d0
-  end if
-
-  ! We multiply with 2.0*pi (max_xi - 1.0) because Cuba does the 
-  ! integration over the hybercube, i.e. from 0 to 1.
-  ff(1) = 2.0d0*pi*(max_xi - 1.0d0)*ff(1)
-  
-  integrand_cuba_fe_tip = 0 ! Return value to Cuba, 0 = success
-  end function integrand_cuba_fe_tip
 
   ! ----------------------------------------------------------------------------
   ! The integration function for the Cuba library
@@ -1615,7 +1803,7 @@ end function Elec_supply_tip
     eta_f = Field_normal(par_pos, field)
 
     ! Add to the average field
-    !F_avg = F_avg + field
+    F_avg = F_avg + field
 
     ! Check if the field is favorable for emission
     if (eta_f < 0.0d0) then
@@ -1681,9 +1869,10 @@ end function Elec_supply_tip
       h_xi = a_foci*sqrt((xi**2 - eta_1**2)/(xi**2 - 1.0d0))
       h_phi = a_foci*sqrt((xi**2 - 1.0d0)*(1 - eta_1**2))
 
-      ! Calculate the current density at this point
+      ! Calculate the current density at this point and convert it to
+      ! electrons supplied per time step
       !w_theta = w_theta_xy(par_pos, userdata)
-      ff(1) = Get_Kevin_Jgtf(eta_f, T_temp, w_theta) * h_xi * h_phi
+      ff(1) = Get_Kevin_Jgtf_v2(eta_f, T_temp, w_theta) * h_xi * h_phi * time_step_div_q0
     else
       ! The field is NOT favourable for emission
       ! This point does not contribute
@@ -1698,220 +1887,49 @@ end function Elec_supply_tip
     integrand_cuba_gtf_tip = 0 ! Return value to Cuba, 0 = success
   end function integrand_cuba_gtf_tip
 
-  subroutine Do_Cuba_Suave_FE_Tip_old(emit, N_sup)
-    ! Input / output variables
-    integer, intent(in)           :: emit
-    double precision, intent(out) :: N_sup
-
-    ! Cuba integration variables
-    integer, parameter :: ndim = 2 ! Number of dimensions
-    integer, parameter :: ncomp = 1 ! Number of components in the integrand
-    integer            :: userdata = 0 ! User data passed to the integrand
-    integer, parameter :: nvec = 1 ! Number of points given to the integrand function
-    double precision   :: epsrel = 1.0d-2 ! Requested relative error
-    double precision   :: epsabs = 1.0d-4 ! Requested absolute error
-    integer            :: flags = 0+4 ! Flags
-    integer            :: seed = 0 ! Seed for the rng. Zero will use Sobol.
-    integer            :: mineval = 10000 ! Minimum number of integrand evaluations
-    integer            :: maxeval = 5000000 ! Maximum number of integrand evaluations
-    integer            :: nnew = 2500 ! Number of integrand evaluations in each subdivision
-    integer            :: nmin = 1000 ! Minimum number of samples a former pass must contribute to a subregion to be considered in the region's compound integral value.
-    double precision   :: flatness = 5.0d0 ! Determine how prominently out-liers, i.e. samples with a large fluctuation, 
-                                           ! figure in the total fluctuation, which in turn determines how a region is split up.
-                                           ! As suggested by its name, flatness should be chosen large for 'flat" integrand and small for 'volatile' integrands
-                                           ! with high peaks.
-    character          :: statefile = "" ! File to save the state in. Empty string means don't do it.
-    integer            :: spin = -1 ! Spinning cores
-    integer            :: nregions ! <out> The actual number of subregions needed
-    integer            :: neval ! <out> The actual number of integrand evaluations needed
-    integer            :: fail ! <out> Error flag (0 = Success, -1 = Dimension out of range, >0 = Accuracy goal was not met)
-    double precision, dimension(1:ncomp) :: integral ! <out> The integral of the integrand over the unit hybercube
-    double precision, dimension(1:ncomp) :: error ! <out> The presumed absolute error
-    double precision, dimension(1:ncomp) :: prob ! <out> The chi-square probability
-
-
-    ! Initialize the average field to zero
-    !F_avg = 0.0d0
-
-    ! Pass the number of the emitter being integrated over to the integrand as userdata
-    userdata = emit
-
-    call suave(ndim, ncomp, integrand_cuba_fe_tip, userdata, nvec, &
-     & epsrel, epsabs, flags, seed, &
-     & mineval, maxeval, nnew, nmin, flatness, &
-     & statefile, spin, &
-     & nregions, neval, fail, integral, error, prob)
-
-     if (fail /= 0) then
-      print '(a)', 'RUMDEED: WARNING Cuba did not return 0'
-      print *, fail
-      print *, error
-      print *, prob
-      print *, integral(1)
-     end if
-
-     ! Round the results to the nearest integer
-     !N_sup = nint( integral(1) )
-     N_sup = integral(1)
-
-    !  print *, 'Integral results'
-    !  print *, integral(1)
-    !  print *, N_sup
-    !  print *, Tip_Area(1.0d0, max_xi, 0.0d0, 2.0d0*pi)
-    !  print *, ''
-    !  print *, a_foci
-    !  pause
-
-     ! Finish calculating the average field
-     !F_avg = F_avg / neval
-  end subroutine Do_Cuba_Suave_FE_Tip_old
 
   ! ----------------------------------------------------------------------------
   ! This subroutine does the Cuba integration for the GTF emission tip.
-  subroutine Do_Cuba_Suave_GTF_Tip(emit, N_sup)
+  subroutine Do_Surface_Integration_GTF_Tip(emit, N_sup)
     ! Input / output variables
     integer, intent(in)           :: emit
     double precision, intent(out) :: N_sup
 
-    ! Cuba integration variables
-    integer, parameter :: ndim = 2 ! Number of dimensions
-    integer, parameter :: ncomp = 1 ! Number of components in the integrand
-    integer            :: userdata = 0 ! User data passed to the integrand
-    integer, parameter :: nvec = 1 ! Number of points given to the integrand function
-    double precision   :: epsrel = 1.0d-2 ! Requested relative error
-    double precision   :: epsabs = 1.0d-4 ! Requested absolute error
-    integer            :: flags = 0+4 ! Flags
-    integer            :: seed = 0 ! Seed for the rng. Zero will use Sobol.
-    integer            :: mineval = 25000 ! Minimum number of integrand evaluations
-    integer            :: maxeval = 50000000 ! Maximum number of integrand evaluations
-    integer            :: nnew = 5000 ! Number of integrand evaluations in each subdivision
-    integer            :: nmin = 1000 ! Minimum number of samples a former pass must contribute to a subregion to be considered in the region's compound integral value.
-    double precision   :: flatness = 5.0d0 ! Determine how prominently out-liers, i.e. samples with a large fluctuation, 
-                                           ! figure in the total fluctuation, which in turn determines how a region is split up.
-                                           ! As suggested by its name, flatness should be chosen large for 'flat" integrand and small for 'volatile' integrands
-                                           ! with high peaks.
-    character          :: statefile = "" ! File to save the state in. Empty string means don't do it.
-    integer            :: spin = -1 ! Spinning cores
-    integer            :: nregions ! <out> The actual number of subregions nedded
-    integer            :: neval ! <out> The actual number of integrand evaluations needed
-    integer            :: fail ! <out> Error flag (0 = Success, -1 = Dimension out of range, >0 = Accuracy goal was not met)
-    double precision, dimension(1:ncomp) :: integral ! <out> The integral of the integrand over the unit hybercube
-    double precision, dimension(1:ncomp) :: error ! <out> The presumed absolute error
-    double precision, dimension(1:ncomp) :: prob ! <out> The chi-square probability
+    integer                          :: nregions, neval, fail
+    double precision, dimension(1:1) :: integral, error, prob
 
-    !integer            :: verbose = 0
-    !integer, parameter :: last = 4
-    integer, parameter :: key = 0
+    ! Initialize the average field to zero
+    F_avg = 0.0d0
 
-    userdata = emit
+    call Cuba_Integrate(integrand_cuba_gtf_tip, 1, emit, integral, error, prob, nregions, neval, fail)
 
-    !call cuhre(ndim, ncomp, integrand_cuba_gtf_tip, userdata, nvec, &
-    ! & epsrel, epsabs, flags, &
-    ! & mineval, maxeval, key, &
-    ! & statefile, spin, &
-    ! & nregions, neval, fail, integral, error, prob)
+    ! The integrand is in electrons supplied per time step
+    N_sup = integral(1)
 
-    call suave(ndim, ncomp, integrand_cuba_gtf_tip, userdata, nvec, &
-     & epsrel, epsabs, flags, seed, &
-     & mineval, maxeval, nnew, nmin, flatness, &
-     & statefile, spin, &
-     & nregions, neval, fail, integral, error, prob)
-
-
-     if (fail /= 0) then
-      print '(a)', 'RUMDEED: WARNING Cuba did not return 0 (GTF)'
-      print *, 'fail = ', fail
-      print *, 'error = ', error
-      print *, 'prob = ', prob
-      print *, 'integral = ', integral(1)
-     end if
-
-     ! Round the results to the nearest integer
-     !N_sup = nint( integral(1) )
-     N_sup = integral(1) * time_step_div_q0
-
-  end subroutine Do_Cuba_Suave_GTF_Tip
+    ! Finish calculating the average field
+    F_avg = F_avg / neval
+  end subroutine Do_Surface_Integration_GTF_Tip
 
   ! ----------------------------------------------------------------------------
   ! This subroutine does the Cuba integration for the field emission tip.
-  subroutine Do_Cuba_Suave_FE_Tip(emit, N_sup)
+  subroutine Do_Surface_Integration_FE_Tip(emit, N_sup)
     ! Input / output variables
     integer, intent(in)           :: emit
     double precision, intent(out) :: N_sup
 
-    ! Cuba integration variables
-    integer, parameter :: ndim = 2 ! Number of dimensions
-    integer, parameter :: ncomp = 1 ! Number of components in the integrand
-    integer            :: userdata = 0 ! User data passed to the integrand
-    integer, parameter :: nvec = 1 ! Number of points given to the integrand function
-    double precision   :: epsrel = 1.0d-2 ! Requested relative error
-    double precision   :: epsabs = 1.0d-4 ! Requested absolute error
-    integer            :: flags = 0+4 ! Flags
-    integer            :: seed = 0 ! Seed for the rng. Zero will use Sobol.
-    integer            :: mineval = 1000 ! Minimum number of integrand evaluations
-    integer            :: maxeval = 50000000 ! Maximum number of integrand evaluations
-    integer            :: nnew = 250 ! Number of integrand evaluations in each subdivision
-    integer            :: nmin = 100 ! Minimum number of samples a former pass must contribute to a subregion to be considered in the region's compound integral value.
-    double precision   :: flatness = 5.0d0 ! Determine how prominently out-liers, i.e. samples with a large fluctuation, 
-                                           ! figure in the total fluctuation, which in turn determines how a region is split up.
-                                           ! As suggested by its name, flatness should be chosen large for 'flat" integrand and small for 'volatile' integrands
-                                           ! with high peaks.
-    character          :: statefile = "" ! File to save the state in. Empty string means don't do it.
-    integer            :: spin = -1 ! Spinning cores
-    integer            :: nregions ! <out> The actual number of subregions nedded
-    integer            :: neval ! <out> The actual number of integrand evaluations needed
-    integer            :: fail ! <out> Error flag (0 = Success, -1 = Dimension out of range, >0 = Accuracy goal was not met)
-    double precision, dimension(1:ncomp) :: integral ! <out> The integral of the integrand over the unit hybercube
-    double precision, dimension(1:ncomp) :: error ! <out> The presumed absolute error
-    double precision, dimension(1:ncomp) :: prob ! <out> The chi-square probability
-
-    !integer            :: verbose = 0
-    !integer, parameter :: last = 4
-    integer, parameter :: key = 0
-
+    integer                          :: nregions, neval, fail
+    double precision, dimension(1:1) :: integral, error, prob
 
     ! Initialize the average field to zero
-    !F_avg = 0.0d0
+    F_avg = 0.0d0
 
-    ! Pass the number of the emitter being integraded over to the integrand as userdata
-    userdata = emit
+    call Cuba_Integrate(integrand_cuba_fe_tip_test, 1, emit, integral, error, prob, nregions, neval, fail)
 
-    !call suave(ndim, ncomp, integrand_cuba_fe_tip_test, userdata, nvec, &
-    ! & epsrel, epsabs, flags, seed, &
-    ! & mineval, maxeval, nnew, nmin, flatness, &
-    ! & statefile, spin, &
-    ! & nregions, neval, fail, integral, error, prob)
+    N_sup = integral(1)
 
-     call cuhre(ndim, ncomp, integrand_cuba_fe_tip_test, userdata, nvec, &
-     & epsrel, epsabs, flags, &
-     & mineval, maxeval, key, &
-     & statefile, spin, &
-     & nregions, neval, fail, integral, error, prob)
-
-
-     if (fail /= 0) then
-      print '(a)', 'RUMDEED: WARNING Cuba did not return 0'
-      print *, fail
-      print *, error
-      print *, prob
-      print *, integral(1)
-     end if
-
-     ! Round the results to the nearest integer
-     !N_sup = nint( integral(1) )
-     N_sup = integral(1)
-
-    !  print *, 'Integral results'
-    !  print *, integral(1)
-    !  print *, N_sup
-    !  print *, Tip_Area(1.0d0, max_xi, 0.0d0, 2.0d0*pi)
-    !  print *, ''
-    !  print *, a_foci
-    !  pause
-
-     ! Finish calculating the average field
-     F_avg = F_avg / neval
-  end subroutine Do_Cuba_Suave_FE_Tip
+    ! Finish calculating the average field
+    F_avg = F_avg / neval
+  end subroutine Do_Surface_Integration_FE_Tip
 
   ! Gives a gaussian emission curve
   ! where step is the current time step

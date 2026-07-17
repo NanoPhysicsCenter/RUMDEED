@@ -32,7 +32,7 @@ contains
 ! Current density: A/cm² -> A/m²
 ! Note that in Kevins units the electron charge is e = 1.
 ! This means that 1 V = 1 eV and that 1 GV/m = 1 eV/nm.
-! See Chapter 2 page 10 in Kevins book Introduction to the Physics of Electrom Emission.
+! See Chapter 2 page 10 in Kevins book Introduction to the Physics of Electron Emission.
 double precision function Get_Kevin_Jgtf(F, T, w_theta)
   double precision, intent(in) :: F, T, w_theta
   double precision             :: Chem = 7.0d0 ! Chemical potential, it dosen't seem to matter what this number is!

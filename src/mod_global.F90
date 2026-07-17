@@ -39,14 +39,33 @@ module mod_global
   !double precision, parameter :: m_e = m_eeff * m_0 ! m_e* Effective electron mass (kg)
   !double precision, parameter :: m_h = m_heff * m_0! m_h* Effective hole mass (kg)
 
-  double precision, parameter :: m_N2p = 2*14.00674d0*m_u - m_0 ! Mass of N_2^+ ion (kg)
 
   double precision, parameter :: q_0 = 1.602176634d-19 ! Elementary charge (C)
   double precision, parameter :: q_02 = q_0**2 ! Elementary charge squared (C)
+  double precision, parameter :: r_0 = 1.0d0/(4.0d0*pi*epsilon_0)*(q_0**2/m_0*c**2) ! Classical electron radius (m)
 
   double precision, parameter :: T_ntp = 293.15d0 ! Normal temperature in Kelvin (NIST)
   double precision, parameter :: P_ntp = 101325.0d0 ! Normal pressure in Pa (NIST)
 
+  ! Rydberg constants
+  double precision, parameter :: R_inf = m_0*q_0**4/(8.0d0*epsilon_0**2*h**3*c) ! Rydberg constant (m^-1)
+  double precision, parameter :: Ryd = h*c*R_inf/q_0 ! Rydberg energy (eV)
+
+  ! N2
+  double precision, parameter :: m_N2 = 28.0134d0*m_u ! Mass of N_2 molecule (kg)
+  double precision, parameter :: m_N2p = m_N2 - m_0 ! Mass of N_2^+ ion (kg)
+  double precision, parameter :: N_r = 0.185d-9 ! N2- radius
+  double precision, parameter :: Z_i = 1.0d0 ! Charge of N2- ion
+  double precision, parameter :: Z_i2 = Z_i**2 ! Charge of N2- ion squared
+  double precision, parameter :: Z_c = 7.0d0 ! Nuclear core charge of nitrogen
+!   double precision, parameter :: Z_eff = sqrt(Z_i*Z_c) ! Effective charge of N2- ion
+!   double precision, parameter :: Z_eff2 = Z_eff**2 ! Effective charge of N2- ion squared
+  double precision, parameter :: N_n = 2.0d0 ! Principal quantum number of nitrogen
+!   double precision, parameter :: CS_RR_NUM = 2.105d-26*Ryd**2*(Z_eff**4) ! Numerator of Kramers cross section
+!   double precision, parameter :: N_bind = Z_eff2 / N_n**2 * Ryd ! Nitrogen binding energy
+  double precision, parameter :: N_bind = 15.581d0 ! Nitrogen binding energy (NIST)
+  double precision, parameter :: Z_eff = sqrt(N_bind*N_n**2/Ryd) ! Effective charge of N2- ion
+  double precision, parameter :: Z_eff2 = Z_eff**2 ! Effective charge of N2- ion squared
   
   ! ----------------------------------------------------------------------------
   ! Define scales used when reading and writing data
@@ -57,15 +76,18 @@ module mod_global
 
 
   ! ----------------------------------------------------------------------------
-  ! Parameters for the surface integration using CUBA
+  ! Parameters for the surface integration using CUBA (see mod_cuba_integration).
+  ! All of these can be overridden in the input file.
   integer, parameter :: cuba_method_suave = 1
   integer, parameter :: cuba_method_divonne = 2
+  integer, parameter :: cuba_method_cuhre = 3
   integer            :: cuba_method = cuba_method_divonne ! Method to use
 
-  double precision   :: cuba_epsabs = 0.5d0 ! Requested absolute error
-  double precision   :: cuba_epsrel = 0.0d0 ! Requested relative error
-  !double precision   :: cuba_epsabs = 1.0d-8 ! Requested absolute error
-  !double precision   :: cuba_epsrel = 1.0d-14 ! Requested relative error
+  ! The supply integrals are in units of electrons per time step, so the
+  ! integration stops at an error of half an electron or 0.1% of the supply,
+  ! whichever is larger.
+  double precision   :: cuba_epsabs = 0.5d0  ! Requested absolute error
+  double precision   :: cuba_epsrel = 1.0d-3 ! Requested relative error
   integer            :: cuba_maxeval = 5000000 ! Maximum number of integrand evaluations
   integer            :: cuba_mineval = 1000    ! Minimum number of integrand evaluations
 
@@ -73,16 +95,17 @@ module mod_global
   ! ----------------------------------------------------------------------------
   ! Define maximum size constants.
   ! These can be increased if needed.
-  integer, parameter :: MAX_PARTICLES = 500000 ! Maximum number of particles allowed in the system
+  integer, parameter :: MAX_PARTICLES = 5000000 ! Maximum number of particles allowed in the system
   integer, parameter :: MAX_EMITTERS  = 1      ! Maximum number of emitters in the system
   integer, parameter :: MAX_SECTIONS  = 96*96    ! Maximum number of sections an emitter can have
 
   ! ----------------------------------------------------------------------------
   ! Define the particle species
-  integer, parameter :: species_unkown   = 0 ! Unknown particle
-  integer, parameter :: species_elec     = 1 ! Electron
-  integer, parameter :: species_ion      = 2 ! Ion
-  integer, parameter :: nrSpecies        = 2 ! 2 = Elec or Ion
+  integer, parameter :: species_unkown    = 0 ! Unknown particle
+  integer, parameter :: species_elec      = 1 ! Electron
+  integer, parameter :: species_ion       = 2 ! Ion
+  integer, parameter :: species_atom      = 3 ! Atom
+  integer, parameter :: nrSpecies         = 3 ! 2 = Elec, Ion, or Atom
 
 
   ! ----------------------------------------------------------------------------
@@ -90,9 +113,17 @@ module mod_global
   integer, parameter :: remove_unknown = 0
   integer, parameter :: remove_top     = 1
   integer, parameter :: remove_bot     = 2
+  integer, parameter :: remove_recom   = 3
+  integer, parameter :: remove_ion     = 4
 
   ! ----------------------------------------------------------------------------
-  ! Define storage arrays for particles
+  ! Ion emission
+  integer, parameter :: ion_emitter = 2
+  integer, parameter :: recom_emitter = 3
+  integer, parameter :: atom_emitter = 4
+
+  ! ----------------------------------------------------------------------------
+  ! Electron data
   ! Position and velocity of particles. Fyrst dimension is x,y,z, second one is the number of the particle
   double precision, dimension(:, :), allocatable :: particles_cur_pos    ! Current position (1:3, 1:MAX_PARTICLES)
   double precision, dimension(:, :), allocatable :: particles_prev_pos   ! Previous position
@@ -101,6 +132,8 @@ module mod_global
   double precision, dimension(:, :), allocatable :: particles_cur_accel  ! Current acceleration
   double precision, dimension(:, :), allocatable :: particles_prev_accel ! Previous acceleration
   double precision, dimension(:, :), allocatable :: particles_prev2_accel ! Previous acceleration
+  double precision, dimension(:)   , allocatable :: particles_nearest_dist ! Distance from nearest particle
+  integer         , dimension(:)   , allocatable :: particles_nearest_id ! ID of nearest particle
 
   ! Other information about particles, the dimension is the number of particles
   double precision, dimension(:)   , allocatable :: particles_charge     ! Charge
@@ -113,7 +146,30 @@ module mod_global
   logical         , dimension(:)   , allocatable :: particles_mask       ! Mask array used to indicate which particles should be removed
                                                                          ! .true. means that the particle is active,
                                                                          ! .false. means it is inactive and should be removed
+  logical         , dimension(:)   , allocatable :: particles_elec_mask  ! Remove flag for the particles
+  logical         , dimension(:)   , allocatable :: particles_ion_mask   ! Remove flag for the particles
+  logical         , dimension(:)   , allocatable :: particles_atom_mask  ! Remove flag for the particles
   integer         , dimension(:)   , allocatable :: particles_id         ! ID to track the particle
+
+  ! Pointer arrays
+  integer, dimension(:), pointer :: particles_elec_pointer ! From nrElec to nrPart
+  integer, dimension(:), pointer :: particles_ion_pointer   ! From nrIon to nrPart
+  integer, dimension(:), pointer :: particles_atom_pointer  ! From nrAtom to nrPart
+  integer, dimension(:), pointer :: particles_inverse_pointer ! From nrPart to nrElec, nrIon, or nrAtom (inverse of the above)
+
+  ! Collision data
+  double precision, dimension(:), allocatable :: particles_cur_energy         ! Current kinetic energy of each particle
+  double precision, dimension(:), allocatable :: particles_recom_cross_rad    ! Recombination cross section for electrons
+  double precision, dimension(:), allocatable :: particles_ion_cross_sec      ! Ionization cross section for electrons
+  double precision, dimension(:), allocatable :: particles_ion_cross_rad      ! Ionization cross section radius for electrons
+  double precision, dimension(:), allocatable :: particles_tot_cross_sec      ! Total collision cross section for electrons
+
+  ! Incremented by mod_pair whenever particles_charge / particles_mass change
+  ! (adding, removing or compacting particles). The OpenACC code in mod_verlet
+  ! compares it against the revision of its device copies, so the charge and
+  ! mass uploads can be skipped on the (majority of) time steps where only the
+  ! positions changed.
+  integer :: particles_charge_rev = 0
 
   ! Cross Sections
   double precision, allocatable, target, dimension(:, :) :: N2_tot_cross ! Total cross section of N2
@@ -125,6 +181,7 @@ module mod_global
   ! Fyrst dimension is x,y,z, second one is the number of the emitter
   double precision, dimension(:, :), allocatable :: emitters_pos         ! Position of the emitters (1:3, 1:MAX_EMITTERS)
   double precision, dimension(:, :), allocatable :: emitters_dim         ! Dimensions of the emitters
+  double precision, dimension(:, :), allocatable :: emitters_ring        ! Outer radius, inner radius, thickness
   ! Dimension is the number of emitters
   integer,          dimension(:),    allocatable :: emitters_Type        ! The type of emitter
   integer,          dimension(:),    allocatable :: emitters_delay       ! The time step the emitters become active
@@ -141,10 +198,15 @@ module mod_global
 
   double precision :: time_step  ! Size of the time_step
   double precision :: time_step2 ! time_step squared
+  integer :: atom_time_interval ! Time interval for atom movement
+  double precision :: atom_time_step ! Size of the time_step for atom movement
+  double precision :: atom_interval2 ! atom_time_step squared
 
   integer          :: steps      ! Number of time steps in the simulation
 
-  logical          :: collisions = .false. ! Do ion colissions or not
+  integer          :: collision_mode = 0 ! Type of collision
+  integer          :: collision_delay = 0 ! Type of ion collision
+  double precision :: ion_atom_ratio = 0.0d0 ! Ratio of ions to atoms
   integer          :: ion_life_time = 100000000 ! Lifetime of ions
 
   double precision :: T_temp = T_ntp ! Temperature in Kelvin
@@ -164,22 +226,30 @@ module mod_global
   integer :: nrPart ! Number of particles in the system (nrPart = nrElec + nrIon + nrFixedPart)
   integer :: nrElec ! Number of electrons in the system
   integer :: nrIon ! Number of ion's in the system
+  integer :: nrAtom ! Number of atoms in the system
   integer :: nrElecIon
   integer :: nrEmit ! Number of emitters in the system
   integer :: nrID   ! Number for the current id
 
   integer :: nrPart_remove_top
   integer :: nrPart_remove_bot
+  integer :: nrPart_remove_recom
+  integer :: nrPart_remove_ion
 
   integer :: nrElec_remove_top
   integer :: nrElec_remove_bot
+  integer :: nrElec_remove_recom
 
   integer :: nrIon_remove_top
   integer :: nrIon_remove_bot
+  integer :: nrIon_remove_recom
+
+  integer :: nrAtom_remove_ion
 
   integer :: nrPart_remove ! Number of particles to be removed
   integer :: nrElec_remove ! Number of electrons to be removed
   integer :: nrIon_remove ! Number of ion's to be removed
+  integer :: nrAtom_remove ! Number of atoms to be removed
 
   integer, dimension(:), allocatable :: nrElec_remove_top_emit
 
@@ -190,13 +260,16 @@ module mod_global
   integer, parameter :: EMIT_CIRCLE          = 1
   integer, parameter :: EMIT_RECTANGLE       = 2
   integer, parameter :: EMIT_RECTANGLE_SPOTS = 3
+  integer, parameter :: EMIT_RING            = 4
 
 
   double precision, dimension(:), allocatable :: ramo_current
   double precision, dimension(:, :), allocatable :: ramo_current_emit
 
   double precision                 :: avg_mob ! Average mobility
-  double precision, dimension(1:3) :: avg_vel ! Average speed
+  double precision, dimension(1:3) :: avg_part_vel ! Average particle speed
+  double precision, dimension(1:3) :: avg_elec_vel ! Average electron speed
+  double precision, dimension(1:3) :: avg_ion_vel  ! Average ion speed
 
   double precision :: cur_time ! This is updated in the main loop, given in ps
   integer, parameter :: MAX_LIFE_TIME = 1000
@@ -236,6 +309,20 @@ module mod_global
   integer           :: N_ic_max = 0
 
   ! ----------------------------------------------------------------------------
+  ! mh_batch: Run the Metropolis-Hastings chains of the field emission
+  ! (mod_field_emission_v2) in lockstep, evaluating the surface field for all
+  ! chains in one batch per jump (see Calc_Field_at_Batch in mod_verlet).
+  ! This is much faster, especially with OpenACC GPU offload (set it to
+  ! .true. in the input file for GPU runs), but all chains see the particle
+  ! configuration from the start of the time step: electrons emitted within
+  ! the current step do not affect the remaining chains, unlike the serial
+  ! algorithm where each chain sees the electrons added before it. The two
+  ! settings agree statistically, but not run for run, so the default is
+  ! .false.: existing input files keep the serial sampling behaviour (and
+  ! bit-identical results) they had before the batch algorithm was added.
+  logical           :: mh_batch = .false.
+
+  ! ----------------------------------------------------------------------------
   ! Define constants
   ! The constant in front of Coulomb's law, often called k
   double precision, parameter :: div_fac_c = 1.0d0/(4.0d0*pi*epsilon_0*epsilon_r) ! 1/(4*pi*epsilon_0*epsilon_r)
@@ -259,6 +346,21 @@ module mod_global
   ! Other stuff
   logical            :: write_ramo_sec = .False. ! Write out the ramo current for each section.
   logical            :: write_position_file = .False. ! Write data to the particle position information.
+  logical            :: write_recombination_file = .False.
+  logical            :: write_particle_data_file = .false.
+  logical            :: write_electron_data_file = .false.
+  logical            :: write_ion_data_file = .false.
+  logical            :: sample_atom_file = .false.
+  integer            :: sample_atom_rate = 500
+  logical            :: sample_elec_file = .false.
+  integer            :: sample_elec_rate = 500
+
+  logical :: two_time_step = .false.
+     
+  ! Laplace solver
+  logical            :: use_polarso = .false., write_field_files = .false.
+  double precision, dimension(3) :: polarso_dim, polarso_pos
+  real(kind=8) :: polarso_padding, polarso_step
 
 
   ! ----------------------------------------------------------------------------
@@ -268,10 +370,13 @@ module mod_global
   integer :: ud_absorb ! File for absorbed electrons and ion's
   integer :: ud_absorb_top ! File for absorbed electrons and ion's
   integer :: ud_absorb_bot ! File for absorbed electrons and ion's
+  integer :: ud_absorb_recom ! File for absorbed electrons and ions during recombination
   integer :: ud_ramo ! File for the Ramo current
   integer :: ud_volt ! Voltage in the system
   integer :: ud_debug ! File for debuging and testing
   integer :: ud_field ! File for surface field
+  integer :: ud_laplace_average_field
+  integer :: ud_grid
   integer :: ud_coll ! Collisions
   integer :: ud_integrand ! Information about the surface integration
   integer :: ud_mh ! Information about MH
@@ -279,14 +384,20 @@ module mod_global
 
   ! unit descriptors for data files (binary files)
   integer :: ud_ramo_sec ! File for the ramo current broken down into emitters and sections
+  integer :: ud_ionization_data
+  integer :: ud_recombination_data
 
   ! Emission density (binary files)
   integer :: ud_density_emit
   integer :: ud_density_ion
+  integer :: ud_density_emit_elec
+  integer :: ud_density_emit_ion
+  integer :: ud_density_emit_atom
 
   ! Absorption density (binary files)
   integer :: ud_density_absorb_top
   integer :: ud_density_absorb_bot
+  integer :: ud_density_absorb_recom
 
   !-----------------------------------------------------------------------------
   ! Nodal Analysis
@@ -307,13 +418,20 @@ module mod_global
   ! ----------------------------------------------------------------------------
   ! Define namelist for the input file
   ! These variables are read for the input file.
-  namelist /input/ V_s, box_dim, time_step, steps, &
+  namelist /input/ V_s, box_dim, time_step, atom_time_interval, steps, &
                    nrEmit, emitters_pos, emitters_dim, &
-                   emitters_type, emitters_delay, EMISSION_MODE, &
-                   image_charge, N_ic_max, collisions, T_temp, P_abs, &
-                   write_ramo_sec, write_position_file, R_s, &
-                   R_p, L_p, C_p, ion_life_time, &
-                   planes_N, planes_z
+                   emitters_type, emitters_delay, emission_mode, &
+                   image_charge, N_ic_max, &
+                   collision_mode, collision_delay, ion_atom_ratio, T_temp, P_abs, &
+                   write_ramo_sec, write_position_file, &
+                   write_recombination_file, write_particle_data_file, &
+                   write_electron_data_file, write_ion_data_file, &
+                   sample_atom_file, sample_atom_rate, &
+                   sample_elec_file, sample_elec_rate, &
+                   R_s, R_p, L_p, C_p, ion_life_time, &
+                   planes_N, planes_z, mh_batch, &
+                   cuba_method, cuba_epsabs, cuba_epsrel, &
+                   cuba_mineval, cuba_maxeval
 
   ! ----------------------------------------------------------------------------
   ! Procedure interfaces and pointers
@@ -376,6 +494,8 @@ contains
    flush(ud_volt)
    flush(ud_debug)
    flush(ud_field)
+   flush(ud_laplace_average_field)
+   flush(ud_grid)
    flush(ud_coll)
    flush(ud_integrand)
    flush(ud_mh)

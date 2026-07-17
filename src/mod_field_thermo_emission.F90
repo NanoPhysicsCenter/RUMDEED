@@ -11,7 +11,8 @@ Module mod_field_thermo_emission
   use mod_velocity
   use mod_pair
   use mod_work_function
-  use mod_kevin_rjgtf
+  use mod_kevin_rjgtf_v2
+  use mod_cuba_integration
   implicit none
 
   PRIVATE
@@ -151,7 +152,7 @@ subroutine Init_Field_Thermo_Emission()
 
 
     ! Do integration
-    call Do_Cuba_Suave_Simple(emit, N_sup)
+    call Do_Surface_Integration_Simple(emit, N_sup)
 
     ! Use the number of electrons as an average for a Poission distribution to get the number of electrons to emit.
     N_round = Rand_Poisson(N_sup)
@@ -212,22 +213,9 @@ subroutine Init_Field_Thermo_Emission()
     !ndim = ndim_in
     ndim_in = 0
 
-    ! Try to keep the acceptance ratio around 50% by
-    ! changing the standard deviation.
-    CALL RANDOM_NUMBER(rnd) ! Change be a random number
-    if (a_rate < 0.525d0) then
-      MH_std = MH_std * (1.0d0 - rnd*0.00025d0)
-    else
-      MH_std = MH_std * (1.0d0 + rnd*0.00025d0)
-    end if
-    ! Limits on how big or low the standard deviation can be.
-    if (MH_std > 0.1250d0) then
-      MH_std = 0.1250d0
-    else if (MH_std < 0.005d0) then
-      MH_std = 0.005d0
-    end if
-
-    std(1:2) = emitters_dim(1:2, emit)*MH_std ! Standard deviation for the normal distribution is 0.075% of the emitter length.
+    ! The proposal step MH_std is fixed during the chain and updated once at
+    ! the end from the acceptance rate of this chain (see below).
+    std(1:2) = emitters_dim(1:2, emit)*MH_std ! Standard deviation for the normal distribution is MH_std of the emitter length.
     ! This means that 68% of jumps are less than this value.
     ! The expected value of the absolute value of the normal distribution is std*sqrt(2/pi).
 
@@ -252,19 +240,21 @@ subroutine Init_Field_Thermo_Emission()
         count = count + 1
         if (count > 10000) then ! The loop is infnite, must stop it at some point.
         ! In field emission it is rare the we reach the CL limit.
+          ! Mark the chain as failed and return a defined position, the
+          ! caller skips the emission when ndim_in < 0.
           ndim_in = -1
+          pos_out(1:2) = emitters_pos(1:2, emit)
+          pos_out(3) = 0.0d0
           print *, 'Failed to find spot for emission'
           return ! Exit the function
         end if
       end if
     end do
 
-    ! Calculate the escape probability at this location
-    if (field(3) < 0.0d0) then
-      df_cur = max(Get_Kevin_Jgtf(field(3), T_temp, cur_w), 1.0d-12) ! Floor to avoid div-by-zero in alpha
-    else
-      df_cur = 1.0d-12 ! Zero escape probabilty if field is not favourable
-    end if
+    ! The chain target is the current density at this location. We work with
+    ! its log because J spans a huge dynamic range, the tiny() guard only
+    ! catches a J that underflows to zero.
+    df_cur = log(max(Get_Kevin_Jgtf_v2(field(3), T_temp, cur_w), tiny(1.0d0)))
 
     !---------------------------------------------------------------------------
     ! We now pick a random distance and direction to jump to from our
@@ -286,13 +276,17 @@ subroutine Init_Field_Thermo_Emission()
       new_w = w_theta_xy(new_pos, emit)
 
       ! Check if the field is favourable for emission at the new position.
-      ! If it is not then cycle, i.e. we reject this location and
-      ! pick another one.
-      if (field(3) > 0.0d0) cycle ! Do the next loop iteration, i.e. find a new position.
+      ! If it is not the current density there is zero, i.e. we reject this
+      ! location and pick another one. It counts as a rejected jump so the
+      ! acceptance rate that drives MH_std sees it.
+      if (field(3) > 0.0d0) then
+        jump_r = jump_r + 1
+        cycle ! Do the next loop iteration, i.e. find a new position.
+      end if
 
-      ! Calculate the escape probability at the new position, to compair with
+      ! Calculate the current density at the new position, to compare with
       ! the current position.
-      df_new = max(Get_Kevin_Jgtf(field(3), T_temp, new_w), 1.0d-12) ! Floor to avoid div-by-zero in alpha
+      df_new = log(max(Get_Kevin_Jgtf_v2(field(3), T_temp, new_w), tiny(1.0d0)))
 
       ! if (abs(cur_w - new_w) > 0.25) then
       !   print *, df_new / df_cur
@@ -304,16 +298,16 @@ subroutine Init_Field_Thermo_Emission()
       !   pause
       ! end if
 
-      alpha = df_new / df_cur
+      alpha = df_new - df_cur ! Log of the Metropolis ratio
 
-      if (alpha >= 1.0d0) then
+      if (df_new >= df_cur) then
         cur_pos = new_pos
         df_cur = df_new
         cur_w = new_w
         jump_a = jump_a + 1
       else
         CALL RANDOM_NUMBER(rnd)
-        if (rnd < alpha) then
+        if (log(rnd) <= alpha) then
           cur_pos = new_pos
           df_cur = df_new
           cur_w = new_w
@@ -344,9 +338,18 @@ subroutine Init_Field_Thermo_Emission()
       ! end if
     end do
 
-    ! Acceptance rate (only update when at least one jump was attempted, to avoid 0/0)
+    ! The acceptance rate of this chain drives one multiplicative update of
+    ! the proposal step size, towards an acceptance ratio of about 50%.
+    ! (Only update when at least one jump was attempted, to avoid 0/0.)
     if ((jump_a + jump_r) > 0) then
       a_rate = DBLE(jump_a) / DBLE(jump_r + jump_a)
+      MH_std = MH_std * exp(0.025d0*(a_rate - 0.525d0))
+      ! Limits on how big or low the standard deviation can be.
+      if (MH_std > 0.1250d0) then
+        MH_std = 0.1250d0
+      else if (MH_std < 0.005d0) then
+        MH_std = 0.005d0
+      end if
     end if
     !print *, jump_a
     !print *, jump_r
@@ -417,9 +420,10 @@ subroutine Init_Field_Thermo_Emission()
     ! Check if the field is favourable for emission
     if (field(3) < 0.0d0) then
       ! The field is favourable for emission
-      ! Calculate the current density at this point
+      ! Calculate the current density at this point and convert it to
+      ! electrons supplied per time step
       w_theta = w_theta_xy(par_pos, userdata)
-      ff(1) = Get_Kevin_Jgtf(field(3), T_temp, w_theta)
+      ff(1) = Get_Kevin_Jgtf_v2(field(3), T_temp, w_theta) * time_step_div_q0
       !ff(1) = Elec_Supply_V2(field(3), par_pos, userdata)*Escape_Prob(field(3), par_pos, userdata)
     else
       ! The field is NOT favourable for emission
@@ -434,64 +438,25 @@ subroutine Init_Field_Thermo_Emission()
     integrand_cuba_simple = 0 ! Return value to Cuba, 0 = success
   end function integrand_cuba_simple
 
-  subroutine Do_Cuba_Suave_Simple(emit, N_sup)
+  subroutine Do_Surface_Integration_Simple(emit, N_sup)
     ! Input / output variables
     integer, intent(in)           :: emit
     double precision, intent(out) :: N_sup
 
-    ! Cuba integration variables
-    integer, parameter :: ndim = 2 ! Number of dimensions
-    integer, parameter :: ncomp = 1 ! Number of components in the integrand
-    integer            :: userdata = 0 ! User data passed to the integrand
-    integer, parameter :: nvec = 1 ! Number of points given to the integrand function
-    double precision   :: epsrel = 1.0d-2 ! Requested relative error
-    double precision   :: epsabs = 1.0d-4 ! Requested absolute error
-    integer            :: flags = 0+4 ! Flags
-    integer            :: seed = 0 ! Seed for the rng. Zero will use Sobol.
-    integer            :: mineval = 10000 ! Minimum number of integrand evaluations
-    integer            :: maxeval = 5000000 ! Maximum number of integrand evaluations
-    integer            :: nnew = 2500 ! Number of integrand evaluations in each subdivision
-    integer            :: nmin = 1000 ! Minimum number of samples a former pass must contribute to a subregion to be considered in the region's compound integral value.
-    double precision   :: flatness = 5.0d0 ! Determine how prominently out-liers, i.e. samples with a large fluctuation, 
-                                           ! figure in the total fluctuation, which in turn determines how a region is split up.
-                                           ! As suggested by its name, flatness should be chosen large for 'flat" integrand and small for 'volatile' integrands
-                                           ! with high peaks.
-    character          :: statefile = "" ! File to save the state in. Empty string means don't do it.
-    integer            :: spin = -1 ! Spinning cores
-    integer            :: nregions ! <out> The actual number of subregions nedded
-    integer            :: neval ! <out> The actual number of integrand evaluations needed
-    integer            :: fail ! <out> Error flag (0 = Success, -1 = Dimension out of range, >0 = Accuracy goal was not met)
-    double precision, dimension(1:ncomp) :: integral ! <out> The integral of the integrand over the unit hybercube
-    double precision, dimension(1:ncomp) :: error ! <out> The presumed absolute error
-    double precision, dimension(1:ncomp) :: prob ! <out> The chi-square probability
-
+    integer                          :: nregions, neval, fail
+    double precision, dimension(1:1) :: integral, error, prob
 
     ! Initialize the average field to zero
     F_avg = 0.0d0
 
-    ! Pass the number of the emitter being integraded over to the integrand as userdata
-    userdata = emit
+    call Cuba_Integrate(integrand_cuba_simple, 1, emit, integral, error, prob, nregions, neval, fail)
 
-    call suave(ndim, ncomp, integrand_cuba_simple, userdata, nvec, &
-     & epsrel, epsabs, flags, seed, &
-     & mineval, maxeval, nnew, nmin, flatness, &
-     & statefile, spin, &
-     & nregions, neval, fail, integral, error, prob)
+    ! The integrand is in electrons supplied per time step
+    N_sup = integral(1)
 
-     if (fail /= 0) then
-      print '(a)', 'RUMDEED: WARNING Cuba did not return 0'
-      print *, fail
-      print *, error
-      print *, prob
-     end if
-
-     !! Round the results to the nearest integer
-     !N_sup = nint( integral(1) )
-     N_sup = integral(1) * time_step_div_q0
-
-     ! Finish calculating the average field
-     F_avg = F_avg / neval
-  end subroutine Do_Cuba_Suave_Simple
+    ! Finish calculating the average field
+    F_avg = F_avg / neval
+  end subroutine Do_Surface_Integration_Simple
 
   ! !----------------------------------------------------------------------------------------
   ! ! A function that calculates
