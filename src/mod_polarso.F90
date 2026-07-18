@@ -74,8 +74,9 @@ module mod_polarso
     real(kind=8) :: emitter_radius, min_d
     real(kind=8), dimension(3) :: h_grid ! Grid spacing (renamed from h to avoid clash with Planck's constant in mod_global)
     real(kind=8), dimension(3) :: div_h, div_h2, div_h3
-    real(kind=8), dimension(3,2) :: elec_lim, grid_lim, emit_lim, anode_lim
+    real(kind=8), dimension(3,2) :: elec_lim, grid_lim, emit_lim
     integer(kind=8) :: Nx, Ny, Nz, nrGrid, nrGridActive, NxNy
+    logical :: anode_in_grid, cathode_in_grid
 
     ! Input file
     namelist /polarso/ use_polarso, polarso_dim, polarso_pos, &
@@ -121,10 +122,10 @@ contains
         polarso_step = polarso_step * length_scale
     end subroutine Read_Polarso_Variables
 
-    subroutine PL_Calculate_Field() ! TODO
-        if (write_field_files .eqv. .true.) then
-            call Place_Electron()
-        end if
+    subroutine PL_Calculate_Field()
+        ! Note: write_field_files only writes diagnostic output; it must not
+        ! change the simulation. Call Place_Electron manually (e.g. from a
+        ! test driver) if a single test electron is wanted.
         print *, 'Polarso: finding electrons'
         call full_update_charge()
         print *, 'Polarso: updating matrix'
@@ -146,9 +147,16 @@ contains
 
     subroutine PL_Update_Field(index)
         integer(kind=8), intent(in) :: index ! Index of the new particle in particle arrays
+        integer(kind=8) :: charge_slot
 
-        call partial_update_charge(index)
-        call partial_update_rhs(index)
+        ! partial_update_charge claims a slot in the newCharge_* arrays; the
+        ! RHS update must use that slot, not the particle index (the two only
+        ! coincide when every particle so far was deposited).
+        call partial_update_charge(index, charge_slot)
+        if (charge_slot == 0) then
+            return ! Particle outside the solver window: field unchanged
+        end if
+        call partial_update_rhs(charge_slot)
         call solve_system()
         call allocate_voltage()
         call calculate_field()
@@ -160,20 +168,23 @@ contains
 ! ------------------------------------------------------------------------------
 
     subroutine solve_system()
-        real(kind=8), dimension(nrGridActive) :: sol_b
-        real(kind=8) :: error
-        integer(kind=8) :: i
+        ! Allocatable rather than automatic: nrGridActive can be large and
+        ! automatic arrays live on the stack.
+        real(kind=8), allocatable, dimension(:) :: sol_b
+        real(kind=8) :: error, norm_b
 
         ! Attempt direct solution with pardiso
         ! print *, 'Polarso: attempting direct solver'
         call direct_solve_system()
 
-        ! Compute relative error
-        ! print * , 'Polarso: computing error'
+        ! Compute relative error (absolute when b = 0, i.e. no space charge)
         sol_b = sparse_dot(nrGridActive, nnz_values, nnz_ia, nnz_col_index, x)
-        error = norm2(sol_b-b)/norm2(b)
-
-        ! print *, error
+        norm_b = norm2(b)
+        if (norm_b > 0.0d0) then
+            error = norm2(sol_b-b)/norm_b
+        else
+            error = norm2(sol_b)
+        end if
 
         ! Possibly use iterative solver
         if (error > 10.0d0**(-switch_tol)) then
@@ -183,23 +194,24 @@ contains
         
     end subroutine solve_system
 
-    subroutine direct_solve_system() ! TODO
+    subroutine direct_solve_system()
         ! Solve the system
-        integer(kind=8) :: i
-        real(kind=8) :: start, end
-
         call pardiso_phase(33,0)
 
     end subroutine direct_solve_system
 
     subroutine iterative_solve_system() ! TODO
-        real(kind=8), dimension(nrGridActive) :: sol_b
-        real(kind=8) :: error
+        real(kind=8), allocatable, dimension(:) :: sol_b
+        real(kind=8) :: error, norm_b
         integer(kind=8) :: par_error
         integer(kind=8) :: itercount
-        ! Solve the system iteratively        
-        ! print *, 'Polarso: initializing dfgmres'
-        allocate(tmp((2*ipar(15)+1)*nrGridActive + ipar(15)*(ipar(15)+9)/2 + 1))
+        integer(kind=8) :: n_restart
+        ! Solve the system iteratively
+        ! dfgmres_init sets ipar(15), the restart length, to min(150, n), so
+        ! tmp can be sized to match before the init call (ipar(15) itself is
+        ! undefined until dfgmres_init has run).
+        n_restart = min(150_8, nrGridActive)
+        allocate(tmp((2*n_restart+1)*nrGridActive + n_restart*(n_restart+9)/2 + 1))
         call init_dfgmres()
         ipar(5) = max_iter
         ipar(8) = 0
@@ -207,8 +219,6 @@ contains
         ipar(11) = 1
 
         ! print *, 'Polarso: checking dfgmres'
-        deallocate(tmp)
-        allocate(tmp((2*ipar(15)+1)*nrGridActive + ipar(15)*(ipar(15)+9)/2 + 1))
         call dfgmres_check(nrGridActive, x, b, rci_request, ipar, dpar, tmp)
         if (rci_request /= 0) then
             print *, '  Polarso: dfgmres_check failed with error code ', rci_request
@@ -233,7 +243,12 @@ contains
                 case (2) ! Stop condition
                     if (ipar(4) < ipar(5)) then
                         sol_b = sparse_dot(nrGridActive, nnz_values, nnz_ia, nnz_col_index, x)
-                        error = norm2(sol_b-b)/norm2(b)
+                        norm_b = norm2(b)
+                        if (norm_b > 0.0d0) then
+                            error = norm2(sol_b-b)/norm_b
+                        else
+                            error = norm2(sol_b)
+                        end if
                         if (error <= 10.0d0**(-fgmres_tol)) then
                             exit iterate
                         else
@@ -314,12 +329,18 @@ contains
         emit_lim(3,:) = (/emitters_pos(3,1), emitters_pos(3,1)+emitters_dim(3,1)/)
         ! print *, 'Polarso: emitter limits:', emit_lim(1,:), emit_lim(2,:), emit_lim(3,:)
 
-        ! Anode limits
-        ! anode_lim(1,:) = emit_lim(1,:)
-        ! anode_lim(2,:) = emit_lim(2,:)
-        anode_lim(1,:) = grid_lim(1,:)
-        anode_lim(2,:) = grid_lim(2,:)
-        anode_lim(3,:) = (/polarso_pos(3) + box_dim(3), polarso_pos(3) + box_dim(3)/)
+        ! The physical anode is the plane z = polarso_pos(3) + box_dim(3). The
+        ! top grid plane carries anode (Dirichlet) rows only when it coincides
+        ! with that plane (within half a cell, to be safe against roundoff in
+        ! hz and against polarso_dim(3) being rounded up to a whole number of
+        ! steps). Otherwise the solver window ends below the anode and the top
+        ! plane gets open-boundary rows like the lateral boundaries.
+        anode_in_grid = (abs(grid_lim(3,2) - (polarso_pos(3) + box_dim(3))) < 0.5d0*hz)
+
+        ! Likewise the bottom grid plane is the grounded cathode plane (the
+        ! conductor the emitter sits on, z = 0 in the planar model) only when
+        ! the window starts there.
+        cathode_in_grid = (abs(grid_lim(3,1)) < 0.5d0*hz)
 
         ! print *, 'Polarso: emitter limits:', emit_lim(1,:), emit_lim(2,:), emit_lim(3,:)
 
@@ -329,7 +350,11 @@ contains
         nrGrid = Nx*Ny*Nz
 
         div_h = (/1.0d0, 1.0d0, 1.0d0/)
-        div_h2 = (/1.0d0, 1.0d0, 1.0d0/)
+        ! Stencil weights of the finite-difference Laplacian with the rows
+        ! multiplied through by hz**2, so cubic grids keep O(1) matrix entries
+        ! next to the O(1) Dirichlet rows. The RHS deposition in
+        ! partial_update_charge carries the matching hz**2 factor.
+        div_h2 = (/(hz*hz)/(hx*hx), (hz*hz)/(hy*hy), 1.0d0/)
 
         emitter_radius = emitters_dim(1,1)
 
@@ -354,7 +379,7 @@ contains
                 else
                     gridPoints(i) = 0
                 end if
-            else if (is_anode(i) == 1) then
+            else if ((is_anode(i) == 1) .or. (is_cathode(i) == 1)) then
                 nrGridActive = nrGridActive + 1
                 gridPointsActive(nrGridActive) = i
                 gridPoints(i) = nrGridActive
@@ -424,7 +449,7 @@ contains
                 nnz_col_index(center) = g
                 ! Place the values
                 call insert_emitter_boundary(g)
-            else if (is_anode(i) == 1) then
+            else if ((is_anode(i) == 1) .or. (is_cathode(i) == 1)) then
                 ! Place the center
                 nnz_center(g) = center
                 next_center = center + 1
@@ -504,9 +529,8 @@ contains
     end subroutine init_matrix
 
     subroutine init_pardiso() ! DONE
-        real(kind=8) :: start, end
-
         allocate(perm(nrGridActive))
+        perm = 0 ! Not used (iparm(5) = 0) but must not be undefined
 
         ! Initialize pardiso solver and do analysis, symbolic factorization, and numerical factorization
         if (pardiso_precision == 4) then
@@ -516,7 +540,9 @@ contains
 
         ! Solver parameters
         iparm(1) = 1 ! use user-defined parameters
-        iparm(2) = 1 ! 1 = minimum degree algorithm, 2 = metis, 3 = parallel metis
+        iparm(2) = 2 ! 1 = minimum degree algorithm, 2 = metis, 3 = parallel metis
+                     ! (1 segfaults inside MKL 2026.1's reordering; 2 is the MKL
+                     ! default and the right choice for 3D grids anyway)
         ! iparm(3) = 0 ! reserved
         iparm(4) = 0 ! >0 = preconditioned CGS
         iparm(5) = 0 ! 0 = ignored; 1 = user supplied fill-in permutation; 2 = returns permutation
@@ -590,10 +616,8 @@ contains
         ! print *, 'Polarso: numerical factorization'
         call pardiso_phase(22,1)
         ! print *, 'Polarso: solving'
-        perm = 0
         call pardiso_phase(33,1)
-        ! call cpu_time(end)
-        
+
     end subroutine init_pardiso
 
     subroutine init_dfgmres()
@@ -649,39 +673,32 @@ contains
     subroutine calculate_field() ! DONE & PARALLEL
         integer(kind=8) :: i, axis
         integer(kind=8), dimension(3) :: boundaries
-        real(kind=8), dimension(3) :: pos
-        real(kind=8) :: l, l_const = q_0 / (4.0d0*pi*epsilon_0)
+        real(kind=8) :: E_applied
+
+        ! Uniform vacuum field of the planar gap, superposed on the
+        ! space-charge field from the solve (grounded electrodes, see
+        ! insert_anode_boundary). Same expression as Set_Voltage in
+        ! mod_verlet; V_d can change every time step.
+        E_applied = -V_d/d
 
         polarso_field = 0.0d0
 
         !$OMP PARALLEL DO DEFAULT(NONE) &
-        !$OMP& SHARED(nrGrid, voltage, polarso_field) &
+        !$OMP& SHARED(nrGrid, voltage, polarso_field, E_applied) &
         !$OMP& PRIVATE(i, axis, boundaries)
         do i=1,nrGrid
-            ! print *, 'Polarso: i:', i, 'nrGrid:', nrGrid
             boundaries = is_boundary(i)
             do axis=1,3
                 select case (boundaries(axis))
                     case (0) ! Inner point
-                        ! print *, '  Polarso: central difference'
                         polarso_field(i,axis) = - central_difference(voltage,i,axis)
-                        if (axis==3) then
-                            polarso_field(i,axis) = polarso_field(i,axis) + applied_field(i)
-                        end if
                     case (1) ! Startpoint
-                        ! print *, '  Polarso: forward difference'
                         polarso_field(i,axis) = - forward_difference(voltage,i,axis)
-                        if (axis==3) then
-                            polarso_field(i,axis) = polarso_field(i,axis) + applied_field(i)
-                        end if
                     case (2) ! Endpoint
-                        ! print *, '  Polarso: backward difference'
                         polarso_field(i,axis) = - backward_difference(voltage,i,axis)
-                        if (axis==3) then
-                            polarso_field(i,axis) = polarso_field(i,axis) + applied_field(i)
-                        end if
                 end select
             end do
+            polarso_field(i,3) = polarso_field(i,3) + E_applied
         end do
         !$OMP END PARALLEL DO
 
@@ -734,26 +751,16 @@ contains
 ! -----------------------------------------------------------------------------
 
     subroutine full_update_rhs()
-        integer(kind=8) :: i, g
-        b = 0
-        do i=1,nrGrid
-            if (is_anode(i) == 1) then
-                g = gridPointsActive(i)
-            end if
-        end do
-        ! $OMP PARALLEL DO DEFAULT(NONE) &
-        ! $OMP& SHARED(nrCharge) &
-        ! $OMP& PRIVATE(i) &
-        ! $OMP& REDUCTION(+:b)
-        ! do i=1,oldNrCharge
-        !     call partial_remove_rhs(i)
-        ! end do
+        integer(kind=8) :: i
+        ! Rebuild the RHS from scratch each time step. All boundary rows are
+        ! homogeneous (emitter and anode grounded, see insert_anode_boundary),
+        ! so only the deposited space charge contributes.
+        b = 0.0d0
         oldNrCharge = newNrCharge
         oldCharge_index = 0
         do i=1,newNrCharge
             call partial_update_rhs(i)
         end do
-        ! $OMP END PARALLEL DO
     end subroutine full_update_rhs
 
     subroutine partial_update_rhs(i)
@@ -789,21 +796,34 @@ contains
         integer(kind=8), intent(in) :: g
         integer(kind=8) :: center
 
-        ! print *, 'Polarso: inserting anode boundary', g
-
         center = nnz_center(g)
 
         nnz_values(center) = 1.0d0
-        b(g) = V_s
+        ! Grounded electrode planes (anode, and the cathode plane outside the
+        ! emitter): the solver computes only the space-charge potential, with
+        ! every conductor at 0 V. The applied vacuum field -V_d/d is
+        ! superposed analytically in calculate_field, which also keeps the
+        ! field correct when the solver window is shorter than the gap. For
+        ! the flat planar emitters this solver supports, the superposition is
+        ! exact.
+        b(g) = 0.0d0
     end subroutine insert_anode_boundary
 
-    subroutine insert_laplace_equation(g) ! DONE
-        ! Insert finite difference equation into matrix
+    subroutine insert_laplace_equation(g)
+        ! Interior points get the 7-point finite-difference Laplacian. Points
+        ! on an open boundary (the lateral faces, and the top plane when the
+        ! solver window ends below the anode) get a homogeneous Neumann
+        ! closure instead: the sum over the boundary axes of the second-order
+        ! one-sided first derivatives, set to zero. The previous scheme
+        ! imposed the PDE itself with one-sided second differences on the
+        ! boundary, which made the matrix numerically singular
+        ! (cond ~ 1e12, with the near-null mode concentrated on the
+        ! boundary edges); the Neumann closure gives cond ~ 1e3.
         integer(kind=8), intent(in) :: g
         integer(kind=8) :: center
         integer(kind=8), dimension(3) :: boundaries
         integer(kind=8), dimension(3,3) :: indices
-        integer(kind=8) :: i, axis, next, next_next, next_next_next, prev, prev_prev, prev_prev_prev
+        integer(kind=8) :: i, axis, next, next_next, prev, prev_prev
 
         center = nnz_center(g)
 
@@ -811,38 +831,40 @@ contains
         boundaries = is_boundary(i)
         call get_finite_indices(g,indices)
 
-        ! Insert finite difference equation for each axis
-        do axis=1,3          
-            select case (boundaries(axis))
-                case (0) ! Inner point (values for central difference)
-                    prev = indices(axis,1)
-                    next = indices(axis,3)
+        if (any(boundaries /= 0)) then
+            ! Neumann closure row. The sign of each axis contribution is
+            ! chosen so that every axis adds +3 to the diagonal. Slots of
+            ! non-boundary axes keep their explicit zeros.
+            do axis=1,3
+                select case (boundaries(axis))
+                    case (1) ! Startpoint: 3*f(x) - 4*f(x+h) + f(x+2h) = 0
+                        next = indices(axis,1)
+                        next_next = indices(axis,2)
 
-                    nnz_values(prev) = nnz_values(prev) + div_h2(axis)
-                    nnz_values(center) = nnz_values(center) - 2.0d0*div_h2(axis)
-                    nnz_values(next) = nnz_values(next) + div_h2(axis)
+                        nnz_values(center) = nnz_values(center) + 3.0d0
+                        nnz_values(next) = nnz_values(next) - 4.0d0
+                        nnz_values(next_next) = nnz_values(next_next) + 1.0d0
 
-                case (1) ! Startpoint (values for forward difference)
-                    next = indices(axis,1)
-                    next_next = indices(axis,2)
-                    next_next_next = indices(axis,3)
+                    case (2) ! Endpoint: 3*f(x) - 4*f(x-h) + f(x-2h) = 0
+                        prev = indices(axis,3)
+                        prev_prev = indices(axis,2)
 
-                    nnz_values(center) = nnz_values(center) + 2.0d0*div_h2(axis)
-                    nnz_values(next) = nnz_values(next) - 5.0d0*div_h2(axis)
-                    nnz_values(next_next) = nnz_values(next_next) + 4.0d0*div_h2(axis)
-                    nnz_values(next_next_next) = nnz_values(next_next_next) - div_h2(axis)
+                        nnz_values(center) = nnz_values(center) + 3.0d0
+                        nnz_values(prev) = nnz_values(prev) - 4.0d0
+                        nnz_values(prev_prev) = nnz_values(prev_prev) + 1.0d0
+                end select
+            end do
+        else
+            ! Interior point: central second difference along every axis
+            do axis=1,3
+                prev = indices(axis,1)
+                next = indices(axis,3)
 
-                case (2) ! Endpoint (values for backward difference)
-                    prev = indices(axis,3)
-                    prev_prev = indices(axis,2)
-                    prev_prev_prev = indices(axis,1)
-
-                    nnz_values(prev_prev_prev) = nnz_values(prev_prev_prev) - div_h2(axis)
-                    nnz_values(prev_prev) = nnz_values(prev_prev) + 4.0d0*div_h2(axis)
-                    nnz_values(prev) = nnz_values(prev) - 5.0d0*div_h2(axis)
-                    nnz_values(center) = nnz_values(center) + 2.0d0*div_h2(axis)
-            end select
-        end do
+                nnz_values(prev) = nnz_values(prev) + div_h2(axis)
+                nnz_values(center) = nnz_values(center) - 2.0d0*div_h2(axis)
+                nnz_values(next) = nnz_values(next) + div_h2(axis)
+            end do
+        end if
 
         b(g) = 0.0d0
     end subroutine insert_laplace_equation
@@ -879,13 +901,11 @@ contains
     function central_difference(f,x,a)
         real(kind=8), dimension(nrGrid), intent(in) :: f
         integer(kind=8), intent(in) :: x, a
-        integer(kind=8) :: x_m1h, x_m2h, x_p1h, x_p2h
+        integer(kind=8) :: x_m1h, x_p1h
         real(kind=8) :: central_difference
 
         x_m1h = move(x,-1,a)
-        x_m2h = move(x,-2,a)
         x_p1h = move(x,1,a)
-        x_p2h = move(x,2,a)
 
         central_difference = (f(x_p1h)-f(x_m1h))/(2.0d0*h_grid(a))
     end function central_difference
@@ -904,33 +924,21 @@ contains
     end function forward_difference
 
     function backward_difference(f,x,a)
+        ! Second-order backward difference, the mirror of forward_difference
         real(kind=8), dimension(nrGrid), intent(in) :: f
         integer(kind=8), intent(in) :: x, a
-        integer(kind=8) :: x_m1h, x_m2h, x_m3h, x_m4h
+        integer(kind=8) :: x_m1h, x_m2h
         real(kind=8) :: backward_difference
 
         x_m1h = move(x,-1,a)
         x_m2h = move(x,-2,a)
-        x_m3h = move(x,-3,a)
-        x_m4h = move(x,-4,a)
 
-        backward_difference = (f(x_m2h)-4.0d0*f(x_m1h)-3.0d0*f(x))/(2.0d0*h_grid(a))
+        backward_difference = (3.0d0*f(x)-4.0d0*f(x_m1h)+f(x_m2h))/(2.0d0*h_grid(a))
     end function backward_difference
 
 ! -----------------------------------------------------------------------------
 ! ----- Boundary conditions ---------------------------------------------------
 ! -----------------------------------------------------------------------------
-
-    function applied_field(i) ! DONE
-        integer(kind=8), intent(in) :: i
-        real(kind=8), dimension(3) :: grid_coord
-        real(kind=8) :: applied_field, r
-
-        grid_coord = cart_coord(i)
-        r = emitters_pos(3,1) + d - grid_coord(3) + min_d
-
-        applied_field = -V_d / r
-    end function applied_field
 
     function charge_voltage(charge_pos, i) ! DONE
         ! Calculate the boundary value for an electron
@@ -946,7 +954,7 @@ contains
     end function charge_voltage
 
     subroutine full_update_charge()
-        integer(kind=8) :: k, i
+        integer(kind=8) :: k, i, charge_slot
         if (allocated(newCharge_density)) then
             deallocate(newCharge_density)
         end if
@@ -959,94 +967,109 @@ contains
 
         !$OMP PARALLEL DO DEFAULT(NONE) &
         !$OMP& SHARED(nrElec, particles_elec_pointer, particles_mask) &
-        !$OMP& PRIVATE(k, i)
+        !$OMP& PRIVATE(k, i, charge_slot)
         do k=1,nrElec
             i = particles_elec_pointer(k)
             if (particles_mask(i) .eqv. .true.) then
-                call partial_update_charge(i)
+                call partial_update_charge(i, charge_slot)
             end if
         end do
         !$OMP END PARALLEL DO
 
         !$OMP PARALLEL DO DEFAULT(NONE) &
         !$OMP& SHARED(nrIon, particles_ion_pointer, particles_mask) &
-        !$OMP& PRIVATE(k, i)
+        !$OMP& PRIVATE(k, i, charge_slot)
         do k=1,nrIon
             i = particles_ion_pointer(k)
             if (particles_mask(i) .eqv. .true.) then
-                call partial_update_charge(i)
+                call partial_update_charge(i, charge_slot)
             end if
         end do
         !$OMP END PARALLEL DO
     end subroutine full_update_charge
 
-    subroutine partial_update_charge(k)
+    subroutine partial_update_charge(k, charge_slot)
+        ! Deposit the charge of particle k onto the grid (cloud-in-cell).
+        ! Returns in charge_slot the column of newCharge_index /
+        ! newCharge_density this charge occupies, or 0 if the particle was
+        ! not deposited (outside the solver window, or no free grid nodes
+        ! around it).
         integer, intent(in) :: k
+        integer(kind=8), intent(out) :: charge_slot
         integer(kind=8), dimension(2,4) :: cube_id
         real(kind=8), dimension(2,4) :: cube_weight
-        real(kind=8), dimension(3) :: elec_pos, new_pos, node_pos
+        real(kind=8), dimension(3) :: elec_pos, node_pos
         real(kind=8) :: weight, weight_sum
         integer(kind=8) :: g, i, l, m
-        integer(kind=8) :: my_charge ! Column of newCharge_* this call owns
         real(kind=8) :: dx, dy, dz
         real(kind=8) :: wx, wy, wz
 
+        charge_slot = 0
+
         elec_pos = particles_cur_pos(:,k)
-        if (is_inside(elec_pos) == 1) then
-            ! full_update_charge calls this from inside an OpenMP parallel loop, so
-            ! the counter must be incremented and read as one atomic operation.
-            ! Otherwise two threads take the same column of newCharge_index /
-            ! newCharge_density and one of the charges is lost.
-            !$OMP ATOMIC CAPTURE
-            newNrCharge = newNrCharge + 1
-            my_charge = newNrCharge
-            !$OMP END ATOMIC
-
-            i = disc_coord(elec_pos(1), elec_pos(2), elec_pos(3))
-            cube_id = cube(i)
-
-            weight_sum = 0.0d0
-            do l=1,2
-                do m=1,4
-                    g = cube_id(l,m)
-
-                    if ((is_emitter(g) == 0) .and. (is_anode(g) == 0)) then
-                        node_pos = cart_coord(g)
-
-                        dx = abs(elec_pos(1) - node_pos(1))
-                        dy = abs(elec_pos(2) - node_pos(2))
-                        dz = abs(elec_pos(3) - node_pos(3))
-                        wx = 1.0d0 - dx / hx
-                        wy = 1.0d0 - dy / hy
-                        wz = 1.0d0 - dz / hz
-                        weight = wx*wy*wz
-
-                        if (weight < 0.0d0) then
-                            weight = 0.0d0
-                        end if
-
-                        cube_weight(l,m) = weight
-                        weight_sum = weight_sum + weight
-                    else
-                        cube_weight(l,m) = 0.0d0
-                    end if
-                end do
-            end do
-
-            do l=1,2
-                do m=1,4
-                    cube_weight(l,m) = cube_weight(l,m) / weight_sum
-                    if (cube_weight(l,m) < 0.0d0) then
-                        print*, 'Polarso: negative weight:', cube_weight(l,m)
-                    end if
-                    g = gridPoints(cube_id(l,m))
-                    newCharge_index((l-1)*4+m,my_charge) = g
-                    newCharge_density((l-1)*4+m,my_charge) = - cube_weight(l,m)*particles_charge(k)/(hz*epsilon_0)
-                    ! print *, newCharge_index((l-1)*4+m,nrCharge), newCharge_density((l-1)*4+m,nrCharge)
-                end do
-            end do
+        if (is_inside(elec_pos) == 0) then
+            return
         end if
-    
+
+        i = disc_coord(elec_pos(1), elec_pos(2), elec_pos(3))
+        cube_id = cube(i)
+
+        weight_sum = 0.0d0
+        do l=1,2
+            do m=1,4
+                g = cube_id(l,m)
+
+                if ((is_emitter(g) == 0) .and. (is_anode(g) == 0) .and. (is_cathode(g) == 0)) then
+                    node_pos = cart_coord(g)
+
+                    dx = abs(elec_pos(1) - node_pos(1))
+                    dy = abs(elec_pos(2) - node_pos(2))
+                    dz = abs(elec_pos(3) - node_pos(3))
+                    wx = 1.0d0 - dx / hx
+                    wy = 1.0d0 - dy / hy
+                    wz = 1.0d0 - dz / hz
+                    weight = wx*wy*wz
+
+                    if (weight < 0.0d0) then
+                        weight = 0.0d0
+                    end if
+
+                    cube_weight(l,m) = weight
+                    weight_sum = weight_sum + weight
+                else
+                    cube_weight(l,m) = 0.0d0
+                end if
+            end do
+        end do
+
+        ! All eight surrounding nodes are electrode nodes: the charge cannot
+        ! be deposited (avoids division by zero below)
+        if (weight_sum <= 0.0d0) then
+            return
+        end if
+
+        ! full_update_charge calls this from inside an OpenMP parallel loop, so
+        ! the counter must be incremented and read as one atomic operation.
+        ! Otherwise two threads take the same column of newCharge_index /
+        ! newCharge_density and one of the charges is lost.
+        !$OMP ATOMIC CAPTURE
+        newNrCharge = newNrCharge + 1
+        charge_slot = newNrCharge
+        !$OMP END ATOMIC
+
+        do l=1,2
+            do m=1,4
+                cube_weight(l,m) = cube_weight(l,m) / weight_sum
+                g = gridPoints(cube_id(l,m))
+                newCharge_index((l-1)*4+m,charge_slot) = g
+                ! RHS of the Poisson rows: -rho/epsilon_0 with the rows
+                ! multiplied by hz**2 (see div_h2 in init_grid), and
+                ! rho = weight*charge/(hx*hy*hz). Reduces to the cubic-cell
+                ! form -weight*charge/(hz*epsilon_0) when hx = hy = hz.
+                newCharge_density((l-1)*4+m,charge_slot) = - cube_weight(l,m)*particles_charge(k)*hz/(hx*hy*epsilon_0)
+            end do
+        end do
+
     end subroutine partial_update_charge
    
 ! -----------------------------------------------------------------------------
@@ -1054,14 +1077,18 @@ contains
 ! -----------------------------------------------------------------------------
 
     function disc_coord(x,y,z) ! DONE
-        ! Change cartesian coordinates to discrete coordinates
+        ! Change cartesian coordinates to discrete coordinates. The cell
+        ! index is clamped to [0, N-2] per axis so that the deposition /
+        ! interpolation cube (this corner plus one step in each axis, see
+        ! cube()) always stays inside the grid, also for points exactly on
+        ! the upper grid boundary.
         real(kind=8), intent(in) :: x, y, z
         integer(kind=8) :: x_coord,y_coord,z_coord,disc_coord
 
-        x_coord = (x-grid_lim(1,1)) / hx
-        y_coord = (y-grid_lim(2,1)) / hy
-        z_coord = (z-grid_lim(3,1)) / hz
-    
+        x_coord = min(max(int((x-grid_lim(1,1)) / hx, kind=8), 0_8), Nx-2)
+        y_coord = min(max(int((y-grid_lim(2,1)) / hy, kind=8), 0_8), Ny-2)
+        z_coord = min(max(int((z-grid_lim(3,1)) / hz, kind=8), 0_8), Nz-2)
+
         disc_coord = x_coord + y_coord*Nx + z_coord*NxNy + 1
     end function disc_coord
 
@@ -1138,20 +1165,33 @@ contains
     end function is_boundary
 
     function is_anode(i)
+        ! Returns 1 if the point lies on the top grid plane and that plane is
+        ! the physical anode (see anode_in_grid in init_grid). Index-based so
+        ! it cannot miss the plane through floating-point roundoff.
         integer(kind=8), intent(in) :: i
         integer(kind=8) :: is_anode
-        real(kind=8), dimension(3) :: point_coord
 
         is_anode = 0
-
-        point_coord = cart_coord(i)
-        if (anode_lim(1,1) <= point_coord(1) .and. point_coord(1) <= anode_lim(1,2) &
-            .and. anode_lim(2,1) <= point_coord(2) .and. point_coord(2) <= anode_lim(2,2) &
-            .and. anode_lim(3,1) <= point_coord(3) .and. point_coord(3) <= anode_lim(3,2)) then
+        if (anode_in_grid .and. ((i-1)/NxNy == Nz-1)) then
             is_anode = 1
         end if
 
     end function is_anode
+
+    function is_cathode(i)
+        ! Returns 1 if the point lies on the bottom grid plane and that plane
+        ! is the grounded cathode plane the emitter sits on (see
+        ! cathode_in_grid in init_grid). The emitter itself is handled
+        ! separately by is_emitter / is_first_layer.
+        integer(kind=8), intent(in) :: i
+        integer(kind=8) :: is_cathode
+
+        is_cathode = 0
+        if (cathode_in_grid .and. ((i-1)/NxNy == 0)) then
+            is_cathode = 1
+        end if
+
+    end function is_cathode
 
     function is_emitter(i)
         ! Returns 1 if point is within the emitter and 0 otherwise
@@ -1370,10 +1410,15 @@ contains
 
         real(kind=8), dimension(3) :: point_field
 
-        ! if (is_inside(point_pos) == 0) then
-        !     print *, 'Polarso: calculating field outside the domain'
-        !     return
-        ! end if
+        ! Points outside the solver grid (the window can be smaller than the
+        ! simulation box) see only the applied vacuum field; interpolating
+        ! there would index polarso_field out of bounds.
+        if ((point_pos(1) < grid_lim(1,1)) .or. (point_pos(1) > grid_lim(1,2)) .or. &
+            (point_pos(2) < grid_lim(2,1)) .or. (point_pos(2) > grid_lim(2,2)) .or. &
+            (point_pos(3) < grid_lim(3,1)) .or. (point_pos(3) > grid_lim(3,2))) then
+            PL_Calculate_Field_At = (/0.0d0, 0.0d0, -V_d/d/)
+            return
+        end if
 
         i = disc_coord(point_pos(1), point_pos(2), point_pos(3))
 
@@ -1433,27 +1478,24 @@ contains
         real(kind=8), allocatable, dimension(:) :: sparse_dot
         integer(kind=8) :: i, j, col_start, col_end
 
-        ! print *, 'Polarso: sparse_dot start'
         allocate(sparse_dot(n))
-        sparse_dot = 0.0d0
 
+        ! Each row is written by exactly one thread, so a plain shared write
+        ! is correct (a reduction over the whole result vector is not needed)
         !$OMP PARALLEL DO DEFAULT(NONE) &
-        !$OMP SHARED(n,a,ia,ja,v) &
-        !$OMP PRIVATE(i,j,col_start,col_end) &
-        !$OMP REDUCTION(+:sparse_dot)
+        !$OMP SHARED(n,a,ia,ja,v,sparse_dot) &
+        !$OMP PRIVATE(i,j,col_start,col_end)
         do i=1,n
-            ! print *, 'i=',i
             col_start = ia(i)
             col_end = ia(i+1)-1
 
+            sparse_dot(i) = 0.0d0
             do j=col_start,col_end
-                ! print *, 'j=',j
                 sparse_dot(i) = sparse_dot(i) + a(j)*v(ja(j))
             end do
         end do
         !$OMP END PARALLEL DO
 
-        ! print *, 'Polarso: sparse_dot end'
     end function sparse_dot
 end module mod_polarso
 
