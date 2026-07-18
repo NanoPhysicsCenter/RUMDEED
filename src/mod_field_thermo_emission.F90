@@ -339,11 +339,12 @@ subroutine Init_Field_Thermo_Emission()
     end do
 
     ! The acceptance rate of this chain drives one multiplicative update of
-    ! the proposal step size, towards an acceptance ratio of about 50%.
+    ! the proposal step size, towards an acceptance ratio of 35%, the
+    ! optimum for a 2D random walk.
     ! (Only update when at least one jump was attempted, to avoid 0/0.)
     if ((jump_a + jump_r) > 0) then
       a_rate = DBLE(jump_a) / DBLE(jump_r + jump_a)
-      MH_std = MH_std * exp(0.025d0*(a_rate - 0.525d0))
+      MH_std = MH_std * exp(0.025d0*(a_rate - 0.35d0))
       ! Limits on how big or low the standard deviation can be.
       if (MH_std > 0.1250d0) then
         MH_std = 0.1250d0

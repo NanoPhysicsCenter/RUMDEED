@@ -70,7 +70,7 @@ Module mod_field_emission_v2
   integer,          parameter :: MH_ndim        = 25*8      ! Number of jumps per chain
   double precision, parameter :: MH_warmup_frac = 0.25d0    ! Fraction of the jumps done with the fixed initial std
   double precision, parameter :: MH_init_std    = 0.10d0    ! Initial std as a fraction of the emitter size
-  double precision, parameter :: MH_target_rate = 0.2525d0  ! Acceptance rate the MH_std adaptation aims for
+  double precision, parameter :: MH_target_rate = 0.35d0    ! Acceptance rate the MH_std adaptation aims for (optimum for a 2D random walk)
   double precision, parameter :: MH_std_gain    = 0.025d0   ! Gain of the multiplicative MH_std update per window
   double precision, parameter :: MH_std_max     = 0.1250d0  ! Upper limit on MH_std
   double precision, parameter :: MH_std_min     = 0.00005d0 ! Lower limit on MH_std

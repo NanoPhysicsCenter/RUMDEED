@@ -252,7 +252,8 @@ The remaining jumps use the adapted step size :math:`\sigma`, which is shared be
 
 clamped between a lower and an upper limit.
 A high acceptance rate means the steps are too small, so the step grows, and the other way around.
-The target rate :math:`a^*` is set per module: 25% for the planar field emission chains, 50% for the planar thermal-field chains, and 35% (the optimum for a two-dimensional random walk) for the tip, cylindrical tip and torus chains.
+The target rate is :math:`a^* = 35\%` in all modules, the optimum for a random walk sampler in two dimensions.
+The choice is not critical: the step size only affects how fast the chain decorrelates, never the distribution it samples, and the sampling efficiency is close to optimal for acceptance rates anywhere between roughly 20% and 50%.
 
 Planar emitters
 ~~~~~~~~~~~~~~~
