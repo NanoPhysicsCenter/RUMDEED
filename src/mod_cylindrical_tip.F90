@@ -2034,11 +2034,14 @@ subroutine Do_Surface_Integration(N_sup)
   ! ----------------------------------------------------------------------------
   ! The integration function for the Cuba library
   !
-  integer function integrand_cuba_cyl(ndim, xx, ncomp, ff, userdata)
+  integer(c_int) function integrand_cuba_cyl(ndim, xx, ncomp, ff, userdata)
+    ! Called from the C Cuba library: the integer arguments and the result
+    ! must be integer(c_int) (see mod_cuba_integration)
+    use, intrinsic :: iso_c_binding, only: c_int
     ! Input / output variables
-    integer, intent(in) :: ndim ! Number of dimensions (Should be 2)
-    integer, intent(in) :: ncomp ! Number of vector-components in the integrand (Always 1 here)
-    integer, intent(in) :: userdata ! Additional data passed to the integral function (In our case the number of the emitter)
+    integer(c_int), intent(in) :: ndim ! Number of dimensions (Should be 2)
+    integer(c_int), intent(in) :: ncomp ! Number of vector-components in the integrand (Always 1 here)
+    integer(c_int), intent(in) :: userdata ! Additional data passed to the integral function (In our case the number of the emitter)
     double precision, intent(in), dimension(1:ndim)   :: xx ! Integration points, between 0 and 1
     double precision, intent(out), dimension(1:ncomp) :: ff ! Results of the integrand function
 
@@ -2052,6 +2055,9 @@ subroutine Do_Surface_Integration(N_sup)
 
     ! Other variables
     integer :: IFAIL
+    integer :: sec ! Default-kind copy for calls into the rest of the code
+
+    sec = userdata
 
     !print *, 'Integrand called'
     ! Surface position
@@ -2159,7 +2165,7 @@ subroutine Do_Surface_Integration(N_sup)
 
     ! Calculate the electric field on the surface
     field = Calc_Field_at(par_pos)
-    field_norm = Field_normal(par_pos, par_pos_org, field, userdata)
+    field_norm = Field_normal(par_pos, par_pos_org, field, sec)
 
     ! Add to the average field
     F_avg = F_avg + field
@@ -2198,11 +2204,14 @@ subroutine Do_Surface_Integration(N_sup)
   ! ----------------------------------------------------------------------------
   ! The integration function for the Cuba library
   !
-  integer function integrand_cuba_cyl_simple(ndim, xx, ncomp, ff, userdata)
+  integer(c_int) function integrand_cuba_cyl_simple(ndim, xx, ncomp, ff, userdata)
+    ! Called from the C Cuba library: the integer arguments and the result
+    ! must be integer(c_int) (see mod_cuba_integration)
+    use, intrinsic :: iso_c_binding, only: c_int
     ! Input / output variables
-    integer, intent(in) :: ndim ! Number of dimensions (Should be 2)
-    integer, intent(in) :: ncomp ! Number of vector-components in the integrand (Always 1 here)
-    integer, intent(in) :: userdata ! Additional data passed to the integral function (In our case the number of the emitter)
+    integer(c_int), intent(in) :: ndim ! Number of dimensions (Should be 2)
+    integer(c_int), intent(in) :: ncomp ! Number of vector-components in the integrand (Always 1 here)
+    integer(c_int), intent(in) :: userdata ! Additional data passed to the integral function (In our case the number of the emitter)
     double precision, intent(in), dimension(1:ndim)   :: xx ! Integration points, between 0 and 1
     double precision, intent(out), dimension(1:ncomp) :: ff ! Results of the integrand function
 
@@ -2216,6 +2225,9 @@ subroutine Do_Surface_Integration(N_sup)
 
     ! Other variables
     integer :: IFAIL
+    integer :: sec ! Default-kind copy for calls into the rest of the code
+
+    sec = userdata
 
     !print *, 'Integrand called'
     ! Surface position
@@ -2323,7 +2335,7 @@ subroutine Do_Surface_Integration(N_sup)
 
     ! Calculate the electric field on the surface
     field = Calc_Field_at(par_pos)
-    field_norm = Field_normal(par_pos, par_pos_org, field, userdata)
+    field_norm = Field_normal(par_pos, par_pos_org, field, sec)
 
     ! Add to the average field
     F_avg = F_avg + field

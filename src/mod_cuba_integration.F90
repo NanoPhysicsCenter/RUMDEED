@@ -15,24 +15,31 @@
 
 Module mod_cuba_integration
   use mod_global
+  ! libcuba is C code compiled with 32-bit ints, so every integer that
+  ! crosses into it must be integer(c_int) — including in ILP64 builds
+  ! (POLARSO=yes compiles with 8-byte default integers). The integrand
+  ! callbacks receive their integer arguments from C and must declare them
+  ! integer(c_int) as well. In default builds c_int equals the default
+  ! integer kind, so this changes nothing there.
+  use, intrinsic :: iso_c_binding, only: c_int
   implicit none
 
   PRIVATE
   PUBLIC :: Cuba_Integrate
 
   ! Common Cuba arguments
-  integer, parameter :: ndim = 2  ! Number of dimensions (emitter surfaces)
-  integer, parameter :: ncomp = 1 ! Number of components in the integrand
-  integer, parameter :: flags = 4 ! Bits 0-1: verbosity level 0.
+  integer(c_int), parameter :: ndim = 2  ! Number of dimensions (emitter surfaces)
+  integer(c_int), parameter :: ncomp = 1 ! Number of components in the integrand
+  integer(c_int), parameter :: flags = 4 ! Bits 0-1: verbosity level 0.
                                   ! Bit 2 (Suave only): use only the last (largest)
                                   ! set of samples for the final result.
-  integer, parameter :: seed = 0  ! 0 = Sobol quasi-random points (deterministic)
+  integer(c_int), parameter :: seed = 0  ! 0 = Sobol quasi-random points (deterministic)
   character, parameter :: statefile = "" ! Empty string means don't save the state to a file
-  integer, parameter   :: spin = -1 ! No spinning cores
+  integer(c_int), parameter   :: spin = -1 ! No spinning cores
 
   ! Suave specific
-  integer, parameter          :: nnew = 1000 ! Number of integrand evaluations in each subdivision
-  integer, parameter          :: nmin = 2    ! Minimum number of samples a former pass must contribute
+  integer(c_int), parameter   :: nnew = 1000 ! Number of integrand evaluations in each subdivision
+  integer(c_int), parameter   :: nmin = 2    ! Minimum number of samples a former pass must contribute
                                              ! to a subregion to be considered in the region's compound
                                              ! integral value.
   double precision, parameter :: flatness = 25.0d0 ! Determines how prominently outliers, i.e. samples
@@ -45,18 +52,18 @@ Module mod_cuba_integration
                                              ! Cuba demo value and passes the unit tests in mod_tests.
 
   ! Divonne specific
-  integer, parameter :: key1 = 47 ! Sampling in the partitioning phase:
+  integer(c_int), parameter :: key1 = 47 ! Sampling in the partitioning phase:
                                   ! 7, 9, 11, 13 selects the cubature rule of that degree
                                   ! (degree 11 only in 3D, degree 13 only in 2D). Other values
                                   ! use a quasi-random sample of |key1| points, Korobov if
                                   ! key1 > 0, Sobol/pseudo-random (by seed) if key1 < 0.
-  integer, parameter :: key2 = 1  ! Sampling in the final integration phase. Same convention as
+  integer(c_int), parameter :: key2 = 1  ! Sampling in the final integration phase. Same convention as
                                   ! key1; |key2| < 40 samples as many points as Divonne estimates
                                   ! it needs to reach the prescribed accuracy.
-  integer, parameter :: key3 = -1 ! Strategy for the refinement phase: 0 = no further treatment,
+  integer(c_int), parameter :: key3 = -1 ! Strategy for the refinement phase: 0 = no further treatment,
                                   ! 1 = split the subregion once more, otherwise sample a third
                                   ! time with key3 as the sampling parameter (same as key2).
-  integer, parameter :: maxpass = 2 ! Thoroughness of the partitioning phase: number of safety
+  integer(c_int), parameter :: maxpass = 2 ! Thoroughness of the partitioning phase: number of safety
                                   ! iterations without improvement before the partition is
                                   ! accepted as final.
   double precision, parameter :: border = 0.0d0 ! Width of the border extrapolation region; zero
@@ -68,10 +75,10 @@ Module mod_cuba_integration
   ! No list of suspected peak locations and no peak-finder subroutine are
   ! given. (If peak hints are ever added, they must be points in the unit
   ! square, NOT raw surface coordinates.)
-  integer, parameter :: ngiven = 0, ldxgiven = ndim, nextra = 0
+  integer(c_int), parameter :: ngiven = 0, ldxgiven = ndim, nextra = 0
 
   ! Cuhre specific
-  integer, parameter :: key = 0 ! Cubature rule: 0 uses the default, the degree-13 rule in 2D.
+  integer(c_int), parameter :: key = 0 ! Cubature rule: 0 uses the default, the degree-13 rule in 2D.
 
 contains
   ! ----------------------------------------------------------------------------
@@ -86,7 +93,7 @@ contains
   ! nvec:      Maximum number of points handed to the integrand per call.
   ! userdata:  Passed through to the integrand (the emitter or section number).
   subroutine Cuba_Integrate(integrand, nvec, userdata, integral, error_out, prob, nregions, neval, fail)
-    integer, external    :: integrand
+    integer(c_int), external :: integrand
     integer, intent(in)  :: nvec
     integer, intent(in)  :: userdata
     double precision, dimension(1:ncomp), intent(out) :: integral  ! The integral over the unit square
@@ -97,33 +104,47 @@ contains
     integer, intent(out) :: fail     ! 0 = success, -1 = dimension out of range,
                                      ! > 0 = accuracy goal not met
 
+    ! c_int copies of everything passed by reference into libcuba (the
+    ! dummies above keep the default kind so callers need no changes)
+    integer(c_int) :: nvec_c, userdata_c, mineval_c, maxeval_c
+    integer(c_int) :: nregions_c, neval_c, fail_c
+
+    nvec_c     = int(nvec,         kind=c_int)
+    userdata_c = int(userdata,     kind=c_int)
+    mineval_c  = int(cuba_mineval, kind=c_int)
+    maxeval_c  = int(cuba_maxeval, kind=c_int)
+
     select case (cuba_method)
     case (cuba_method_suave)
-      call suave(ndim, ncomp, integrand, userdata, nvec, &
+      call suave(ndim, ncomp, integrand, userdata_c, nvec_c, &
                  cuba_epsrel, cuba_epsabs, flags, seed, &
-                 cuba_mineval, cuba_maxeval, nnew, nmin, flatness, &
+                 mineval_c, maxeval_c, nnew, nmin, flatness, &
                  statefile, spin, &
-                 nregions, neval, fail, integral, error_out, prob)
+                 nregions_c, neval_c, fail_c, integral, error_out, prob)
     case (cuba_method_divonne)
-      call divonne(ndim, ncomp, integrand, userdata, nvec, &
+      call divonne(ndim, ncomp, integrand, userdata_c, nvec_c, &
                    cuba_epsrel, cuba_epsabs, flags, seed, &
-                   cuba_mineval, cuba_maxeval, &
+                   mineval_c, maxeval_c, &
                    key1, key2, key3, maxpass, &
                    border, maxchisq, mindeviation, &
                    ngiven, ldxgiven, 0, nextra, 0, &
                    statefile, spin, &
-                   nregions, neval, fail, integral, error_out, prob)
+                   nregions_c, neval_c, fail_c, integral, error_out, prob)
     case (cuba_method_cuhre)
-      call cuhre(ndim, ncomp, integrand, userdata, nvec, &
+      call cuhre(ndim, ncomp, integrand, userdata_c, nvec_c, &
                  cuba_epsrel, cuba_epsabs, flags, &
-                 cuba_mineval, cuba_maxeval, key, &
+                 mineval_c, maxeval_c, key, &
                  statefile, spin, &
-                 nregions, neval, fail, integral, error_out, prob)
+                 nregions_c, neval_c, fail_c, integral, error_out, prob)
     case default
       print '(a)', 'RUMDEED: ERROR UNKNOWN INTEGRATION METHOD'
       print *, cuba_method
       stop
     end select
+
+    nregions = nregions_c
+    neval    = neval_c
+    fail     = fail_c
 
     ! A positive fail just means the accuracy goal was not met within
     ! cuba_maxeval evaluations. Only warn if the result missed the requested

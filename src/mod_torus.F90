@@ -1631,11 +1631,14 @@ end subroutine Do_Surface_Integration_simple
   ! ----------------------------------------------------------------------------
   ! The integration function for the Cuba library
   !
-  integer function integrand_cuba_torus_simple(ndim, xx, ncomp, ff, userdata)
+  integer(c_int) function integrand_cuba_torus_simple(ndim, xx, ncomp, ff, userdata)
+    ! Called from the C Cuba library: the integer arguments and the result
+    ! must be integer(c_int) (see mod_cuba_integration)
+    use, intrinsic :: iso_c_binding, only: c_int
     ! Input / output variables
-    integer, intent(in) :: ndim ! Number of dimensions (Should be 2)
-    integer, intent(in) :: ncomp ! Number of vector-components in the integrand (Always 1 here)
-    integer, intent(in) :: userdata ! Additional data passed to the integral function (In our case the number of the emitter)
+    integer(c_int), intent(in) :: ndim ! Number of dimensions (Should be 2)
+    integer(c_int), intent(in) :: ncomp ! Number of vector-components in the integrand (Always 1 here)
+    integer(c_int), intent(in) :: userdata ! Additional data passed to the integral function (In our case the number of the emitter)
     double precision, intent(in), dimension(1:ndim)   :: xx ! Integration points, between 0 and 1
     double precision, intent(out), dimension(1:ncomp) :: ff ! Results of the integrand function
 

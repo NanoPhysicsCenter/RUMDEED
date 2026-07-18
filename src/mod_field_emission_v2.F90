@@ -665,12 +665,15 @@ end function Escape_Prob_log
   ! The integration points and results do not depend on the block size, but
   ! the electric field for the whole block is computed in one batch, which
   ! runs as a single kernel on the GPU in OpenACC builds.
-  integer function integrand_cuba_fe_v(ndim, xx, ncomp, ff, userdata, nvec)
+  integer(c_int) function integrand_cuba_fe_v(ndim, xx, ncomp, ff, userdata, nvec)
+    ! Called from the C Cuba library: the integer arguments and the result
+    ! must be integer(c_int) (see mod_cuba_integration)
+    use, intrinsic :: iso_c_binding, only: c_int
     ! Input / output variables
-    integer, intent(in) :: ndim ! Number of dimensions (Should be 2)
-    integer, intent(in) :: ncomp ! Number of vector-components in the integrand (Always 1 here)
-    integer, intent(in) :: userdata ! Additional data passed to the integral function (In our case the number of the emitter)
-    integer, intent(in) :: nvec ! Number of integration points in this block
+    integer(c_int), intent(in) :: ndim ! Number of dimensions (Should be 2)
+    integer(c_int), intent(in) :: ncomp ! Number of vector-components in the integrand (Always 1 here)
+    integer(c_int), intent(in) :: userdata ! Additional data passed to the integral function (In our case the number of the emitter)
+    integer(c_int), intent(in) :: nvec ! Number of integration points in this block
     double precision, intent(in), dimension(1:ndim, 1:nvec)   :: xx ! Integration points, between 0 and 1
     double precision, intent(out), dimension(1:ncomp, 1:nvec) :: ff ! Results of the integrand function
 
@@ -679,6 +682,10 @@ end function Escape_Prob_log
     double precision, dimension(1:nvec)      :: A ! Area factor, per point (the ring area depends on the radius)
     double precision                         :: angle, radius
     integer                                  :: k
+    integer                                  :: emit, nv ! Default-kind copies for calls into the rest of the code
+
+    emit = userdata
+    nv = nvec
 
     ! Surface positions
     ! Cuba does the intergration over the hybercube.
@@ -711,7 +718,7 @@ end function Escape_Prob_log
         field(:, k) = PL_Calculate_Field_At(par_pos(:, k))
       end do
     else
-      call Calc_Field_at_Batch(nvec, par_pos, field)
+      call Calc_Field_at_Batch(nv, par_pos, field)
     end if
 
     do k = 1, nvec
@@ -722,7 +729,7 @@ end function Escape_Prob_log
       if (field(3, k) < 0.0d0) then
         ! The field is favorable for emission
         ! Calculate the electron supply at this point
-        ff(1, k) = Elec_Supply_V2(field(3, k), par_pos(:, k), userdata)
+        ff(1, k) = Elec_Supply_V2(field(3, k), par_pos(:, k), emit)
       else
         ! The field is NOT favorable for emission
         ! This point does not contribute
@@ -742,17 +749,23 @@ end function Escape_Prob_log
   ! ----------------------------------------------------------------------------
   ! The integration function for the Cuba library
   !
-  integer function integrand_cuba_simple(ndim, xx, ncomp, ff, userdata)
+  integer(c_int) function integrand_cuba_simple(ndim, xx, ncomp, ff, userdata)
+    ! Called from the C Cuba library: the integer arguments and the result
+    ! must be integer(c_int) (see mod_cuba_integration)
+    use, intrinsic :: iso_c_binding, only: c_int
     ! Input / output variables
-    integer, intent(in) :: ndim ! Number of dimensions (Should be 2)
-    integer, intent(in) :: ncomp ! Number of vector-components in the integrand (Always 1 here)
-    integer, intent(in) :: userdata ! Additional data passed to the integral function (In our case the number of the emitter)
+    integer(c_int), intent(in) :: ndim ! Number of dimensions (Should be 2)
+    integer(c_int), intent(in) :: ncomp ! Number of vector-components in the integrand (Always 1 here)
+    integer(c_int), intent(in) :: userdata ! Additional data passed to the integral function (In our case the number of the emitter)
     double precision, intent(in), dimension(1:ndim)   :: xx ! Integration points, between 0 and 1
     double precision, intent(out), dimension(1:ncomp) :: ff ! Results of the integrand function
 
     ! Variables used for calculations
     double precision, dimension(1:3) :: par_pos, field
     double precision                 :: A ! Emitter area
+    integer                          :: emit ! Default-kind copy for calls into the rest of the code
+
+    emit = userdata
 
     ! Emitter area
     A = emitters_dim(1, userdata)*emitters_dim(2, userdata)
@@ -777,7 +790,7 @@ end function Escape_Prob_log
     if (field(3) < 0.0d0) then
       ! The field is favorable for emission
       ! Calculate the current density at this point
-      ff(1) = Elec_Supply_V2(field(3), par_pos, userdata) * Escape_Prob(field(3), par_pos, userdata)
+      ff(1) = Elec_Supply_V2(field(3), par_pos, emit) * Escape_Prob(field(3), par_pos, emit)
     else
       ! The field is NOT favorable for emission
       ! This point does not contribute
