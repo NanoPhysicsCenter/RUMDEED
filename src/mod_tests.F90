@@ -362,6 +362,7 @@ contains
     nrElec_remove_top = 0
     nrElec_remove_bot = 0
     nrElec_remove_recom = 0
+    nrElec_remove_ion = 0
     nrIon_remove_top = 0
     nrIon_remove_bot = 0
     nrIon_remove_recom = 0

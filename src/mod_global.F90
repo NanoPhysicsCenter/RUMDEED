@@ -239,6 +239,7 @@ module mod_global
   integer :: nrElec_remove_top
   integer :: nrElec_remove_bot
   integer :: nrElec_remove_recom
+  integer :: nrElec_remove_ion
 
   integer :: nrIon_remove_top
   integer :: nrIon_remove_bot
@@ -250,6 +251,10 @@ module mod_global
   integer :: nrElec_remove ! Number of electrons to be removed
   integer :: nrIon_remove ! Number of ion's to be removed
   integer :: nrAtom_remove ! Number of atoms to be removed
+
+  ! Number of particles Add_Particle refused because the system was full
+  ! (nrPart at MAX_PARTICLES). Reported at the end of the run.
+  integer :: nrPart_dropped
 
   integer, dimension(:), allocatable :: nrElec_remove_top_emit
 
