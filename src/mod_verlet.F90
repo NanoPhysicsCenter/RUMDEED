@@ -630,8 +630,16 @@ contains
     double precision                 :: im_1, im_2
     double precision                 :: pre_fac_c
     integer                          :: i, j
+    logical                          :: use_ic_idx
     double precision, allocatable    :: inv_mass(:)
     double precision, allocatable    :: accel_sum(:, :)
+
+    ! The kd-tree geometries (cylinder/torus) interpolate the image charges
+    ! of a source particle from tabulated data. That interpolation depends
+    ! only on the source particle, so it is done once per particle here
+    ! instead of once per pair in the O(N^2) loop below.
+    use_ic_idx = associated(ptr_Image_Charge_effect_idx)
+    if (use_ic_idx) call ptr_Image_Charge_Prepare()
 
     ! Precompute the inverse masses once (O(N)) so the inner O(N^2) loop below
     ! does array loads instead of a division per pair.
@@ -655,7 +663,7 @@ contains
     !$OMP PARALLEL DO DEFAULT(NONE) PRIVATE(i, j, pos_1, pos_2, diff, r, inv_r3) &
     !$OMP& PRIVATE(force_E, force_c, force_ic, force_ic_N, force_ic_self, im_1, q_1, qd_1, im_2, q_2, pre_fac_c) &
     !$OMP& SHARED(nrPart, particles_cur_pos, particles_mass, inv_mass, particles_species, ptr_field_E, box_dim) &
-    !$OMP& SHARED(ptr_Image_Charge_effect, particles_charge, d) &
+    !$OMP& SHARED(ptr_Image_Charge_effect, ptr_Image_Charge_effect_idx, use_ic_idx, particles_charge, d) &
     !$OMP& SCHEDULE(DYNAMIC, 1) &
     !$OMP& REDUCTION(+:accel_sum)
     do i = 1, nrPart
@@ -717,8 +725,13 @@ contains
         inv_r3 = 1.0d0 / (r*r*r)
         force_c = (pre_fac_c*inv_r3) * diff
 
-        ! Do image charge
-        force_ic = pre_fac_c * ptr_Image_Charge_effect(pos_1, pos_2)
+        ! Do image charge. The kd-tree geometries serve the interpolated
+        ! image charges of particle j from the per-particle cache.
+        if (use_ic_idx) then
+          force_ic = pre_fac_c * ptr_Image_Charge_effect_idx(pos_1, j)
+        else
+          force_ic = pre_fac_c * ptr_Image_Charge_effect(pos_1, pos_2)
+        end if
 
         ! The image charge force of particle i on particle j is the same in the z-direction
         ! but we reverse the x and y directions of the force due to symmetry.
@@ -891,8 +904,15 @@ contains
     double precision                  ::  im_1, im_2
     double precision                  ::  pre_fac_c
     integer                           ::  i, j, k, l, m, n
+    logical                           ::  use_ic_idx
     double precision, allocatable     ::  inv_mass(:)
     double precision, allocatable     ::  accel_sum(:, :)
+
+    ! Interpolate the image charges of the kd-tree geometries once per
+    ! particle instead of once per pair (see
+    ! Calculate_Acceleration_Particles_Generic).
+    use_ic_idx = associated(ptr_Image_Charge_effect_idx)
+    if (use_ic_idx) call ptr_Image_Charge_Prepare()
 
     ! Precompute the inverse masses once (O(N)) so the inner O(N^2) loops below
     ! do array loads instead of a division per pair.
@@ -915,7 +935,7 @@ contains
     !$OMP& PRIVATE(i, j, k, l, m, n, pos_1, pos_2, diff, r, inv_r3) &
     !$OMP& PRIVATE(force_E, force_c, force_ic, force_ic_N, force_ic_self, im_1, q_1, qd_1, im_2, q_2, pre_fac_c) &
     !$OMP& SHARED(nrElec, nrIon, particles_elec_pointer, particles_ion_pointer, particles_cur_pos, inv_mass, particles_species, ptr_field_E, box_dim) &
-    !$OMP& SHARED(ptr_Image_Charge_effect, particles_charge, d) &
+    !$OMP& SHARED(ptr_Image_Charge_effect, ptr_Image_Charge_effect_idx, use_ic_idx, particles_charge, d) &
     !$OMP& SCHEDULE(DYNAMIC, 1) &
     !$OMP& REDUCTION(+:accel_sum)
 
@@ -966,8 +986,12 @@ contains
         inv_r3 = 1.0d0 / (r*r*r)
         force_c = (pre_fac_c*inv_r3) * diff
 
-        ! Do image charge
-        force_ic = pre_fac_c * ptr_Image_Charge_effect(pos_1, pos_2)
+        ! Do image charge (per-particle cache for the kd-tree geometries)
+        if (use_ic_idx) then
+          force_ic = pre_fac_c * ptr_Image_Charge_effect_idx(pos_1, j)
+        else
+          force_ic = pre_fac_c * ptr_Image_Charge_effect(pos_1, pos_2)
+        end if
 
         ! The image charge force of particle i on particle j is the same in the z-direction
         ! but we reverse the x and y directions of the force due to symmetry.
@@ -996,8 +1020,12 @@ contains
         inv_r3 = 1.0d0 / (r*r*r)
         force_c = (pre_fac_c*inv_r3) * diff
 
-        ! Do image charge
-        force_ic = pre_fac_c * ptr_Image_Charge_effect(pos_1, pos_2)
+        ! Do image charge (per-particle cache for the kd-tree geometries)
+        if (use_ic_idx) then
+          force_ic = pre_fac_c * ptr_Image_Charge_effect_idx(pos_1, n)
+        else
+          force_ic = pre_fac_c * ptr_Image_Charge_effect(pos_1, pos_2)
+        end if
 
         ! The image charge force of particle i on particle j is the same in the z-direction
         ! but we reverse the x and y directions of the force due to symmetry.
@@ -1024,8 +1052,15 @@ contains
     double precision                  ::  im_1, im_2
     double precision                  ::  pre_fac_c
     integer                           ::  i, j, k, l
+    logical                           ::  use_ic_idx
     double precision, allocatable     ::  inv_mass(:)
     double precision, allocatable     ::  accel_sum(:, :)
+
+    ! Interpolate the image charges of the kd-tree geometries once per
+    ! particle instead of once per pair (see
+    ! Calculate_Acceleration_Particles_Generic).
+    use_ic_idx = associated(ptr_Image_Charge_effect_idx)
+    if (use_ic_idx) call ptr_Image_Charge_Prepare()
 
     ! Precompute the inverse masses once (see Update_Elec_Acceleration)
     allocate(inv_mass(1:nrPart))
@@ -1047,7 +1082,7 @@ contains
     !$OMP& PRIVATE(i, j, k, l, pos_1, pos_2, diff, r, inv_r3) &
     !$OMP& PRIVATE(force_E, force_c, force_ic, force_ic_N, force_ic_self, im_1, q_1, qd_1, im_2, q_2, pre_fac_c) &
     !$OMP& SHARED(nrIon, particles_ion_pointer, particles_cur_pos, inv_mass, particles_species, ptr_field_E, box_dim) &
-    !$OMP& SHARED(ptr_Image_Charge_effect, particles_charge, d) &
+    !$OMP& SHARED(ptr_Image_Charge_effect, ptr_Image_Charge_effect_idx, use_ic_idx, particles_charge, d) &
     !$OMP& SCHEDULE(DYNAMIC, 1) &
     !$OMP& REDUCTION(+:accel_sum)
 
@@ -1091,8 +1126,12 @@ contains
         inv_r3 = 1.0d0 / (r*r*r)
         force_c = (pre_fac_c*inv_r3) * diff
 
-        ! Do image charge
-        force_ic = pre_fac_c * ptr_Image_Charge_effect(pos_1, pos_2)
+        ! Do image charge (per-particle cache for the kd-tree geometries)
+        if (use_ic_idx) then
+          force_ic = pre_fac_c * ptr_Image_Charge_effect_idx(pos_1, j)
+        else
+          force_ic = pre_fac_c * ptr_Image_Charge_effect(pos_1, pos_2)
+        end if
 
         ! The image charge force of particle i on particle j is the same in the z-direction
         ! but we reverse the x and y directions of the force due to symmetry.

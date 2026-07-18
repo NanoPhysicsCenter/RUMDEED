@@ -239,6 +239,7 @@ module mod_global
   integer :: nrElec_remove_top
   integer :: nrElec_remove_bot
   integer :: nrElec_remove_recom
+  integer :: nrElec_remove_ion
 
   integer :: nrIon_remove_top
   integer :: nrIon_remove_bot
@@ -250,6 +251,10 @@ module mod_global
   integer :: nrElec_remove ! Number of electrons to be removed
   integer :: nrIon_remove ! Number of ion's to be removed
   integer :: nrAtom_remove ! Number of atoms to be removed
+
+  ! Number of particles Add_Particle refused because the system was full
+  ! (nrPart at MAX_PARTICLES). Reported at the end of the run.
+  integer :: nrPart_dropped
 
   integer, dimension(:), allocatable :: nrElec_remove_top_emit
 
@@ -458,6 +463,23 @@ module mod_global
       double precision, dimension(1:3), intent(in) :: pos_1, pos_2 ! Image charge effects of pos_2 on pos_1
     end function Image_Charge_effect
 
+    ! Image charge effect of particle idx_2 on pos_1, served from a
+    ! per-particle cache built by Image_Charge_Prepare. The kd-tree
+    ! geometries interpolate the image charges of a source particle from
+    ! tabulated data; that interpolation depends only on the source
+    ! particle, so the N^2 pair loops call Image_Charge_Prepare once and
+    ! then look the source up by index instead of interpolating per pair.
+    ! The cache is only valid as long as the particles do not move: the
+    ! pair loops build it and consume it within one call.
+    function Image_Charge_effect_idx(pos_1, idx_2)
+      double precision, dimension(1:3)             :: Image_Charge_effect_idx
+      double precision, dimension(1:3), intent(in) :: pos_1
+      integer, intent(in)                          :: idx_2 ! Index of the source particle
+    end function Image_Charge_effect_idx
+
+    subroutine Image_Charge_Prepare()
+    end subroutine Image_Charge_Prepare
+
    function E_zunit(pos)
       double precision, dimension(1:3), intent(in) :: pos
       double precision, dimension(1:3)             :: E_zunit
@@ -477,6 +499,8 @@ module mod_global
   procedure(Electric_Field), pointer            :: ptr_field_E => null()
   procedure(Do_Emission), pointer               :: ptr_Do_Emission => null()
   procedure(Image_Charge_effect), pointer       :: ptr_Image_Charge_effect => null()
+  procedure(Image_Charge_effect_idx), pointer   :: ptr_Image_Charge_effect_idx => null()
+  procedure(Image_Charge_Prepare), pointer      :: ptr_Image_Charge_Prepare => null()
   procedure(E_zunit), pointer                   :: ptr_E_zunit => null()
   procedure(Get_Emission_Velocity), pointer     :: ptr_Get_Emission_Velocity => null()
   procedure(Get_Photo_Emission_Energy), pointer :: ptr_Get_Photo_Emission_Energy => null()

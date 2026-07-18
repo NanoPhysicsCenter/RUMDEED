@@ -255,6 +255,13 @@ program RUMDEED
     call Clean_Up_Manual()
   END SELECT
 
+  ! Make particles silently refused by Add_Particle visible: if this fires the
+  ! run hit MAX_PARTICLES and the emission statistics are missing particles.
+  if (nrPart_dropped > 0) then
+    print '(a, i0, a)', 'RUMDEED: WARNING ', nrPart_dropped, &
+        & ' particles were dropped because MAX_PARTICLES was reached'
+  end if
+
   print '(a)', 'RUMDEED: Final clean up'
   call Clean_up()
   call date_and_time(VALUES=values)
@@ -493,13 +500,17 @@ contains
     nrPart_remove_top = 0
     nrPart_remove_bot = 0
     nrPart_remove_recom = 0
+    nrPart_remove_ion = 0
     nrElec_remove_top = 0
     nrElec_remove_bot = 0
     nrElec_remove_recom = 0
+    nrElec_remove_ion = 0
     nrIon_remove_top  = 0
     nrIon_remove_bot  = 0
     nrIon_remove_recom = 0
     nrAtom_remove_ion = 0
+
+    nrPart_dropped = 0
 
     ! ID starts with 0
     nrID = 0

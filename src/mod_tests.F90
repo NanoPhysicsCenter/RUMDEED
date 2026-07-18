@@ -362,6 +362,7 @@ contains
     nrElec_remove_top = 0
     nrElec_remove_bot = 0
     nrElec_remove_recom = 0
+    nrElec_remove_ion = 0
     nrIon_remove_top = 0
     nrIon_remove_bot = 0
     nrIon_remove_recom = 0
@@ -1871,8 +1872,11 @@ contains
 
   ! Cuba test integrand: smooth polynomial scaled by userdata.
   ! The integral over the unit square is 3*userdata.
-  integer function test_integrand_poly(ndim, xx, ncomp, ff, userdata)
-    integer, intent(in) :: ndim, ncomp, userdata
+  ! The test integrands are called from the C Cuba library: their integer
+  ! arguments and results must be integer(c_int) (see mod_cuba_integration)
+  integer(c_int) function test_integrand_poly(ndim, xx, ncomp, ff, userdata)
+    use, intrinsic :: iso_c_binding, only: c_int
+    integer(c_int), intent(in) :: ndim, ncomp, userdata
     double precision, intent(in), dimension(1:ndim)   :: xx
     double precision, intent(out), dimension(1:ncomp) :: ff
 
@@ -1881,8 +1885,9 @@ contains
   end function test_integrand_poly
 
   ! Vectorized form of test_integrand_poly (blocks of up to nvec points)
-  integer function test_integrand_poly_v(ndim, xx, ncomp, ff, userdata, nvec)
-    integer, intent(in) :: ndim, ncomp, userdata, nvec
+  integer(c_int) function test_integrand_poly_v(ndim, xx, ncomp, ff, userdata, nvec)
+    use, intrinsic :: iso_c_binding, only: c_int
+    integer(c_int), intent(in) :: ndim, ncomp, userdata, nvec
     double precision, intent(in), dimension(1:ndim, 1:nvec)   :: xx
     double precision, intent(out), dimension(1:ncomp, 1:nvec) :: ff
     integer :: k
@@ -1895,8 +1900,9 @@ contains
 
   ! Cuba test integrand: Gaussian peak at (mu1, mu2). The analytic value is
   ! computed in Test_Cuba_Integration with Gauss_Column_Integral.
-  integer function test_integrand_gauss(ndim, xx, ncomp, ff, userdata)
-    integer, intent(in) :: ndim, ncomp, userdata
+  integer(c_int) function test_integrand_gauss(ndim, xx, ncomp, ff, userdata)
+    use, intrinsic :: iso_c_binding, only: c_int
+    integer(c_int), intent(in) :: ndim, ncomp, userdata
     double precision, intent(in), dimension(1:ndim)   :: xx
     double precision, intent(out), dimension(1:ncomp) :: ff
 

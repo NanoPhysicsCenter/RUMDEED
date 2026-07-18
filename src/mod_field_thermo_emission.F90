@@ -391,17 +391,23 @@ subroutine Init_Field_Thermo_Emission()
   ! ----------------------------------------------------------------------------
   ! The integration function for the Cuba library
   !
-  integer function integrand_cuba_simple(ndim, xx, ncomp, ff, userdata)
+  integer(c_int) function integrand_cuba_simple(ndim, xx, ncomp, ff, userdata)
+    ! Called from the C Cuba library: the integer arguments and the result
+    ! must be integer(c_int) (see mod_cuba_integration)
+    use, intrinsic :: iso_c_binding, only: c_int
     ! Input / output variables
-    integer, intent(in) :: ndim ! Number of dimensions (Should be 2)
-    integer, intent(in) :: ncomp ! Number of vector-components in the integrand (Always 1 here)
-    integer, intent(in) :: userdata ! Additional data passed to the integral function (In our case the number of the emitter)
+    integer(c_int), intent(in) :: ndim ! Number of dimensions (Should be 2)
+    integer(c_int), intent(in) :: ncomp ! Number of vector-components in the integrand (Always 1 here)
+    integer(c_int), intent(in) :: userdata ! Additional data passed to the integral function (In our case the number of the emitter)
     double precision, intent(in), dimension(1:ndim)   :: xx ! Integration points, between 0 and 1
     double precision, intent(out), dimension(1:ncomp) :: ff ! Results of the integrand function
 
     ! Variables used for calculations
     double precision, dimension(1:3) :: par_pos, field
     double precision                 :: A, w_theta ! Emitter area
+    integer                          :: emit ! Default-kind copy for calls into the rest of the code
+
+    emit = userdata
 
     ! Emitter area
     A = emitters_dim(1, userdata)*emitters_dim(2, userdata)
@@ -423,7 +429,7 @@ subroutine Init_Field_Thermo_Emission()
       ! The field is favourable for emission
       ! Calculate the current density at this point and convert it to
       ! electrons supplied per time step
-      w_theta = w_theta_xy(par_pos, userdata)
+      w_theta = w_theta_xy(par_pos, emit)
       ff(1) = Get_Kevin_Jgtf_v2(field(3), T_temp, w_theta) * time_step_div_q0
       !ff(1) = Elec_Supply_V2(field(3), par_pos, userdata)*Escape_Prob(field(3), par_pos, userdata)
     else

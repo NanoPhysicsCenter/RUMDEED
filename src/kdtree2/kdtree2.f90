@@ -601,6 +601,14 @@ module kdtree2_module
   ! everything else is private.
 
   type(tree_search_record), save, target :: sr   ! A GLOBAL VARIABLE for search
+  !
+  ! Every search entry point fills this record and the recursive search
+  ! reads/updates it, so concurrent searches from different threads would
+  ! corrupt each other. Making it threadprivate gives each OpenMP thread
+  ! its own copy, which makes all the search routines thread safe as long
+  ! as the tree itself is not being built or destroyed at the same time
+  ! (the tree is only read during a search).
+  !$omp threadprivate(sr)
 
 contains
 
