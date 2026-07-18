@@ -272,7 +272,7 @@ contains
           !$OMP ATOMIC UPDATE
           nrAtom_remove_ion = nrAtom_remove_ion + 1
         CASE DEFAULT
-          print *, 'Error unkown remove case ', m
+          print *, 'Error unknown remove case ', m
       END SELECT
 
     else if (particles_species(i) == species_ion) then
@@ -310,7 +310,7 @@ contains
           !$OMP END CRITICAL(DENSITY_ABSORB_RECOM)
 
         CASE DEFAULT
-          print *, 'Error unkown remove case ', m
+          print *, 'Error unknown remove case ', m
       END SELECT
 
     else if (particles_species(i) == species_atom) then
@@ -327,7 +327,7 @@ contains
           nrAtom_remove_ion = nrAtom_remove_ion + 1
 
         CASE DEFAULT
-          print *, 'Error unkown remove case ', m
+          print *, 'Error unknown remove case ', m
       END SELECT
     end if
     ! Unknown species are rejected by the guard at the top of this routine.
