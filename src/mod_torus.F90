@@ -36,6 +36,14 @@ Module mod_torus
     double precision, dimension(:,:), allocatable  :: kd_image_pos ! Electron velocities for image charges
     double precision, dimension(:)  , allocatable  :: kd_image_q   ! Electron charges for image charges
 
+    ! Per-particle image charge cache, built by Prepare_Image_Charge_Torus
+    ! and read by Image_Charge_Torus_four_idx. Entry j holds the
+    ! interpolated image charge of particle j.
+    double precision, dimension(:, :), allocatable :: ic_cache_pos ! (1:3, :) Image charge position
+    double precision, dimension(:), allocatable    :: ic_cache_q ! Image charge
+    logical, dimension(:), allocatable             :: ic_cache_ok ! In range of the image charge data
+    integer                                        :: ic_cache_n = 0 ! Number of valid entries
+
     double precision :: image_max_z ! Maximum z-coordinate for the image charges
     double precision :: image_min_z ! Minimum z-coordinate for the image charges
     double precision :: image_max_x ! Maximum x-coordinate for the image charges
@@ -127,6 +135,10 @@ subroutine Init_Torus()
     ! The function to do image charge effects
     ptr_Image_Charge_effect => Image_Charge_Torus_four ! Force_Image_charges for the cylinder
     !ptr_Image_Charge_effect => Force_Image_charges_v2
+
+    ! Per-particle image charge cache used by the N^2 pair loops
+    ptr_Image_Charge_effect_idx => Image_Charge_Torus_four_idx
+    ptr_Image_Charge_Prepare => Prepare_Image_Charge_Torus
 
     !call Read_work_function()
 
@@ -531,6 +543,9 @@ subroutine Check_Boundary_Torus(i)
     ! Local variables
     double precision, dimension(1:3) :: pos
     double precision                 :: phi, x_c, y_c, z_c
+    double precision                 :: dist ! Distance to the torus center curve.
+    ! Must be a local variable: this runs inside the OMP loops of
+    ! Update_*_Position, and the name d is the gap spacing in mod_global.
 
     pos = particles_cur_pos(:, i)
 
@@ -549,8 +564,8 @@ subroutine Check_Boundary_Torus(i)
         z_c = R_z*sin(phi)
 
         ! Calculate the distance from the particle to the center of the torus
-        d = sqrt((pos(1) - x_c)**2 + (pos(2) - y_c)**2 + (pos(3) - z_c)**2)
-        if (d <= rho) then
+        dist = sqrt((pos(1) - x_c)**2 + (pos(2) - y_c)**2 + (pos(3) - z_c)**2)
+        if (dist <= rho) then
             ! The particle is inside the torus tube
             call Mark_Particles_Remove(i, remove_bot)
         end if
@@ -582,24 +597,20 @@ function field_E_Torus(pos_xyz, org_pos, is_surface) result(field_E)
     integer                                   :: k ! loop variable
     type(kdtree2_result)                      :: kd_results(1:nn) ! results from the kd-tree
     double precision, dimension(1:nn)         :: w ! weights for the interpolation
-    double precision, parameter               :: eps = length_scale**3 ! Small number to avoid division by zero
+    double precision, parameter               :: eps = length_scale**2 ! Small length to avoid division by zero at a mesh node
     integer, parameter                        :: p = 1 ! Power for the inverse distance weighting
 
     !! For debugging start with planar field
     !field_E = field_E_planar(pos)
 
     ! Find the nearest neighbors
-    !print *, 'pos = ', pos
-    ! Note: The kd-tree is not thread safe, so we have to use a critical section
-    !$omp critical (kdtree2)
+    ! The kd-tree searches are thread safe (threadprivate search record in kdtree2)
     call kdtree2_n_nearest(tp=kd_tree, qv=pos_xyz, nn=nn, results=kd_results)
-    !$omp end critical (kdtree2)
 
-    ! Interpolate the electric field at the point using the nearest neighbors and the inverse distance to each as weights
-    ! Calculate the weights as 1/distance^p
-    !print *, 'kd_results(1:nn)%idx = ', kd_results(1:nn)%idx
-    !print *, 'kd_results(1:nn)%dis = ', kd_results(1:nn)%dis
-    w(1:nn) = 1.0d0/(kd_results(1:nn)%dis**p + eps)
+    ! Interpolate the electric field at the point using the nearest neighbors
+    ! with inverse distance weights w = 1/d^p.
+    ! Note: kdtree2 returns SQUARED distances, hence the sqrt.
+    w(1:nn) = 1.0d0/(sqrt(kd_results(1:nn)%dis) + eps)**p
 
     ! Normalize the weights
     w = w / sum(w)
@@ -670,24 +681,20 @@ function E_zunit_torus(pos) result(field_E)
     integer                                   :: k ! loop variable
     type(kdtree2_result)                      :: kd_results(1:nn) ! results from the kd-tree
     double precision, dimension(1:nn)         :: w ! weights for the interpolation
-    double precision, parameter               :: eps = length_scale**3 ! Small number to avoid division by zero
+    double precision, parameter               :: eps = length_scale**2 ! Small length to avoid division by zero at a mesh node
     integer, parameter                        :: p = 1 ! Power for the inverse distance weighting
 
     !! For debugging start with planar field
     !field_E = field_E_planar(pos)
 
     ! Find the nearest neighbors
-    !print *, 'pos = ', pos
-    ! Note: The kd-tree is not thread safe, so we have to use a critical section
-    !$omp critical (kdtree2)
+    ! The kd-tree searches are thread safe (threadprivate search record in kdtree2)
     call kdtree2_n_nearest(tp=kd_tree_1V, qv=pos, nn=nn, results=kd_results)
-    !$omp end critical (kdtree2)
 
-    ! Interpolate the electric field at the point using the nearest neighbors and the inverse distance to each as weights
-    ! Calculate the weights as 1/distance^p
-    !print *, 'kd_results(1:nn)%idx = ', kd_results(1:nn)%idx
-    !print *, 'kd_results(1:nn)%dis = ', kd_results(1:nn)%dis
-    w(1:nn) = 1.0d0/(kd_results(1:nn)%dis**p + eps)
+    ! Interpolate the electric field at the point using the nearest neighbors
+    ! with inverse distance weights w = 1/d^p.
+    ! Note: kdtree2 returns SQUARED distances, hence the sqrt.
+    w(1:nn) = 1.0d0/(sqrt(kd_results(1:nn)%dis) + eps)**p
 
     ! Normalize the weights
     w = w / sum(w)
@@ -695,7 +702,7 @@ function E_zunit_torus(pos) result(field_E)
     ! Calculate the interpolated electric field
     field_E = 0.0d0
     do k = 1, nn
-        field_E = field_E + w(k) * kd_data(:, kd_results(k)%idx)
+        field_E = field_E + w(k) * kd_data_1V(:, kd_results(k)%idx)
     end do
 end function E_zunit_torus
 
@@ -806,9 +813,8 @@ function Image_Charge_Torus_single(pos_1, pos_2)
     else
 
       ! Look up the nearest electron position
-      !$omp critical (kdtree2)
+      ! (thread safe, threadprivate search record in kdtree2)
       call kdtree2_n_nearest(tp=kd_tree_image, qv=pos_2, nn=nn, results=kd_results)
-      !$omp end critical (kdtree2)
 
       ! Look up the image charge position and charge
       pos_ic = kd_image_pos(:, kd_results(1)%idx)
@@ -821,72 +827,158 @@ function Image_Charge_Torus_single(pos_1, pos_2)
     end if
 end function Image_Charge_Torus_single
 
-! Interpolate four nearest neighbors
-function Image_Charge_Torus_four(pos_1, pos_2)
-    double precision, dimension(1:3)             :: Image_Charge_Torus_four ! Image charge effect
-    double precision, intent(in), dimension(1:3) :: pos_1 ! Position of the particle we are calculating the force/acceleration on
-    double precision, intent(in), dimension(1:3) :: pos_2 ! Position of the particle that is acting on the particle at pos_1
+!-------------------------------------------!
+! Interpolate the image charge of an electron at pos_2 from the tabulated
+! image charge data (inverse distance weighting over the four nearest
+! tabulated electron positions).
+! Returns in_range = .false. when pos_2 is outside the range of the table.
+!
+! The interpolation depends only on the source electron position (pos_2).
+! The N^2 pair loops therefore call Prepare_Image_Charge_Torus once per
+! call to interpolate every particle's image charge up front (through
+! ptr_Image_Charge_Prepare), and then look the source up by particle index
+! with Image_Charge_Torus_four_idx (through ptr_Image_Charge_effect_idx)
+! instead of redoing the kd-tree search and interpolation for every pair.
+subroutine Torus_Image_Set(pos_2, pos_ic, q_ic, in_range)
+    double precision, dimension(1:3), intent(in)  :: pos_2
+    double precision, dimension(1:3), intent(out) :: pos_ic ! Position of the image charge
+    double precision, intent(out)                 :: q_ic ! Charge of the image charge
+    logical, intent(out)                          :: in_range
 
-    double precision, dimension(1:3) :: pos_1_ic, pos_2_ic, pos_3_ic, pos_4_ic, pos_ic ! Position of the image charge
-    double precision                 :: q_1_ic, q_2_ic, q_3_ic, q_4_ic, q_ic ! Charge of the image charge
-    double precision                 :: w1, w2, w3, w4, w ! Weights for the interpolation
-    double precision, dimension(1:3) :: diff ! Vector from pos_1 to pos_ic
-    double precision                 :: r ! Distance from pos_1 to pos_ic
+    ! Local variables
     integer, parameter               :: nn = 4 ! number of nearest neighbors to find
     integer, parameter               :: p = 1 ! Power for the inverse distance weighting
-    double precision, parameter      :: eps = length_scale**3 ! Small number to avoid division by zero
+    double precision, parameter      :: eps = length_scale**2 ! Small length to avoid division by zero at a tabulated point
     type(kdtree2_result)             :: kd_results(1:nn) ! results from the kd-tree
+    double precision, dimension(1:4) :: w ! Weights for the interpolation
+    integer                          :: k, idx
 
     ! Check if the position is within the bounds of the image charge data
     if (pos_2(1) < image_min_x .or. pos_2(1) > image_max_x .or. &
         pos_2(2) < image_min_y .or. pos_2(2) > image_max_y .or. &
         pos_2(3) < image_min_z .or. pos_2(3) > image_max_z) then
-        Image_Charge_Torus_four = 0.0d0
+        in_range = .false.
+        pos_ic = 0.0d0
+        q_ic = 0.0d0
+        return
+    end if
+    in_range = .true.
+
+    ! Look up the nearest tabulated electron positions
+    ! (thread safe, threadprivate search record in kdtree2)
+    call kdtree2_n_nearest(tp=kd_tree_image, qv=pos_2, nn=nn, results=kd_results)
+
+    ! Inverse distance weights w = 1/d^p.
+    ! Note: kdtree2 returns SQUARED distances, hence the sqrt.
+    w(1:nn) = 1.0d0/(sqrt(kd_results(1:nn)%dis) + eps)**p
+
+    ! Normalize the weights
+    w = w / sum(w)
+
+    ! Interpolate the image charge position and charge
+    pos_ic = 0.0d0
+    q_ic = 0.0d0
+    do k = 1, nn
+      idx = kd_results(k)%idx
+      pos_ic = pos_ic + w(k)*kd_image_pos(:, idx)
+      q_ic = q_ic + w(k)*kd_image_q(idx)
+    end do
+end subroutine Torus_Image_Set
+
+!-------------------------------------------!
+! Force-like field at pos_1 from an interpolated image charge,
+! to be multiplied with q_1/(4 pi epsilon_0) by the caller.
+pure function Torus_IC_Force(pos_1, pos_ic, q_ic) result(force)
+    double precision, dimension(1:3)             :: force
+    double precision, dimension(1:3), intent(in) :: pos_1, pos_ic
+    double precision, intent(in)                 :: q_ic
+
+    double precision, dimension(1:3) :: diff
+    double precision                 :: r
+
+    ! Distance from pos_1 to the image charge, with a small guard
+    ! against r = 0 (division by zero)
+    diff = pos_1 - pos_ic
+    r = sqrt( sum(diff**2) ) + length_scale**2
+
+    ! (-1.0) since the charges are opposite
+    force = (-1.0d0)*(diff*q_ic/r**3)
+end function Torus_IC_Force
+
+!-------------------------------------------!
+! Image charge effect of a particle at pos_2 on the particle at pos_1,
+! interpolated from the four nearest tabulated positions
+function Image_Charge_Torus_four(pos_1, pos_2)
+    double precision, dimension(1:3)             :: Image_Charge_Torus_four ! Image charge effect
+    double precision, intent(in), dimension(1:3) :: pos_1 ! Position of the particle we are calculating the force/acceleration on
+    double precision, intent(in), dimension(1:3) :: pos_2 ! Position of the particle that is acting on the particle at pos_1
+
+    ! Local variables
+    double precision, dimension(1:3) :: pos_ic ! Position of the image charge
+    double precision                 :: q_ic ! Charge of the image charge
+    logical                          :: in_range
+
+    call Torus_Image_Set(pos_2, pos_ic, q_ic, in_range)
+
+    if (in_range .eqv. .true.) then
+      Image_Charge_Torus_four = Torus_IC_Force(pos_1, pos_ic, q_ic)
     else
-
-      ! Look up the nearest electron position
-      !$omp critical (kdtree2)
-      call kdtree2_n_nearest(tp=kd_tree_image, qv=pos_2, nn=nn, results=kd_results)
-      !$omp end critical (kdtree2)
-
-      ! Look up the image charge position and charge
-      pos_1_ic = kd_image_pos(:, kd_results(1)%idx)
-      q_1_ic = kd_image_q(kd_results(1)%idx)
-      w1 = 1.0d0 / (kd_results(1)%dis + eps)**p
-
-      pos_2_ic = kd_image_pos(:, kd_results(2)%idx)
-      q_2_ic = kd_image_q(kd_results(2)%idx)
-      w2 = 1.0d0 / (kd_results(2)%dis + eps)**p
-
-      pos_3_ic = kd_image_pos(:, kd_results(3)%idx)
-      q_3_ic = kd_image_q(kd_results(3)%idx)
-      w3 = 1.0d0 / (kd_results(3)%dis + eps)**p
-
-      pos_4_ic = kd_image_pos(:, kd_results(4)%idx)
-      q_4_ic = kd_image_q(kd_results(4)%idx)
-      w4 = 1.0d0 / (kd_results(4)%dis + eps)**p
-
-      ! Normalize the weights
-      w = w1 + w2 + w3 + w4
-      w1 = w1 / w
-      w2 = w2 / w
-      w3 = w3 / w
-      w4 = w4 / w
-
-      ! Interpolate the image charge position and charge using inverse distance weighting
-      q_ic = w1*q_1_ic + w2*q_2_ic + w3*q_3_ic + w4*q_4_ic
-      pos_ic = w1*pos_1_ic + w2*pos_2_ic + w3*pos_3_ic + w4*pos_4_ic
-
-      ! Debugging prints
-      !print *, 'Image charge position: ', pos_ic
-      !print *, 'Image charge value: ', q_ic
-
-      ! Calculate the force/acceleration on the particle at pos_1 due to the image charge
-      diff = pos_1 - pos_ic
-      r = sqrt( sum(diff**2) ) + length_scale**2
-      Image_Charge_Torus_four = (-1.0d0)*(diff*q_ic/r**3)
+      ! The charge is outside the range of the image charge model
+      Image_Charge_Torus_four = 0.0d0
     end if
 end function Image_Charge_Torus_four
+
+!-------------------------------------------!
+! Image charge effect of particle idx_2 on the particle at pos_1, served
+! from the cache built by Prepare_Image_Charge_Torus. Particles added
+! after the cache was built (idx_2 > ic_cache_n) fall back to the direct
+! computation.
+function Image_Charge_Torus_four_idx(pos_1, idx_2)
+    double precision, dimension(1:3)             :: Image_Charge_Torus_four_idx ! Image charge effect
+    double precision, intent(in), dimension(1:3) :: pos_1 ! Position of the particle we are calculating the force/acceleration on
+    integer, intent(in)                          :: idx_2 ! Index of the particle that is acting on the particle at pos_1
+
+    if (idx_2 <= ic_cache_n) then
+      if (ic_cache_ok(idx_2) .eqv. .true.) then
+        Image_Charge_Torus_four_idx = Torus_IC_Force(pos_1, ic_cache_pos(:, idx_2), ic_cache_q(idx_2))
+      else
+        ! The charge is outside the range of the image charge model
+        Image_Charge_Torus_four_idx = 0.0d0
+      end if
+    else
+      Image_Charge_Torus_four_idx = Image_Charge_Torus_four(pos_1, particles_cur_pos(:, idx_2))
+    end if
+end function Image_Charge_Torus_four_idx
+
+!-------------------------------------------!
+! Interpolate the image charge of every particle in the system into the
+! module cache (one kd-tree search per particle instead of one per pair).
+! Called by the pair loops through ptr_Image_Charge_Prepare; the cache is
+! valid until the particles move.
+subroutine Prepare_Image_Charge_Torus()
+    integer :: j
+
+    ! Grow the cache arrays if needed (amortized)
+    if (allocated(ic_cache_q)) then
+      if (size(ic_cache_q) < nrPart) then
+        deallocate(ic_cache_pos, ic_cache_q, ic_cache_ok)
+      end if
+    end if
+    if (.not. allocated(ic_cache_q)) then
+      allocate(ic_cache_pos(1:3, 1:max(2*nrPart, 1024)))
+      allocate(ic_cache_q(1:max(2*nrPart, 1024)))
+      allocate(ic_cache_ok(1:max(2*nrPart, 1024)))
+    end if
+
+    !$OMP PARALLEL DO PRIVATE(j) SHARED(nrPart, particles_cur_pos, ic_cache_pos, ic_cache_q, ic_cache_ok)
+    do j = 1, nrPart
+      call Torus_Image_Set(particles_cur_pos(:, j), ic_cache_pos(:, j), ic_cache_q(j), ic_cache_ok(j))
+    end do
+    !$OMP END PARALLEL DO
+
+    ic_cache_n = nrPart
+
+end subroutine Prepare_Image_Charge_Torus
 
 !-------------------------------------------!
 ! Generate a random position on the surface of the torus
