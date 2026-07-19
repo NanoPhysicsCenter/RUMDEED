@@ -4,6 +4,14 @@
 ! Kristinn Torfason                         !
 ! 21.10.18                                  !
 !-------------------------------------------!
+! Notes from Claude to check:
+! Physics observations I did not change (model choices, not bugs)
+! Continuous mode uses P = d/λ rather than 1−exp(−d/λ) — fine while d ≪ λ, which holds at your time steps.
+! Non-ionizing collisions have no effect on the electron in continuous mode (no scattering, no energy loss) — they're only counted.
+! Ion lifetime is only enforced inside the recombination routines, so in modes 1/3 ions never expire (they only leave via electrodes), and in mode 4 an expired ion does not return an atom, so the gas slowly depletes. If either is unintended, it's a small change — say the word.
+! The angular sampling (cube proposal × folded-normal acceptance) effectively distributes polar angles as sinθ·f(θ), which is the right thing if the folded normal represents the per-solid-angle DDCS from the Nogueira et al. reference — I believe that's the intent.
+! Electrons created by ionization carry pseudo-emitter index 2 (ion_emitter) while MAX_EMITTERS = 1, so per-emitter absorption stats skip them (the existing guard prints the warning you may have seen).
+! -------------------------------
 module mod_collisions
   use mod_global
   use mod_pair
@@ -170,28 +178,23 @@ subroutine Do_Discrete_Recombination_ots(step,nrRecombinations)
           t4_r = root4%re
           t4_i = root4%im
 
-          if (code == 31) then
-            if (t1_i == 0 .and. t1_r > 0 .and. t1_r <= time_step) then
-              coll_happens = .true.
-              t = t1_r
-            else if (t2_i == 0 .and. t2_r > 0 .and. t2_r <= time_step) then
-              coll_happens = .true.
-              t = t2_r
-            else if (t3_i == 0 .and. t3_r > 0 .and. t3_r <= time_step) then
-              coll_happens = .true.
-              t = t3_r
-            else if (t4_i == 0 .and. t4_r > 0 .and. t4_r <= time_step) then
-              coll_happens = .true.
-              t = t4_r
-            end if            
-          else if (code == 42) then 
-            if (t1_i == 0 .and. t1_r > 0 .and. t1_r <= time_step) then
-              coll_happens = .true.
-              t = t1_r
-            else if (t2_i == 0 .and. t2_r > 0 .and. t2_r <= time_step) then
-              coll_happens = .true.
-              t = t2_r
-            end if
+          ! Scan all four roots for the earliest real crossing time inside the
+          ! step. Real roots from SolvePolynomial have exactly zero imaginary
+          ! part, and roots not produced by the solver are zero (they fail
+          ! t > 0), so this covers every code with real roots — not just the
+          ! quartic codes 31 and 42 that were special-cased before.
+          if (t1_i == 0 .and. t1_r > 0 .and. t1_r <= time_step) then
+            coll_happens = .true.
+            t = t1_r
+          else if (t2_i == 0 .and. t2_r > 0 .and. t2_r <= time_step) then
+            coll_happens = .true.
+            t = t2_r
+          else if (t3_i == 0 .and. t3_r > 0 .and. t3_r <= time_step) then
+            coll_happens = .true.
+            t = t3_r
+          else if (t4_i == 0 .and. t4_r > 0 .and. t4_r <= time_step) then
+            coll_happens = .true.
+            t = t4_r
           end if
         end if
       end if
@@ -333,33 +336,25 @@ subroutine Do_Discrete_Recombination_tts(step,nrRecombinations)
           t4_r = root4%re
           t4_i = root4%im
 
-          if (code == 31) then
-            if (t1_i == 0 .and. t1_r > 0 .and. t1_r <= time_step) then
-              coll_happens = .true.
-              t = t1_r
-            else if (t2_i == 0 .and. t2_r > 0 .and. t2_r <= time_step) then
-              coll_happens = .true.
-              t = t2_r
-            else if (t3_i == 0 .and. t3_r > 0 .and. t3_r <= time_step) then
-              coll_happens = .true.
-              t = t3_r
-            else if (t4_i == 0 .and. t4_r > 0 .and. t4_r <= time_step) then
-              coll_happens = .true.
-              t = t4_r
-            end if            
-          else if (code == 42) then 
-            if (t1_i == 0 .and. t1_r > 0 .and. t1_r <= time_step) then
-              coll_happens = .true.
-              t = t1_r
-            else if (t2_i == 0 .and. t2_r > 0 .and. t2_r <= time_step) then
-              coll_happens = .true.
-              t = t2_r
-            end if
+          ! Scan all four roots for the earliest real crossing time inside the
+          ! step (see the one-time-step version above for why this replaces
+          ! the code-31/42 special cases).
+          if (t1_i == 0 .and. t1_r > 0 .and. t1_r <= time_step) then
+            coll_happens = .true.
+            t = t1_r
+          else if (t2_i == 0 .and. t2_r > 0 .and. t2_r <= time_step) then
+            coll_happens = .true.
+            t = t2_r
+          else if (t3_i == 0 .and. t3_r > 0 .and. t3_r <= time_step) then
+            coll_happens = .true.
+            t = t3_r
+          else if (t4_i == 0 .and. t4_r > 0 .and. t4_r <= time_step) then
+            coll_happens = .true.
+            t = t4_r
           end if
         end if
       end if
 
-      ! coll_happens = .false. ! REMOVE !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
       ! Recombination
       if (coll_happens .eqv. .true.) then
         elec_next_pos = elec_cur_pos + elec_cur_vel*t+0.5d0*elec_cur_acc*t**2
@@ -426,8 +421,7 @@ subroutine Do_Continuous_Ionization_ots_old(step, nrIonizations, nrCollisions)
     integer                           ::  newID, ionID, newSlot
     ! Ionization
     double precision                  ::  E1, E2, collE, ejecE, inSpeed, outSpeed, newSpeed
-    integer                           ::  count_n
-    double precision                  ::  cross_tot, cross_ion, mean_path, mean_path_avg
+    double precision                  ::  cross_tot, cross_ion, mean_path
     ! Misc
     integer                           ::  i
     double precision                  ::  rnd, alpha
@@ -435,17 +429,16 @@ subroutine Do_Continuous_Ionization_ots_old(step, nrIonizations, nrCollisions)
 
     nrIonizations = 0
     nrCollisions = 0
-    count_n = 0
 
     if (nrElec == 0) return
     !$OMP PARALLEL DO DEFAULT(NONE) &
     !$OMP& PRIVATE(elec_cur_pos,elec_prev_pos,elec_cur_vel,direct_vec,ejec_elec_pos,ejec_elec_vel,ion_pos,ion_vel) &
     !$OMP& PRIVATE(elec_energy,elec_cur_path,elec_cur_speed,newID,ionID,newSlot,E1,E2,collE,ejecE,inSpeed,outSpeed,newSpeed) &
-    !$OMP& PRIVATE(cross_tot,cross_ion,mean_path,mean_path_avg,i,rnd,alpha) &
+    !$OMP& PRIVATE(cross_tot,cross_ion,mean_path,i,rnd,alpha) &
     !$OMP& SHARED(particles_species,particles_mask,particles_cur_pos,particles_prev_pos,particles_cur_vel) &
     !$OMP& SHARED(particles_cur_energy,particles_ion_cross_sec,particles_tot_cross_sec,nrID,step) &
     !$OMP& SHARED(n_d,nrPart,ion_life_time,particles_emitter,emitters_dim) &
-    !$OMP& REDUCTION(+:nrIonizations,nrCollisions,count_n)
+    !$OMP& REDUCTION(+:nrIonizations,nrCollisions)
 
     do i=1,nrPart
       if ((particles_species(i) == species_elec) .and. (particles_mask(i) .eqv. .true.)) then
@@ -464,8 +457,6 @@ subroutine Do_Continuous_Ionization_ots_old(step, nrIonizations, nrCollisions)
             cross_tot = particles_tot_cross_sec(i)
 
             mean_path = 1.0d0/(n_d*cross_tot)
-            mean_path_avg = mean_path_avg + mean_path
-            count_n = count_n + 1
 
             ! Calculate the ratio between the distance travled and the mean free path
             alpha = elec_cur_path/mean_path
@@ -568,26 +559,24 @@ subroutine Do_Continuous_Ionization_ots(step,nrCollisions,nrIonizations)
   integer                           ::  newID, ionID, newSlot
   ! Ionization
   double precision                  ::  E1, E2, collE, ejecE, inSpeed, outSpeed, newSpeed
-  integer                           ::  count_n
-  double precision                  ::  cross_tot, cross_ion, mean_path, mean_path_avg
+  double precision                  ::  cross_tot, cross_ion, mean_path
   ! Misc
   integer                           ::  i
   double precision                  ::  rnd, alpha
 
   nrCollisions = 0
   nrIonizations = 0
-  count_n = 0
 
   if (nrElec == 0) return
   !$OMP PARALLEL DO DEFAULT(NONE) &
   !$OMP& PRIVATE(i,elec_cur_pos,elec_prev_pos,elec_cur_vel,direct_vec,ejec_elec_pos,ejec_elec_vel,ion_pos,ion_vel) &
   !$OMP& PRIVATE(elec_energy,elec_cur_path,elec_cur_speed,newID,ionID,newSlot,E1,E2,collE,ejecE,inSpeed,outSpeed,newSpeed) &
-  !$OMP& PRIVATE(cross_tot,cross_ion,mean_path,mean_path_avg,rnd,alpha) &
+  !$OMP& PRIVATE(cross_tot,cross_ion,mean_path,rnd,alpha) &
   !$OMP& SHARED(nrPart,particles_elec_pointer,particles_species,particles_mask) &	
   !$OMP& SHARED(particles_cur_pos,particles_prev_pos,particles_cur_vel) &
   !$OMP& SHARED(particles_cur_energy,particles_ion_cross_sec,particles_tot_cross_sec,nrID,step) &
   !$OMP& SHARED(n_d,ion_life_time,particles_emitter,emitters_dim) &
-  !$OMP& REDUCTION(+:nrIonizations,nrCollisions,count_n)
+  !$OMP& REDUCTION(+:nrIonizations,nrCollisions)
 
   elec: do i=1,nrPart
 
@@ -608,8 +597,6 @@ subroutine Do_Continuous_Ionization_ots(step,nrCollisions,nrIonizations)
         cross_tot = particles_tot_cross_sec(i)
 
         mean_path = 1.0d0/(n_d*cross_tot)
-        mean_path_avg = mean_path_avg + mean_path
-        count_n = count_n + 1
 
         ! Calculate the ratio between the distance travled and the mean free path
         alpha = elec_cur_path/mean_path
@@ -717,26 +704,24 @@ subroutine Do_Continuous_Ionization_tts(step,nrCollisions,nrIonizations)
   integer                           ::  newID, ionID, newSlot
   ! Ionization
   double precision                  ::  E1, E2, collE, ejecE, inSpeed, outSpeed, newSpeed
-  integer                           ::  count_n
-  double precision                  ::  cross_tot, cross_ion, mean_path, mean_path_avg
+  double precision                  ::  cross_tot, cross_ion, mean_path
   ! Misc
   integer                           ::  i, k
   double precision                  ::  rnd, alpha
 
   nrCollisions = 0
   nrIonizations = 0
-  count_n = 0
 
   if (nrElec == 0) return
   !$OMP PARALLEL DO DEFAULT(NONE) &
   !$OMP& PRIVATE(k,i,elec_cur_pos,elec_prev_pos,elec_cur_vel,direct_vec,ejec_elec_pos,ejec_elec_vel,ion_pos,ion_vel) &
   !$OMP& PRIVATE(elec_energy,elec_cur_path,elec_cur_speed,newID,ionID,newSlot,E1,E2,collE,ejecE,inSpeed,outSpeed,newSpeed) &
-  !$OMP& PRIVATE(cross_tot,cross_ion,mean_path,mean_path_avg,rnd,alpha) &
+  !$OMP& PRIVATE(cross_tot,cross_ion,mean_path,rnd,alpha) &
   !$OMP& SHARED(nrPart,nrElec,particles_elec_pointer,particles_species,particles_mask) &	
   !$OMP& SHARED(particles_cur_pos,particles_prev_pos,particles_cur_vel) &
   !$OMP& SHARED(particles_cur_energy,particles_ion_cross_sec,particles_tot_cross_sec,nrID,step) &
   !$OMP& SHARED(n_d,ion_life_time,particles_emitter,emitters_dim) &
-  !$OMP& REDUCTION(+:nrIonizations,nrCollisions,count_n)
+  !$OMP& REDUCTION(+:nrIonizations,nrCollisions)
 
   elec: do k=1,nrElec
     i = particles_elec_pointer(k)
@@ -759,8 +744,6 @@ subroutine Do_Continuous_Ionization_tts(step,nrCollisions,nrIonizations)
         cross_tot = particles_tot_cross_sec(i)
 
         mean_path = 1.0d0/(n_d*cross_tot)
-        mean_path_avg = mean_path_avg + mean_path
-        count_n = count_n + 1
 
         ! Calculate the ratio between the distance travled and the mean free path
         alpha = elec_cur_path/mean_path
@@ -865,7 +848,7 @@ subroutine Do_Discrete_Ionization_ots(step,nrIonizations)
   double precision, dimension(1:3)  ::  ejec_elec_pos, ejec_elec_vel, ion_pos, ion_vel, relative_pos,direct_vec
   double precision                  ::  elec_cur_speed, elec_energy, cur_dist2, ionization_dist
   ! Ionization
-  logical                           ::  ionization
+  logical                           ::  ionization, ionized
   double precision                  ::  ion_rad2, ion_rad, E1, E2, collE, ejecE, inSpeed, outSpeed, newSpeed
   integer                           ::  newID, ionID, newSlot
   ! Polynomial solver
@@ -882,7 +865,7 @@ subroutine Do_Discrete_Ionization_ots(step,nrIonizations)
   !$OMP PARALLEL DO DEFAULT(NONE) &
   !$OMP& PRIVATE(i,j,atom_cur_pos,elec_cur_pos,elec_next_pos,elec_cur_vel,elec_cur_acc) &
   !$OMP& PRIVATE(ejec_elec_pos,ejec_elec_vel,ion_pos,ion_vel,relative_pos,direct_vec) &
-  !$OMP& PRIVATE(elec_cur_speed,elec_energy,cur_dist2,ionization_dist,ionization,ion_rad2,ion_rad) &
+  !$OMP& PRIVATE(elec_cur_speed,elec_energy,cur_dist2,ionization_dist,ionization,ionized,ion_rad2,ion_rad) &
   !$OMP& PRIVATE(E1,E2,collE,ejecE,inSpeed,outSpeed,newSpeed,newID,ionID,newSlot) &
   !$OMP& PRIVATE (a,b,cc,dd,e,t,t1_r,t1_i,t2_r,t2_i,t3_r,t3_i,t4_r,t4_i,root1,root2,root3,root4,code,rnd) &
   !$OMP& SHARED(nrPart,step,time_step,nrID,ion_life_time,particles_emitter,particles_step) &
@@ -944,16 +927,20 @@ subroutine Do_Discrete_Ionization_ots(step,nrIonizations)
             t4_r = root4%re
             t4_i = root4%im
 
-            if ((abs(t1_i) <= 2.0d-16) .and. (t1_r > 0) .and. (t1_r <= time_step)) then
+            ! Real roots from SolvePolynomial have exactly zero imaginary
+            ! part, so test for zero. The old absolute tolerance (~2e-16 s)
+            ! was of the same order as the roots themselves and could accept
+            ! a genuinely complex pair (a near-miss trajectory) as a hit.
+            if ((t1_i == 0) .and. (t1_r > 0) .and. (t1_r <= time_step)) then
               ionization = .true.
               t = t1_r
-            else if ((abs(t2_i) <= 2.0d-16) .and. (t2_r > 0) .and. (t2_r <= time_step)) then
+            else if ((t2_i == 0) .and. (t2_r > 0) .and. (t2_r <= time_step)) then
               ionization = .true.
               t = t2_r
-            else if ((abs(t3_i) <= 2.0d-16) .and. (t3_r > 0) .and. (t3_r <= time_step)) then
+            else if ((t3_i == 0) .and. (t3_r > 0) .and. (t3_r <= time_step)) then
               ionization = .true.
               t = t3_r
-            else if ((abs(t4_i) <= 2.0d-16) .and. (t4_r > 0) .and. (t4_r <= time_step)) then
+            else if ((t4_i == 0) .and. (t4_r > 0) .and. (t4_r <= time_step)) then
               ionization = .true.
               t = t4_r
             end if
@@ -963,88 +950,94 @@ subroutine Do_Discrete_Ionization_ots(step,nrIonizations)
 
         ! Do ionization
         if (ionization .eqv. .true.) then
-          ! print *, 'Atom species = ', particles_species(i), '=', species_atom
-          ! print *, 'Ionization distance reached'
           ! Some data for the file
           elec_next_pos = elec_cur_pos + elec_cur_vel*t+0.5d0*elec_cur_acc*t**2
           ionization_dist = norm2(elec_next_pos - atom_cur_pos)
-          
-          ! --------------------- Energy conservation ---------------------
-          E1 = elec_energy ! Starting energy
-          E2 = E1 - N_bind ! Energy after ionization
-          call random_number(rnd)
-          collE = E2*rnd ! Energy of the colliding electron
-          ejecE = E2 - collE ! Energy of the ejected electron
 
-          ! --------------------- Colliding electron ----------------------
-          ! New direction
-          direct_vec = Get_Injected_Vec(elec_energy, elec_cur_vel)
-          direct_vec = direct_vec / norm2(direct_vec)
-          ! New velocity vector
-          particles_cur_vel(:, j) = direct_vec*sqrt(2.0d0*q_0*collE/m_0)
-          !$OMP CRITICAL
-          call Update_Collision_Data(j)
-          !$OMP END CRITICAL
-          ! Some variables for the file
-          inSpeed = elec_cur_speed
-          outSpeed = norm2(particles_cur_vel(:,j))
+          ! Claim the electron and carry out the whole event under one lock.
+          ! Another thread handling a different atom can reach this point with
+          ! the same electron; without the re-check both would drain N_bind
+          ! from the same initial energy (creating energy from nothing) and
+          ! overwrite each other's scattered velocity. The data file is
+          ! written here as well, so records cannot interleave.
+          ionized = .false.
+          !$OMP CRITICAL(IONIZATION)
+          elec_energy = particles_cur_energy(j)
+          if ((particles_mask(i) .eqv. .true.) .and. (particles_mask(j) .eqv. .true.) &
+            & .and. (elec_energy >= N_bind)) then
+            ! Re-fetch the velocity: it changes if this electron already
+            ! ionized another atom since it was read at the top of the loop.
+            elec_cur_vel = particles_cur_vel(:,j)
+            elec_cur_speed = norm2(elec_cur_vel)
 
-          ! --------------------- Ejected electron ---------------------
-          
-          ! New position
-          call random_number(ejec_elec_pos)
-          ejec_elec_pos = ejec_elec_pos - 0.5d0
-          ejec_elec_pos = atom_cur_pos + ejec_elec_pos*length_scale
-          ! New direction
-          direct_vec = Get_Ejected_Vec(elec_energy, elec_energy, elec_cur_vel)
-          direct_vec = direct_vec / norm2(direct_vec)
-          ! New velocity vector
-          ejec_elec_vel = direct_vec*sqrt(2.0d0*q_0*ejecE/m_0)
-          ! Some data for the file
-          newSpeed = norm2(ejec_elec_vel)
+            ! --------------------- Energy conservation ---------------------
+            E1 = elec_energy ! Starting energy
+            E2 = E1 - N_bind ! Energy after ionization
+            call random_number(rnd)
+            collE = E2*rnd ! Energy of the colliding electron
+            ejecE = E2 - collE ! Energy of the ejected electron
 
-          ! ----------------------- Created ion -----------------------
-          ion_pos = atom_cur_pos
-          ion_vel = 0.0d0
+            ! --------------------- Colliding electron ----------------------
+            ! New direction
+            direct_vec = Get_Injected_Vec(elec_energy, elec_cur_vel)
+            direct_vec = direct_vec / norm2(direct_vec)
+            ! New velocity vector
+            particles_cur_vel(:, j) = direct_vec*sqrt(2.0d0*q_0*collE/m_0)
+            call Update_Collision_Data(j)
+            ! Some variables for the file
+            inSpeed = elec_cur_speed
+            outSpeed = norm2(particles_cur_vel(:,j))
 
-          ! --------------------- Ionization ---------------------------
-          !$OMP CRITICAL
-          ! Add the new electron to the system
-          newID = nrID
-          call Add_Particle(ejec_elec_pos, ejec_elec_vel, species_elec, step, ion_emitter, -1) ! Electron
-          ! Add_Particle appends the electron and increments nrPart, so nrPart is the
-          ! array slot it landed in. Update_Collision_Data indexes the particle arrays
-          ! by slot, while newID is the global particle-ID counter used for the output
-          ! files. Both must stay inside this critical section so that no other thread
-          ! can add a particle in between.
-          newSlot = nrPart
-          call Update_Collision_Data(newSlot)
-          !$OMP END CRITICAL
+            ! --------------------- Ejected electron ---------------------
+            ! New position
+            call random_number(ejec_elec_pos)
+            ejec_elec_pos = ejec_elec_pos - 0.5d0
+            ejec_elec_pos = atom_cur_pos + ejec_elec_pos*length_scale
+            ! New direction
+            direct_vec = Get_Ejected_Vec(elec_energy, elec_energy, elec_cur_vel)
+            direct_vec = direct_vec / norm2(direct_vec)
+            ! New velocity vector
+            ejec_elec_vel = direct_vec*sqrt(2.0d0*q_0*ejecE/m_0)
+            ! Some data for the file
+            newSpeed = norm2(ejec_elec_vel)
 
-          !$OMP CRITICAL
-          ! Remove the atom from the system
-          call Mark_Particles_Remove(i,remove_ion)
-          !$OMP END CRITICAL
+            ! ----------------------- Created ion -----------------------
+            ion_pos = atom_cur_pos
+            ion_vel = 0.0d0
 
-          !$OMP CRITICAL
-          ! Add the new positively charged ion to the system
-          ionID = nrID
-          call Add_Particle(ion_pos, ion_vel, species_ion, step, ion_emitter, step+ion_life_time) ! Ion
-          !$OMP END CRITICAL
-          !$OMP CRITICAL
-          call Write_Ionization_Data(step,atom_cur_pos,inSpeed,outSpeed,newSpeed,ionization_dist, &
-          & ion_rad,i,newID,ionID,particles_emitter(i))
-          !$OMP END CRITICAL
+            ! --------------------- Ionization ---------------------------
+            ! Add the new electron to the system. Add_Particle appends it and
+            ! increments nrPart, so nrPart is the array slot it landed in.
+            ! Update_Collision_Data indexes the particle arrays by slot, while
+            ! newID is the global particle-ID counter used for the output files.
+            newID = nrID
+            call Add_Particle(ejec_elec_pos, ejec_elec_vel, species_elec, step, ion_emitter, -1) ! Electron
+            newSlot = nrPart
+            call Update_Collision_Data(newSlot)
 
-          nrIonizations = nrIonizations + 1
+            ! Remove the atom from the system
+            call Mark_Particles_Remove(i,remove_ion)
 
-          particles_emitter(j) = ion_emitter
+            ! Add the new positively charged ion to the system
+            ionID = nrID
+            call Add_Particle(ion_pos, ion_vel, species_ion, step, ion_emitter, step+ion_life_time) ! Ion
 
-          cycle atom
+            call Write_Ionization_Data(step,atom_cur_pos,inSpeed,outSpeed,newSpeed,ionization_dist, &
+            & ion_rad,i,newID,ionID,particles_emitter(i))
+
+            particles_emitter(j) = ion_emitter
+            ionized = .true.
+          end if
+          !$OMP END CRITICAL(IONIZATION)
+
+          if (ionized .eqv. .true.) then
+            nrIonizations = nrIonizations + 1
+            cycle atom ! The atom is gone, move on to the next one
+          end if
+          ! The electron could no longer ionize; try the next one.
         end if
       end if
     end do elec
-  ! end if
   end do atom
   !$OMP END PARALLEL DO
 end subroutine Do_Discrete_Ionization_ots
@@ -1059,7 +1052,7 @@ subroutine Do_Discrete_Ionization_tts(step,nrIonizations)
   double precision, dimension(1:3)  ::  ejec_elec_pos, ejec_elec_vel, ion_pos, ion_vel, relative_pos,direct_vec
   double precision                  ::  elec_cur_speed, elec_energy, cur_dist2, ionization_dist
   ! Ionization
-  logical                           ::  ionization
+  logical                           ::  ionization, ionized
   double precision                  ::  ion_rad2, ion_rad, E1, E2, collE, ejecE, inSpeed, outSpeed, newSpeed
   integer                           ::  newID, ionID, newSlot
   ! Polynomial solver
@@ -1076,7 +1069,7 @@ subroutine Do_Discrete_Ionization_tts(step,nrIonizations)
   !$OMP PARALLEL DO DEFAULT(NONE) &
   !$OMP& PRIVATE(i,j,k,l,atom_cur_pos,elec_cur_pos,elec_next_pos,elec_cur_vel,elec_cur_acc) &
   !$OMP& PRIVATE(ejec_elec_pos,ejec_elec_vel,ion_pos,ion_vel,relative_pos,direct_vec) &
-  !$OMP& PRIVATE(elec_cur_speed,elec_energy,cur_dist2,ionization_dist,ionization,ion_rad2,ion_rad) &
+  !$OMP& PRIVATE(elec_cur_speed,elec_energy,cur_dist2,ionization_dist,ionization,ionized,ion_rad2,ion_rad) &
   !$OMP& PRIVATE(E1,E2,collE,ejecE,inSpeed,outSpeed,newSpeed,newID,ionID,newSlot) &
   !$OMP& PRIVATE (a,b,cc,dd,e,t,t1_r,t1_i,t2_r,t2_i,t3_r,t3_i,t4_r,t4_i,root1,root2,root3,root4,code,rnd) &
   !$OMP& SHARED(nrAtom,nrElec,particles_atom_pointer,particles_elec_pointer) &
@@ -1120,9 +1113,7 @@ subroutine Do_Discrete_Ionization_tts(step,nrIonizations)
         ionization = .false.
 
         ! Check if ionization happens
-        call random_number(rnd)
         if (cur_dist2 <= ion_rad2) then
-        ! if  (rnd <= ion_rad2/cur_dist2) then
           ionization = .true.
           t = 0
           ionization_dist = norm2(elec_cur_pos - atom_cur_pos)
@@ -1145,16 +1136,18 @@ subroutine Do_Discrete_Ionization_tts(step,nrIonizations)
             t4_r = root4%re
             t4_i = root4%im
             
-            if ((abs(t1_i) <= 2.22d-16) .and. (t1_r > 0) .and. (t1_r <= time_step)) then
+            ! Real roots have exactly zero imaginary part (see the
+            ! one-time-step version for why a tolerance here is wrong).
+            if ((t1_i == 0) .and. (t1_r > 0) .and. (t1_r <= time_step)) then
               ionization = .true.
               t = t1_r
-            else if ((abs(t2_i) <= 2.22d-16) .and. (t2_r > 0) .and. (t2_r <= time_step)) then
+            else if ((t2_i == 0) .and. (t2_r > 0) .and. (t2_r <= time_step)) then
               ionization = .true.
               t = t2_r
-            else if ((abs(t3_i) <= 2.22d-16) .and. (t3_r > 0) .and. (t3_r <= time_step)) then
+            else if ((t3_i == 0) .and. (t3_r > 0) .and. (t3_r <= time_step)) then
               ionization = .true.
               t = t3_r
-            else if ((abs(t4_i) <= 2.22d-16) .and. (t4_r > 0) .and. (t4_r <= time_step)) then
+            else if ((t4_i == 0) .and. (t4_r > 0) .and. (t4_r <= time_step)) then
               ionization = .true.
               t = t4_r
             end if
@@ -1165,79 +1158,87 @@ subroutine Do_Discrete_Ionization_tts(step,nrIonizations)
       
         ! Do ionization
         if (ionization .eqv. .true.) then
-          ! print *, 'Ionization distance reached'
           ! Some data for the file
           elec_next_pos = elec_cur_pos + elec_cur_vel*t+0.5d0*elec_cur_acc*t**2
           ionization_dist = norm2(elec_next_pos - atom_cur_pos)
-          
-          ! --------------------- Energy conservation ---------------------
-          E1 = elec_energy ! Starting energy
-          E2 = E1 - N_bind ! Energy after ionization
-          call random_number(rnd)
-          collE = E2*rnd ! Energy of the colliding electron
-          ejecE = E2 - collE ! Energy of the ejected electron
 
-          ! --------------------- Colliding electron ----------------------
-          ! New direction
-          direct_vec = Get_Injected_Vec(elec_energy, elec_cur_vel)
-          direct_vec = direct_vec / norm2(direct_vec)
-          ! New velocity vector
-          particles_cur_vel(:, j) = direct_vec*sqrt(2.0d0*q_0*collE/m_0)
-          !$OMP CRITICAL
-          call Update_Collision_Data(j)
-          !$OMP END CRITICAL
-          ! Some variables for the file
-          inSpeed = elec_cur_speed
-          outSpeed = norm2(particles_cur_vel(:,j))
+          ! Claim the electron and carry out the whole event under one lock
+          ! (see the one-time-step version for the race this prevents).
+          ionized = .false.
+          !$OMP CRITICAL(IONIZATION)
+          elec_energy = particles_cur_energy(j)
+          if ((particles_mask(i) .eqv. .true.) .and. (particles_mask(j) .eqv. .true.) &
+            & .and. (elec_energy >= N_bind)) then
+            ! Re-fetch the velocity: it changes if this electron already
+            ! ionized another atom since it was read at the top of the loop.
+            elec_cur_vel = particles_cur_vel(:,j)
+            elec_cur_speed = norm2(elec_cur_vel)
 
-          ! --------------------- Ejected electron ---------------------
-          
-          ! New position
-          call random_number(ejec_elec_pos)
-          ejec_elec_pos = ejec_elec_pos - 0.5d0
-          ejec_elec_pos = atom_cur_pos + ejec_elec_pos*length_scale
-          ! New direction
-          direct_vec = Get_Ejected_Vec(elec_energy, elec_energy, elec_cur_vel)
-          direct_vec = direct_vec / norm2(direct_vec)
-          ! New velocity vector
-          ejec_elec_vel = direct_vec*sqrt(2.0d0*q_0*ejecE/m_0)
-          ! Some data for the file
-          newSpeed = norm2(ejec_elec_vel)
+            ! --------------------- Energy conservation ---------------------
+            E1 = elec_energy ! Starting energy
+            E2 = E1 - N_bind ! Energy after ionization
+            call random_number(rnd)
+            collE = E2*rnd ! Energy of the colliding electron
+            ejecE = E2 - collE ! Energy of the ejected electron
 
-          ! ----------------------- Created ion -----------------------
-          ion_pos = atom_cur_pos
-          ion_vel = 0.0d0
+            ! --------------------- Colliding electron ----------------------
+            ! New direction
+            direct_vec = Get_Injected_Vec(elec_energy, elec_cur_vel)
+            direct_vec = direct_vec / norm2(direct_vec)
+            ! New velocity vector
+            particles_cur_vel(:, j) = direct_vec*sqrt(2.0d0*q_0*collE/m_0)
+            call Update_Collision_Data(j)
+            ! Some variables for the file
+            inSpeed = elec_cur_speed
+            outSpeed = norm2(particles_cur_vel(:,j))
 
-          ! --------------------- Ionization ---------------------------
-          !$OMP CRITICAL
-          ! Add the new electron to the system
-          newID = nrID
-          call Add_Particle(ejec_elec_pos, ejec_elec_vel, species_elec, step, ion_emitter, -1) ! Electron
-          ! Add_Particle appends the electron and increments nrPart, so nrPart is the
-          ! array slot it landed in. Update_Collision_Data indexes the particle arrays
-          ! by slot, while newID is the global particle-ID counter used for the output
-          ! files. Both must stay inside this critical section so that no other thread
-          ! can add a particle in between.
-          newSlot = nrPart
-          call Update_Collision_Data(newSlot)
-          !$OMP END CRITICAL
+            ! --------------------- Ejected electron ---------------------
+            ! New position
+            call random_number(ejec_elec_pos)
+            ejec_elec_pos = ejec_elec_pos - 0.5d0
+            ejec_elec_pos = atom_cur_pos + ejec_elec_pos*length_scale
+            ! New direction
+            direct_vec = Get_Ejected_Vec(elec_energy, elec_energy, elec_cur_vel)
+            direct_vec = direct_vec / norm2(direct_vec)
+            ! New velocity vector
+            ejec_elec_vel = direct_vec*sqrt(2.0d0*q_0*ejecE/m_0)
+            ! Some data for the file
+            newSpeed = norm2(ejec_elec_vel)
 
-          ! Remove the atom from the system
-          call Mark_Particles_Remove(i,remove_ion)
+            ! ----------------------- Created ion -----------------------
+            ion_pos = atom_cur_pos
+            ion_vel = 0.0d0
 
-          !$OMP CRITICAL
-          ! Add the new positively charged ion to the system
-          ionID = nrID
-          call Add_Particle(ion_pos, ion_vel, species_ion, step, ion_emitter, step+ion_life_time) ! Ion
-          !$OMP END CRITICAL
-          !$OMP CRITICAL
-          call Write_Ionization_Data(step,atom_cur_pos,inSpeed,outSpeed,newSpeed,ionization_dist, &
-          & ion_rad,i,newID,ionID,particles_emitter(i))
-          !$OMP END CRITICAL
+            ! --------------------- Ionization ---------------------------
+            ! Add the new electron to the system. Add_Particle appends it and
+            ! increments nrPart, so nrPart is the array slot it landed in.
+            ! Update_Collision_Data indexes the particle arrays by slot, while
+            ! newID is the global particle-ID counter used for the output files.
+            newID = nrID
+            call Add_Particle(ejec_elec_pos, ejec_elec_vel, species_elec, step, ion_emitter, -1) ! Electron
+            newSlot = nrPart
+            call Update_Collision_Data(newSlot)
 
-          nrIonizations = nrIonizations + 1
+            ! Remove the atom from the system
+            call Mark_Particles_Remove(i,remove_ion)
 
-          cycle atom
+            ! Add the new positively charged ion to the system
+            ionID = nrID
+            call Add_Particle(ion_pos, ion_vel, species_ion, step, ion_emitter, step+ion_life_time) ! Ion
+
+            call Write_Ionization_Data(step,atom_cur_pos,inSpeed,outSpeed,newSpeed,ionization_dist, &
+            & ion_rad,i,newID,ionID,particles_emitter(i))
+
+            particles_emitter(j) = ion_emitter
+            ionized = .true.
+          end if
+          !$OMP END CRITICAL(IONIZATION)
+
+          if (ionized .eqv. .true.) then
+            nrIonizations = nrIonizations + 1
+            cycle atom ! The atom is gone, move on to the next one
+          end if
+          ! The electron could no longer ionize; try the next one.
         end if
       end if
     end do elec
@@ -2081,11 +2082,12 @@ subroutine Place_Atoms_Cylinder()
     ! Set velocity to zero
     atom_vel(:) = 0.0d0
 
-    if (nrStartIons > 0) then
+    ! Decide ion vs atom from the loop index: decrementing a shared counter
+    ! here raced between threads and could place the wrong number of ions.
+    if (i <= nrStartIons) then
       !$OMP CRITICAL
       call Add_Particle(atom_pos, atom_vel, species_ion, 0, ion_emitter, ion_life_time)
       !$OMP END CRITICAL
-      nrStartIons = nrStartIons - 1
     else
       !$OMP CRITICAL
       call Add_Particle(atom_pos, atom_vel, species_atom, 0, ion_emitter, -1)
@@ -2122,8 +2124,12 @@ subroutine Update_Collision_Data(i)
   tot_cross_sec = Find_Cross_tot_data(elec_energy)
 
   elec_energy = 0.5d0*m_0*elec_cur_speed2/q_0
-  recom_cross_sec = Calculate_Kramers_Cross_Section(elec_energy)
-  recom_cross_rad = sqrt(Calculate_Kramers_Cross_Section(elec_energy)/pi)
+  ! The Kramers cross section diverges as 1/E for E -> 0, so a zero-velocity
+  ! electron (e.g. freshly emitted) would get an infinite recombination radius
+  ! and instantly recombine with any ion at any distance. Floor the energy at
+  ! the thermal energy of the gas when evaluating the cross section.
+  recom_cross_sec = Calculate_Kramers_Cross_Section(max(elec_energy, k_b*T_temp/q_0))
+  recom_cross_rad = sqrt(recom_cross_sec/pi)
 
   particles_cur_energy(i) = elec_energy
   particles_ion_cross_sec(i) = ion_cross_sec

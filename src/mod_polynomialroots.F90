@@ -30,7 +30,11 @@ module mod_polynomialroots
       REAL(DP),PARAMETER,PRIVATE:: EPS=EPSILON(ONE)
     
       CHARACTER(LEN=*),PARAMETER,PUBLIC:: POLYROOTS_VERSION= "1.3 (4 Jan 1999)"
+      ! SolvePolynomial is called concurrently from OpenMP parallel regions
+      ! (mod_collisions); a shared module variable would let one thread's code
+      ! overwrite another's between the root solve and the copy-out.
       INTEGER,PRIVATE:: outputCode
+      !$OMP THREADPRIVATE(outputCode)
     !    =0 degenerate equation
     !    =1 one real root
     !    =21 two identical real roots
@@ -379,6 +383,14 @@ module mod_polynomialroots
       IF (a(1)==0.0) THEN
         z(1) = CZERO    !  one root is obviously zero
         CALL CubicRoots(a(2:), z(2:))
+        ! CubicRoots does not set outputCode. Its real roots have exactly zero
+        ! imaginary part and a complex pair always lands in its z(2),z(3) —
+        ! z(3),z(4) here — so testing z(3) classifies the root pattern.
+        IF (AIMAG(z(3)) == ZERO) THEN
+          outputCode = 31   ! four real roots
+        ELSE
+          outputCode = 42   ! two real and two complex roots
+        END IF
         RETURN
       END IF
     
@@ -542,10 +554,25 @@ module mod_polynomialroots
       a(4)=cubicCoeff
       a(5)=quarticCoeff
     
+      ! Roots that are not produced by the branch taken below must not be left
+      ! undefined: the collision routines inspect all four. A zero root is
+      ! inert there (they require a root strictly greater than zero).
+      root1=CZERO
+      root2=CZERO
+      root3=CZERO
+      root4=CZERO
+
       IF (quarticCoeff /= ZERO) THEN
-        CALL QuarticRoots(a,z,outputCode)  
+        CALL QuarticRoots(a,z,outputCode)
       ELSE IF (cubicCoeff /= ZERO) THEN
         CALL CubicRoots(a,z)
+        ! CubicRoots does not set outputCode; classify its roots here. A
+        ! complex pair always lands in z(2),z(3) with z(1) real.
+        IF (AIMAG(z(2)) == ZERO) THEN
+          outputCode=33   ! three real roots
+        ELSE
+          outputCode=32   ! one real and two complex roots
+        END IF
       ELSE IF (quadraticCoeff /= ZERO) THEN
         CALL QuadraticRoots(a,z)
       ELSE IF (linearCoeff /= ZERO) THEN
@@ -554,12 +581,16 @@ module mod_polynomialroots
       ELSE
         outputCode=0    !  { no roots }
       END IF
-    
+
       code=outputCode
       IF (outputCode > 0) root1=z(1)
       IF (outputCode > 1) root2=z(2)
       IF (outputCode > 23) root3=z(3)
-      IF (outputCode > 99) root4=z(4)
+      ! Only the quartic codes carry a fourth root (the cubic codes 31-33 in
+      ! the documented taxonomy are never produced with four roots; code 31
+      ! here always comes from QuarticRoots). The old test (> 99) could never
+      ! be true, so root4 was returned undefined.
+      IF (outputCode == 31 .OR. outputCode == 42 .OR. outputCode == 44) root4=z(4)
       RETURN
     END Subroutine SolvePolynomial   ! ------------------------------------------
     

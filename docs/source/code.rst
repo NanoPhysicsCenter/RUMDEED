@@ -91,6 +91,181 @@ Details worth knowing:
   window; the electron--ion forces themselves are sampled at full resolution regardless of
   :math:`n`.
 
+.. _collisions:
+
+Electron collisions with the background gas
+-------------------------------------------
+In collision runs the system contains a neutral background gas of nitrogen (N\ :sub:`2`) in addition
+to the emitted electrons. Energetic electrons ionize the gas, creating an electron–ion pair, and the
+resulting ions can later recapture an electron by recombination. The code lives in
+**mod_collisions.F90**; the top-level routine ``Do_Electron_Atom_Collisions`` is called once per time
+step from **mod_verlet.F90** and dispatches on :ref:`COLLISION_MODE <run>`:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 10 45 45
+
+   * - Mode
+     - Ionization
+     - Recombination
+   * - 1
+     - Continuous
+     - —
+   * - 2
+     - Continuous
+     - Discrete
+   * - 3
+     - Discrete
+     - —
+   * - 4
+     - Discrete
+     - Discrete
+
+The *continuous* ionization model is due to Kristinn Torfason. The *discrete* ionization model and the
+recombination model are due to Arnar Jónsson.
+
+Background gas and cross sections
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The gas is treated as stationary and uniform, with number density set from the ideal gas law from the
+input temperature :ref:`T_TEMP <run>` and pressure :ref:`P_ABS <run>`,
+
+.. math::
+    n_d = \frac{P}{k_B T}\, .
+
+Two electron-impact cross sections for N\ :sub:`2` enter the models: the total (momentum-transfer)
+cross section :math:`\sigma_\text{tot}(E)` and the ionization cross section :math:`\sigma_\text{ion}(E)`,
+both a function of the electron kinetic energy :math:`E` (in eV). They are tabulated in the files
+``N2-tot-cross.txt`` and ``N2-ion-cross.txt`` (read by ``Read_Cross_Section``). Below the fitted range
+the value is linearly interpolated from the table (clamped to the tabulated energy range); above it a
+double-exponential fit :math:`\sigma(E) = (a\, e^{bE} + c\, e^{dE})\times 10^{-20}\ \text{m}^2` is used
+(``Find_Cross_tot_data``, ``Find_Cross_ion_data``). For cross-section lookups the energy is capped at
+5000 eV.
+
+Each electron caches its energy and the associated cross-section quantities in
+``Update_Collision_Data``, refreshed for all electrons at the start of every collision step. This
+routine also converts each cross section to an equivalent geometric interaction radius by treating it
+as the area of a disk, :math:`\sigma = \pi r^2`, so
+
+.. math::
+    r_\text{ion} = \sqrt{\sigma_\text{ion}/\pi}\, , \qquad
+    r_\text{rec} = \sqrt{\sigma_\text{rec}/\pi}\, ,
+
+which the discrete models below use as collision radii.
+
+Continuous ionization
+~~~~~~~~~~~~~~~~~~~~~~~
+*Model by Kristinn Torfason* (``Do_Continuous_Ionization_ots`` / ``_tts``).
+
+In the continuous model the gas is not represented by explicit particles; each electron instead
+samples a collision probability from the local mean free path. An electron that moved a distance
+:math:`d = |\mathbf{x}(t) - \mathbf{x}(t-\Delta t)|` in the last step, and whose energy exceeds the
+binding energy :math:`E > E_\text{bind}`, has mean free path and collision probability
+
+.. math::
+    \lambda = \frac{1}{n_d\, \sigma_\text{tot}(E)}\, , \qquad
+    P_\text{coll} = \frac{d}{\lambda}\, ,
+
+valid while :math:`d \ll \lambda`. A uniform random number decides whether a collision occurs. If it
+does, the collision is ionizing with the conditional probability
+
+.. math::
+    P_\text{ion} = \frac{\sigma_\text{ion}(E)}{\sigma_\text{tot}(E)}\, ,
+
+otherwise the collision is treated as elastic and leaves the electron unchanged (only the collision is
+counted).
+
+An ionizing collision converts an incident electron of energy :math:`E_1` into two outgoing electrons.
+The binding energy is paid first and the remainder is split randomly between the incident (scattered)
+electron and the newly ejected electron,
+
+.. math::
+    E_2 = E_1 - E_\text{bind}\, , \qquad
+    E_\text{scat} = \zeta E_2\, , \qquad
+    E_\text{ejec} = (1-\zeta) E_2\, , \qquad \zeta \sim U(0,1)\, ,
+
+so that energy is conserved. Both electrons are given new directions (see
+:ref:`collision-angles`) and speeds :math:`v = \sqrt{2 q_0 E/m_0}`. The ejected electron is placed at a
+small random offset from the collision point, and a singly charged ion of mass
+:math:`m_{\text{N}_2^+}` is created at rest nearby with a finite lifetime :ref:`ION_LIFE_TIME <run>`.
+
+Discrete ionization
+~~~~~~~~~~~~~~~~~~~~~
+*Model by Arnar Jónsson* (``Do_Discrete_Ionization_ots`` / ``_tts``).
+
+In the discrete model the gas is represented by explicit neutral-atom particles, placed uniformly in a
+cylinder over the emitter at the start of the run by ``Place_Atoms_Cylinder`` (a fraction
+:ref:`ION_ATOM_RATIO <run>` of them start already ionized). Ionization is then a geometric event: an
+electron ionizes an atom if its trajectory over the time step passes within the ionization radius
+:math:`r_\text{ion}` of the atom, provided the electron has enough energy, :math:`E \ge E_\text{bind}`.
+
+The electron is advanced over the step with the Beeman trajectory
+:math:`\mathbf{x}(t) = \mathbf{x}_0 + \mathbf{v} t + \tfrac{1}{2}\mathbf{a} t^2`. Writing
+:math:`\mathbf{r}_0 = \mathbf{x}_0 - \mathbf{x}_\text{atom}`, the crossing condition
+:math:`|\mathbf{x}(t) - \mathbf{x}_\text{atom}|^2 = r_\text{ion}^2` is the quartic
+
+.. math::
+    \tfrac{1}{4}|\mathbf{a}|^2\, t^4
+    + (\mathbf{v}\cdot\mathbf{a})\, t^3
+    + \left(|\mathbf{v}|^2 + \mathbf{r}_0\cdot\mathbf{a}\right) t^2
+    + 2(\mathbf{r}_0\cdot\mathbf{v})\, t
+    + \left(|\mathbf{r}_0|^2 - r_\text{ion}^2\right) = 0\, ,
+
+solved for its roots by ``SolvePolynomial`` in **mod_polynomialroots.F90**. If the electron already
+starts inside the radius the event fires immediately; otherwise the earliest real root
+:math:`t \in (0, \Delta t]` is the crossing time. The energy split and the angular distributions of the
+two outgoing electrons are the same as in the continuous model. On ionization the atom is removed and
+replaced by an ion at the atom's position, and the ejected electron is created nearby, so that charge
+and particle number are accounted for exactly.
+
+Recombination
+~~~~~~~~~~~~~
+*Model by Arnar Jónsson* (``Do_Discrete_Recombination_ots`` / ``_tts``).
+
+Recombination is the reverse process: a free electron is captured by an ion. It uses the same geometric
+crossing test as discrete ionization, but with a capture radius :math:`r_\text{rec}` derived from the
+Kramers radiative-recombination cross section :cite:p:`kramers1923`
+(``Calculate_Kramers_Cross_Section``),
+
+.. math::
+    \sigma_\text{rec}(E) = 2.105\times 10^{-26}\,
+    \frac{\text{Ry}^2\, Z_\text{eff}^4}
+         {N_n E\left(N_n^2 E + \text{Ry}\, Z_\text{eff}^2\right)}\, ,
+
+where :math:`\text{Ry}` is the Rydberg energy, :math:`N_n = 2` the principal quantum number of nitrogen
+and :math:`Z_\text{eff}` an effective charge fixed from the binding energy. Because this cross section
+diverges as :math:`1/E` at low energy, the energy used to evaluate it is floored at the thermal energy
+:math:`k_B T` of the gas, which caps the capture radius for slow electrons.
+
+For every ion–electron pair the electron's trajectory over the step is tested against :math:`r_\text{rec}`
+with the same quartic as above. When an electron crosses within the capture radius, the ion and the
+electron are both removed. In mode 4 (where the gas is made of explicit atoms) a neutral atom is put
+back at the ion's position, so the discrete gas is conserved over an ionize–recombine cycle; in mode 2
+(continuous ionization) no atom is returned. Ions are also removed when they reach the end of their
+lifetime :ref:`ION_LIFE_TIME <run>`.
+
+.. _collision-angles:
+
+Scattering angles
+~~~~~~~~~~~~~~~~~~
+Both outgoing electrons of an ionizing collision are given a direction relative to the incident
+electron's velocity, drawn by acceptance–rejection from a folded normal distribution
+:cite:p:`leone1961folded` of the scattering angle :math:`\theta \in [0^\circ, 180^\circ]`,
+
+.. math::
+    f(\theta) = \sqrt{\frac{2}{\pi \sigma^2}}\,
+    \exp\!\left(-\frac{\mu^2 + \theta^2}{2\sigma^2}\right) \cosh\!\left(\frac{\mu\theta}{\sigma^2}\right)\, ,
+
+with the envelope constant taken as the true maximum of :math:`f` over the angular domain
+(``folded_normal_max``) so the acceptance ratio never exceeds one.
+
+* The **scattered** (incident) electron uses a distribution peaked near the forward direction,
+  :math:`\mu = 5^\circ`, :math:`\sigma = 25^\circ` (``Get_Injected_Vec``).
+* The **ejected** electron uses an energy-dependent peak angle
+  :math:`\theta_\text{max}(T) = a\, T^{b} + c` with :math:`a = -430.5`, :math:`b = -0.5445`,
+  :math:`c = 89.32` (clamped for :math:`T < 100` eV) and :math:`\sigma = 48^\circ`
+  (``Get_Ejected_Vec``). This form follows the doubly differential cross-section measurements for
+  electrons scattered by nitrogen of Nogueira, Eschiapati Ferreira and Barbieri.
+
 .. _photo:
 
 Photo emission
