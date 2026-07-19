@@ -283,6 +283,9 @@ contains
     call Test_TTS_Equivalence()
 
     print *, ''
+    call Test_TTS_Staggered()
+
+    print *, ''
     call Test_Transit_Time()
 
     !call Test_Many_Particles()
@@ -1543,6 +1546,150 @@ contains
     print *, 'Two-time-step equivalence test finished'
     print *, ''
   end subroutine Test_TTS_Equivalence
+
+  !-----------------------------------------------------------------------------
+  ! The two-time-step integrator with atom_time_interval > 1 -- the staggered
+  ! cadence that Test_TTS_Equivalence (atom_time_interval = 1) cannot see.
+  !
+  ! Between two ion steps the electron->ion force must reach the ion as one
+  ! velocity impulse a*dt per electron step (the impulse multiple-time-step
+  ! method), the ion Beeman acceleration arrays must hold only the slow
+  ! ion-ion + vacuum field forces, and the ion Shockley-Ramo current must be
+  ! recorded on every step. The first step of the staggered run checks each
+  ! of those properties against values computed here from the same formulas.
+  !
+  ! The staggered run (atom_time_interval = 4) is then integrated over the
+  ! same physical time as an atom_time_interval = 1 reference (which
+  ! Test_TTS_Equivalence pins to the standard integrator) and the ion
+  ! trajectory and time-summed ion Ramo current are compared. The bugs this
+  ! test was written against showed up here as a factor ~atom_time_interval
+  ! error in both: the accumulated electron->ion samples entered the ion
+  ! Beeman update ~n times too strongly, and the ion Ramo current was only
+  ! recorded on every n-th step.
+  subroutine Test_TTS_Staggered()
+    double precision, parameter :: d_test = 1000.0d0*length_scale
+    double precision, parameter :: V_test = 200.0d0 ! V
+    double precision, parameter :: delta_t_test = 0.25d-15 ! Time step
+    integer, parameter          :: n_int = 4  ! atom_time_interval of the staggered run
+    integer, parameter          :: n_steps = 80 ! Multiple of n_int: both runs end on an ion step
+
+    double precision, dimension(1:3) :: R_e, R_i, V_e, V_i
+    double precision, dimension(1:3) :: v_before, v_expect, a_seed, diff, force_c, E_zu
+    double precision, dimension(1:3) :: pos_ref_i, vel_ref_i, pos_ref_e, vel_ref_e
+    double precision                 :: r, inv_r3, pre_fac_c, ramo_expect, ramo_ion_sum, ramo_ion_sum_ref
+    integer                          :: i, run, idx_e, idx_i
+
+    print *, 'Starting two-time-step staggered cadence test'
+
+    ! One electron and one ion a few nm apart: the electron->ion pair force
+    ! is the only source of ion x/y velocity, so those components measure the
+    ! fast-force treatment directly. The ion starts with v_z = 1 km/s so the
+    ! per-step ion Ramo current is well above the absolute tolerance.
+    R_e = (/  1.0d0, -2.0d0, 500.0d0 /) * length_scale
+    R_i = (/ -2.0d0,  2.0d0, 506.0d0 /) * length_scale
+    V_e = (/  1.0d3,  0.0d0, 0.0d0 /)
+    V_i = (/  0.0d0,  0.0d0, 1.0d3 /)
+
+    do run = 1, 2
+      ! Image charge off: the expected impulse below is then the bare
+      ! Coulomb force, written out with the same formulas the pair loop uses
+      call Setup_Test_System(d_test, delta_t_test, n_steps, V_test, .false., 0)
+
+      ptr_field_E => field_E_planar
+      ptr_Image_Charge_effect => Force_Image_charges_v2
+      ptr_Check_Boundary => Check_Boundary_Planar
+      ptr_E_zunit => E_zunit_planar
+
+      two_time_step = .true.
+      if (run == 1) then
+        atom_time_interval = 1     ! Reference: every step is an ion step
+      else
+        atom_time_interval = n_int ! Staggered cadence
+      end if
+
+      call Add_Particle(R_e, V_e, species_elec, 1, 1, -1)
+      call Add_Particle(R_i, V_i, species_ion, 1, 1, -1)
+      idx_e = particles_elec_pointer(1)
+      idx_i = particles_ion_pointer(1)
+
+      ! Vacuum-field Beeman seed of the ion (see Add_Particle)
+      a_seed = particles_cur_accel(:, idx_i)
+      v_before = particles_cur_vel(:, idx_i)
+
+      ramo_ion_sum = 0.0d0
+      do i = 1, n_steps
+        call Update_Position(i)
+        ramo_ion_sum = ramo_ion_sum + ramo_current(species_ion)
+
+        if ((run == 2) .and. (i == 1)) then
+          ! Step 1 is not an ion step (mod(1, 4) /= 0). The ion must not
+          ! have moved ...
+          call Assert_Close_Vec(particles_cur_pos(:, idx_i)/length_scale, R_i/length_scale, &
+                              & 'TTS stagger: ion position frozen between ion steps')
+
+          ! ... its Beeman acceleration must still be the untouched vacuum
+          ! field seed (the fast force stays out of the slow-force arrays) ...
+          call Assert_Close_Vec(particles_cur_accel(:, idx_i), a_seed, &
+                              & 'TTS stagger: ion Beeman accel holds only slow forces')
+
+          ! ... its velocity must carry exactly one impulse a_fast*dt of the
+          ! electron->ion Coulomb force, evaluated at the post-step
+          ! positions like the pair loop in Update_Elec_Acceleration does ...
+          diff = particles_cur_pos(:, idx_e) - particles_cur_pos(:, idx_i)
+          r = sqrt( sum(diff**2) ) + length_scale**2
+          inv_r3 = 1.0d0 / (r*r*r)
+          pre_fac_c = particles_charge(idx_e) * div_fac_c * particles_charge(idx_i)
+          force_c = (pre_fac_c*inv_r3) * diff ! Force on the electron; the ion gets -force_c
+          v_expect = v_before - force_c/particles_mass(idx_i)*time_step
+          call Assert_Close_Vec(particles_cur_vel(:, idx_i), v_expect, &
+                              & 'TTS stagger: e->ion impulse on the ion velocity')
+
+          ! ... and its Ramo current must be recorded although no ion Beeman
+          ! step ran on this step. Scaled to pA so that the relative
+          ! tolerance in Assert_Close applies.
+          E_zu = E_zunit_planar(particles_cur_pos(:, idx_i))
+          ramo_expect = particles_charge(idx_i) * dot_product(particles_cur_vel(:, idx_i), E_zu)
+          call Assert_Close(ramo_current(species_ion)*1.0d12, ramo_expect*1.0d12, &
+                          & 'TTS stagger: ion Ramo current between ion steps')
+        end if
+      end do
+
+      if (run == 1) then
+        pos_ref_i = particles_cur_pos(:, idx_i)
+        vel_ref_i = particles_cur_vel(:, idx_i)
+        pos_ref_e = particles_cur_pos(:, idx_e)
+        vel_ref_e = particles_cur_vel(:, idx_e)
+        ramo_ion_sum_ref = ramo_ion_sum
+      else
+        ! The staggered run must reproduce the reference over the same
+        ! physical time. The comparison is physical, not bitwise: the
+        ! impulse treatment of the fast force differs from the reference
+        ! Beeman weighting by an O(dt) boundary (half-step phase) term.
+        ! Measured deviation with these parameters: 1.1% on the pure
+        ! fast-force ion velocity components (x, y), deterministic, vs the
+        ! 2% assert tolerance -- while the factor ~atom_time_interval
+        ! errors this test guards against are far outside it. If this
+        ! assert ever trips after a parameter change, check the deviation
+        ! before loosening anything: it scales like 0.5/n_steps.
+        call Assert_Close_Vec(particles_cur_vel(:, idx_i), vel_ref_i, &
+                            & 'TTS stagger: ion velocity matches interval-1 reference')
+        call Assert_Close_Vec(particles_cur_pos(:, idx_i)/length_scale, pos_ref_i/length_scale, &
+                            & 'TTS stagger: ion position matches interval-1 reference')
+        call Assert_Close_Vec(particles_cur_vel(:, idx_e), vel_ref_e, &
+                            & 'TTS stagger: electron velocity matches interval-1 reference')
+        call Assert_Close_Vec(particles_cur_pos(:, idx_e)/length_scale, pos_ref_e/length_scale, &
+                            & 'TTS stagger: electron position matches interval-1 reference')
+        call Assert_Close(ramo_ion_sum*1.0d12, ramo_ion_sum_ref*1.0d12, &
+                        & 'TTS stagger: time-summed ion Ramo current matches reference')
+      end if
+    end do
+
+    two_time_step = .false.
+    atom_time_interval = 0
+
+    print *, 'Two-time-step staggered cadence test finished'
+    print *, ''
+  end subroutine Test_TTS_Staggered
 
   !-----------------------------------------------------------------------------
   ! Test the batched field evaluation for the planar geometry against the

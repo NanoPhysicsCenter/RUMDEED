@@ -31,6 +31,66 @@ After the force calculation the velocity is updated using:
 
 See the ``Update_Velocity`` subroutine.
 
+.. _twotimestep:
+
+Two-time-step integration (collision runs)
+------------------------------------------
+In collision runs (see :ref:`COLLISION_MODE <run>`) the system contains ions and a neutral background
+gas in addition to the electrons. The ions are more than four orders of magnitude heavier than the
+electrons and barely move during an electron time step, so integrating them with the electron
+:math:`\Delta t` wastes work. Setting :ref:`ATOM_TIME_INTERVAL <run>` to an integer :math:`n > 0`
+activates a two-time-step (multiple-time-step) scheme in **mod_verlet.F90**:
+
+* **Electrons** take a Beeman step of :math:`\Delta t` on every time step, exactly as in the
+  standard integrator. They feel the ions at their frozen positions.
+* **Ions** take a Beeman step of :math:`n \Delta t` on every :math:`n`-th time step
+  (``Update_Species_Position`` / ``Update_Species_Velocity`` with the step length scaled by
+  :math:`n`). Between those steps their positions are frozen.
+* **Atoms** are never advanced; they act as a static background for the collision sampling.
+
+The forces on an ion are split by time scale, following the impulse multiple-time-step method
+(the same idea as r-RESPA :cite:p:`doi:10.1063/1.463137`). The *slow* forces --- ion--ion pairs,
+their image charges and the vacuum field --- are evaluated once per ion step
+(``Update_Ion_Acceleration``) and integrated with the Beeman formulas above with
+:math:`\Delta t \rightarrow n\Delta t`. The *fast* electron--ion pair forces change on the electron
+time scale, so they are not accumulated into the Beeman acceleration history. Instead each electron
+step applies them to the ion velocity directly as an impulse,
+
+.. math::
+    \mathbf{v}_\text{ion} \leftarrow \mathbf{v}_\text{ion} + \mathbf{a}_\text{fast}(t_k)\,\Delta t ,
+
+(see the fold at the end of ``Update_Elec_Acceleration``). Over one ion window the impulses sum to
+:math:`\sum_k \mathbf{a}_\text{fast}(t_k)\Delta t \approx \int \mathbf{a}_\text{fast}\,dt`, so the
+momentum transferred from the electron cloud to the ion is captured at full time resolution while
+the expensive ion--ion loop only runs every :math:`n`-th step. Accumulating the fast samples into
+the Beeman acceleration instead would weight them :math:`n` times too strongly, since the ion update
+treats that array as a single acceleration and scales it by :math:`n\Delta t` (this was a bug in
+older versions, fixed July 2026; see below).
+
+Details worth knowing:
+
+* **Newly created ions.** An ion created by ionization between two ion steps has only existed for
+  part of the window, so its first update caps the step length at
+  :math:`\min(n,\, \text{step} - \text{birth step} + 1)` steps.
+* **Ramo current.** The induced (Shockley--Ramo) current :math:`q\,\mathbf{v}\cdot\hat{\mathbf{E}}`
+  of an ion is recorded on *every* time step --- on the ion steps by the Beeman velocity update and
+  in between by ``Update_Ion_Ramo_Current`` --- so the current written to **ramo_current.dt**
+  integrates to the transported ion charge. The same holds for the ion velocity averages in that
+  file. Output produced before the July 2026 fixes under-reports the ion current and the
+  between-step ion velocity averages by a factor of :math:`n`.
+* **Equivalence at** :math:`n = 1`. With ``ATOM_TIME_INTERVAL = 1`` every step is an ion step and
+  the single fast-force sample is exactly the Beeman acceleration, so the two-time-step integrator
+  reproduces the standard one bitwise. This contract is asserted by ``Test_TTS_Equivalence`` in
+  **mod_tests.F90**; the staggered cadence (:math:`n > 1`), the impulse treatment and the per-step
+  Ramo recording are asserted by ``Test_TTS_Staggered``.
+* **Accuracy.** The impulse channel carries an :math:`O(\Delta t)` half-step phase offset relative
+  to the Beeman weighting of the reference integrator (about :math:`0.5/N_\text{steps}` relative on
+  velocity after :math:`N_\text{steps}` steps), and the fast impulses gathered during a window only
+  affect the ion *drift* from the next window on, an :math:`O((n\Delta t)^2)` per-window effect.
+  Choose :math:`n` so that the ions move a negligible fraction of the inter-particle spacing per
+  window; the electron--ion forces themselves are sampled at full resolution regardless of
+  :math:`n`.
+
 .. _photo:
 
 Photo emission

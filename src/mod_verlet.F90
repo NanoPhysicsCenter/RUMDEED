@@ -235,7 +235,7 @@ contains
     ! Update the position of particles in the verlet integration
     integer, intent(in) :: step, species
     integer             :: nrFor, i, k
-    double precision    :: nrStep, nrStep2
+    double precision    :: nrStep, nrStep_i, nrStep2_i
 
     select case (species)
       case (species_elec)
@@ -248,11 +248,10 @@ contains
         nrFor = nrAtom
         nrStep = atom_time_interval
     end select
-    nrStep2 = nrStep**2
 
-    !$OMP PARALLEL DO PRIVATE(i) &
-    !$OMP& SHARED(nrFor, nrStep, nrStep2, particles_prev_pos, particles_cur_pos, particles_cur_vel, particles_cur_accel) &
-    !$OMP& SHARED(time_step, time_step2, particles_prev2_accel, particles_species, particles_prev_accel)
+    !$OMP PARALLEL DO PRIVATE(i, nrStep_i, nrStep2_i) &
+    !$OMP& SHARED(step, nrFor, nrStep, particles_prev_pos, particles_cur_pos, particles_cur_vel, particles_cur_accel) &
+    !$OMP& SHARED(time_step, time_step2, particles_prev2_accel, particles_species, particles_prev_accel, particles_step)
 
     do k = 1, nrFor
       select case (species)
@@ -263,7 +262,18 @@ contains
         case (species_atom)
           i = particles_atom_pointer(k)
       end select
-      
+
+      ! Cap the step length at the number of steps the particle has existed
+      ! for: an ion created between two ion steps (ionization) would
+      ! otherwise be advanced over the full atom_time_interval window on its
+      ! first ion step, overshooting its drift by the part of the window
+      ! that lies before its birth. particles_step holds the birth step; the
+      ! +1 is because a particle added at the start of step s already moves
+      ! during step s, which also keeps nrStep_i = nrStep exact for the
+      ! electrons and for atom_time_interval = 1 (see Test_TTS_Equivalence).
+      nrStep_i = min(nrStep, dble(step - particles_step(i) + 1))
+      nrStep2_i = nrStep_i**2
+
       ! if (particles_species(i) == species_elec) then
         ! Verlet
         !particles_prev_pos(:, i) = particles_cur_pos(:, i) ! Store the previous position
@@ -272,8 +282,8 @@ contains
 
         ! Beeman
         particles_prev_pos(:, i) = particles_cur_pos(:, i) ! Store the previous position
-        particles_cur_pos(:, i)  = particles_cur_pos(:, i) + particles_cur_vel(:, i)*time_step*nrStep &
-                              & + 1.0d0/6.0d0*( 4.0d0*particles_cur_accel(:, i) - particles_prev_accel(:, i) )*time_step2*nrStep2
+        particles_cur_pos(:, i)  = particles_cur_pos(:, i) + particles_cur_vel(:, i)*time_step*nrStep_i &
+                              & + 1.0d0/6.0d0*( 4.0d0*particles_cur_accel(:, i) - particles_prev_accel(:, i) )*time_step2*nrStep2_i
 
         particles_prev2_accel(:, i) = particles_prev_accel(:, i) ! Beeman
         particles_prev_accel(:, i) = particles_cur_accel(:, i)
@@ -406,6 +416,14 @@ contains
       ! Ion velocity is updated at every atom_time_interval time step
       if (mod(step,atom_time_interval) == 0) then
         call Update_Species_Velocity(step, species_ion)
+      else
+        ! The ions keep their velocity (plus the electron->ion impulses from
+        ! Update_Elec_Acceleration) on the steps between two ion steps, so
+        ! their Shockley-Ramo current must be recorded on every step:
+        ! ramo_current is reset and written out once per step, and only
+        ! recording the ions on the ion steps would undercount their
+        ! time-averaged current by a factor of atom_time_interval.
+        call Update_Ion_Ramo_Current()
       end if
       ! Atom velocity is currently not updated
     else
@@ -427,9 +445,12 @@ contains
   ! sums a second time on the time steps where the ions are updated as well.
   subroutine Average_Velocities()
 
-    ! Divide velocity sum by the number of particles to get the average
-    if (nrPart /= 0) then ! Check that we don't divide by zero
-      avg_part_vel(:) = avg_part_vel(:) / nrPart ! Take the average
+    ! Divide velocity sum by the number of particles to get the average.
+    ! The sum only contains the moving species (electrons and ions), so the
+    ! divisor must exclude the atoms: nrPart includes the background gas,
+    ! which would dilute the average in collision runs.
+    if ((nrElec + nrIon) /= 0) then ! Check that we don't divide by zero
+      avg_part_vel(:) = avg_part_vel(:) / (nrElec + nrIon) ! Take the average
     end if
     if (nrElec /= 0) then ! Check that we don't divide by zero
       avg_elec_vel(:) = avg_elec_vel(:) / nrElec ! Take the average
@@ -512,7 +533,7 @@ contains
     ! Update the velocity in the verlet integration
     integer, intent(in)              :: step, species
     integer                          :: i, k, s, nrFor, emit, sec
-    double precision                 :: q, EzV, nrStep
+    double precision                 :: q, EzV, nrStep, nrStep_i
     double precision, dimension(1:3) :: E_zu
 
     select case (species)
@@ -525,20 +546,27 @@ contains
     end select
 
     !$OMP PARALLEL DO DEFAULT(NONE) &
-    !$OMP& PRIVATE(i, k, s, q, emit, sec, E_zu, EzV) &
-    !$OMP& SHARED(species, nrStep, particles_cur_vel, particles_prev_accel, particles_cur_accel, time_step) &
+    !$OMP& PRIVATE(i, k, s, q, emit, sec, E_zu, EzV, nrStep_i) &
+    !$OMP& SHARED(step, species, nrStep, particles_cur_vel, particles_prev_accel, particles_cur_accel, time_step) &
     !$OMP& SHARED(ramo_current, ramo_current_emit, ptr_E_zunit, particles_section, particles_charge, particles_cur_pos) &
     !$OMP& SHARED(nrFor, particles_elec_pointer, particles_ion_pointer, particles_species, particles_emitter, particles_prev2_accel) &
+    !$OMP& SHARED(particles_step) &
     !$OMP& REDUCTION(+:avg_part_vel, avg_elec_vel, avg_ion_vel)
     do k = 1, nrFor
 
-      ! Get index for the main arrays	
+      ! Get index for the main arrays
       select case (species)
         case (species_elec)
           i = particles_elec_pointer(k)
         case (species_ion)
           i = particles_ion_pointer(k)
       end select
+
+      ! Cap the step length at the number of steps the particle has existed
+      ! for, exactly like Update_Species_Position does (see the comment
+      ! there): an ion created between two ion steps only integrates the
+      ! part of the window from its birth on.
+      nrStep_i = min(nrStep, dble(step - particles_step(i) + 1))
 
       ! Verlet
       !particles_cur_vel(:, i) = particles_cur_vel(:, i) &
@@ -548,8 +576,8 @@ contains
       !! Beeman
       particles_cur_vel(:, i) = particles_cur_vel(:, i) &
                             & + 1.0d0/6.0d0*( 2.0d0*particles_cur_accel(:, i) &
-                            & + 5.0d0*particles_prev_accel(:, i) & 
-                            & - particles_prev2_accel(:, i) )*time_step*nrStep
+                            & + 5.0d0*particles_prev_accel(:, i) &
+                            & - particles_prev2_accel(:, i) )*time_step*nrStep_i
 
       q = particles_charge(i)
       s = particles_species(i)
@@ -588,6 +616,59 @@ contains
     ! would divide the electron sums again when this routine is called a second
     ! time for the ions in the same time step.
   end subroutine Update_Species_Velocity
+
+  ! ----------------------------------------------------------------------------
+  ! Shockley-Ramo current of the ions on the steps between two ion steps
+  ! (two-time-step mode). The ions move with their current velocity on every
+  ! step -- their positions are just advanced in one lump on the ion steps --
+  ! so their instantaneous induced current q*(v . E_zunit) belongs in every
+  ! written time step. Update_Species_Velocity records it as part of the ion
+  ! Beeman update on the ion steps; this routine records it on the steps in
+  ! between, so each step holds exactly one ion contribution.
+  !
+  ! The ion velocity sums for the written averages (avg_ion_vel,
+  ! avg_part_vel) are accumulated here for the same reason: without them the
+  ! output would show a zero average ion velocity on every step between two
+  ! ion steps.
+  subroutine Update_Ion_Ramo_Current()
+    integer                          :: i, k, s, emit, sec
+    double precision                 :: q, EzV
+    double precision, dimension(1:3) :: E_zu
+
+    !$OMP PARALLEL DO DEFAULT(NONE) &
+    !$OMP& PRIVATE(i, k, s, q, emit, sec, E_zu, EzV) &
+    !$OMP& SHARED(nrIon, particles_ion_pointer, particles_charge, particles_species) &
+    !$OMP& SHARED(particles_emitter, particles_section, particles_cur_pos, particles_cur_vel) &
+    !$OMP& SHARED(ptr_E_zunit, ramo_current, ramo_current_emit) &
+    !$OMP& REDUCTION(+:avg_part_vel, avg_ion_vel)
+    do k = 1, nrIon
+      i = particles_ion_pointer(k)
+
+      q = particles_charge(i)
+      s = particles_species(i)
+      emit = particles_emitter(i)
+      sec  = particles_section(i)
+
+      ! Dot product the velocity with the electric field unit vector
+      E_zu = ptr_E_zunit(particles_cur_pos(:, i))
+      EzV = particles_cur_vel(1, i) * E_zu(1) &
+        & + particles_cur_vel(2, i) * E_zu(2) &
+        & + particles_cur_vel(3, i) * E_zu(3)
+
+      ! We use OMP ATOMIC here because the index s is not a loop index
+      !$OMP ATOMIC UPDATE
+      ramo_current(s) = ramo_current(s) + q * EzV
+
+      ! We use OMP ATOMIC here because the indexes sec and emit are not loop indexes
+      !$OMP ATOMIC UPDATE
+      ramo_current_emit(sec, emit) = ramo_current_emit(sec, emit) + q * EzV
+
+      ! Update velocity sum
+      avg_ion_vel(:)  = avg_ion_vel(:)  + particles_cur_vel(:, i)
+      avg_part_vel(:) = avg_part_vel(:) + particles_cur_vel(:, i)
+    end do
+    !$OMP END PARALLEL DO
+  end subroutine Update_Ion_Ramo_Current
 
   ! ----------------------------------------------------------------------------
   ! Acceleration
@@ -1040,8 +1121,36 @@ contains
     end do
     !$OMP END PARALLEL DO
 
-    ! Fold the summed pair forces into the acceleration array
-    particles_cur_accel(:, 1:nrPart) = particles_cur_accel(:, 1:nrPart) + accel_sum
+    ! Fold the summed pair forces into the particle arrays.
+    !
+    ! The electron->ion forces change on the electron time scale, so between
+    ! two ion steps they are applied to the ion velocities directly, one
+    ! impulse a_fast*time_step per electron step (the impulse multiple-time-
+    ! step method). Folding them into particles_cur_accel instead would pile
+    ! atom_time_interval samples into an array that the ion Beeman update
+    ! treats as ONE acceleration and scales by the ion time step
+    ! (atom_time_interval*time_step), weighting the electron forces
+    ! atom_time_interval times too strongly relative to the ion-ion and
+    ! vacuum field forces, which enter that array once per ion step
+    ! (Update_Ion_Acceleration). The ion Beeman arrays therefore hold only
+    ! the slow forces.
+    !
+    ! With atom_time_interval = 1 every step is an ion step and the single
+    ! sample IS the Beeman acceleration of the standard integrator, so it is
+    ! folded into particles_cur_accel and the two-time-step mode stays
+    ! exactly equivalent to the one-time-step mode (see Test_TTS_Equivalence;
+    ! Test_TTS_Staggered covers the impulse path).
+    if (atom_time_interval > 1) then
+      do i = 1, nrPart
+        if (particles_species(i) == species_ion) then
+          particles_cur_vel(:, i) = particles_cur_vel(:, i) + accel_sum(:, i)*time_step
+        else
+          particles_cur_accel(:, i) = particles_cur_accel(:, i) + accel_sum(:, i)
+        end if
+      end do
+    else
+      particles_cur_accel(:, 1:nrPart) = particles_cur_accel(:, 1:nrPart) + accel_sum
+    end if
   end subroutine Update_Elec_Acceleration
 
   subroutine Update_Ion_Acceleration()

@@ -144,9 +144,13 @@ T_TEMP
 P_ABS
     Pressure of the background gas as a fraction of normal pressure. The default is 1.
 ATOM_TIME_INTERVAL
-    If given a value larger than zero, neutral atoms are advanced on a coarser time step of ATOM_TIME_INTERVAL × TIME_STEP
-    (the two-time-step scheme used with collisions). Set it to 0 to advance all particles every time step. This parameter should
-    always be set explicitly when running with collisions, as it has no default value.
+    If given a value :math:`n` larger than zero, the two-time-step integrator is activated (see
+    :ref:`twotimestep`): the ions are advanced on a coarser time step of :math:`n` × TIME_STEP while
+    the electrons keep the full resolution and the electron–ion forces reach the ions as per-step
+    velocity impulses. Neutral atoms are never advanced. The default is 0, which advances all
+    charged particles every time step with the standard integrator. With :math:`n = 1` the
+    two-time-step integrator reproduces the standard one exactly. This parameter should be set
+    explicitly when running with collisions.
 
 .. rubric:: External circuit
 
