@@ -18,7 +18,7 @@ PROJECT_NAME=IC
 # makefile
 all: $(PROJECT_NAME).out
 
-$(PROJECT_NAME).out: main.o conicpr.o cons.o auxil.o cgamma.o
+$(PROJECT_NAME).out: main.o conicpr.o cons.o auxil.o bessel.o gammaCHI.o air.o cgamma.o
 		$(FCOMPILER) $(FFLAGS) main.o conicpr.o cons.o auxil.o bessel.o gammaCHI.o air.o cgamma.o \
 		-o $(PROJECT_NAME).out
 
