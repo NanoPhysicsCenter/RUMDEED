@@ -26,6 +26,9 @@ program Tip_IC
   USE, intrinsic :: ieee_arithmetic ! For ieee_is_nan
   implicit none
 
+  ! Note: epsilon_0, m_e, q_e and V_0 are not used in the calculation. The
+  ! output is the unnormalized image-charge density from ref. 1 (no physical
+  ! prefactor and no applied-field contribution), not SI units.
   double precision, parameter :: pi = 3.14159265358979324d0 ! Pi
   double precision, parameter :: epsilon_0 = 8.854187817d-12 ! Farads / meters
   double precision, parameter :: m_e = 9.10938291d-31 ! kg
@@ -37,6 +40,21 @@ program Tip_IC
   ! usable above x - 1 ~ 4.6e-4, so this sits inside the overlap for every tau
   ! reached by the integration.
   double precision, parameter :: x_series = 1.0d-3
+
+  ! Fixed tau-quadrature grid used by Calculate_Integral: composite Simpson's
+  ! rule with N_simp intervals on each unit segment [k-1, k], k = 1..tau_max.
+  ! The prefactor table below is precomputed on exactly this grid.
+  integer, parameter          :: N_simp  = 20
+  integer, parameter          :: tau_max = 100
+  double precision, parameter :: h_tau   = 1.0d0 / N_simp
+
+  ! Highest m in the H/S summations, see ref. 1
+  integer, parameter          :: m_max = 30
+
+  ! The part of H_m that depends only on (m, tau), tabulated on the tau grid:
+  ! Hm_pref(m, j) holds Calculate_Hm_prefactor(m, j*h_tau). Filled once by
+  ! Precompute_Hm_Prefactors, then read-only during the grid loop.
+  double complex, allocatable :: Hm_pref(:, :)
 
   double precision, parameter :: xi_c = 1.00d0
   !double precision, parameter :: eta_c = -0.95d0
@@ -99,10 +117,13 @@ program Tip_IC
   print *, 'eta_c = ', eta_c
   print *, 'phi_c = ', phi_c
   print * , 'or'
-  print *, 'x     = ', (a_foci*sqrt(xi_c**2-1.0d0)*sqrt(1.0d0-eta_c**2)*cos(phi_p)/length_scale), ' [nm]'
-  print *, 'y     = ', (a_foci*sqrt(xi_c**2-1.0d0)*sqrt(1.0d0-eta_c**2)*sin(phi_p)/length_scale), ' [nm]'
+  print *, 'x     = ', (a_foci*sqrt(xi_c**2-1.0d0)*sqrt(1.0d0-eta_c**2)*cos(phi_c)/length_scale), ' [nm]'
+  print *, 'y     = ', (a_foci*sqrt(xi_c**2-1.0d0)*sqrt(1.0d0-eta_c**2)*sin(phi_c)/length_scale), ' [nm]'
   print *, 'z     = ', (a_foci*xi_c*eta_c/length_scale), ' [nm]'
   print *, ''
+
+  print *, 'Precomputing H_m prefactors on the tau grid'
+  call Precompute_Hm_Prefactors()
 
   call Calculate_Charge_Density_xy_grid()
 contains
@@ -183,6 +204,7 @@ contains
     open(newunit=ud_graph, iostat=IFAIL, file='charge_graph.dt', status='REPLACE', action='WRITE')
     if (IFAIL /= 0) then
       print *, 'Failed to open file charge_graph.dt.'
+      error stop
     else
       print *, 'Created file charge_graph.dt'
     end if
@@ -228,30 +250,29 @@ contains
     double precision             :: a, b ! Integration interval
     double precision             :: p, h ! Integration point, interval size
     integer                      :: i, k ! Loop index
-    integer, parameter           :: N = 20 ! Number of intervals
     double complex               :: res ! Results of the integration of each part
     double complex               :: res_tot ! Total results of the integration
 
     res_tot = cmplx(0.0d0, 0.0d0, kind(0.0d0))
 
     ! We divide the integral into parts [0, 1], [1, 2], [2, 3], ..., [99, 100]
-    ! On each part we use Simpsons rule with N = 20 intervals
-    do k = 1, 100
+    ! On each part we use Simpsons rule with N_simp = 20 intervals
+    do k = 1, tau_max
 
       a = k - 1.0d0
       b = k
-      h = (b - a) / N
+      h = (b - a) / N_simp
 
       res = Calculate_Hsum(a, xi, phi) + Calculate_Hsum(b, xi, phi) ! End points
 
       ! Odd numbers
-      do i = 1, N, 2
+      do i = 1, N_simp, 2
         p = a + i*h
         res = res + 4.0d0*Calculate_Hsum(p, xi, phi)
       end do
 
       ! Even numbers
-      do i = 2, N-1, 2
+      do i = 2, N_simp-1, 2
         p = a + i*h
         res = res + 2.0d0*Calculate_Hsum(p, xi, phi)
       end do
@@ -273,9 +294,12 @@ contains
       res_tot = res_tot + res
 
       ! We stop if the magnitude of the last interval is less than 10^-9
-      ! of the total results
-      if ( (abs(res)/abs(res_tot)) < 1.0d-9 ) then
-        exit
+      ! of the total results. Guard against res_tot = 0 so FPE trapping
+      ! builds do not abort on the division.
+      if (abs(res_tot) > 0.0d0) then
+        if ( (abs(res)/abs(res_tot)) < 1.0d-9 ) then
+          exit
+        end if
       end if
     end do
 
@@ -288,7 +312,6 @@ contains
   !
   double complex function Calculate_Hsum(tau, xi, phi)
     double precision, intent(in)       :: tau, xi, phi
-    integer, parameter                 :: m_max = 30
     integer                            :: m ! The summation index, m <= 30
     integer                            :: m_cut ! Where to cut the summation
     double complex, dimension(0:m_max) :: H_array
@@ -313,19 +336,50 @@ contains
     Calculate_Hsum = sum(H_array(0:m_cut))
   end function Calculate_Hsum
 
-  double complex function Calculate_Hm(m, tau, xi, phi)
+  ! ----------------------------------------------------------------------------
+  ! Fills Hm_pref with Calculate_Hm_prefactor on the tau quadrature grid.
+  ! The prefactor depends only on (m, tau), so without this table it would be
+  ! recomputed identically for every point of the x-y grid.
+  subroutine Precompute_Hm_Prefactors()
+    integer          :: j, m
+    double precision :: tau
+
+    allocate(Hm_pref(0:m_max, 0:tau_max*N_simp))
+
+    !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(j, m, tau) SCHEDULE(GUIDED)
+    do j = 0, tau_max*N_simp
+      tau = j * h_tau
+      do m = 0, m_max
+        Hm_pref(m, j) = Calculate_Hm_prefactor(m, tau)
+      end do
+    end do
+    !$OMP END PARALLEL DO
+  end subroutine Precompute_Hm_Prefactors
+
+  ! ----------------------------------------------------------------------------
+  ! The part of H_m that depends only on (m, tau) and the fixed source/tip
+  ! geometry -- everything except cos(m*phi) and K_xi at the field point.
+  double complex function Calculate_Hm_prefactor(m, tau) result(pref)
     integer, intent(in)          :: m
-    double precision, intent(in) :: tau, xi, phi
+    double precision, intent(in) :: tau
 
-    double complex               :: Z_p, Z_m, fac_1
-
+    double complex               :: Z_p, Z_m
     double precision             :: fac_2
-    double precision             :: K_xic, K_xi
+    double precision             :: K_xic
     double precision             :: K_etac, K_metac
     double precision             :: K_eta1, K_meta1
     !double precision             :: K_eta2, K_meta2
 
-    integer                      :: ierr = 0
+    ! No initializer here: that would imply SAVE, and this routine runs inside
+    ! an OpenMP parallel region.
+    integer                      :: ierr
+
+    ! The tau*tanh(pi*tau) factor vanishes at tau = 0, and the conical function
+    ! library requires tau > 0 (see Calculate_Hsum).
+    if (tau <= 0.0d0) then
+      pref = cmplx(0.0d0, 0.0d0, kind(0.0d0))
+      return
+    end if
 
     !---------------------------------------------------------------------------
     ierr = 0
@@ -338,15 +392,11 @@ contains
       print *, ''
     end if
 
-    ierr = 0
-    CALL conicp_lim(xi, m, tau, K_xi, ierr)
-    if (ierr /= 0) then
-      print *, 'WARNING: ierr = ', ierr
-      print *, 'xi = ', xi
-      print *, 'm = ', m
-      print *, 'tau = ', tau
-      print *, 'K_xi = ', K_xi
-      print *, ''
+    ! With the charge on the axis (xi_c = 1) K_xic = 0 for every m >= 1, so
+    ! the whole term vanishes and the eta evaluations can be skipped.
+    if (K_xic == 0.0d0) then
+      pref = cmplx(0.0d0, 0.0d0, kind(0.0d0))
+      return
     end if
     !---------------------------------------------------------------------------
 
@@ -407,19 +457,69 @@ contains
     Z_m = CMPLX(0.5d0 - m, tau, kind(0.0d0))
     Z_p = CMPLX(0.5d0 + m, tau, kind(0.0d0))
 
-    fac_1 = cos(m*phi)*tau*tanh(pi*tau) * ( mygamma(Z_m) / mygamma(Z_p) ) * (K_xic * K_xi)
     !fac_2 = (K_metac * K_eta2 - K_etac * K_meta2) / (K_eta1 * K_meta2 - K_meta1 * K_eta2)
     fac_2 = (K_metac - K_etac) / (K_eta1 - K_meta1) ! We can factor out eta_2 if it is always zero
 
-    Calculate_Hm = (-1.0d0)**m**(2.0d0-delta_k(0, m))*fac_1 * fac_2
+    ! Note: ** is right-associative, so the (2 - delta_m0) factor must be
+    ! multiplied, not chained onto the exponent.
+    pref = ((-1.0d0)**m)*(2.0d0 - delta_k(0, m))*tau*tanh(pi*tau) &
+        & * ( mygamma(Z_m) / mygamma(Z_p) ) * K_xic * fac_2
+  end function Calculate_Hm_prefactor
+
+  ! ----------------------------------------------------------------------------
+  ! H_m at a field point: the tabulated (m, tau) prefactor times the
+  ! point-dependent factors cos(m*phi) and K_xi.
+  double complex function Calculate_Hm(m, tau, xi, phi)
+    integer, intent(in)          :: m
+    double precision, intent(in) :: tau, xi, phi
+
+    double complex               :: pref
+    double precision             :: K_xi
+    integer                      :: ierr, j
+
+    ! Use the tabulated prefactor when tau lies on the quadrature grid the
+    ! table was built for (a + i*h reproduces j*h_tau only up to rounding,
+    ! hence the tolerance); otherwise compute it directly.
+    pref = cmplx(0.0d0, 0.0d0, kind(0.0d0))
+    j = nint(tau / h_tau)
+    if (allocated(Hm_pref) .and. (j >= 0) .and. (j <= tau_max*N_simp)) then
+      if (abs(tau - j*h_tau) <= 1.0d-9) then
+        pref = Hm_pref(m, j)
+      else
+        pref = Calculate_Hm_prefactor(m, tau)
+      end if
+    else
+      pref = Calculate_Hm_prefactor(m, tau)
+    end if
+
+    ! A zero prefactor makes the whole term zero; skip the K_xi evaluation.
+    if (pref == cmplx(0.0d0, 0.0d0, kind(0.0d0))) then
+      Calculate_Hm = pref
+      return
+    end if
+
+    ierr = 0
+    CALL conicp_lim(xi, m, tau, K_xi, ierr)
+    if (ierr /= 0) then
+      print *, 'WARNING: ierr = ', ierr
+      print *, 'xi = ', xi
+      print *, 'm = ', m
+      print *, 'tau = ', tau
+      print *, 'K_xi = ', K_xi
+      print *, ''
+    end if
+
+    Calculate_Hm = pref * cos(m*phi) * K_xi
   end function Calculate_Hm
 
   ! ----------------------------------------------------------------------------
   ! Calculates the summation over S_m, see ref. 1, eq. 22.
   !
+  ! NOTE: Calculate_F / Calculate_Sm are currently unused (the charge-density
+  ! calculation only needs Calculate_Hsum). They are kept as the
+  ! potential-evaluation counterpart from ref. 1.
   double complex function Calculate_F(tau, eta, xi, phi)
     double precision, intent(in)       :: tau, eta, xi, phi
-    integer, parameter                 :: m_max = 30
     integer                            :: m ! The summation index, m <= 30
     integer                            :: m_cut ! Where to cut the summation
     double complex, dimension(0:m_max) :: S_array
@@ -457,7 +557,9 @@ contains
     double precision             :: K_eta1, K_meta1
     double precision             :: K_eta2, K_meta2
 
-    integer                      :: ierr = 0
+    ! No initializer here: that would imply SAVE, and this routine runs inside
+    ! an OpenMP parallel region.
+    integer                      :: ierr
 
     !---------------------------------------------------------------------------
     ierr = 0
