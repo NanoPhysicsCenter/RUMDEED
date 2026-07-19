@@ -574,4 +574,78 @@ The chains (``Metropolis_Hastings_cyl_tip_v2``, 55 jumps) target :math:`\ln(J\, 
 Because the current density concentrates almost entirely on the corner arc, which is a small fraction of the meridian, the chain starts in a section drawn with the probabilities that the surface integration computes from the per-section current integrals each time step, then uniform along that section's meridian — a starting point only, not a bias, since the chain converges to its target from any start.
 The original sampler ``Metropolis_Hastings_cyl_tip`` is kept for reference: it proposes steps in the local coordinates of each section and projects points that cross a boundary onto the neighboring section; those transition maps are not symmetric, the physical step sizes differ by large factors between the sections, and it targets :math:`|F|` without the area elements.
 
-.. index:: Verlet, Beeman, code, Fowler-Nordheim, Metropolis-Hastings
+.. _tip-ic:
+
+Image charge on the prolate spheroidal tip
+------------------------------------------
+The main code approximates the tip by a sphere when it computes the image charge interaction, as described at the end of :ref:`field-tip`.
+**Util/Tip-IC** is a standalone utility that instead computes the image charge on the prolate spheroidal tip itself, using the method of :cite:p:`peridier:4888`, and can be used to check how good the spherical approximation is.
+It is not part of the simulation; it is built separately with its own makefile in ``Util/Tip-IC/build`` and writes the induced surface charge density on a grid to ``charge_graph.dt``.
+
+The geometry is the same as in :ref:`field-tip`: the tip is the surface :math:`\eta = \eta_1` in prolate spheroidal coordinates, the anode is the plane :math:`\eta_2 = 0`, and a point charge sits at :math:`(\xi_c, \eta_c, \phi_c)`.
+The induced charge density is obtained from an integral over the separation constant :math:`\tau` of a sum over the azimuthal index :math:`m`,
+
+.. math::
+    \sigma(\xi, \phi) = \int_0^\infty \sum_{m=0}^{30} H_m(\tau, \xi, \phi) \, \mathrm{d}\tau\, ,
+
+Writing :math:`K^m_\tau(u) = P^m_{-\frac{1}{2}+i\tau}(u)` for the conical function, each term separates into a part that depends only on :math:`(m, \tau)` and the fixed source and tip geometry, and a part that depends on the field point,
+
+.. math::
+    H_m(\tau, \xi, \phi) = A_m(\tau)\, \cos(m\phi)\, K^m_\tau(\xi)\, ,
+
+with
+
+.. math::
+    A_m(\tau) = (-1)^m \left(2 - \delta_{0m}\right) \tau \tanh(\pi\tau)\,
+    \frac{\Gamma\!\left(\frac{1}{2} - m + i\tau\right)}{\Gamma\!\left(\frac{1}{2} + m + i\tau\right)}\,
+    K^m_\tau(\xi_c)\,
+    \frac{K^m_\tau(-\eta_c) - K^m_\tau(\eta_c)}{K^m_\tau(\eta_1) - K^m_\tau(-\eta_1)}\, ,
+
+where the last factor is the boundary term with :math:`\eta_2 = 0` factored out.
+Because :math:`A_m` does not depend on the field point and the :math:`\tau` quadrature points form a fixed grid, it is tabulated once by ``Precompute_Hm_Prefactors`` instead of being recomputed for every point of the output grid, with a fallback for off-grid :math:`\tau`.
+A zero prefactor also short-circuits the :math:`K^m_\tau(\xi)` evaluation, which is the common case on the axis.
+
+The :math:`\tau` integral is done with the composite Simpson rule on unit panels :math:`[0,1], [1,2], \ldots, [99,100]`, stopping when a panel contributes less than :math:`10^{-9}` of the running total.
+The upper limit of 100 is set by the conical function library.
+The conical functions themselves come from the ``Conical`` module of :cite:p:`DUNSTER2017193` and the complex Gamma function from :cite:p:`zhang1996computation`.
+
+``Calculate_F`` and ``Calculate_Sm``, which evaluate the corresponding sum over :math:`S_m` for the potential, are currently unused; the charge density needs only the :math:`H_m` sum.
+
+Changes made to the original program
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The program as first written returned NaN at every grid point. The following were corrected.
+
+* **Single precision truncation in the Gamma function.** ``mygamma`` assembled its result with ``CMPLX(GR, GI)`` and no ``kind=``, so the value was truncated to single precision. For :math:`\tau \approx 70` the magnitude :math:`\left| \Gamma\!\left(\frac{1}{2} \pm m + i\tau\right) \right| \sim e^{-\pi\tau/2} \sim 10^{-48}` is perfectly representable in double precision but underflows to zero in single. Numerator and denominator both became zero, so the ratio was :math:`0/0`, and the resulting NaN propagated through the whole integral. This was the source of the NaN.
+* **The** :math:`m = 0` **term was skipped.** The summation ran from :math:`m = 1`, although the :math:`\left(2 - \delta_{0m}\right)` factor is only meaningful when :math:`m = 0` is included. For a charge on the axis, where :math:`\xi_c = 1`, azimuthal symmetry means :math:`m = 0` is the *only* term that contributes, so the result was identically zero once the NaN was dealt with.
+* **The** :math:`\left(2 - \delta_{0m}\right)` **factor was lost to operator precedence.** It was written as ``(-1.0d0)**m**(2.0d0 - delta_k(0, m))``, and since ``**`` is right-associative in Fortran this parses as :math:`(-1)^{\left(m^{2-\delta_{0m}}\right)}`, which reduces to :math:`(-1)^m` and so halves every :math:`m \geq 1` term. It is also nonconforming for a negative real base with a real exponent. The on-axis charge masked it, since :math:`K^m_\tau(\xi_c) = 0` for :math:`m \geq 1` when :math:`\xi_c = 1`.
+* **The integrand was evaluated at** :math:`\tau = 0`. The first Simpson panel starts at :math:`\tau = 0`, but the conical function library requires :math:`\tau > 0`. Since :math:`H_m` carries an explicit :math:`\tau \tanh(\pi\tau)` factor the integrand vanishes there, and the limit is now taken directly instead of calling the library outside its domain.
+* **The conical function library has a gap just above** :math:`x = 1`. It returns ``ierr = 1`` for :math:`0 < x - 1 \lesssim 4.6 \times 10^{-4}`, and at :math:`x = 1` exactly it returns zero with ``ierr = 0``, a wrong value with no error flag. This matters because the source charge sits on the axis at :math:`\xi_c = 1` and field points near the axis fall inside the gap. It is covered by ``conicp_series``, described below.
+* **A race in the OpenMP grid loop.** ``ierr`` in ``Calculate_Hm`` and ``Calculate_Sm`` was declared with an initializer, which in Fortran implies ``SAVE``, so the variable was shared between threads; the ``ierr == 2`` path could then stop the run spuriously.
+* **Smaller fixes.** The electron-position printout read the uninitialized ``phi_p`` instead of ``phi_c``; the interval-convergence test is now guarded against a zero running total; a failed file open stops the program instead of writing to an undefined unit; and the makefile linked ``bessel.o``, ``gammaCHI.o`` and ``air.o`` without listing them as prerequisites, so a partial build could link stale objects.
+
+Conical functions near :math:`x = 1`
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+For :math:`x - 1 < 10^{-3}` the conical functions are evaluated by ``conicp_series`` rather than by the library, using the Gauss series
+
+.. math::
+    P^\mu_{-\frac{1}{2}+i\tau}(x) = \frac{C_\mu}{\Gamma(1+\mu)}
+    \left(\frac{x-1}{x+1}\right)^{\frac{\mu}{2}}
+    {}_2F_1\!\left(\tfrac{1}{2} - i\tau,\; \tfrac{1}{2} + i\tau;\; 1 + \mu;\; \tfrac{1-x}{2}\right)\, ,
+    \qquad
+    C_\mu = \prod_{k=0}^{\mu-1}\left[ \left(k + \tfrac{1}{2}\right)^2 + \tau^2 \right]\, .
+
+Both Pochhammer products are real, so this needs no complex arithmetic and contains nothing that can underflow the way the complex Gamma ratio does.
+With :math:`|1-x|/2 < 5\times10^{-4}` it converges in at most about 13 terms, and it reproduces the exact limit at :math:`x = 1` on its own: :math:`P^0 = 1` and :math:`P^\mu = 0` for :math:`\mu \geq 1`.
+
+The threshold :math:`x - 1 = 10^{-3}` sits inside the range where both the series and the library are reliable.
+Checked against a quadruple precision evaluation of the same series over the range in which it is used (:math:`10^{-8} \leq x - 1 \leq 10^{-3}`, :math:`0 \leq \mu \leq 30`, :math:`\tau \leq 100`), the series is accurate to :math:`3 \times 10^{-15}`, against about :math:`10^{-10}` for the library.
+The series is only used near :math:`x = 1` because it loses accuracy to cancellation once :math:`\tau^2 |1-x|` becomes large.
+
+Truncation of the :math:`m` summation
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Reference :cite:p:`peridier:4888` limits the sum to :math:`m \leq 30` and truncates it where the terms start to alternate in sign and grow exponentially.
+This is applied in ``Truncate_Sum``, which stops the sum when the magnitude of the terms rises on several consecutive steps --- fewer if the sign alternates as well --- and then keeps the terms up to the *smallest* one, where the truncation error of an asymptotic series is smallest.
+A sum that simply converges instead exits on a relative tolerance against the largest term.
+The earlier version compared successive differences, :math:`|T_{m-1} - T_m| > 10\,|T_{m-2} - T_{m-1}|`, which never looked at the signs, could be tripped by a single noisy term, and compared two vanishingly small differences once the sum had converged.
+
+.. index:: Verlet, Beeman, code, Fowler-Nordheim, Metropolis-Hastings, image charge, conical functions, prolate spheroidal
