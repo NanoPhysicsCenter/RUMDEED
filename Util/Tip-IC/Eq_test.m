@@ -1,7 +1,7 @@
 clear all
 close all
 
-%run('/home/kristor/physconst.m');
+%run('physconst.m');
 
 r_tip = 20E-10;
 eta_1 = 0.9;
