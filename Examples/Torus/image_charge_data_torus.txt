@@ -1,0 +1,1 @@
+../../data/Looped-CNT/image_charge_data_torus.txt

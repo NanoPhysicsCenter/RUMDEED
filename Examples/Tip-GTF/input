@@ -1,18 +1,18 @@
 &INPUT
   V_S = 1.00d3,                      ! Voltage over the gap in volts
-  BOX_DIM = 0.0d0, 0.0d0, 1000.0d0,  ! N/A for tip
+  BOX_DIM = 0.0d0, 0.0d0, 1000.0d0,  ! N/A for tip, the gap is d_tip + h_tip
   TIME_STEP = 0.25d-4,               ! Size of the time step in pico-seconds
-  STEPS = 50000,                     ! Number of time steps to do in the simulation
+  STEPS = 10000,                     ! Number of time steps to do in the simulation
   EMISSION_MODE = 3,                 ! 3 = Emission from a hyperboloid tip
   NREMIT = 1,                        ! Number of emitters in the system
   IMAGE_CHARGE = .True.,             ! True means use image charge effects
   N_IC_MAX = 1,                      ! N/A for tip
   COLLISION_MODE = 0,                ! 0 = Off, 1 = Continuous ionization, 2 = 1 + discrete recombination, 3 = Discrete ionization, 4 = 3 + discrete recombination
-  T_temp = 293.15d0,                 ! Temperature [K] of the ion gas, or of the cathode for GTF emission (EMITTERS_TYPE = 4)
+  T_temp = 1500.0d0,                 ! Temperature [K] of the cathode, used by the GTF emission model
   P_abs = 1.0d0,                     ! Pressure of the ion gas as a fraction of NTP pressure
 
   EMITTERS_DIM(1:3, 1) = 1000.0d0, 250.0d0, 500.0d0, ! Dimensions of the emitter, for the Tip this is d_tip, R_base, h_tip
   EMITTERS_POS(1:3, 1) = 0.0d0, 0.0d0, 0.0d0,        ! Ignored for tip
-  EMITTERS_TYPE(1) = 1,                              ! 1 = Field emission, 2 = Reversed voltage (not fully tested), 3 = Photo emission, 4 = Thermal-field (GTF) emission
+  EMITTERS_TYPE(1) = 4,                              ! 1 = Field emission, 2 = Reversed voltage, 3 = Photo emission, 4 = Thermal-field (GTF) emission
   EMITTERS_DELAY(1) = 0,                             ! Ignored for tip
 /

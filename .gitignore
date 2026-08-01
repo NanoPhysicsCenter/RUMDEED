@@ -10,6 +10,7 @@ __genmod.f90
 *.out
 *.code-workspace
 input
+!Examples/**/input
 run.sh
 .vscode/
 docs/build/
