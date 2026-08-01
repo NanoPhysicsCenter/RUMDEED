@@ -380,17 +380,13 @@ contains
 
         ! Nothing below the first dead index moves, so the compaction loops
         ! can start there. Each species pointer array has its own mask and
-        ! therefore its own first dead index; findloc returns 0 when a mask
-        ! has no dead entry (e.g. only ions were removed), in which case the
-        ! start is placed past the end so the loop does nothing.
-        k = findloc(particles_mask(1:nrPart), .false., dim=1)
-        if (k == 0) k = nrPart + 1
-        k_elec = findloc(particles_elec_mask(1:nrElec), .false., dim=1)
-        if (k_elec == 0) k_elec = nrElec + 1
-        k_ion = findloc(particles_ion_mask(1:nrIon), .false., dim=1)
-        if (k_ion == 0) k_ion = nrIon + 1
-        k_atom = findloc(particles_atom_mask(1:nrAtom), .false., dim=1)
-        if (k_atom == 0) k_atom = nrAtom + 1
+        ! therefore its own first dead index; First_Dead_Index returns one
+        ! past the end when a mask has no dead entry (e.g. only ions were
+        ! removed), in which case the loop does nothing.
+        k = First_Dead_Index(particles_mask, nrPart)
+        k_elec = First_Dead_Index(particles_elec_mask, nrElec)
+        k_ion = First_Dead_Index(particles_ion_mask, nrIon)
+        k_atom = First_Dead_Index(particles_atom_mask, nrAtom)
         m = nrPart
 
         !$OMP TASK FIRSTPRIVATE(k, m) SHARED(particles_cur_pos, particles_mask)
@@ -564,6 +560,26 @@ contains
     end if
 
   end subroutine Remove_Particles
+
+  ! ----------------------------------------------------------------------------
+  ! Index of the first .false. entry in mask(1:n), or n+1 if there is none.
+  ! This is findloc(mask(1:n), .false., dim=1) with the no-match value moved
+  ! from 0 to n+1, written out as a loop because the FINDLOC intrinsic is
+  ! unimplemented for logical arrays in the NVHPC 23.7 runtime (it aborts
+  ! with "FINDLOC: unimplemented for data type" at the first removal).
+  pure integer function First_Dead_Index(mask, n)
+    logical, dimension(:), intent(in) :: mask
+    integer,               intent(in) :: n
+    integer                           :: i
+
+    do i = 1, n
+      if (.not. mask(i)) then
+        First_Dead_Index = i
+        return
+      end if
+    end do
+    First_Dead_Index = n + 1
+  end function First_Dead_Index
 
   subroutine Update_Pointer_Arrays_sequential()
     integer :: i, k
