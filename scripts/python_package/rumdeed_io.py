@@ -12,8 +12,10 @@
 #                              (only written when write_ramo_sec = .true.)
 #   density_absorb_top.bin  -> Mark_Particles_Remove in src/mod_pair.F90
 #   density_absorb_bot.bin  -> Mark_Particles_Remove in src/mod_pair.F90
+#   density_emit.bin        -> Add_Particle in src/mod_pair.F90
+#                              (all emitted particles, includes section and species)
 #   density_emit_*.bin      -> Add_Particle in src/mod_pair.F90
-#                              (density_emit.bin itself is no longer written)
+#                              (one file per species, no section)
 #   planes-N.bin            -> Check_Planes in src/mod_verlet.F90
 #   init.bin                -> Write_Initial_Variables in src/main.F90
 
@@ -54,13 +56,23 @@ DENSITY_ABSORB_BOT_DTYPE = np.dtype([('x', np.float64),
                                      ('sec', np.int32),
                                      ('id', np.int32)])
 
-# density_emit_elec.bin / density_emit_ion.bin / density_emit_atom.bin
-# (32 bytes per record), x, y, z in units of length_scale
+# density_emit.bin, every emitted particle (40 bytes per record)
+# x, y, z in units of length_scale; species: 1 = electron, 2 = ion, 3 = atom
 DENSITY_EMIT_DTYPE = np.dtype([('x', np.float64),
                                ('y', np.float64),
                                ('z', np.float64),
                                ('emit', np.int32),
-                               ('id', np.int32)])
+                               ('sec', np.int32),
+                               ('id', np.int32),
+                               ('species', np.int32)])
+
+# density_emit_elec.bin / density_emit_ion.bin / density_emit_atom.bin
+# (32 bytes per record), x, y, z in units of length_scale
+DENSITY_EMIT_SPECIES_DTYPE = np.dtype([('x', np.float64),
+                                       ('y', np.float64),
+                                       ('z', np.float64),
+                                       ('emit', np.int32),
+                                       ('id', np.int32)])
 
 # ramo_current.dt columns, 11 fixed plus one ramo current per species
 # (nrSpecies = 3: electrons, ions, atoms)
@@ -92,8 +104,11 @@ def read_ramo_current(filename='out/ramo_current.dt'):
 
 
 # ----------------------------------------------------------------
-# Memory map a binary file of fixed size records and return a dataframe
+# Memory map a binary file of fixed size records and return a dataframe.
+# An empty file (e.g. no particles absorbed yet) gives an empty dataframe.
 def _read_records(filename, dtype):
+    if path.getsize(filename) == 0:
+        return pd.DataFrame(np.empty(0, dtype=dtype))
     data_mem = np.memmap(filename, dtype=dtype, mode='r', order='F')
     return pd.DataFrame.from_records(data=data_mem, columns=dtype.names)
 
@@ -108,9 +123,14 @@ def read_density_absorb_bot(filename='out/density_absorb_bot.bin'):
     return _read_records(filename, DENSITY_ABSORB_BOT_DTYPE)
 
 
-# Read one of the density_emit_elec/ion/atom.bin files
-def read_density_emit(filename='out/density_emit_elec.bin'):
+# Read density_emit.bin (all emitted particles with section and species)
+def read_density_emit(filename='out/density_emit.bin'):
     return _read_records(filename, DENSITY_EMIT_DTYPE)
+
+
+# Read one of the density_emit_elec/ion/atom.bin files
+def read_density_emit_species(filename='out/density_emit_elec.bin'):
+    return _read_records(filename, DENSITY_EMIT_SPECIES_DTYPE)
 
 
 # Read a planes-N.bin file (same record layout as density_absorb_top.bin)

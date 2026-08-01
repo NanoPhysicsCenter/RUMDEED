@@ -116,6 +116,12 @@ contains
         stop
       end if
 
+      ! Write out the position of every emitted particle along with which
+      ! emitter and section it came from, its id and species. Unlike the
+      ! per-species files above this one includes the section, which the
+      ! emission density plots use.
+      write(unit=ud_density_emit) par_pos(:)/length_scale, emit, sec, nrID, par_species
+
       ! Seed the Beeman acceleration history with the acceleration from the
       ! vacuum field at the emission point. Beeman is not self-starting: with
       ! a zeroed history the particle's first position update is field-free
