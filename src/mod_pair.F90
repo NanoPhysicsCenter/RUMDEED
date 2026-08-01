@@ -1084,7 +1084,7 @@ contains
       end if
 
       if (write_ion_data_file .eqv. .true.) then
-        write(filename, '(a9 i0, a3)') 'out/ions-', step, '.dt'
+        write(filename, '(a9, i0, a3)') 'out/ions-', step, '.dt'
 
         ! Open the output file
         open(newunit=ud_ion_data, iostat=IFAIL, file=filename, status='REPLACE', action='write')
