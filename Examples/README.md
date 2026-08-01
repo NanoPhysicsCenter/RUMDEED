@@ -22,6 +22,7 @@ cd Examples/Planar-FE/2.0eV
 | `Tip-FE` | 3 | Field emission from a hyperboloid tip (`EMITTERS_TYPE = 1`) | — |
 | `Tip-GTF` | 3 | Thermal-field (GTF) emission from a hyperboloid tip (`EMITTERS_TYPE = 4`) | — |
 | `Torus` | 12 | Field emission from a torus / looped CNT, field interpolated from mesh data | `Torus_mesh_data.txt`, `Torus_mesh_data_1V.txt`, `image_charge_data_torus.txt` (symlinks into `data/Looped-CNT/`) |
+| `GPU-Planar-FE` | 10 | Planar field emission on an NVIDIA GPU (OpenACC build, `MH_BATCH = .True.`) | `work` |
 
 ## The `work` file
 
@@ -41,6 +42,16 @@ function values in eV; a 1x1 grid gives a uniform work function. The tip
 neutral atoms in a cylinder of radius `EMITTERS_DIM(1,1)` at startup — at
 NTP density this exceeds `MAX_PARTICLES` for micron-sized systems, so lower
 `P_abs` accordingly.
+
+## Running on GPUs
+
+The N-body and emission-field kernels can be offloaded to NVIDIA GPUs with
+OpenACC: build with `make FC=nvfortran ACC=gpu` (add `GPU_CC=cc80` etc. when
+compiling on a machine without a visible GPU) and set `MH_BATCH = .True.`
+in mode-10 decks. The planar modes (1, 9, 10) and the hyperboloid tip
+(mode 3) run on the GPU; the cylindrical tip (11) and torus (12) fall back
+to the OpenMP CPU path automatically. See `GPU-Planar-FE/README.md` for
+details, including a Slurm job script example.
 
 ## Notes
 
