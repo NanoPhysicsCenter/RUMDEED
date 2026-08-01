@@ -4,9 +4,14 @@
 # Mod. Hákon Örn 05.06.2021
 
 import sys
+import os.path as path
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
+
+# The file layouts live in scripts/python_package/rumdeed_io.py
+sys.path.insert(0, path.join(path.dirname(path.abspath(__file__)), '..', 'python_package'))
+import rumdeed_io
 
 # Path to the position file, defaults to out/position.bin in the current directory.
 # Usage: python plot_pos.py [path/to/position.bin]
@@ -14,32 +19,11 @@ filename = sys.argv[1] if len(sys.argv) > 1 else "out/position.bin"
 
 with open(filename, 'rb') as f:
     # Header is two int32's: total number of time steps and the output interval N_steps
-    max_steps, N_steps = np.fromfile(file=f, count=2, dtype=np.int32)
+    max_steps, N_steps = rumdeed_io.read_position_header(f)
     print('max_steps')
     print(max_steps)
     print('N_steps')
     print(N_steps)
-
-
-    # for i in range(steps):
-    #     step, nrPart = np.fromfile(file=f, count=2, dtype=np.int32)
-    #     print(step)
-    #     print(nrPart)
-    #     for j in range(nrPart):
-    #         x, y, z = np.fromfile(file=f, count=3, dtype=np.float64)
-    #         emit = np.fromfile(file=f, count=1, dtype=np.int32)
-    #         print(x/1.0E-9)
-    #         print(y/1.0E-9)
-    #         print(z/1.0E-9)
-    #         print(emit)
-    #         print('')
-    #         plt.plot(x/1.0E-9, z/1.0E-9, 'r.')
-    #         plt.xlim([-200.0, 200.0])
-    #         plt.ylim([0.0, 1500.0])
-    #
-    #     plt.show()
-
-
 
     #------------------------------------------------------------
     # set up figure and animation
@@ -87,23 +71,12 @@ with open(filename, 'rb') as f:
 
     # Read in data for time step i
     def animate(i):
-        step, nrPart = np.fromfile(file=f, count=2, dtype=np.int32)
-
-        x = np.zeros(nrPart)
-        y = np.zeros(nrPart)
-        z = np.zeros(nrPart)
-        #r = np.zeros(nrPart)
-
-        for j in range(nrPart):
-            x[j], y[j], z[j] = np.fromfile(file=f, count=3, dtype=np.float64)
-            emit = np.fromfile(file=f, count=1, dtype=np.int32)
-            sec = np.fromfile(file=f, count=1, dtype=np.int32)
-            id = np.fromfile(file=f, count=1, dtype=np.int32)
+        step, particles = rumdeed_io.read_position_step(f)
 
         # Scale to nm
-        x = x / 1.0E-9
-        y = y / 1.0E-9
-        z = z / 1.0E-9
+        x = particles['x'] / 1.0E-9
+        y = particles['y'] / 1.0E-9
+        z = particles['z'] / 1.0E-9
 
         #r = np.sqrt(np.square(x) + np.square(y))
         particles1.set_data(x, y)

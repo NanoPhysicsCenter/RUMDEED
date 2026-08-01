@@ -5,6 +5,7 @@
 import numpy as np
 import pandas as pd
 import Vacuum
+import rumdeed_io
 import os.path as path
 import matplotlib.pyplot as plt
 from matplotlib.patches import Ellipse
@@ -12,23 +13,14 @@ from matplotlib.patches import Ellipse
 filepath = './'
 filename = path.join(filepath, 'density_absorb_top.bin')
 
-# Binary file layout
-# float64 (double precision numbers)
-# int32 (32bit integers)
-dt = np.dtype([('x', np.float64), ('y', np.float64), ('vx', np.float64), ('vy', np.float64), ('vz', np.float64), ('emit', np.int32), ('sec', np.int32), ('id', np.int32)])
-
-# Memory map the file
-# mode=r (Read only)
-# order=F (Fortran style array)
 emittance = np.array([])
 sigma_w = np.array([])
 sigma_wp = np.array([])
 theta_ell = np.array([])
 w_theta = np.array([0.00, 0.10, 0.20, 0.30, 0.40, 0.50])
-data_mem = np.memmap(filename, dtype=dt, mode='r', order='F')
 
 # Read the data into dataframe
-df = pd.DataFrame.from_records(data=data_mem, columns=data_mem.dtype.names)
+df = rumdeed_io.read_density_absorb_top(filename)
 
 df['v'] = np.sqrt(df['vx']**2 + df['vy']**2 + df['vz']**2)
 
@@ -53,10 +45,7 @@ print('Emittance in y-direction {:6.2f} nm-mrad'.format(e_y))
 
 # Read data for current
 filename_ramo = path.join(filepath, 'ramo_current.dt') # Ramo current
-df_cur = pd.read_csv(filepath_or_buffer=filename_ramo, index_col=1, sep=r'\s+', \
-                    header=None, names=['time', 'step', 'current', 'volt', 'nrPart', 'nrElec', 'nrIon', \
-                                        'avg_mob', 'avg_part_speed', 'avg_elec_speed', 'avg_ion_speed', \
-                                        'ramo_elec', 'ramo_ion', 'ramo_atom'])
+df_cur = rumdeed_io.read_ramo_current(filename_ramo)
         
 df_cur['cur_roll'] = df_cur['current'].rolling(1000).mean()
 cur = df_cur['cur_roll'].iloc[-1]
