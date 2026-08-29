@@ -538,12 +538,14 @@ contains
     if (image_charge .eqv. .true.) then
       l = l_const * (-1.0d0*F) / w_theta_xy(pos, emit)**2 ! l = y^2, y = 3.79E-4 * sqrt(F_old) / w_theta
       if (l > 1.0d0) then
-        print *, 'Error: l > 1.0'
-        print *, 'l = ', l, ', F = ', F
-        print *, 'x = ', pos(1)/length_scale, 'y = ', pos(2)/length_scale, ' z = ,', pos(3)/length_scale
+        ! Clamp exactly like v_y above and only count the clamp. This is called
+        ! for every sampled emitter point and l exceeds 1 routinely at high
+        ! fields (the approximation is simply out of range there), so the former
+        ! three print statements produced millions of lines of output and
+        ! dominated the run time.
+        !$OMP ATOMIC UPDATE
+        nrFN_l_clamped = nrFN_l_clamped + 1
         l = 1.0d0
-        !call Write_Current_Position()
-        !stop
       end if
 
       t_y = 1.0d0 + l*(1.0d0/9.0d0 - 1.0d0/18.0d0*log(l))

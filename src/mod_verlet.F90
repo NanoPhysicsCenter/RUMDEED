@@ -508,9 +508,20 @@ contains
       !$OMP ATOMIC UPDATE
       ramo_current(s) = ramo_current(s) + q * EzV
 
-      ! We use OMP ATOMIC here because the indexes sec and emit are not loop indexes
-      !$OMP ATOMIC UPDATE
-      ramo_current_emit(sec, emit) = ramo_current_emit(sec, emit) + q * EzV
+      ! Only particles that belong to a real emitter have a slot in
+      ! ramo_current_emit, which is allocated (1:MAX_SECTIONS, 1:MAX_EMITTERS).
+      ! Particles created by the collision module carry the pseudo emitter
+      ! indices ion_emitter and recom_emitter (2 and 3), which are outside that
+      ! range and used to write past the end of the array. Their induced
+      ! current is still recorded in the total ramo_current(s) above, so only
+      ! the per-emitter breakdown (out/ramo_current.bin) omits them, which is
+      ! what that file describes. Same guard as in Mark_Particles_Remove.
+      if ((emit >= 1) .and. (emit <= MAX_EMITTERS) .and. &
+          (sec >= 1) .and. (sec <= MAX_SECTIONS)) then
+        ! We use OMP ATOMIC here because the indexes sec and emit are not loop indexes
+        !$OMP ATOMIC UPDATE
+        ramo_current_emit(sec, emit) = ramo_current_emit(sec, emit) + q * EzV
+      end if
 
       ! avg_part_vel(:) = avg_part_vel(:) + particles_cur_vel(:, i) ! Calculate the sum for the average
 
@@ -594,9 +605,20 @@ contains
       !$OMP ATOMIC UPDATE
       ramo_current(s) = ramo_current(s) + q * EzV
 
-      ! We use OMP ATOMIC here because the indexes sec and emit are not loop indexes
-      !$OMP ATOMIC UPDATE
-      ramo_current_emit(sec, emit) = ramo_current_emit(sec, emit) + q * EzV
+      ! Only particles that belong to a real emitter have a slot in
+      ! ramo_current_emit, which is allocated (1:MAX_SECTIONS, 1:MAX_EMITTERS).
+      ! Particles created by the collision module carry the pseudo emitter
+      ! indices ion_emitter and recom_emitter (2 and 3), which are outside that
+      ! range and used to write past the end of the array. Their induced
+      ! current is still recorded in the total ramo_current(s) above, so only
+      ! the per-emitter breakdown (out/ramo_current.bin) omits them, which is
+      ! what that file describes. Same guard as in Mark_Particles_Remove.
+      if ((emit >= 1) .and. (emit <= MAX_EMITTERS) .and. &
+          (sec >= 1) .and. (sec <= MAX_SECTIONS)) then
+        ! We use OMP ATOMIC here because the indexes sec and emit are not loop indexes
+        !$OMP ATOMIC UPDATE
+        ramo_current_emit(sec, emit) = ramo_current_emit(sec, emit) + q * EzV
+      end if
 
       ! avg_part_vel(:) = avg_part_vel(:) + particles_cur_vel(:, i) ! Calculate the sum for the average
 
@@ -659,9 +681,20 @@ contains
       !$OMP ATOMIC UPDATE
       ramo_current(s) = ramo_current(s) + q * EzV
 
-      ! We use OMP ATOMIC here because the indexes sec and emit are not loop indexes
-      !$OMP ATOMIC UPDATE
-      ramo_current_emit(sec, emit) = ramo_current_emit(sec, emit) + q * EzV
+      ! Only particles that belong to a real emitter have a slot in
+      ! ramo_current_emit, which is allocated (1:MAX_SECTIONS, 1:MAX_EMITTERS).
+      ! Particles created by the collision module carry the pseudo emitter
+      ! indices ion_emitter and recom_emitter (2 and 3), which are outside that
+      ! range and used to write past the end of the array. Their induced
+      ! current is still recorded in the total ramo_current(s) above, so only
+      ! the per-emitter breakdown (out/ramo_current.bin) omits them, which is
+      ! what that file describes. Same guard as in Mark_Particles_Remove.
+      if ((emit >= 1) .and. (emit <= MAX_EMITTERS) .and. &
+          (sec >= 1) .and. (sec <= MAX_SECTIONS)) then
+        ! We use OMP ATOMIC here because the indexes sec and emit are not loop indexes
+        !$OMP ATOMIC UPDATE
+        ramo_current_emit(sec, emit) = ramo_current_emit(sec, emit) + q * EzV
+      end if
 
       ! Update velocity sum
       avg_ion_vel(:)  = avg_ion_vel(:)  + particles_cur_vel(:, i)

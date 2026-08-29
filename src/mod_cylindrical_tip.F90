@@ -1908,12 +1908,14 @@ subroutine Do_Surface_Integration(N_sup)
     if (image_charge .eqv. .true.) then
       l = l_const * (-1.0d0*F) / w_theta_pos_tip(pos)**2 ! l = y^2, y = 3.79E-4 * sqrt(F_old) / w_theta
       if (l > 1.0d0) then
-        print *, 'Error: l > 1.0'
-        print *, 'l = ', l, ', F = ', F, ', t_y = ', t_y
-        print *, 'x = ', pos(1)/length_scale, 'y = ', pos(2)/length_scale, ' z = ,', pos(3)/length_scale
+        ! Clamp exactly like v_y above and only count the clamp. This is called
+        ! for every sampled emitter point and l exceeds 1 routinely at high
+        ! fields, where the approximation is simply out of range. The former
+        ! print statements produced millions of lines of output and one of them
+        ! even read t_y before it was assigned.
+        !$OMP ATOMIC UPDATE
+        nrFN_l_clamped = nrFN_l_clamped + 1
         l = 1.0d0
-        !call Write_Current_Position()
-        !stop
       end if
 
       t_y = 1.0d0 + l*(1.0d0/9.0d0 - 1.0d0/18.0d0*log(l))

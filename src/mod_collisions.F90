@@ -2049,9 +2049,29 @@ subroutine Place_Atoms_Cylinder()
   double precision, dimension(1:3)  :: atom_pos, atom_vel
   integer                           :: nrStartAtoms, nrStartIons, i
 
+  ! Only the discrete modes need atoms in the particle arrays. The continuous
+  ! modes (1 and 2) sample a mean free path from n_d per step instead, so this
+  ! routine does nothing for them. The caller runs it for every collision_mode,
+  ! so without this test it counted a gas it never places.
+  !
+  ! Note: the gas volume is taken from emitter 1 only -- its x dimension is the
+  ! cylinder radius and its x,y position is the axis -- so a run with several
+  ! emitters, or with an emitter that is not the gas volume, places the gas
+  ! where emitter 1 is.
+  if ((collision_mode /= 3) .and. (collision_mode /= 4)) then
+    return
+  end if
+
   cylindR = emitters_dim(1, 1) ! Radius of the gas cylinder
   cylindR2 = cylindR**2 ! Radius of cylinder squared
-  
+
+  if (cylindR <= 0.0d0) then
+    print '(a)', 'RUMDEED: ERROR the gas cylinder radius is zero or negative'
+    print '(a, es12.4)', 'RUMDEED: EMITTERS_DIM(1,1) = ', emitters_dim(1, 1)
+    print '(a)', 'RUMDEED: With collisions on, that places no gas in the system'
+    error stop 1
+  end if
+
   ! Calculate number of atoms
   volume = pi*cylindR2*box_dim(3)
   nrStartAtoms = int(volume*n_d)
@@ -2060,8 +2080,22 @@ subroutine Place_Atoms_Cylinder()
   print *, 'Max particles = ', MAX_PARTICLES
   print *, 'Nr atoms = ', nrStartAtoms
   print *, 'Nr ions = ', nrStartIons
-  
-  if ((collision_mode == 3) .or. (collision_mode == 4)) then
+
+  ! The gas has to fit into the particle arrays. Add_Particle refuses everything
+  ! past MAX_PARTICLES, which used to leave the run silently with a lower gas
+  ! density than the pressure asks for, i.e. too few collisions. The comparison
+  ! is done on the real count, before the conversion to the 32 bit integer, so
+  ! that an overflowing count cannot sneak past the check.
+  if (volume*n_d > real(MAX_PARTICLES, kind=8)) then
+    print '(a, es14.5, a, i0)', 'RUMDEED: ERROR the gas needs ', volume*n_d, &
+          & ' particles but MAX_PARTICLES = ', MAX_PARTICLES
+    print '(a, es12.4)', 'RUMDEED: gas density n_d = ', n_d
+    print '(a, es12.4, a, es12.4, a)', 'RUMDEED: cylinder radius = ', cylindR/length_scale, &
+          & ' nm, gap = ', box_dim(3)/length_scale, ' nm'
+    print '(a)', 'RUMDEED: Increase MAX_PARTICLES in src/mod_global.F90, or lower the pressure'
+    error stop 1
+  end if
+
   !$OMP PARALLEL DO DEFAULT(NONE) &
   !$OMP& PRIVATE(i, rnd, atom_pos, atom_vel, R2) &
   !$OMP& SHARED(cylindR, cylindR2, nrStartAtoms, nrStartIons, box_dim, emitters_pos, emitters_dim, ion_life_time, collision_mode)
@@ -2095,7 +2129,6 @@ subroutine Place_Atoms_Cylinder()
     end if
   end do
   !$OMP END PARALLEL DO
-  end if
 end subroutine Place_Atoms_Cylinder
 
 ! --------------------------------------------------------------------------

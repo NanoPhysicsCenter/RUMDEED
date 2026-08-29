@@ -430,12 +430,32 @@ contains
 
       ! Scale x, y to unit square
       select case (emitters_Type(emit))
-        case (EMIT_RECTANGLE)
+        case (EMIT_RECTANGLE, EMIT_RECTANGLE_SPOTS)
+          ! The spot emitter is a rectangle as far as the emitter area goes, the
+          ! spots only change where the particles are sampled (mod_photo_emission)
           pos_scaled(1:2) = (pos(1:2) - emitters_pos(1:2, emit)) / emitters_dim(1:2, emit) ! Rectange
         case (EMIT_CIRCLE)
           pos_scaled(1:2) = (pos(1:2) - emitters_pos(1:2, emit)) / emitters_dim(1:2, emit) ! Circle
         case (EMIT_RING)
           pos_scaled(1:2) = (pos(1:2) - emitters_pos(1:2, emit)) / (2.0d0 * emitters_dim(1:2, emit))
+        case DEFAULT
+          ! This select used to have no default, so for any other emitter type
+          ! (including the 0 the emitter array holds when EMITTERS_TYPE is
+          ! missing from the input file) pos_scaled was left undefined, and both
+          ! the work function and the section index were computed from
+          ! indeterminate values -- floor() of a NaN also raises an invalid
+          ! number exception, which stops a run compiled with
+          ! -ffpe-trap=invalid. Fall back to the first section of the emitter
+          ! and count it; main.F90 reports the total at the end of the run. No
+          ! printing here: this function is evaluated inside print statements by
+          ! some callers, and gfortran rejects I/O on a unit that is busy.
+          !$OMP ATOMIC UPDATE
+          nrWork_emit_type_unknown = nrWork_emit_type_unknown + 1
+          w_theta_checkerboard = w_theta_arr(1, 1)
+          if (present(sec) .eqv. .true.) then
+            sec = 1
+          end if
+          return
       end select
       
       x = pos_scaled(1)

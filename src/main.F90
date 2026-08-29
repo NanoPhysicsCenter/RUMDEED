@@ -262,6 +262,27 @@ program RUMDEED
         & ' particles were dropped because MAX_PARTICLES was reached'
   end if
 
+  ! The diagnostics that fire per particle or per integrand evaluation are only
+  ! counted where they happen, so they are reported once here.
+  if (nrSection_clamped > 0) then
+    print '(a, i0, a)', 'RUMDEED: WARNING ', nrSection_clamped, &
+        & ' particles had their section index clamped to MAX_SECTIONS. Increase MAX_SECTIONS'
+  end if
+  if (nrEmit_index_invalid > 0) then
+    print '(a, i0, a)', 'RUMDEED: WARNING ', nrEmit_index_invalid, &
+        & ' absorbed electrons carried an emitter index outside 1:MAX_EMITTERS'
+  end if
+  if (nrFN_l_clamped > 0) then
+    print '(a, i0, a)', 'RUMDEED: NOTE ', nrFN_l_clamped, &
+        & ' Fowler-Nordheim image-charge corrections were clamped because l > 1 (y > 1),'
+    print '(a)', 'RUMDEED: i.e. the field is high enough that the barrier is below the Fermi level'
+  end if
+  if (nrWork_emit_type_unknown > 0) then
+    print '(a, i0, a)', 'RUMDEED: WARNING ', nrWork_emit_type_unknown, &
+        & ' work function lookups had an unknown emitter type and used the first section'
+    print '(a)', 'RUMDEED: Check EMITTERS_TYPE in the input file against the manual'
+  end if
+
   print '(a)', 'RUMDEED: Final clean up'
   call Clean_up()
   call date_and_time(VALUES=values)
@@ -297,6 +318,7 @@ contains
   ! A subroutine to read the input variable from the file 'input'
   subroutine Read_Input_Variables()
     integer :: ud_input, IFAIL, emit
+    character(len=256) :: iomsg
 
 
     !Open the file 'input' for reading and check for errors
@@ -333,10 +355,34 @@ contains
     ! emittersf_type: Type of emitter (Circle or square)
     ! emitters_delay: When the emitter should start emitting ()
     ! EMISSION_MODE: What emission to do (Photo/CL, Field emission, e.t.c)
-    read(ud_input, NML=input)
+    ! An unmatched or malformed namelist item must be reported with the name of
+    ! the offending variable, not as a bare Fortran run-time error. Every item
+    ! of the input namelist is optional, so a name that is not in the namelist
+    ! (a typo, or a keyword from an older version of the code) aborts the read
+    ! here with a message instead of taking down the run with a backtrace.
+    read(ud_input, NML=input, iostat=IFAIL, iomsg=iomsg)
+    if (IFAIL /= 0) then
+      print '(a)', 'RUMDEED: ERROR reading the input file'
+      print '(a, i0)', 'RUMDEED: iostat = ', IFAIL
+      print '(a, a)', 'RUMDEED: ', trim(iomsg)
+      print '(a)', 'RUMDEED: Check every keyword against the input file section of the manual'
+      close(unit=ud_input, iostat=IFAIL, status='keep')
+      ! A bad input file is a user error worth a non-zero exit status, so that
+      ! job scripts and job arrays notice it.
+      error stop 1
+    end if
 
     ! Close the 'input' file
     close(unit=ud_input, iostat=IFAIL, status='keep')
+
+    ! The emitter arrays above are allocated with MAX_EMITTERS, so nrEmit has
+    ! to be checked before it is used as an upper bound below.
+    if ((nrEmit < 1) .or. (nrEmit > MAX_EMITTERS)) then
+      print '(a, i0, a, i0)', 'RUMDEED: ERROR nrEmit = ', nrEmit, &
+            & ' is outside the range 1 to MAX_EMITTERS = ', MAX_EMITTERS
+      print '(a)', 'RUMDEED: Increase MAX_EMITTERS in src/mod_global.F90 and recompile'
+      error stop 1
+    end if
 
     ! planes_z and planes_ud are sized 1:planes_N_max, guard against overflow
     if (planes_N > planes_N_max) then
@@ -511,6 +557,10 @@ contains
     nrAtom_remove_ion = 0
 
     nrPart_dropped = 0
+    nrSection_clamped = 0
+    nrEmit_index_invalid = 0
+    nrFN_l_clamped = 0
+    nrWork_emit_type_unknown = 0
 
     ! ID starts with 0
     nrID = 0
@@ -528,10 +578,14 @@ contains
 
     call init_random_seed()
 
-    ! Register a subroutine to catch the SIGINT signal
-#if defined(__GNUC__)
+    ! Register a subroutine to catch the SIGINT signal and the slurm
+    ! preemption signal. SIGNAL() is a gfortran specific extension, so the hook
+    ! is guarded on __GFORTRAN__ rather than __GNUC__: the other compilers this
+    ! code is built with (nvfortran, and any clang based flang) define __GNUC__
+    ! on Linux but do not provide SIGNAL(), which would break the build.
+#if defined(__GFORTRAN__)
     IFAIL = SIGNAL(SIGINT, Signal_Handler) ! SIGINT is used by to stop the simulations by ctrl+c
-    IFAIL = SIGNAL(SIGUSR1, Signal_Handler) ! SIGUSR1=10 is used by slurm to stop the simulation
+    IFAIL = SIGNAL(SIGUSR1, Signal_Handler) ! SIGUSR1 is used by slurm to stop the simulation
 #endif
 
     ! Create folder for output files

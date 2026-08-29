@@ -47,8 +47,12 @@ contains
       if (present(opt_sec) .eqv. .true.) then
         if (opt_sec > MAX_SECTIONS) then
           sec = MAX_SECTIONS
-          print '(a)', 'RUMDEED: WARNING MAX_SECTIONS REACHED. INCREASE MAX_SECTIONS'
-          print *, opt_sec
+          ! Count the clamped sections and let main.F90 report the total once at
+          ! the end of the run. This is on the emission path and called per
+          ! particle, so printing here used to flood the output; the counter is
+          ! the same convention as the nrPart_dropped guard above.
+          !$OMP ATOMIC UPDATE
+          nrSection_clamped = nrSection_clamped + 1
         else
           sec = opt_sec
         end if
@@ -229,7 +233,13 @@ contains
             !$OMP ATOMIC UPDATE
             nrElec_remove_top_emit(emit) = nrElec_remove_top_emit(emit) + 1
           else
-            print *, 'RUMDEED: WARNING invalid emitter index in Mark_Particles_Remove ', emit
+            ! Electrons born out of an ionization or a recombination event carry
+            ! the pseudo emitter indices ion_emitter/recom_emitter, which are
+            ! outside the 1:MAX_EMITTERS range of the per-emitter counter. They
+            ! are only missing from that breakdown, so count them (this is a hot
+            ! loop) and report the total once at the end of the run.
+            !$OMP ATOMIC UPDATE
+            nrEmit_index_invalid = nrEmit_index_invalid + 1
           end if
 
           ! Write out the transverse position of the particle, its velocity and which emitter/section it came from.

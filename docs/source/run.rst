@@ -143,6 +143,10 @@ T_TEMP
     Temperature of the background gas in Kelvin. The default is 293.15 K.
 P_ABS
     Pressure of the background gas as a fraction of normal pressure. The default is 1.
+    With COLLISION_MODE 3 or 4 the gas is placed as one particle per atom, so it has to fit
+    within MAX_PARTICLES (set in **mod_global.F90**). If the pressure and the volume of the
+    emitter ask for more particles than that, the run stops at initialization and reports how
+    many particles the gas needs, instead of silently lowering the gas density.
 ATOM_TIME_INTERVAL
     If given a value :math:`n` larger than zero, the two-time-step integrator is activated (see
     :ref:`twotimestep`): the ions are advanced on a coarser time step of :math:`n` × TIME_STEP while

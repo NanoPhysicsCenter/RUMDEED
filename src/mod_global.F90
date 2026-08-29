@@ -256,6 +256,16 @@ module mod_global
   ! (nrPart at MAX_PARTICLES). Reported at the end of the run.
   integer :: nrPart_dropped
 
+  ! Counters for the diagnostics that fire on the hot paths (per particle or
+  ! per integrand evaluation). Printing them where they happen floods stdout --
+  ! the Fowler-Nordheim one produced 2.6 million messages (7.8 million lines) in
+  ! a 10 step run -- so they are
+  ! only counted here and reported once, at the end of the run, in main.F90.
+  integer(kind=8) :: nrSection_clamped    ! Section index clamped to MAX_SECTIONS by Add_Particle
+  integer(kind=8) :: nrEmit_index_invalid ! Emitter index outside 1:MAX_EMITTERS in Mark_Particles_Remove
+  integer(kind=8) :: nrFN_l_clamped       ! Fowler-Nordheim l > 1 clamped to 1 in t_y/v_y
+  integer(kind=8) :: nrWork_emit_type_unknown ! Work function asked for an unknown emitter type
+
   integer, dimension(:), allocatable :: nrElec_remove_top_emit
 
 
@@ -410,9 +420,23 @@ module mod_global
 
   !-----------------------------------------------------------------------------
   ! Other
-  logical            :: cought_stop_signal = .false. ! If true we stop the main loop
+  ! VOLATILE because it is written inside a signal handler and polled in the
+  ! main loop; without it an optimizing compiler may hoist the poll out of the
+  ! loop and the run would never stop on the signal.
+  logical, volatile  :: cought_stop_signal = .false. ! If true we stop the main loop
+
+  ! Signal numbers are an ABI property, not a compiler one. SIGINT is 2 on
+  ! every Linux ABI, but SIGUSR1 is 10 only on the asm-generic ABIs; the
+  ! alpha/arm64/mips/parisc/powerpc/sparc headers define it as 30, so a
+  ! hardcoded 10 means slurm's preemption signal is simply never caught on
+  ! those machines (aarch64 included). Unknown architectures keep the old
+  ! asm-generic value rather than failing the build.
   integer, parameter :: SIGINT = 2 ! Interrupt signal (Ctrl+C)
-  integer, parameter :: SIGUSR1 = 10 ! User signal 1 (Linux/x86), used by slurm to stop the simulation
+#if defined(__alpha__) || defined(__aarch64__) || defined(__mips__) || defined(__hppa__) || defined(__powerpc__) || defined(__sparc__)
+  integer, parameter :: SIGUSR1 = 30 ! User signal 1 (alpha/arm64/mips/pa-risc/ppc/sparc), used by slurm to stop the simulation
+#else
+  integer, parameter :: SIGUSR1 = 10 ! User signal 1 (asm-generic ABIs: x86/x86_64/arm/riscv/m68k/loongarch), used by slurm to stop the simulation
+#endif
   integer            :: nthreads ! Number of OpenMP threads
 
   ! Units tests
